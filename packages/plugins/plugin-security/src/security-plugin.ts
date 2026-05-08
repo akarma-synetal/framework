@@ -158,6 +158,19 @@ export class SecurityPlugin implements Plugin {
       const roles = opCtx.context?.roles ?? [];
       const explicitPermissionSets = opCtx.context?.permissions ?? [];
 
+      // [DIAG] log execution context for read ops on user objects
+      if (opCtx.operation === 'find' && !opCtx.object?.startsWith('sys_')) {
+        // eslint-disable-next-line no-console
+        console.error('[security:diag]', {
+          op: opCtx.operation,
+          object: opCtx.object,
+          userId: opCtx.context?.userId,
+          tenantId: opCtx.context?.tenantId,
+          roles: opCtx.context?.roles,
+          explicitPermissionSets: opCtx.context?.permissions,
+        });
+      }
+
       // Skip security checks if no roles AND no explicit permission sets
       // AND no userId (anonymous/unauthenticated). The auth middleware
       // should handle authentication separately.
