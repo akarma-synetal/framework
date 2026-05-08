@@ -146,9 +146,28 @@ export class DefaultProjectKernelFactory implements ProjectKernelFactory {
 
     if (!driver) {
       const credential = await this.fetchActiveCredential(projectId);
-      const authToken = credential
+      let authToken = credential
         ? await Promise.resolve(this.encryptor.decrypt(credential.secret_ciphertext))
         : '';
+      // Single-project / bootstrap fallback: when the project's database_url
+      // matches one of the well-known env vars and no credential row exists,
+      // pick the matching auth token from the environment. This lets
+      // operators deploy with just `OS_DATABASE_URL` + `OS_DATABASE_AUTH_TOKEN`
+      // (or the Vercel/Turso integration's `TURSO_DATABASE_URL` +
+      // `TURSO_AUTH_TOKEN`) without having to seed sys_project_credential.
+      if (!authToken && project.database_url) {
+        const envOsUrl = process.env.OS_DATABASE_URL?.trim();
+        const envTursoUrl = process.env.TURSO_DATABASE_URL?.trim();
+        if (envOsUrl && envOsUrl === project.database_url) {
+          authToken = process.env.OS_DATABASE_AUTH_TOKEN?.trim()
+            ?? process.env.TURSO_AUTH_TOKEN?.trim()
+            ?? '';
+        } else if (envTursoUrl && envTursoUrl === project.database_url) {
+          authToken = process.env.TURSO_AUTH_TOKEN?.trim()
+            ?? process.env.OS_DATABASE_AUTH_TOKEN?.trim()
+            ?? '';
+        }
+      }
       driver = await this.createDriver(project.database_driver, project.database_url, authToken);
     }
 

@@ -157,9 +157,13 @@ export async function createRuntimeStack(config?: RuntimeStackConfig): Promise<R
 
     // Project DB. This is the user's business-data DB. When `OS_DATABASE_URL`
     // is set, honour it (and infer the driver from its scheme unless
-    // `OS_DATABASE_DRIVER` overrides). Otherwise fall back to a local
-    // SQLite file beside `control.db`.
-    const envProjectDbUrl = process.env.OS_DATABASE_URL?.trim();
+    // `OS_DATABASE_DRIVER` overrides). On Vercel/Turso deployments the
+    // official Turso integration sets `TURSO_DATABASE_URL` +
+    // `TURSO_AUTH_TOKEN` — accept those as fallbacks so users don't have
+    // to duplicate the secret. Otherwise fall back to a local SQLite
+    // file beside `control.db`.
+    const envProjectDbUrl = process.env.OS_DATABASE_URL?.trim()
+        || process.env.TURSO_DATABASE_URL?.trim();
     const projectDbUrl = envProjectDbUrl || `file:${resolvePath(dataDir, `${projectId}.db`)}`;
     const projectDbDriver = (process.env.OS_DATABASE_DRIVER?.trim().toLowerCase())
         || inferDriverFromUrl(projectDbUrl)
