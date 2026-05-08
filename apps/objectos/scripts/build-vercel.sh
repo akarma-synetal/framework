@@ -21,7 +21,7 @@ echo "[build-vercel] Starting server build..."
 # 1. Build the project with turbo (from monorepo root)
 # This builds server, studio, and the account portal.
 cd ../..
-pnpm turbo run build --filter=@objectstack/objectos --filter=@objectstack/studio --filter=@objectstack/account
+pnpm turbo run build --filter=@objectstack/objectos --filter=@objectstack/studio --filter=@objectstack/account --filter=@objectstack/dashboard
 cd apps/objectos
 
 # 1b. Compile objectstack.config.ts → dist/objectstack.json (the metadata artifact).
@@ -66,6 +66,17 @@ if [ -d "../account/dist" ]; then
   echo "[build-vercel]   ✓ Copied account dist to public/_account/"
 else
   echo "[build-vercel]   ⚠ Account dist not found (skipped)"
+fi
+
+# 3c. Copy the dashboard SPA to public/_dashboard/ — same pattern as studio.
+# Dashboard is built with base: '/_dashboard/'.
+echo "[build-vercel] Copying dashboard dist to public/_dashboard/..."
+mkdir -p public/_dashboard
+if [ -d "../dashboard/dist" ]; then
+  cp -r ../dashboard/dist/. public/_dashboard/
+  echo "[build-vercel]   ✓ Copied dashboard dist to public/_dashboard/"
+else
+  echo "[build-vercel]   ⚠ Dashboard dist not found (skipped)"
 fi
 
 # 4. Install external dependencies in api/node_modules/ (no symlinks)
