@@ -192,6 +192,7 @@ export async function cloneTenantSeedData(
 
       const fields = fieldList(schema);
       const lookups = fields.filter(isLookupField);
+      const uniqueFields = fields.filter((f) => f.unique && !SKIP_COPY_FIELDS.has(f.name));
       const objectRemap: Record<string, string> = (remap[objectName] ??= {});
       let cloned = 0;
       for (const row of rows) {
@@ -202,6 +203,22 @@ export async function cloneTenantSeedData(
           if (f.type && SKIP_COPY_TYPES.has(f.type)) continue;
           if (row[f.name] === undefined) continue;
           data[f.name] = row[f.name];
+        }
+        // Disambiguate UNIQUE columns. Many seed schemas declare
+        // single-column unique indexes (e.g. `lead.email`) without
+        // tenant scoping — cloning the donor row verbatim would
+        // collide. Append a per-tenant suffix so each org gets its
+        // own copy.
+        const suffix = `+${targetOrgId.slice(-6)}`;
+        for (const uf of uniqueFields) {
+          const v = data[uf.name];
+          if (typeof v !== 'string' || !v) continue;
+          if (uf.type === 'email' && v.includes('@')) {
+            const [local, domain] = v.split('@');
+            data[uf.name] = `clone-${targetOrgId.slice(-6)}-${local}@${domain}`;
+          } else {
+            data[uf.name] = `${v}${suffix}`;
+          }
         }
         try {
           await ql.insert(objectName, data, { context: SYSTEM_CTX });

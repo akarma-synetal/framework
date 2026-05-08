@@ -14,9 +14,9 @@ import type { Hook, HookContext } from '@objectstack/spec/data';
 
 type ApiShape = {
   object: (n: string) => {
-    count: (q: { filter: Record<string, unknown> }) => Promise<number>;
-    findOne: (q: { filter: Record<string, unknown> }) => Promise<Record<string, unknown> | null>;
-    updateMany: (q: { filter: Record<string, unknown>; doc: Record<string, unknown> }) => Promise<unknown>;
+    count: (q: { where: Record<string, unknown> }) => Promise<number>;
+    findOne: (q: { where: Record<string, unknown> }) => Promise<Record<string, unknown> | null>;
+    updateMany: (q: { where: Record<string, unknown>; doc: Record<string, unknown> }) => Promise<unknown>;
   };
 };
 
@@ -37,7 +37,7 @@ const contactHook: Hook = {
       if (email && account) {
         input.email = email;
         const dup = await api.object('contact').findOne({
-          filter: { email, account },
+          where: { email, account },
         });
         const dupId = (dup as { id?: string } | null)?.id;
         const selfId = ctx.previous?.id ?? input.id;
@@ -63,7 +63,7 @@ const contactHook: Hook = {
       if (Object.keys(patch).length === 0) return;
       try {
         await api.object('opportunity').updateMany({
-          filter: { primary_contact: id },
+          where: { primary_contact: id },
           doc: patch,
         });
       } catch (err) {
@@ -76,13 +76,13 @@ const contactHook: Hook = {
       if (!id) return;
       const [openOpps, openQuotes, activeContracts] = await Promise.all([
         api.object('opportunity').count({
-          filter: { primary_contact: id, stage: { $nin: ['closed_won', 'closed_lost'] } },
+          where: { primary_contact: id, stage: { $nin: ['closed_won', 'closed_lost'] } },
         }),
         api.object('quote').count({
-          filter: { contact: id, status: { $nin: ['rejected', 'expired'] } },
+          where: { contact: id, status: { $nin: ['rejected', 'expired'] } },
         }),
         api.object('contract').count({
-          filter: { contact: id, status: 'activated' },
+          where: { contact: id, status: 'activated' },
         }),
       ]);
       const total = openOpps + openQuotes + activeContracts;
