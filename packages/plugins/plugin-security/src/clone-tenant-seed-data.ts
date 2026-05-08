@@ -55,6 +55,7 @@ interface FieldDescriptor {
   type?: string;
   reference?: string;
   multiple?: boolean;
+  unique?: boolean;
 }
 
 const SYSTEM_CTX = { isSystem: true };
@@ -66,6 +67,13 @@ const SKIP_COPY_FIELDS = new Set<string>([
   'organization_id',
 ]);
 
+// Computed / virtual / system-managed field types — these have no
+// physical column in the DB, so re-inserting them would fail with
+// "table X has no column named Y". `find()` returns them in the
+// projected row (formula evaluation, rollup summary, autonumber),
+// but they must NEVER be sent back to `insert()`.
+const SKIP_COPY_TYPES = new Set<string>(['formula', 'summary', 'autonumber']);
+
 function fieldList(schema: ServiceObject): FieldDescriptor[] {
   const fields: any = (schema as any)?.fields;
   if (!fields) return [];
@@ -75,6 +83,7 @@ function fieldList(schema: ServiceObject): FieldDescriptor[] {
       type: f?.type,
       reference: f?.reference,
       multiple: f?.multiple,
+      unique: f?.unique,
     }));
   }
   return Object.entries(fields as Record<string, any>).map(([name, f]) => ({
@@ -82,6 +91,7 @@ function fieldList(schema: ServiceObject): FieldDescriptor[] {
     type: f?.type,
     reference: f?.reference,
     multiple: f?.multiple,
+    unique: f?.unique,
   }));
 }
 
@@ -178,8 +188,6 @@ export async function cloneTenantSeedData(
         : Array.isArray(donorRows?.records)
           ? donorRows.records
           : [];
-      // eslint-disable-next-line no-console
-      (globalThis as any).console?.error?.('[clone:diag]', objectName, 'donor rows:', rows.length);
       if (rows.length === 0) continue;
 
       const fields = fieldList(schema);
@@ -191,6 +199,7 @@ export async function cloneTenantSeedData(
         const data: Record<string, unknown> = { id: newId, organization_id: targetOrgId };
         for (const f of fields) {
           if (SKIP_COPY_FIELDS.has(f.name)) continue;
+          if (f.type && SKIP_COPY_TYPES.has(f.type)) continue;
           if (row[f.name] === undefined) continue;
           data[f.name] = row[f.name];
         }
@@ -200,8 +209,6 @@ export async function cloneTenantSeedData(
           inserted.push({ object: objectName, newId, record: data, lookups });
           cloned++;
         } catch (e) {
-          // eslint-disable-next-line no-console
-          (globalThis as any).console?.error?.('[clone:diag]', objectName, 'insert failed:', (e as Error).message);
           logger?.warn?.('[security] cloneTenantSeedData: insert failed', {
             object: objectName,
             error: (e as Error).message,
