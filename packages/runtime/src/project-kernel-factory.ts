@@ -185,7 +185,13 @@ export class DefaultProjectKernelFactory implements ProjectKernelFactory {
       throw new Error(`[ProjectKernelFactory] Project not found: ${projectId}`);
     }
     if (!project.database_url || !project.database_driver) {
-      throw new Error(`[ProjectKernelFactory] Project ${projectId} missing database_url/database_driver`);
+      const status = (project as any).status ?? 'unknown';
+      const hint = status === 'provisioning' || status === 'pending'
+        ? ' (project is still provisioning — set OS_PROVISION_SYNC=1 on serverless deployments where background work cannot finish after the response)'
+        : status === 'failed'
+          ? ' (project provisioning previously failed — inspect sys_project.metadata.provisioningError and recreate the project)'
+          : '';
+      throw new Error(`[ProjectKernelFactory] Project ${projectId} missing database_url/database_driver — status='${status}'${hint}`);
     }
 
     if (!driver) {

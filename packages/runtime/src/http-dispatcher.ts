@@ -1958,12 +1958,33 @@ export class HttpDispatcher {
                         );
                     }
                 };
-                // Don't await — respond immediately with the provisioning row.
-                void runProvisioning();
+                // On serverless platforms (Vercel/AWS Lambda/Netlify) the
+                // function instance freezes the moment we send the response,
+                // so a fire-and-forget background task never gets to
+                // persist `database_url` — leaving every subsequent request
+                // to crash with "Project … missing database_url/database_driver".
+                // Auto-detect those environments and await the provisioning
+                // inline. Operators can also force this with
+                // `OS_PROVISION_SYNC=1` (or disable with `=0`).
+                const provisionSyncEnv = process.env.OS_PROVISION_SYNC;
+                const onServerless = !!(
+                    process.env.VERCEL
+                    || process.env.AWS_LAMBDA_FUNCTION_NAME
+                    || process.env.NETLIFY
+                    || process.env.CF_PAGES
+                );
+                const syncProvisioning = provisionSyncEnv === undefined
+                    ? onServerless
+                    : provisionSyncEnv !== '0' && provisionSyncEnv !== 'false';
+                if (syncProvisioning) {
+                    await runProvisioning();
+                } else {
+                    void runProvisioning();
+                }
 
                 const project = cleanProjectRow(await findOne(ENV, { id: projectId }));
                 const res = this.success({ project });
-                res.status = 202; // Accepted — provisioning continues async.
+                res.status = syncProvisioning ? 201 : 202;
                 return { handled: true, response: res };
             }
 

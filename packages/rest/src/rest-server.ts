@@ -41,6 +41,31 @@ function mapDataError(error: any, object?: string): { status: number; body: Reco
     }
     const raw = String(error?.message ?? error ?? '');
     const lower = raw.toLowerCase();
+
+    // ProjectKernelFactory: project missing database_url/driver — typically
+    // means provisioning is in flight or the project record was never
+    // fully provisioned. 503 (with Retry-After implied) is more accurate
+    // than the default 400/500: clients can poll until the project is
+    // active.
+    if (
+        raw.includes('[ProjectKernelFactory]') &&
+        (lower.includes('missing database_url') || lower.includes('not found'))
+    ) {
+        const isProvisioning = lower.includes("status='provisioning'") || lower.includes("status='pending'");
+        const isFailed = lower.includes("status='failed'");
+        return {
+            status: isProvisioning ? 503 : isFailed ? 502 : 404,
+            body: {
+                error: raw,
+                code: isProvisioning
+                    ? 'PROJECT_PROVISIONING'
+                    : isFailed
+                        ? 'PROJECT_PROVISIONING_FAILED'
+                        : 'PROJECT_NOT_FOUND',
+            },
+        };
+    }
+
     const looksLikeUnknownObject =
         lower.includes('no such table') ||
         lower.includes('relation') && lower.includes('does not exist') ||
@@ -60,6 +85,19 @@ function mapDataError(error: any, object?: string): { status: number; body: Reco
         };
     }
     return { status: 400, body: { error: raw || 'Bad request' } };
+}
+
+/**
+ * Whether a mapped data-error status represents an *expected* client/lifecycle
+ * outcome (and therefore shouldn't be logged as "[REST] Unhandled error").
+ *  - 403 PERMISSION_DENIED is a normal RBAC denial
+ *  - 404 unknown object / project not found is a normal client mistake
+ *  - 502/503 mean the underlying project is provisioning or failed; the
+ *    handler will emit the response and the operator can inspect
+ *    sys_project.metadata.provisioningError if needed.
+ */
+function isExpectedDataStatus(status: number): boolean {
+    return status === 403 || status === 404 || status === 502 || status === 503;
 }
 
 /**
@@ -999,8 +1037,8 @@ export class RestServer {
                         res.json(result);
                     } catch (error: any) {
                         const mapped = mapDataError(error, req.params?.object);
-                        if (mapped.status === 404) {
-                            res.status(404).json(mapped.body);
+                        if (mapped.status === 404 || mapped.status === 503 || mapped.status === 502) {
+                            res.status(mapped.status).json(mapped.body);
                         } else {
                             logError("[REST] Unhandled error:", error);
                             res.status(mapped.status).json(mapped.body);
@@ -1036,7 +1074,7 @@ export class RestServer {
                         res.json(result);
                     } catch (error: any) {
                         const mapped = mapDataError(error, req.params?.object);
-                        if (mapped.status !== 404 && mapped.status !== 403) logError("[REST] Unhandled error:", error);
+                        if (!isExpectedDataStatus(mapped.status)) logError("[REST] Unhandled error:", error);
                         res.status(mapped.status === 400 ? 404 : mapped.status).json(mapped.body);
                     }
                 },
@@ -1066,7 +1104,7 @@ export class RestServer {
                         res.status(201).json(result);
                     } catch (error: any) {
                         const mapped = mapDataError(error, req.params?.object);
-                        if (mapped.status !== 404 && mapped.status !== 403) logError("[REST] Unhandled error:", error);
+                        if (!isExpectedDataStatus(mapped.status)) logError("[REST] Unhandled error:", error);
                         res.status(mapped.status).json(mapped.body);
                     }
                 },
@@ -1097,7 +1135,7 @@ export class RestServer {
                         res.json(result);
                     } catch (error: any) {
                         const mapped = mapDataError(error, req.params?.object);
-                        if (mapped.status !== 404 && mapped.status !== 403) logError("[REST] Unhandled error:", error);
+                        if (!isExpectedDataStatus(mapped.status)) logError("[REST] Unhandled error:", error);
                         res.status(mapped.status).json(mapped.body);
                     }
                 },
@@ -1127,7 +1165,7 @@ export class RestServer {
                         res.json(result);
                     } catch (error: any) {
                         const mapped = mapDataError(error, req.params?.object);
-                        if (mapped.status !== 404 && mapped.status !== 403) logError("[REST] Unhandled error:", error);
+                        if (!isExpectedDataStatus(mapped.status)) logError("[REST] Unhandled error:", error);
                         res.status(mapped.status).json(mapped.body);
                     }
                 },
