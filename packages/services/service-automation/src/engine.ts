@@ -609,9 +609,12 @@ export class AutomationEngine implements IAutomationService {
      * Supports: comparisons (>, <, >=, <=, ==, !=, ===, !==),
      * boolean literals (true, false), and basic arithmetic.
      */
-    evaluateCondition(expression: string, variables: Map<string, unknown>): boolean {
+    evaluateCondition(expression: string | { dialect?: string; source?: string }, variables: Map<string, unknown>): boolean {
+        // M9.3 transition shim: accept the new Expression envelope. Real wiring
+        // to ExpressionEngine.evaluate ships in M9.5.
+        const exprStr = typeof expression === 'string' ? expression : (expression?.source ?? '');
         // Template replacement: {varName} → value
-        let resolved = expression;
+        let resolved = exprStr;
         for (const [key, value] of variables) {
             resolved = resolved.split(`{${key}}`).join(String(value));
         }

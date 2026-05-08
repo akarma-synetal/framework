@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Flow Node Types
@@ -145,7 +146,7 @@ export const FlowEdgeSchema = lazySchema(() => z.object({
   target: z.string().describe('Target Node ID'),
   
   /** Condition for this path (only for decision/branch nodes) */
-  condition: z.string().optional().describe('Expression returning boolean used for branching'),
+  condition: ExpressionInputSchema.optional().describe('Predicate (CEL) returning boolean used for branching.'),
   
   type: z.enum(['default', 'fault', 'conditional']).default('default')
     .describe('Connection type: default (normal flow), fault (error path), or conditional (expression-guarded)'),

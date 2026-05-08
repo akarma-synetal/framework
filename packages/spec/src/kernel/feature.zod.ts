@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { SnakeCaseIdentifierSchema } from '../shared/identifiers.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Feature Rollout Strategy
@@ -37,7 +38,7 @@ export const FeatureFlagSchema = lazySchema(() => z.object({
     percentage: z.number().min(0).max(100).optional(),
     users: z.array(z.string()).optional(),
     groups: z.array(z.string()).optional(),
-    expression: z.string().optional().describe('Custom formula expression')
+    expression: ExpressionInputSchema.optional().describe('Custom predicate (CEL).')
   }).optional(),
   
   /** Integration */

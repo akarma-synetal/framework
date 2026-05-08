@@ -14,8 +14,8 @@ Field Type Enum
 ## TypeScript Usage
 
 ```typescript
-import { Address, ComputedFieldCache, CurrencyConfig, CurrencyValue, DataQualityRules, Field, FieldType, FileAttachmentConfig, LocationCoordinates, SelectOption, VectorConfig } from '@objectstack/spec/data';
-import type { Address, ComputedFieldCache, CurrencyConfig, CurrencyValue, DataQualityRules, Field, FieldType, FileAttachmentConfig, LocationCoordinates, SelectOption, VectorConfig } from '@objectstack/spec/data';
+import { Address, ComputedFieldCache, CurrencyConfig, CurrencyValue, DataQualityRules, FieldType, FileAttachmentConfig, LocationCoordinates, SelectOption, VectorConfig } from '@objectstack/spec/data';
+import type { Address, ComputedFieldCache, CurrencyConfig, CurrencyValue, DataQualityRules, FieldType, FileAttachmentConfig, LocationCoordinates, SelectOption, VectorConfig } from '@objectstack/spec/data';
 
 // Validate data
 const result = Address.parse(data);
@@ -87,78 +87,6 @@ const result = Address.parse(data);
 | **uniqueness** | `boolean` | ✅ | Enforce unique values across all records |
 | **completeness** | `number` | ✅ | Minimum ratio of non-null values (0-1, default: 0 = no requirement) |
 | **accuracy** | `Object` | optional | Accuracy validation configuration |
-
-
----
-
-## Field
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | optional | Machine name (snake_case) |
-| **label** | `string` | optional | Human readable label |
-| **type** | `Enum<'text' \| 'textarea' \| 'email' \| 'url' \| 'phone' \| 'password' \| 'markdown' \| 'html' \| 'richtext' \| 'number' \| 'currency' \| 'percent' \| 'date' \| 'datetime' \| 'time' \| 'boolean' \| 'toggle' \| 'select' \| 'multiselect' \| 'radio' \| 'checkboxes' \| 'lookup' \| 'master_detail' \| 'tree' \| 'image' \| 'file' \| 'avatar' \| 'video' \| 'audio' \| 'formula' \| 'summary' \| 'autonumber' \| 'location' \| 'address' \| 'code' \| 'json' \| 'color' \| 'rating' \| 'slider' \| 'signature' \| 'qrcode' \| 'progress' \| 'tags' \| 'vector'>` | ✅ | Field Data Type |
-| **description** | `string` | optional | Tooltip/Help text |
-| **format** | `string` | optional | Format string (e.g. email, phone) |
-| **columnName** | `string` | optional | Physical column name in the target datasource. Defaults to the field key when not set. |
-| **required** | `boolean` | ✅ | Is required |
-| **searchable** | `boolean` | ✅ | Is searchable |
-| **multiple** | `boolean` | ✅ | Allow multiple values (Stores as Array/JSON). Applicable for select, lookup, file, image. |
-| **unique** | `boolean` | ✅ | Is unique constraint |
-| **defaultValue** | `any` | optional | Default value |
-| **maxLength** | `number` | optional | Max character length |
-| **minLength** | `number` | optional | Min character length |
-| **precision** | `number` | optional | Total digits |
-| **scale** | `number` | optional | Decimal places |
-| **min** | `number` | optional | Minimum value |
-| **max** | `number` | optional | Maximum value |
-| **options** | `Object[]` | optional | Static options for select/multiselect |
-| **reference** | `string` | optional | Target object name (snake_case) for lookup/master_detail fields. Required for relationship types. Used by $expand to resolve foreign key IDs into full objects. |
-| **referenceFilters** | `string[]` | optional | Filters applied to lookup dialogs (e.g. "active = true") |
-| **writeRequiresMasterRead** | `boolean` | optional | If true, user needs read access to master record to edit this field |
-| **deleteBehavior** | `Enum<'set_null' \| 'cascade' \| 'restrict'>` | ✅ | What happens if referenced record is deleted |
-| **expression** | `string` | optional | Formula expression |
-| **summaryOperations** | `Object` | optional | Roll-up summary definition |
-| **language** | `string` | optional | Programming language for syntax highlighting (e.g., javascript, python, sql) |
-| **theme** | `string` | optional | Code editor theme (e.g., dark, light, monokai) |
-| **lineNumbers** | `boolean` | optional | Show line numbers in code editor |
-| **maxRating** | `number` | optional | Maximum rating value (default: 5) |
-| **allowHalf** | `boolean` | optional | Allow half-star ratings |
-| **displayMap** | `boolean` | optional | Display map widget for location field |
-| **allowGeocoding** | `boolean` | optional | Allow address-to-coordinate conversion |
-| **addressFormat** | `Enum<'us' \| 'uk' \| 'international'>` | optional | Address format template |
-| **colorFormat** | `Enum<'hex' \| 'rgb' \| 'rgba' \| 'hsl'>` | optional | Color value format |
-| **allowAlpha** | `boolean` | optional | Allow transparency/alpha channel |
-| **presetColors** | `string[]` | optional | Preset color options |
-| **step** | `number` | optional | Step increment for slider (default: 1) |
-| **showValue** | `boolean` | optional | Display current value on slider |
-| **marks** | `Record<string, string>` | optional | Custom marks/labels at specific values (e.g., `{0: "Low", 50: "Medium", 100: "High"}`) |
-| **barcodeFormat** | `Enum<'qr' \| 'ean13' \| 'ean8' \| 'code128' \| 'code39' \| 'upca' \| 'upce'>` | optional | Barcode format type |
-| **qrErrorCorrection** | `Enum<'L' \| 'M' \| 'Q' \| 'H'>` | optional | QR code error correction level (L=7%, M=15%, Q=25%, H=30%). Only applicable when barcodeFormat is "qr" |
-| **displayValue** | `boolean` | optional | Display human-readable value below barcode/QR code |
-| **allowScanning** | `boolean` | optional | Enable camera scanning for barcode/QR code input |
-| **currencyConfig** | `Object` | optional | Configuration for currency field type |
-| **vectorConfig** | `Object` | optional | Configuration for vector field type (AI/ML embeddings) |
-| **fileAttachmentConfig** | `Object` | optional | Configuration for file and attachment field types |
-| **encryptionConfig** | `Object` | optional | Field-level encryption configuration for sensitive data (GDPR/HIPAA/PCI-DSS) |
-| **maskingRule** | `Object` | optional | Data masking rules for PII protection |
-| **auditTrail** | `boolean` | ✅ | Enable detailed audit trail for this field (tracks all changes with user and timestamp) |
-| **dependencies** | `string[]` | optional | Array of field names that this field depends on (for formulas, visibility rules, etc.) |
-| **cached** | `Object` | optional | Caching configuration for computed/formula fields |
-| **dataQuality** | `Object` | optional | Data quality validation and monitoring rules |
-| **group** | `string` | optional | Field group name for organizing fields in forms and layouts (e.g., "contact_info", "billing", "system") |
-| **conditionalRequired** | `string` | optional | Formula expression that makes this field required when TRUE (e.g., "status = 'closed_won'") |
-| **hidden** | `boolean` | ✅ | Hidden from default UI |
-| **readonly** | `boolean` | ✅ | Read-only in UI |
-| **sortable** | `boolean` | ✅ | Whether field is sortable in list views |
-| **inlineHelpText** | `string` | optional | Help text displayed below the field in forms |
-| **trackFeedHistory** | `boolean` | optional | Track field changes in Chatter/activity feed (Salesforce pattern) |
-| **caseSensitive** | `boolean` | optional | Whether text comparisons are case-sensitive |
-| **autonumberFormat** | `string` | optional | Auto-number display format pattern (e.g., "CASE-`{0000}`") |
-| **index** | `boolean` | ✅ | Create standard database index |
-| **externalId** | `boolean` | ✅ | Is external ID for upsert operations |
 
 
 ---

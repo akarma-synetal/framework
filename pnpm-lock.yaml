@@ -1212,6 +1212,9 @@ importers:
       '@objectstack/core':
         specifier: workspace:*
         version: link:../core
+      '@objectstack/formula':
+        specifier: workspace:*
+        version: link:../formula
       '@objectstack/spec':
         specifier: workspace:*
         version: link:../spec
@@ -1577,6 +1580,9 @@ importers:
       '@objectstack/core':
         specifier: workspace:*
         version: link:../core
+      '@objectstack/formula':
+        specifier: workspace:*
+        version: link:../formula
       '@objectstack/rest':
         specifier: workspace:*
         version: link:../rest

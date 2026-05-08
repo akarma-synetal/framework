@@ -114,11 +114,11 @@ describe('bindHooksToEngine', () => {
 });
 
 describe('wrapDeclarativeHook', () => {
-  it('skips when condition formula evaluates to false', async () => {
+  it('skips when condition predicate evaluates to false', async () => {
     const calls: string[] = [];
     const meta: Hook = {
       name: 'cond', object: 'account', events: ['beforeInsert'], priority: 100,
-      condition: 'annual_revenue > 1000',
+      condition: 'record.annual_revenue > 1000',
       handler: () => { calls.push('ran'); },
     };
     const wrapped = wrapDeclarativeHook(meta, meta.handler as any);

@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * # Plugin Security and Sandboxing Protocol
@@ -107,7 +108,7 @@ export const PermissionSchema = lazySchema(() => z.object({
     /**
      * Filter condition
      */
-    condition: z.string().optional().describe('Filter expression (e.g., owner = currentUser)'),
+    condition: ExpressionInputSchema.optional().describe('Predicate (CEL) filter, e.g. P`record.owner == os.user.id`.'),
     
     /**
      * Field-level access

@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { FieldType } from '../data/field.zod';
 import { SnakeCaseIdentifierSchema } from '../shared/identifiers.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 import { I18nLabelSchema, AriaPropsSchema } from './i18n.zod';
 import { HookBodySchema } from '../data/hook-body.zod';
 
@@ -140,8 +141,8 @@ export const ActionSchema = lazySchema(() => z.object({
   refreshAfter: z.boolean().default(false).describe('Refresh view after execution'),
   
   /** Access */
-  visible: z.string().optional().describe('Formula returning boolean'),
-  disabled: z.union([z.boolean(), z.string()]).optional().describe('Whether the action is disabled, or a condition expression string'),
+  visible: ExpressionInputSchema.optional().describe('Visibility predicate (CEL).'),
+  disabled: z.union([z.boolean(), ExpressionInputSchema]).optional().describe('Boolean or predicate (CEL) — action is disabled when TRUE.'),
 
   /** Keyboard Shortcut */
   shortcut: z.string().optional().describe('Keyboard shortcut to trigger this action (e.g., "Ctrl+S")'),

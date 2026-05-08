@@ -12,8 +12,8 @@ description: Misc protocol schemas
 ## TypeScript Usage
 
 ```typescript
-import { AckMode, ApiVersionConfig, BuildConfig, CdcConfig, DatabaseConnector, DatabasePoolConfig, DatabaseTable, DeliveryGuarantee, DeploymentConfig, DlqConfig, DomainConfig, EdgeFunctionConfig, EnvironmentVariables, FileAccessPattern, FileFilterConfig, FileMetadataConfig, FileStorageConnector, FileStorageProvider, FileVersioningConfig, GitHubActionsWorkflow, GitHubCommitConfig, GitHubConnector, GitHubIssueTracking, GitHubProvider, GitHubPullRequestConfig, GitHubReleaseConfig, GitHubRepository, GitRepositoryConfig, MessageQueueConnector, ProducerConfig, SaasConnector, SaasObjectType, SaasProvider, SslConfig, StorageBucket, TopicQueue, VercelConnector, VercelFramework, VercelMonitoring, VercelProject, VercelProvider, VercelTeam } from '@objectstack/spec/integration';
-import type { AckMode, ApiVersionConfig, BuildConfig, CdcConfig, DatabaseConnector, DatabasePoolConfig, DatabaseTable, DeliveryGuarantee, DeploymentConfig, DlqConfig, DomainConfig, EdgeFunctionConfig, EnvironmentVariables, FileAccessPattern, FileFilterConfig, FileMetadataConfig, FileStorageConnector, FileStorageProvider, FileVersioningConfig, GitHubActionsWorkflow, GitHubCommitConfig, GitHubConnector, GitHubIssueTracking, GitHubProvider, GitHubPullRequestConfig, GitHubReleaseConfig, GitHubRepository, GitRepositoryConfig, MessageQueueConnector, ProducerConfig, SaasConnector, SaasObjectType, SaasProvider, SslConfig, StorageBucket, TopicQueue, VercelConnector, VercelFramework, VercelMonitoring, VercelProject, VercelProvider, VercelTeam } from '@objectstack/spec/integration';
+import { AckMode, ApiVersionConfig, BuildConfig, CdcConfig, DatabasePoolConfig, DeliveryGuarantee, DeploymentConfig, DlqConfig, DomainConfig, EdgeFunctionConfig, EnvironmentVariables, FileAccessPattern, FileFilterConfig, FileMetadataConfig, FileStorageProvider, FileVersioningConfig, GitHubActionsWorkflow, GitHubCommitConfig, GitHubIssueTracking, GitHubProvider, GitHubPullRequestConfig, GitHubReleaseConfig, GitHubRepository, GitRepositoryConfig, ProducerConfig, SaasProvider, SslConfig, StorageBucket, TopicQueue, VercelFramework, VercelMonitoring, VercelProject, VercelProvider, VercelTeam } from '@objectstack/spec/integration';
+import type { AckMode, ApiVersionConfig, BuildConfig, CdcConfig, DatabasePoolConfig, DeliveryGuarantee, DeploymentConfig, DlqConfig, DomainConfig, EdgeFunctionConfig, EnvironmentVariables, FileAccessPattern, FileFilterConfig, FileMetadataConfig, FileStorageProvider, FileVersioningConfig, GitHubActionsWorkflow, GitHubCommitConfig, GitHubIssueTracking, GitHubProvider, GitHubPullRequestConfig, GitHubReleaseConfig, GitHubRepository, GitRepositoryConfig, ProducerConfig, SaasProvider, SslConfig, StorageBucket, TopicQueue, VercelFramework, VercelMonitoring, VercelProject, VercelProvider, VercelTeam } from '@objectstack/spec/integration';
 
 // Validate data
 const result = AckMode.parse(data);
@@ -81,45 +81,6 @@ Message acknowledgment mode
 
 ---
 
-## DatabaseConnector
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Unique connector identifier |
-| **label** | `string` | ✅ | Display label |
-| **type** | `string` | ✅ |  |
-| **description** | `string` | optional | Connector description |
-| **icon** | `string` | optional | Icon identifier |
-| **authentication** | `Object \| Object \| Object \| Object \| Object` | ✅ | Authentication configuration |
-| **actions** | `Object[]` | optional |  |
-| **triggers** | `Object[]` | optional |  |
-| **syncConfig** | `Object` | optional | Data sync configuration |
-| **fieldMappings** | `Object[]` | optional | Field mapping rules |
-| **webhooks** | `Object[]` | optional | Webhook configurations |
-| **rateLimitConfig** | `Object` | optional | Rate limiting configuration |
-| **retryConfig** | `Object` | optional | Retry configuration |
-| **connectionTimeoutMs** | `number` | ✅ | Connection timeout in ms |
-| **requestTimeoutMs** | `number` | ✅ | Request timeout in ms |
-| **status** | `Enum<'active' \| 'inactive' \| 'error' \| 'configuring'>` | ✅ | Connector status |
-| **enabled** | `boolean` | ✅ | Enable connector |
-| **errorMapping** | `Object` | optional | Error mapping configuration |
-| **health** | `Object` | optional | Health and resilience configuration |
-| **metadata** | `Record<string, any>` | optional | Custom connector metadata |
-| **provider** | `Enum<'postgresql' \| 'mysql' \| 'mariadb' \| 'mssql' \| 'oracle' \| 'mongodb' \| 'redis' \| 'cassandra' \| 'snowflake' \| 'bigquery' \| 'redshift' \| 'custom'>` | ✅ | Database provider type |
-| **connectionConfig** | `Object` | ✅ | Database connection configuration |
-| **poolConfig** | `Object` | optional | Connection pool configuration |
-| **sslConfig** | `Object` | optional | SSL/TLS configuration |
-| **tables** | `Object[]` | ✅ | Tables to sync |
-| **cdcConfig** | `Object` | optional | CDC configuration |
-| **readReplicaConfig** | `Object` | optional | Read replica configuration |
-| **queryTimeoutMs** | `number` | ✅ | Query timeout in ms |
-| **enableQueryLogging** | `boolean` | ✅ | Enable SQL query logging |
-
-
----
-
 ## DatabasePoolConfig
 
 ### Properties
@@ -133,24 +94,6 @@ Message acknowledgment mode
 | **acquireTimeoutMs** | `number` | ✅ | Connection acquisition timeout in ms |
 | **evictionRunIntervalMs** | `number` | ✅ | Connection eviction check interval in ms |
 | **testOnBorrow** | `boolean` | ✅ | Test connection before use |
-
-
----
-
-## DatabaseTable
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Table name in ObjectStack (snake_case) |
-| **label** | `string` | ✅ | Display label |
-| **schema** | `string` | optional | Database schema name |
-| **tableName** | `string` | ✅ | Actual table name in database |
-| **primaryKey** | `string` | ✅ | Primary key column |
-| **enabled** | `boolean` | ✅ | Enable sync for this table |
-| **fieldMappings** | `Object[]` | optional | Table-specific field mappings |
-| **whereClause** | `string` | optional | SQL WHERE clause for filtering |
 
 
 ---
@@ -286,47 +229,6 @@ File access pattern
 
 ---
 
-## FileStorageConnector
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Unique connector identifier |
-| **label** | `string` | ✅ | Display label |
-| **type** | `string` | ✅ |  |
-| **description** | `string` | optional | Connector description |
-| **icon** | `string` | optional | Icon identifier |
-| **authentication** | `Object \| Object \| Object \| Object \| Object` | ✅ | Authentication configuration |
-| **actions** | `Object[]` | optional |  |
-| **triggers** | `Object[]` | optional |  |
-| **syncConfig** | `Object` | optional | Data sync configuration |
-| **fieldMappings** | `Object[]` | optional | Field mapping rules |
-| **webhooks** | `Object[]` | optional | Webhook configurations |
-| **rateLimitConfig** | `Object` | optional | Rate limiting configuration |
-| **retryConfig** | `Object` | optional | Retry configuration |
-| **connectionTimeoutMs** | `number` | ✅ | Connection timeout in ms |
-| **requestTimeoutMs** | `number` | ✅ | Request timeout in ms |
-| **status** | `Enum<'active' \| 'inactive' \| 'error' \| 'configuring'>` | ✅ | Connector status |
-| **enabled** | `boolean` | ✅ | Enable connector |
-| **errorMapping** | `Object` | optional | Error mapping configuration |
-| **health** | `Object` | optional | Health and resilience configuration |
-| **metadata** | `Record<string, any>` | optional | Custom connector metadata |
-| **provider** | `Enum<'s3' \| 'azure_blob' \| 'gcs' \| 'dropbox' \| 'box' \| 'onedrive' \| 'google_drive' \| 'sharepoint' \| 'ftp' \| 'local' \| 'custom'>` | ✅ | File storage provider type |
-| **storageConfig** | `Object` | optional | Storage configuration |
-| **buckets** | `Object[]` | ✅ | Buckets/containers to sync |
-| **metadataConfig** | `Object` | optional | Metadata extraction configuration |
-| **multipartConfig** | `Object` | optional | Multipart upload configuration |
-| **versioningConfig** | `Object` | optional | File versioning configuration |
-| **encryption** | `Object` | optional | Encryption configuration |
-| **lifecyclePolicy** | `Object` | optional | Lifecycle policy |
-| **contentProcessing** | `Object` | optional | Content processing configuration |
-| **bufferSize** | `number` | ✅ | Buffer size in bytes |
-| **transferAcceleration** | `boolean` | ✅ | Enable transfer acceleration |
-
-
----
-
 ## FileStorageProvider
 
 File storage provider type
@@ -388,46 +290,6 @@ File storage provider type
 | **signCommits** | `boolean` | ✅ | Sign commits with GPG |
 | **messageTemplate** | `string` | optional | Commit message template |
 | **useConventionalCommits** | `boolean` | ✅ | Use conventional commits format |
-
-
----
-
-## GitHubConnector
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Unique connector identifier |
-| **label** | `string` | ✅ | Display label |
-| **type** | `string` | ✅ |  |
-| **description** | `string` | optional | Connector description |
-| **icon** | `string` | optional | Icon identifier |
-| **authentication** | `Object \| Object \| Object \| Object \| Object` | ✅ | Authentication configuration |
-| **actions** | `Object[]` | optional |  |
-| **triggers** | `Object[]` | optional |  |
-| **syncConfig** | `Object` | optional | Data sync configuration |
-| **fieldMappings** | `Object[]` | optional | Field mapping rules |
-| **webhooks** | `Object[]` | optional | Webhook configurations |
-| **rateLimitConfig** | `Object` | optional | Rate limiting configuration |
-| **retryConfig** | `Object` | optional | Retry configuration |
-| **connectionTimeoutMs** | `number` | ✅ | Connection timeout in ms |
-| **requestTimeoutMs** | `number` | ✅ | Request timeout in ms |
-| **status** | `Enum<'active' \| 'inactive' \| 'error' \| 'configuring'>` | ✅ | Connector status |
-| **enabled** | `boolean` | ✅ | Enable connector |
-| **errorMapping** | `Object` | optional | Error mapping configuration |
-| **health** | `Object` | optional | Health and resilience configuration |
-| **metadata** | `Record<string, any>` | optional | Custom connector metadata |
-| **provider** | `Enum<'github' \| 'github_enterprise'>` | ✅ | GitHub provider |
-| **baseUrl** | `string` | ✅ | GitHub API base URL |
-| **repositories** | `Object[]` | ✅ | Repositories to manage |
-| **commitConfig** | `Object` | optional | Commit configuration |
-| **pullRequestConfig** | `Object` | optional | Pull request configuration |
-| **workflows** | `Object[]` | optional | GitHub Actions workflows |
-| **releaseConfig** | `Object` | optional | Release configuration |
-| **issueTracking** | `Object` | optional | Issue tracking configuration |
-| **enableWebhooks** | `boolean` | ✅ | Enable GitHub webhooks |
-| **webhookEvents** | `Enum<'push' \| 'pull_request' \| 'issues' \| 'issue_comment' \| 'release' \| 'workflow_run' \| 'deployment' \| 'deployment_status' \| 'check_run' \| 'check_suite' \| 'status'>[]` | optional | Webhook events to subscribe to |
 
 
 ---
@@ -523,46 +385,6 @@ GitHub provider type
 
 ---
 
-## MessageQueueConnector
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Unique connector identifier |
-| **label** | `string` | ✅ | Display label |
-| **type** | `string` | ✅ |  |
-| **description** | `string` | optional | Connector description |
-| **icon** | `string` | optional | Icon identifier |
-| **authentication** | `Object \| Object \| Object \| Object \| Object` | ✅ | Authentication configuration |
-| **actions** | `Object[]` | optional |  |
-| **triggers** | `Object[]` | optional |  |
-| **syncConfig** | `Object` | optional | Data sync configuration |
-| **fieldMappings** | `Object[]` | optional | Field mapping rules |
-| **webhooks** | `Object[]` | optional | Webhook configurations |
-| **rateLimitConfig** | `Object` | optional | Rate limiting configuration |
-| **retryConfig** | `Object` | optional | Retry configuration |
-| **connectionTimeoutMs** | `number` | ✅ | Connection timeout in ms |
-| **requestTimeoutMs** | `number` | ✅ | Request timeout in ms |
-| **status** | `Enum<'active' \| 'inactive' \| 'error' \| 'configuring'>` | ✅ | Connector status |
-| **enabled** | `boolean` | ✅ | Enable connector |
-| **errorMapping** | `Object` | optional | Error mapping configuration |
-| **health** | `Object` | optional | Health and resilience configuration |
-| **metadata** | `Record<string, any>` | optional | Custom connector metadata |
-| **provider** | `Enum<'rabbitmq' \| 'kafka' \| 'redis_pubsub' \| 'redis_streams' \| 'aws_sqs' \| 'aws_sns' \| 'google_pubsub' \| 'azure_service_bus' \| 'azure_event_hubs' \| 'nats' \| 'pulsar' \| 'activemq' \| 'custom'>` | ✅ | Message queue provider type |
-| **brokerConfig** | `Object` | ✅ | Broker connection configuration |
-| **topics** | `Object[]` | ✅ | Topics/queues to sync |
-| **deliveryGuarantee** | `Enum<'at_most_once' \| 'at_least_once' \| 'exactly_once'>` | ✅ | Message delivery guarantee |
-| **sslConfig** | `Object` | optional | SSL/TLS configuration |
-| **saslConfig** | `Object` | optional | SASL authentication configuration |
-| **schemaRegistry** | `Object` | optional | Schema registry configuration |
-| **preserveOrder** | `boolean` | ✅ | Preserve message ordering |
-| **enableMetrics** | `boolean` | ✅ | Enable message queue metrics |
-| **enableTracing** | `boolean` | ✅ | Enable distributed tracing |
-
-
----
-
 ## ProducerConfig
 
 ### Properties
@@ -578,62 +400,6 @@ GitHub provider type
 | **idempotence** | `boolean` | ✅ | Enable idempotent producer |
 | **transactional** | `boolean` | ✅ | Enable transactional producer |
 | **transactionTimeoutMs** | `number` | optional | Transaction timeout in ms |
-
-
----
-
-## SaasConnector
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Unique connector identifier |
-| **label** | `string` | ✅ | Display label |
-| **type** | `string` | ✅ |  |
-| **description** | `string` | optional | Connector description |
-| **icon** | `string` | optional | Icon identifier |
-| **authentication** | `Object \| Object \| Object \| Object \| Object` | ✅ | Authentication configuration |
-| **actions** | `Object[]` | optional |  |
-| **triggers** | `Object[]` | optional |  |
-| **syncConfig** | `Object` | optional | Data sync configuration |
-| **fieldMappings** | `Object[]` | optional | Field mapping rules |
-| **webhooks** | `Object[]` | optional | Webhook configurations |
-| **rateLimitConfig** | `Object` | optional | Rate limiting configuration |
-| **retryConfig** | `Object` | optional | Retry configuration |
-| **connectionTimeoutMs** | `number` | ✅ | Connection timeout in ms |
-| **requestTimeoutMs** | `number` | ✅ | Request timeout in ms |
-| **status** | `Enum<'active' \| 'inactive' \| 'error' \| 'configuring'>` | ✅ | Connector status |
-| **enabled** | `boolean` | ✅ | Enable connector |
-| **errorMapping** | `Object` | optional | Error mapping configuration |
-| **health** | `Object` | optional | Health and resilience configuration |
-| **metadata** | `Record<string, any>` | optional | Custom connector metadata |
-| **provider** | `Enum<'salesforce' \| 'hubspot' \| 'stripe' \| 'shopify' \| 'zendesk' \| 'intercom' \| 'mailchimp' \| 'slack' \| 'microsoft_dynamics' \| 'servicenow' \| 'netsuite' \| 'custom'>` | ✅ | SaaS provider type |
-| **baseUrl** | `string` | ✅ | API base URL |
-| **apiVersion** | `Object` | optional | API version configuration |
-| **objectTypes** | `Object[]` | ✅ | Syncable object types |
-| **oauthSettings** | `Object` | optional | OAuth-specific configuration |
-| **paginationConfig** | `Object` | optional | Pagination configuration |
-| **sandboxConfig** | `Object` | optional | Sandbox environment configuration |
-| **customHeaders** | `Record<string, string>` | optional | Custom HTTP headers for all requests |
-
-
----
-
-## SaasObjectType
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Object type name (snake_case) |
-| **label** | `string` | ✅ | Display label |
-| **apiName** | `string` | ✅ | API name in external system |
-| **enabled** | `boolean` | ✅ | Enable sync for this object |
-| **supportsCreate** | `boolean` | ✅ | Supports record creation |
-| **supportsUpdate** | `boolean` | ✅ | Supports record updates |
-| **supportsDelete** | `boolean` | ✅ | Supports record deletion |
-| **fieldMappings** | `Object[]` | optional | Object-specific field mappings |
 
 
 ---
@@ -712,43 +478,6 @@ SaaS provider type
 | **dlqConfig** | `Object` | optional | Dead letter queue configuration |
 | **routingKey** | `string` | optional | Routing key pattern |
 | **messageFilter** | `Object` | optional | Message filter criteria |
-
-
----
-
-## VercelConnector
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Unique connector identifier |
-| **label** | `string` | ✅ | Display label |
-| **type** | `string` | ✅ |  |
-| **description** | `string` | optional | Connector description |
-| **icon** | `string` | optional | Icon identifier |
-| **authentication** | `Object \| Object \| Object \| Object \| Object` | ✅ | Authentication configuration |
-| **actions** | `Object[]` | optional |  |
-| **triggers** | `Object[]` | optional |  |
-| **syncConfig** | `Object` | optional | Data sync configuration |
-| **fieldMappings** | `Object[]` | optional | Field mapping rules |
-| **webhooks** | `Object[]` | optional | Webhook configurations |
-| **rateLimitConfig** | `Object` | optional | Rate limiting configuration |
-| **retryConfig** | `Object` | optional | Retry configuration |
-| **connectionTimeoutMs** | `number` | ✅ | Connection timeout in ms |
-| **requestTimeoutMs** | `number` | ✅ | Request timeout in ms |
-| **status** | `Enum<'active' \| 'inactive' \| 'error' \| 'configuring'>` | ✅ | Connector status |
-| **enabled** | `boolean` | ✅ | Enable connector |
-| **errorMapping** | `Object` | optional | Error mapping configuration |
-| **health** | `Object` | optional | Health and resilience configuration |
-| **metadata** | `Record<string, any>` | optional | Custom connector metadata |
-| **provider** | `Enum<'vercel'>` | ✅ | Vercel provider |
-| **baseUrl** | `string` | ✅ | Vercel API base URL |
-| **team** | `Object` | optional | Vercel team configuration |
-| **projects** | `Object[]` | ✅ | Vercel projects |
-| **monitoring** | `Object` | optional | Monitoring configuration |
-| **enableWebhooks** | `boolean` | ✅ | Enable Vercel webhooks |
-| **webhookEvents** | `Enum<'deployment.created' \| 'deployment.succeeded' \| 'deployment.failed' \| 'deployment.ready' \| 'deployment.error' \| 'deployment.canceled' \| 'deployment-checks-completed' \| 'deployment-prepared' \| 'project.created' \| 'project.removed'>[]` | optional | Webhook events to subscribe to |
 
 
 ---

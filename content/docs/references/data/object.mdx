@@ -14,8 +14,8 @@ API Operations Enum
 ## TypeScript Usage
 
 ```typescript
-import { ApiMethod, CDCConfig, Index, ObjectCapabilities, ObjectExtension, ObjectFieldGroup, ObjectOwnershipEnum, PartitioningConfig, SoftDeleteConfig, TenancyConfig, VersioningConfig } from '@objectstack/spec/data';
-import type { ApiMethod, CDCConfig, Index, ObjectCapabilities, ObjectExtension, ObjectFieldGroup, ObjectOwnershipEnum, PartitioningConfig, SoftDeleteConfig, TenancyConfig, VersioningConfig } from '@objectstack/spec/data';
+import { ApiMethod, CDCConfig, Index, ObjectCapabilities, ObjectFieldGroup, ObjectOwnershipEnum, PartitioningConfig, SoftDeleteConfig, TenancyConfig, VersioningConfig } from '@objectstack/spec/data';
+import type { ApiMethod, CDCConfig, Index, ObjectCapabilities, ObjectFieldGroup, ObjectOwnershipEnum, PartitioningConfig, SoftDeleteConfig, TenancyConfig, VersioningConfig } from '@objectstack/spec/data';
 
 // Validate data
 const result = ApiMethod.parse(data);
@@ -89,24 +89,6 @@ const result = ApiMethod.parse(data);
 | **trash** | `boolean` | ✅ | Enable soft-delete with restore capability |
 | **mru** | `boolean` | ✅ | Track Most Recently Used (MRU) list for users |
 | **clone** | `boolean` | ✅ | Allow record deep cloning |
-
-
----
-
-## ObjectExtension
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **extend** | `string` | ✅ | Target object name (FQN) to extend |
-| **fields** | `Record<string, Object>` | optional | Fields to add/override |
-| **label** | `string` | optional | Override label for the extended object |
-| **pluralLabel** | `string` | optional | Override plural label for the extended object |
-| **description** | `string` | optional | Override description for the extended object |
-| **validations** | `[__schema0](./__schema0)[]` | optional | Additional validation rules to merge into the target object |
-| **indexes** | `Object[]` | optional | Additional indexes to merge into the target object |
-| **priority** | `integer` | ✅ | Merge priority (higher = applied later) |
 
 
 ---

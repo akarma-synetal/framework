@@ -9,7 +9,10 @@ import { z } from 'zod';
 import { lazySchema } from '../shared/lazy-schema';
 export const CronScheduleSchema = lazySchema(() => z.object({
   type: z.literal('cron'),
-  expression: z.string().describe('Cron expression (e.g., "0 0 * * *" for daily at midnight)'),
+  expression: z.union([
+    z.string().min(1),
+    z.object({ dialect: z.literal('cron'), source: z.string().min(1), ast: z.unknown().optional() }),
+  ]).describe('Cron expression (e.g., "0 0 * * *" for daily at midnight). Build emits {dialect:"cron",source} envelope.'),
   timezone: z.string().optional().default('UTC').describe('Timezone for cron execution (e.g., "America/New_York")'),
 }));
 

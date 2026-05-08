@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { SnakeCaseIdentifierSchema } from '../shared/identifiers.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Approval Step Approver Type
@@ -49,7 +50,7 @@ export const ApprovalStepSchema = lazySchema(() => z.object({
   description: z.string().optional(),
   
   /** Entry criteria for this step */
-  entryCriteria: z.string().optional().describe('Formula expression to enter this step'),
+  entryCriteria: ExpressionInputSchema.optional().describe('Predicate (CEL) to enter this step.'),
   
   /** Who can approve */
   approvers: z.array(z.object({
@@ -85,7 +86,7 @@ export const ApprovalProcessSchema = lazySchema(() => z.object({
   description: z.string().optional(),
   
   /** Entry Criteria for the entire process */
-  entryCriteria: z.string().optional().describe('Formula to allow submission'),
+  entryCriteria: ExpressionInputSchema.optional().describe('Predicate (CEL) to allow submission.'),
   
   /** Record Locking */
   lockRecord: z.boolean().default(true).describe('Lock record from editing during approval'),

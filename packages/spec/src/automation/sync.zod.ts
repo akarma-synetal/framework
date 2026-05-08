@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { FieldMappingSchema } from '../shared/mapping.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Data Sync Protocol - LEVEL 1: Simple Synchronization
@@ -317,7 +318,7 @@ export const DataSyncConfigSchema = lazySchema(() => z.object({
     unique: z.array(z.string()).optional().describe('Unique constraint fields'),
     custom: z.array(z.object({
       name: z.string(),
-      condition: z.string().describe('Validation condition'),
+      condition: ExpressionInputSchema.describe('Validation predicate (CEL).'),
       message: z.string().describe('Error message'),
     })).optional().describe('Custom validation rules'),
   }).optional().describe('Validation rules'),

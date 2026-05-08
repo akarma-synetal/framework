@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * # ObjectStack Validation Protocol
@@ -83,7 +84,7 @@ const BaseValidationSchema = z.object({
  */
 export const ScriptValidationSchema = lazySchema(() => BaseValidationSchema.extend({
   type: z.literal('script'),
-  condition: z.string().describe('Formula expression. If TRUE, validation fails. (e.g. amount < 0)'),
+  condition: ExpressionInputSchema.describe('Predicate (CEL). If TRUE, validation fails. e.g. P`record.amount < 0`'),
 }));
 
 /**
@@ -93,7 +94,7 @@ export const ScriptValidationSchema = lazySchema(() => BaseValidationSchema.exte
 export const UniquenessValidationSchema = lazySchema(() => BaseValidationSchema.extend({
   type: z.literal('unique'),
   fields: z.array(z.string()).describe('Fields that must be combined unique'),
-  scope: z.string().optional().describe('Formula condition for scope (e.g. active = true)'),
+  scope: ExpressionInputSchema.optional().describe('Predicate (CEL) limiting uniqueness scope. e.g. P`record.active == true`'),
   caseSensitive: z.boolean().default(true),
 }));
 
@@ -183,7 +184,7 @@ export const FormatValidationSchema = lazySchema(() => BaseValidationSchema.exte
  */
 export const CrossFieldValidationSchema = lazySchema(() => BaseValidationSchema.extend({
   type: z.literal('cross_field'),
-  condition: z.string().describe('Formula expression comparing fields (e.g. "end_date > start_date")'),
+  condition: ExpressionInputSchema.describe('Predicate (CEL) comparing fields. e.g. P`record.end_date > record.start_date`'),
   fields: z.array(z.string()).describe('Fields involved in the validation'),
 }));
 
@@ -549,7 +550,7 @@ export const ValidationRuleSchema: z.ZodType<BaseValidationRuleShape> = z.lazy((
  */
 export const ConditionalValidationSchema = lazySchema(() => BaseValidationSchema.extend({
   type: z.literal('conditional'),
-  when: z.string().describe('Condition formula (e.g. "type = \'enterprise\'")'),
+  when: ExpressionInputSchema.describe('Predicate (CEL). e.g. P`record.type == \'enterprise\'`'),
   then: ValidationRuleSchema.describe('Validation rule to apply when condition is true'),
   otherwise: ValidationRuleSchema.optional().describe('Validation rule to apply when condition is false'),
 }));

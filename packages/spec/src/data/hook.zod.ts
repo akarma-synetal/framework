@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Hook Lifecycle Events
@@ -122,7 +123,7 @@ export const HookSchema = lazySchema(() => z.object({
    * 
    * @example "status = 'active' AND amount > 1000"
    */
-  condition: z.string().optional().describe('Formula expression; hook runs only when TRUE (e.g., "status = \'closed\' AND amount > 1000")'),
+  condition: ExpressionInputSchema.optional().describe('Predicate (CEL); hook runs only when TRUE. e.g. P`record.status == "closed" && record.amount > 1000`'),
 
   /**
    * Human-readable description

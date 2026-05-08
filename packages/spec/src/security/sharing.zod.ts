@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Organization-Wide Defaults (OWD)
@@ -75,7 +76,7 @@ const BaseSharingRuleSchema = z.object({
  */
 export const CriteriaSharingRuleSchema = lazySchema(() => BaseSharingRuleSchema.extend({
   type: z.literal('criteria'),
-  condition: z.string().describe('Formula condition (e.g. "department = \'Sales\'")'),
+  condition: ExpressionInputSchema.describe('Predicate (CEL). e.g. P`record.department == "Sales"`'),
 }));
 
 /**

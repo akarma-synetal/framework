@@ -1413,7 +1413,7 @@ describe('FieldSchema - conditionalRequired property', () => {
       type: 'text',
       conditionalRequired: "status = 'closed_won'",
     });
-    expect(result.conditionalRequired).toBe("status = 'closed_won'");
+    expect(result.conditionalRequired).toEqual({ dialect: 'cel', source: "status = 'closed_won'" });
   });
 
   it('should accept a field without conditionalRequired (optional)', () => {
@@ -1430,7 +1430,7 @@ describe('FieldSchema - conditionalRequired property', () => {
       conditionalRequired: 'amount > 1000',
     });
     expect(result.required).toBe(false);
-    expect(result.conditionalRequired).toBe('amount > 1000');
+    expect(result.conditionalRequired).toEqual({ dialect: 'cel', source: 'amount > 1000' });
   });
 });
 

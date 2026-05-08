@@ -14,6 +14,7 @@ import type {
   Dataset,
 } from '@objectstack/spec/data';
 import { SeedLoaderConfigSchema } from '@objectstack/spec/data';
+import { resolveSeedRecord } from '@objectstack/formula';
 
 interface Logger {
   info(message: string, meta?: Record<string, any>): void;
@@ -195,8 +196,25 @@ export class SeedLoaderService implements ISeedLoaderService {
     // Get reference resolutions for this object
     const objectRefs = refMap.get(objectName) || [];
 
+    // Pin a single `now()` snapshot for the entire dataset so multi-pass
+    // loads see one logical clock — the M9 determinism guarantee for seeds.
+    const seedNow = new Date();
+
     for (let i = 0; i < dataset.records.length; i++) {
-      const record = { ...dataset.records[i] }; // Clone to avoid mutation
+      // Resolve any embedded Expression envelopes (e.g. `cel\`daysFromNow(30)\``)
+      // BEFORE reference resolution so downstream lookups see resolved values.
+      const seedResult = resolveSeedRecord(
+        dataset.records[i] as Record<string, never>,
+        { now: seedNow },
+      );
+      const record = seedResult.ok
+        ? { ...(seedResult.value as Record<string, unknown>) }
+        : { ...dataset.records[i] };
+      if (!seedResult.ok) {
+        this.logger.warn(
+          `[SeedLoader] Failed to resolve dynamic values for ${objectName} record #${i}: ${seedResult.error.message}`,
+        );
+      }
 
       // Resolve references
       for (const ref of objectRefs) {

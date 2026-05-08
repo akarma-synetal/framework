@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { SnakeCaseIdentifierSchema } from '../shared/identifiers.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 import { SortItemSchema } from '../shared/enums.zod';
 import { FilterConditionSchema } from '../data/filter.zod';
 import { I18nLabelSchema, AriaPropsSchema } from './i18n.zod';
@@ -87,7 +88,7 @@ export const PageComponentSchema = lazySchema(() => z.object({
   className: z.string().optional().describe('CSS class names'),
 
   /** Visibility Rule */
-  visibility: z.string().optional().describe('Visibility filter/formula'),
+  visibility: ExpressionInputSchema.optional().describe('Visibility predicate (CEL).'),
 
   /** Per-element data binding, overrides page-level object context */
   dataSource: ElementDataSourceSchema.optional().describe('Per-element data binding for multi-object pages'),

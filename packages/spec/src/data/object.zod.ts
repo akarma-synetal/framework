@@ -9,6 +9,7 @@ import { ActionSchema } from '../ui/action.zod';
 /**
  * API Operations Enum
  */
+import { ExpressionInputSchema } from '../shared/expression.zod';
 import { lazySchema } from '../shared/lazy-schema';
 export const ApiMethod = z.enum([
   'get', 'list',          // Read
@@ -268,7 +269,7 @@ export const ObjectFieldGroupSchema = lazySchema(() => z.object({
   defaultExpanded: z.boolean().optional().default(true).describe('Whether the group is expanded by default'),
 
   /** Optional visibility expression — when false, the entire group is hidden (e.g., "$user.isAdmin", "status == \'closed\'"). */
-  visibleOn: z.string().optional().describe('Visibility condition expression; when false the group is hidden'),
+  visibleOn: ExpressionInputSchema.optional().describe('Visibility predicate (CEL); group is hidden when FALSE.'),
 }));
 
 export type ObjectFieldGroup = z.infer<typeof ObjectFieldGroupSchema>;

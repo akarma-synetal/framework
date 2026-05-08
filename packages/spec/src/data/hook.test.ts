@@ -702,7 +702,7 @@ describe('HookSchema - condition property', () => {
       handler: 'sendNotification',
       condition: "amount > 1000 AND status = 'confirmed'",
     });
-    expect(hook.condition).toBe("amount > 1000 AND status = 'confirmed'");
+    expect(hook.condition).toEqual({ dialect: 'cel', source: "amount > 1000 AND status = 'confirmed'" });
   });
 
   it('should accept a hook without condition (optional)', () => {

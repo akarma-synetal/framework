@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { SnakeCaseIdentifierSchema } from '../shared/identifiers.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 import { I18nLabelSchema, AriaPropsSchema } from './i18n.zod';
 import { SharingConfigSchema } from './sharing.zod';
 import { ResponsiveConfigSchema, PerformanceConfigSchema } from './responsive.zod';
@@ -447,7 +448,7 @@ export const ListViewSchema = lazySchema(() => z.object({
 
   /** Conditional Formatting */
   conditionalFormatting: z.array(z.object({
-    condition: z.string().describe('Condition expression to evaluate'),
+    condition: ExpressionInputSchema.describe('Predicate (CEL) to evaluate.'),
     style: z.record(z.string(), z.string()).describe('CSS styles to apply when condition is true'),
   })).optional().describe('Conditional formatting rules for list rows'),
 
@@ -507,7 +508,7 @@ export const FormFieldSchema = lazySchema(() => z.object({
   colSpan: z.number().int().min(1).max(4).optional().describe('Column span in grid layout (1-4)'),
   widget: z.string().optional().describe('Custom widget/component name'),
   dependsOn: z.string().optional().describe('Parent field name for cascading'),
-  visibleOn: z.string().optional().describe('Visibility condition expression'),
+  visibleOn: ExpressionInputSchema.optional().describe('Visibility predicate (CEL).'),
 }));
 
 /**

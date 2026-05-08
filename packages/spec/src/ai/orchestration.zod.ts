@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { TokenUsageSchema } from './cost.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * AI Agentic Orchestration Protocol
@@ -91,7 +92,7 @@ export const AITaskSchema = lazySchema(() => z.object({
   retryAttempts: z.number().int().min(0).max(5).optional().default(1),
   
   /** Conditional Execution */
-  condition: z.string().optional().describe('Formula condition - task only runs if TRUE'),
+  condition: ExpressionInputSchema.optional().describe('Predicate (CEL) - task only runs if TRUE.'),
   
   /** Task Metadata */
   description: z.string().optional(),
@@ -130,7 +131,7 @@ export const PostProcessingActionSchema = lazySchema(() => z.object({
   type: z.enum(['field_update', 'send_email', 'create_record', 'update_related', 'trigger_flow', 'webhook']),
   name: z.string().describe('Action name'),
   config: z.record(z.string(), z.unknown()).describe('Action-specific configuration'),
-  condition: z.string().optional().describe('Execute only if condition is TRUE'),
+  condition: ExpressionInputSchema.optional().describe('Predicate (CEL). Execute only if TRUE.'),
 }));
 
 /**
@@ -158,7 +159,7 @@ export const AIOrchestrationSchema = lazySchema(() => z.object({
   }).optional().describe('Webhook configuration (for webhook trigger)'),
   
   /** Entry Criteria */
-  entryCriteria: z.string().optional().describe('Formula condition - workflow only runs if TRUE'),
+  entryCriteria: ExpressionInputSchema.optional().describe('Predicate (CEL) - workflow only runs if TRUE.'),
   
   /** AI Tasks */
   aiTasks: z.array(AITaskSchema).describe('AI tasks to execute in sequence'),

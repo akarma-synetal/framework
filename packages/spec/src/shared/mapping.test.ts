@@ -49,7 +49,7 @@ describe('TransformTypeSchema', () => {
       type: 'javascript',
       expression: 'value.toUpperCase()',
     });
-    expect(result).toEqual({ type: 'javascript', expression: 'value.toUpperCase()' });
+    expect(result).toEqual({ type: 'javascript', expression: { dialect: 'cel', source: 'value.toUpperCase()' } });
   });
 
   it('should accept map transform', () => {

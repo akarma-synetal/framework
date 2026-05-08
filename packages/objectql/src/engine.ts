@@ -15,10 +15,11 @@ import { CoreServiceName, StorageNameMapping } from '@objectstack/spec/system';
 import { IRealtimeService, RealtimeEventPayload } from '@objectstack/spec/contracts';
 import { pluralToSingular } from '@objectstack/spec/shared';
 import { SchemaRegistry, computeFQN } from './registry.js';
-import { compileFormula, evaluateFormula } from './formula.js';
+import { ExpressionEngine } from '@objectstack/formula';
+import type { Expression } from '@objectstack/spec';
 import { bindHooksToEngine } from './hook-binder.js';
 
-interface FormulaPlanEntry { name: string; expression: string; }
+interface FormulaPlanEntry { name: string; expression: Expression; }
 
 function planFormulaProjection(
   schema: any,
@@ -32,20 +33,25 @@ function planFormulaProjection(
   for (const f of requestedFields) {
     const def = (schema.fields as any)[f];
     if (def?.type === 'formula' && def.expression) {
-      plan.push({ name: f, expression: def.expression });
-      try {
-        for (const dep of compileFormula(def.expression).dependencies) {
-          if ((schema.fields as any)[dep]) projected.add(dep);
-        }
-      } catch {
-        // ignore broken formulas at planning stage
-      }
+      // Normalize string-shorthand → Expression envelope (M9 transition).
+      const expr: Expression = typeof def.expression === 'string'
+        ? { dialect: 'cel', source: def.expression }
+        : def.expression;
+      plan.push({ name: f, expression: expr });
+      // Pre-compile to catch syntax errors at planning stage. Dependency
+      // discovery (which fields the formula reads) is no longer used —
+      // CEL uses dynamic projection via `record.<field>` lookups.
+      ExpressionEngine.compile(expr);
     } else {
       projected.add(f);
     }
   }
   if (plan.length === 0) return { plan: [] };
   if (!projected.has('id')) projected.add('id');
+  // For formulas: project all known fields so CEL `record.<field>` lookups
+  // see complete data. Static dependency analysis on AST is M9.7 work;
+  // until then we accept a slightly wider SELECT.
+  for (const fname of Object.keys(schema.fields ?? {})) projected.add(fname);
   return { plan, projected: Array.from(projected) };
 }
 
@@ -54,7 +60,8 @@ function applyFormulaPlan(plan: FormulaPlanEntry[], records: any[]): void {
   for (const rec of records) {
     if (rec == null) continue;
     for (const fp of plan) {
-      rec[fp.name] = evaluateFormula(fp.expression, rec);
+      const r = ExpressionEngine.evaluate(fp.expression, { record: rec });
+      rec[fp.name] = r.ok ? r.value : null;
     }
   }
 }

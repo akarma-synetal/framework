@@ -140,7 +140,7 @@ describe('SharingRuleSchema', () => {
     });
 
     expect(rule.label).toBe('Full Sharing Rule');
-    expect(rule.condition).toContain('Closed Won');
+    expect((rule.condition as any).source).toContain('Closed Won');
   });
 
   it('should accept different sharing rule types', () => {
@@ -291,7 +291,7 @@ describe('SharingRuleSchema', () => {
       },
     });
 
-    expect(rule.condition).toContain('CA');
+    expect((rule.condition as any).source).toContain('CA');
   });
 
   it('should handle department-based sharing', () => {

@@ -14,8 +14,9 @@
  * the metadata-driven behaviours.
  */
 import type { Hook, HookContext } from '@objectstack/spec/data';
+import type { Expression } from '@objectstack/spec';
 import type { HookHandler } from './engine.js';
-import { compileFormula, evaluateFormula } from './formula.js';
+import { ExpressionEngine } from '@objectstack/formula';
 import { noopHookMetricsRecorder, type HookMetricsRecorder, type HookMetricOutcome } from './hook-metrics.js';
 
 export interface WrapDeclarativeOptions {
@@ -71,28 +72,33 @@ export function wrapDeclarativeHook(
 
   // Pre-compile condition once so each invocation is cheap.
   let conditionFn: ((record: any) => boolean) | undefined;
-  if (meta.condition && typeof meta.condition === 'string' && meta.condition.trim()) {
-    try {
-      compileFormula(meta.condition);
-      const expr = meta.condition;
-      conditionFn = (record: any) => {
-        try {
-          return Boolean(evaluateFormula(expr, record ?? {}));
-        } catch (err: any) {
-          logger.warn('[hook] condition evaluation failed; treating as false', {
-            hook: meta.name,
-            condition: expr,
-            error: err?.message,
-          });
-          return false;
-        }
-      };
-    } catch (err: any) {
-      logger.warn('[hook] condition formula failed to compile; condition ignored', {
-        hook: meta.name,
-        condition: meta.condition,
-        error: err?.message,
-      });
+  if (meta.condition) {
+    // Accept either string shorthand or full Expression envelope.
+    const expr: Expression = typeof meta.condition === 'string'
+      ? { dialect: 'cel', source: meta.condition }
+      : (meta.condition as Expression);
+    if (expr.source && expr.source.trim()) {
+      const check = ExpressionEngine.compile(expr);
+      if (check.ok) {
+        conditionFn = (record: any) => {
+          const r = ExpressionEngine.evaluate<boolean>(expr, { record: record ?? {} });
+          if (!r.ok) {
+            logger.warn('[hook] condition evaluation failed; treating as false', {
+              hook: meta.name,
+              condition: expr.source,
+              error: r.error.message,
+            });
+            return false;
+          }
+          return Boolean(r.value);
+        };
+      } else {
+        logger.warn('[hook] condition formula failed to compile; condition ignored', {
+          hook: meta.name,
+          condition: expr.source,
+          error: check.error.message,
+        });
+      }
     }
   }
 

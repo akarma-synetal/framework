@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { SnakeCaseIdentifierSchema } from '../shared/identifiers.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 import { I18nLabelSchema, AriaPropsSchema } from './i18n.zod';
 import { SharingConfigSchema, EmbedConfigSchema } from './sharing.zod';
 
@@ -43,7 +44,7 @@ const BaseNavItemSchema = z.object({
    * Formula expression returning boolean. 
    * e.g. "user.is_admin || user.department == 'sales'"
    */
-  visible: z.string().optional().describe('Visibility formula condition'),
+  visible: ExpressionInputSchema.optional().describe('Visibility predicate (CEL). e.g. P`os.user.role == "admin"`'),
 
   /** Permissions required to see/access this navigation item */
   requiredPermissions: z.array(z.string()).optional().describe('Permissions required to access this item'),
@@ -195,7 +196,7 @@ export const NavigationAreaSchema = lazySchema(() => z.object({
    * Visibility condition.
    * Formula expression returning boolean.
    */
-  visible: z.string().optional().describe('Visibility formula condition for this area'),
+  visible: ExpressionInputSchema.optional().describe('Visibility predicate (CEL) for this area.'),
 
   /** Permissions required to access this area */
   requiredPermissions: z.array(z.string()).optional().describe('Permissions required to access this area'),

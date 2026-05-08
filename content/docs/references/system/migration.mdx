@@ -12,28 +12,12 @@ description: Migration protocol schemas
 ## TypeScript Usage
 
 ```typescript
-import { AddFieldOperation, DeleteObjectOperation, ExecuteSqlOperation, MigrationDependency, ModifyFieldOperation, RemoveFieldOperation, RenameObjectOperation } from '@objectstack/spec/system';
-import type { AddFieldOperation, DeleteObjectOperation, ExecuteSqlOperation, MigrationDependency, ModifyFieldOperation, RemoveFieldOperation, RenameObjectOperation } from '@objectstack/spec/system';
+import { DeleteObjectOperation, ExecuteSqlOperation, MigrationDependency, ModifyFieldOperation, RemoveFieldOperation, RenameObjectOperation } from '@objectstack/spec/system';
+import type { DeleteObjectOperation, ExecuteSqlOperation, MigrationDependency, ModifyFieldOperation, RemoveFieldOperation, RenameObjectOperation } from '@objectstack/spec/system';
 
 // Validate data
-const result = AddFieldOperation.parse(data);
+const result = DeleteObjectOperation.parse(data);
 ```
-
----
-
-## AddFieldOperation
-
-Add a new field to an existing object
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **type** | `string` | ✅ |  |
-| **objectName** | `string` | ✅ | Target object name |
-| **fieldName** | `string` | ✅ | Name of the field to add |
-| **field** | `Object` | ✅ | Full field definition to add |
-
 
 ---
 

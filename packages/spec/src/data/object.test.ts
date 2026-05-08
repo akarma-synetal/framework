@@ -808,7 +808,7 @@ describe('ObjectFieldGroupSchema', () => {
       visibleOn: '$user.isAdmin',
     };
     const result = ObjectFieldGroupSchema.parse(group);
-    expect(result).toEqual(group);
+    expect(result).toEqual({ ...group, visibleOn: { dialect: 'cel', source: '$user.isAdmin' } });
   });
 
   it('should reject missing key or label', () => {

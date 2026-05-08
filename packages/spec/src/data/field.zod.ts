@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { SystemIdentifierSchema } from '../shared/identifiers.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 import { EncryptionConfigSchema } from '../system/encryption.zod';
 import { MaskingRuleSchema } from '../system/masking.zod';
 
@@ -392,8 +393,8 @@ export const FieldSchema = lazySchema(() => z.object({
   writeRequiresMasterRead: z.boolean().optional().describe('If true, user needs read access to master record to edit this field'),
   deleteBehavior: z.enum(['set_null', 'cascade', 'restrict']).optional().default('set_null').describe('What happens if referenced record is deleted'),
 
-  /** Calculation */
-  expression: z.string().optional().describe('Formula expression'),
+  /** Calculation — CEL formula. Plain string accepted for back-compat; build emits canonical envelope. */
+  expression: ExpressionInputSchema.optional().describe('Formula expression (CEL). e.g. F`record.amount * 0.1`'),
   summaryOperations: z.object({
     object: z.string().describe('Source child object name for roll-up'),
     field: z.string().describe('Field on child object to aggregate'),
@@ -470,7 +471,7 @@ export const FieldSchema = lazySchema(() => z.object({
   group: z.string().optional().describe('Field group name for organizing fields in forms and layouts (e.g., "contact_info", "billing", "system")'),
 
   /** Conditional Requirements */
-  conditionalRequired: z.string().optional().describe('Formula expression that makes this field required when TRUE (e.g., "status = \'closed_won\'")'),
+  conditionalRequired: ExpressionInputSchema.optional().describe('Predicate (CEL) — field is required when TRUE. e.g. P`record.status == \'closed_won\'`'),
 
   /** Security & Visibility */
   hidden: z.boolean().default(false).describe('Hidden from default UI'),

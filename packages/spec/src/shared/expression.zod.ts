@@ -104,3 +104,48 @@ export type PredicateInput = z.input<typeof PredicateInputSchema>;
 export function expression(source: string, dialect: ExpressionDialect = 'cel', meta?: ExpressionMeta): Expression {
   return { dialect, source, ...(meta ? { meta } : {}) };
 }
+
+/**
+ * Tagged-template helpers for inline expression authoring.
+ *
+ * ```ts
+ * import { cel, F, P } from '@objectstack/spec';
+ *
+ * const f = { formula: F`record.amount * 0.1` };
+ * const v = { visible: P`record.status == "open"` };
+ * const d = { close_date: cel`now() + duration("P30D")` };
+ * ```
+ *
+ * Each helper produces an {@link Expression} envelope with `dialect: 'cel'`
+ * and the rendered template string as `source`. The CLI `objectstack compile`
+ * step (M9.2) parses these into ASTs at build time so the persisted artifact
+ * is dialect-AST only.
+ */
+function renderTemplate(strings: TemplateStringsArray, values: readonly unknown[]): string {
+  if (values.length === 0) return strings[0] ?? '';
+  let out = strings[0] ?? '';
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    // Inline literal substitution. Strings get JSON-escaped so `${name}` for
+    // `name = 'O\'Brien'` produces a valid CEL string literal. Numbers and
+    // booleans render as their toString. Anything exotic should be passed via
+    // the variable scope (record/input) rather than interpolated.
+    if (typeof v === 'string') out += JSON.stringify(v);
+    else if (typeof v === 'number' || typeof v === 'boolean') out += String(v);
+    else if (v === null || v === undefined) out += 'null';
+    else out += JSON.stringify(v);
+    out += strings[i + 1] ?? '';
+  }
+  return out;
+}
+
+/** Tagged template — produces a CEL Expression envelope. */
+export function cel(strings: TemplateStringsArray, ...values: unknown[]): Expression {
+  return { dialect: 'cel', source: renderTemplate(strings, values) };
+}
+
+/** Formula alias of {@link cel} — semantic shorthand for computed-field formulas. */
+export const F = cel;
+
+/** Predicate alias of {@link cel} — semantic shorthand for boolean conditions. */
+export const P = cel;

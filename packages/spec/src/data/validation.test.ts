@@ -268,7 +268,7 @@ describe('ValidationRuleSchema (Discriminated Union)', () => {
     const result = ValidationRuleSchema.parse(scriptRule);
     expect(result.type).toBe('script');
     if (result.type === 'script') {
-      expect(result.condition).toBe('true');
+      expect(result.condition).toEqual({ dialect: 'cel', source: 'true' });
     }
   });
 

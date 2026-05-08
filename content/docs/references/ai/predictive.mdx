@@ -36,8 +36,8 @@ Use Cases:
 ## TypeScript Usage
 
 ```typescript
-import { EvaluationMetrics, Hyperparameters, ModelDrift, ModelFeature, PredictionRequest, PredictionResult, PredictiveModel, PredictiveModelType, TrainingConfig } from '@objectstack/spec/ai';
-import type { EvaluationMetrics, Hyperparameters, ModelDrift, ModelFeature, PredictionRequest, PredictionResult, PredictiveModel, PredictiveModelType, TrainingConfig } from '@objectstack/spec/ai';
+import { EvaluationMetrics, Hyperparameters, ModelDrift, ModelFeature, PredictionRequest, PredictionResult, PredictiveModelType } from '@objectstack/spec/ai';
+import type { EvaluationMetrics, Hyperparameters, ModelDrift, ModelFeature, PredictionRequest, PredictionResult, PredictiveModelType } from '@objectstack/spec/ai';
 
 // Validate data
 const result = EvaluationMetrics.parse(data);
@@ -167,47 +167,6 @@ const result = EvaluationMetrics.parse(data);
 
 ---
 
-## PredictiveModel
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Model unique identifier (snake_case) |
-| **label** | `string` | ✅ | Model display name |
-| **description** | `string` | optional |  |
-| **type** | `Enum<'classification' \| 'regression' \| 'clustering' \| 'forecasting' \| 'anomaly_detection' \| 'recommendation' \| 'ranking'>` | ✅ |  |
-| **algorithm** | `string` | optional | Specific algorithm (e.g., "random_forest", "xgboost", "lstm") |
-| **objectName** | `string` | ✅ | Target object for predictions |
-| **target** | `string` | ✅ | Target field to predict |
-| **targetType** | `Enum<'numeric' \| 'categorical' \| 'binary'>` | optional | Target field type |
-| **features** | `Object[]` | ✅ | Input features for the model |
-| **hyperparameters** | `Object` | optional |  |
-| **training** | `Object` | optional |  |
-| **metrics** | `Object` | optional | Evaluation metrics from last training |
-| **deploymentStatus** | `Enum<'draft' \| 'training' \| 'trained' \| 'deployed' \| 'deprecated'>` | ✅ |  |
-| **version** | `string` | ✅ |  |
-| **predictionField** | `string` | optional | Field to store predictions |
-| **confidenceField** | `string` | optional | Field to store confidence scores |
-| **updateTrigger** | `Enum<'on_create' \| 'on_update' \| 'manual' \| 'scheduled'>` | ✅ |  |
-| **autoRetrain** | `boolean` | ✅ |  |
-| **retrainSchedule** | `string` | optional | Cron expression for auto-retraining |
-| **retrainThreshold** | `number` | optional | Performance threshold to trigger retraining |
-| **enableExplainability** | `boolean` | ✅ | Generate feature importance & explanations |
-| **enableMonitoring** | `boolean` | ✅ |  |
-| **alertOnDrift** | `boolean` | ✅ | Alert when model drift is detected |
-| **active** | `boolean` | ✅ |  |
-| **owner** | `string` | optional | User ID of model owner |
-| **permissions** | `string[]` | optional | User/group IDs with access |
-| **tags** | `string[]` | optional |  |
-| **category** | `string` | optional | Model category (e.g., "sales", "marketing", "operations") |
-| **lastTrainedAt** | `string` | optional | ISO timestamp |
-| **createdAt** | `string` | optional | ISO timestamp |
-| **updatedAt** | `string` | optional | ISO timestamp |
-
-
----
-
 ## PredictiveModelType
 
 ### Allowed Values
@@ -219,30 +178,6 @@ const result = EvaluationMetrics.parse(data);
 * `anomaly_detection`
 * `recommendation`
 * `ranking`
-
-
----
-
-## TrainingConfig
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **trainingDataRatio** | `number` | ✅ | Proportion of data for training |
-| **validationDataRatio** | `number` | ✅ | Proportion for validation |
-| **testDataRatio** | `number` | ✅ | Proportion for testing |
-| **dataFilter** | `string` | optional | Formula to filter training data |
-| **minRecords** | `integer` | ✅ | Minimum records required |
-| **maxRecords** | `integer` | optional | Maximum records to use |
-| **strategy** | `Enum<'full' \| 'incremental' \| 'online' \| 'transfer_learning'>` | ✅ |  |
-| **crossValidation** | `boolean` | ✅ |  |
-| **folds** | `integer` | ✅ | Cross-validation folds |
-| **earlyStoppingEnabled** | `boolean` | ✅ |  |
-| **earlyStoppingPatience** | `integer` | ✅ | Epochs without improvement before stopping |
-| **maxTrainingTime** | `number` | optional | Maximum training time in seconds |
-| **gpuEnabled** | `boolean` | ✅ |  |
-| **randomSeed** | `integer` | optional | Random seed for reproducibility |
 
 
 ---

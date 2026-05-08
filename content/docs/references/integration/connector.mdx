@@ -102,8 +102,8 @@ Authentication is now imported from the canonical auth/config.zod.ts.
 ## TypeScript Usage
 
 ```typescript
-import { CircuitBreakerConfig, Connector, ConnectorAction, ConnectorHealth, ConnectorStatus, ConnectorTrigger, ConnectorType, DataSyncConfig, ErrorCategory, ErrorMappingConfig, ErrorMappingRule, HealthCheckConfig, RateLimitStrategy, RetryConfig, RetryStrategy, SyncStrategy, WebhookConfig, WebhookEvent, WebhookSignatureAlgorithm } from '@objectstack/spec/integration';
-import type { CircuitBreakerConfig, Connector, ConnectorAction, ConnectorHealth, ConnectorStatus, ConnectorTrigger, ConnectorType, DataSyncConfig, ErrorCategory, ErrorMappingConfig, ErrorMappingRule, HealthCheckConfig, RateLimitStrategy, RetryConfig, RetryStrategy, SyncStrategy, WebhookConfig, WebhookEvent, WebhookSignatureAlgorithm } from '@objectstack/spec/integration';
+import { CircuitBreakerConfig, ConnectorAction, ConnectorHealth, ConnectorStatus, ConnectorTrigger, ConnectorType, DataSyncConfig, ErrorCategory, ErrorMappingConfig, ErrorMappingRule, HealthCheckConfig, RateLimitStrategy, RetryConfig, RetryStrategy, SyncStrategy, WebhookConfig, WebhookEvent, WebhookSignatureAlgorithm } from '@objectstack/spec/integration';
+import type { CircuitBreakerConfig, ConnectorAction, ConnectorHealth, ConnectorStatus, ConnectorTrigger, ConnectorType, DataSyncConfig, ErrorCategory, ErrorMappingConfig, ErrorMappingRule, HealthCheckConfig, RateLimitStrategy, RetryConfig, RetryStrategy, SyncStrategy, WebhookConfig, WebhookEvent, WebhookSignatureAlgorithm } from '@objectstack/spec/integration';
 
 // Validate data
 const result = CircuitBreakerConfig.parse(data);
@@ -125,36 +125,6 @@ Circuit breaker configuration
 | **halfOpenMaxRequests** | `number` | ✅ | Requests allowed in half-open state |
 | **monitoringWindow** | `number` | ✅ | Rolling window for failure count in ms |
 | **fallbackStrategy** | `Enum<'cache' \| 'default_value' \| 'error' \| 'queue'>` | optional | Fallback strategy when circuit is open |
-
-
----
-
-## Connector
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Unique connector identifier |
-| **label** | `string` | ✅ | Display label |
-| **type** | `Enum<'saas' \| 'database' \| 'file_storage' \| 'message_queue' \| 'api' \| 'custom'>` | ✅ | Connector type |
-| **description** | `string` | optional | Connector description |
-| **icon** | `string` | optional | Icon identifier |
-| **authentication** | `Object \| Object \| Object \| Object \| Object` | ✅ | Authentication configuration |
-| **actions** | `Object[]` | optional |  |
-| **triggers** | `Object[]` | optional |  |
-| **syncConfig** | `Object` | optional | Data sync configuration |
-| **fieldMappings** | `Object[]` | optional | Field mapping rules |
-| **webhooks** | `Object[]` | optional | Webhook configurations |
-| **rateLimitConfig** | `Object` | optional | Rate limiting configuration |
-| **retryConfig** | `Object` | optional | Retry configuration |
-| **connectionTimeoutMs** | `number` | ✅ | Connection timeout in ms |
-| **requestTimeoutMs** | `number` | ✅ | Request timeout in ms |
-| **status** | `Enum<'active' \| 'inactive' \| 'error' \| 'configuring'>` | ✅ | Connector status |
-| **enabled** | `boolean` | ✅ | Enable connector |
-| **errorMapping** | `Object` | optional | Error mapping configuration |
-| **health** | `Object` | optional | Health and resilience configuration |
-| **metadata** | `Record<string, any>` | optional | Custom connector metadata |
 
 
 ---

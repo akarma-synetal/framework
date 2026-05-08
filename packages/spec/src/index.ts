@@ -89,3 +89,24 @@ export type { MetadataCollectionInput, MapSupportedField } from './shared/metada
 
 export { type PluginContext } from './kernel/plugin.zod';
 
+// Expression Protocol (M9 — canonical wire format for formulas / predicates / conditions)
+export {
+  ExpressionDialect,
+  ExpressionMetaSchema,
+  ExpressionSchema,
+  ExpressionInputSchema,
+  PredicateSchema,
+  PredicateInputSchema,
+  expression,
+  cel,
+  F,
+  P,
+} from './shared/expression.zod';
+export type {
+  Expression,
+  ExpressionMeta,
+  ExpressionInput,
+  Predicate,
+  PredicateInput,
+} from './shared/expression.zod';
+

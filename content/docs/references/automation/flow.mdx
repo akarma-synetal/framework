@@ -14,52 +14,12 @@ Flow Node Types
 ## TypeScript Usage
 
 ```typescript
-import { Flow, FlowEdge, FlowNode, FlowNodeAction, FlowVariable, FlowVersionHistory } from '@objectstack/spec/automation';
-import type { Flow, FlowEdge, FlowNode, FlowNodeAction, FlowVariable, FlowVersionHistory } from '@objectstack/spec/automation';
+import { FlowNode, FlowNodeAction, FlowVariable } from '@objectstack/spec/automation';
+import type { FlowNode, FlowNodeAction, FlowVariable } from '@objectstack/spec/automation';
 
 // Validate data
-const result = Flow.parse(data);
+const result = FlowNode.parse(data);
 ```
-
----
-
-## Flow
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Machine name |
-| **label** | `string` | ✅ | Flow label |
-| **description** | `string` | optional |  |
-| **version** | `integer` | ✅ | Version number |
-| **status** | `Enum<'draft' \| 'active' \| 'obsolete' \| 'invalid'>` | ✅ | Deployment status |
-| **template** | `boolean` | ✅ | Is logic template (Subflow) |
-| **type** | `Enum<'autolaunched' \| 'record_change' \| 'schedule' \| 'screen' \| 'api'>` | ✅ | Flow type |
-| **variables** | `Object[]` | optional | Flow variables |
-| **nodes** | `Object[]` | ✅ | Flow nodes |
-| **edges** | `Object[]` | ✅ | Flow connections |
-| **active** | `boolean` | ✅ | Is active (Deprecated: use status) |
-| **runAs** | `Enum<'system' \| 'user'>` | ✅ | Execution context |
-| **errorHandling** | `Object` | optional | Flow-level error handling configuration |
-
-
----
-
-## FlowEdge
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **id** | `string` | ✅ | Edge unique ID |
-| **source** | `string` | ✅ | Source Node ID |
-| **target** | `string` | ✅ | Target Node ID |
-| **condition** | `string` | optional | Expression returning boolean used for branching |
-| **type** | `Enum<'default' \| 'fault' \| 'conditional'>` | ✅ | Connection type: default (normal flow), fault (error path), or conditional (expression-guarded) |
-| **label** | `string` | optional | Label on the connector |
-| **isDefault** | `boolean` | ✅ | Marks this edge as the default path when no other conditions match |
-
 
 ---
 
@@ -120,22 +80,6 @@ const result = Flow.parse(data);
 | **type** | `string` | ✅ | Data type (text, number, boolean, object, list) |
 | **isInput** | `boolean` | ✅ | Is input parameter |
 | **isOutput** | `boolean` | ✅ | Is output parameter |
-
-
----
-
-## FlowVersionHistory
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **flowName** | `string` | ✅ | Flow machine name |
-| **version** | `integer` | ✅ | Version number |
-| **definition** | `Object` | ✅ | Complete flow definition snapshot |
-| **createdAt** | `string` | ✅ | When this version was created |
-| **createdBy** | `string` | optional | User who created this version |
-| **changeNote** | `string` | optional | Description of what changed in this version |
 
 
 ---

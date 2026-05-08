@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { ExpressionInputSchema } from './expression.zod';
 
 /**
  * Base Field Mapping Protocol
@@ -62,7 +63,7 @@ export const TransformTypeSchema = lazySchema(() => z.discriminatedUnion('type',
   
   z.object({
     type: z.literal('javascript'),
-    expression: z.string().describe('JavaScript expression (e.g., "value.toUpperCase()")'),
+    expression: ExpressionInputSchema.describe('JS expression (dialect="js" recommended). e.g. value.toUpperCase()'),
   }).describe('Custom JavaScript transformation'),
   
   z.object({

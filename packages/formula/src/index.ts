@@ -13,5 +13,6 @@ export { ExpressionEngine, getEngine, hasDialect, register } from './registry';
 export { celEngine, DEFAULT_LIMITS } from './cel-engine';
 export { registerStdLib, buildScope } from './stdlib';
 export { resolveSeed, resolveSeedRecord } from './seed-eval';
+export { normalizeExpression, normalizeExpressionTree } from './normalize';
 export type { SeedValue, SeedPrimitive } from './seed-eval';
 export type { DialectEngine, EvalContext, EvalResult, EvalError } from './types';

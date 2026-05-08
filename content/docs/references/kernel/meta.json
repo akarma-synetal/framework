@@ -15,7 +15,6 @@
     "package-artifact",
     "package-registry",
     "package-upgrade",
-    "permission",
     "plugin",
     "plugin-capability",
     "plugin-lifecycle-advanced",

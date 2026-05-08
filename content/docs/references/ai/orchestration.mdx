@@ -32,47 +32,12 @@ Use Cases:
 ## TypeScript Usage
 
 ```typescript
-import { AIOrchestration, AIOrchestrationExecutionResult, AIOrchestrationTrigger, AITask, AITaskType, AgentCommunicationProtocol, AgentGroupMember, AgentGroupRole, BatchAIOrchestrationExecution, MultiAgentGroup, PostProcessingAction, WorkflowFieldCondition, WorkflowSchedule } from '@objectstack/spec/ai';
-import type { AIOrchestration, AIOrchestrationExecutionResult, AIOrchestrationTrigger, AITask, AITaskType, AgentCommunicationProtocol, AgentGroupMember, AgentGroupRole, BatchAIOrchestrationExecution, MultiAgentGroup, PostProcessingAction, WorkflowFieldCondition, WorkflowSchedule } from '@objectstack/spec/ai';
+import { AIOrchestrationExecutionResult, AIOrchestrationTrigger, AITaskType, AgentCommunicationProtocol, AgentGroupMember, AgentGroupRole, BatchAIOrchestrationExecution, MultiAgentGroup, WorkflowFieldCondition, WorkflowSchedule } from '@objectstack/spec/ai';
+import type { AIOrchestrationExecutionResult, AIOrchestrationTrigger, AITaskType, AgentCommunicationProtocol, AgentGroupMember, AgentGroupRole, BatchAIOrchestrationExecution, MultiAgentGroup, WorkflowFieldCondition, WorkflowSchedule } from '@objectstack/spec/ai';
 
 // Validate data
-const result = AIOrchestration.parse(data);
+const result = AIOrchestrationExecutionResult.parse(data);
 ```
-
----
-
-## AIOrchestration
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Orchestration unique identifier (snake_case) |
-| **label** | `string` | ✅ | Display name |
-| **description** | `string` | optional |  |
-| **objectName** | `string` | ✅ | Target object for this orchestration |
-| **trigger** | `Enum<'record_created' \| 'record_updated' \| 'field_changed' \| 'scheduled' \| 'manual' \| 'webhook' \| 'batch'>` | ✅ |  |
-| **fieldConditions** | `Object[]` | optional | Fields to monitor (for field_changed trigger) |
-| **schedule** | `Object` | optional | Schedule configuration (for scheduled trigger) |
-| **webhookConfig** | `Object` | optional | Webhook configuration (for webhook trigger) |
-| **entryCriteria** | `string` | optional | Formula condition - workflow only runs if TRUE |
-| **aiTasks** | `Object[]` | ✅ | AI tasks to execute in sequence |
-| **postActions** | `Object[]` | optional | Actions after AI tasks complete |
-| **executionMode** | `Enum<'sequential' \| 'parallel'>` | ✅ | How to execute multiple AI tasks |
-| **stopOnError** | `boolean` | ✅ | Stop workflow if any task fails |
-| **timeout** | `number` | optional | Maximum execution time in seconds |
-| **priority** | `Enum<'low' \| 'normal' \| 'high' \| 'critical'>` | ✅ |  |
-| **enableLogging** | `boolean` | ✅ |  |
-| **enableMetrics** | `boolean` | ✅ |  |
-| **notifyOnFailure** | `string[]` | optional | User IDs to notify on failure |
-| **active** | `boolean` | ✅ |  |
-| **version** | `string` | ✅ |  |
-| **tags** | `string[]` | optional |  |
-| **category** | `string` | optional | Workflow category (e.g., "support", "sales", "hr") |
-| **owner** | `string` | optional | User ID of workflow owner |
-| **createdAt** | `string` | optional | ISO timestamp |
-| **updatedAt** | `string` | optional | ISO timestamp |
-
 
 ---
 
@@ -110,37 +75,6 @@ const result = AIOrchestration.parse(data);
 * `manual`
 * `webhook`
 * `batch`
-
-
----
-
-## AITask
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **id** | `string` | optional | Optional task ID for referencing |
-| **name** | `string` | ✅ | Human-readable task name |
-| **type** | `Enum<'classify' \| 'extract' \| 'summarize' \| 'generate' \| 'predict' \| 'translate' \| 'sentiment' \| 'entity_recognition' \| 'anomaly_detection' \| 'recommendation'>` | ✅ |  |
-| **model** | `string` | optional | Model ID from registry (uses default if not specified) |
-| **promptTemplate** | `string` | optional | Prompt template ID for this task |
-| **inputFields** | `string[]` | ✅ | Source fields to process (e.g., ["description", "comments"]) |
-| **inputSchema** | `Record<string, any>` | optional | Validation schema for inputs |
-| **inputContext** | `Record<string, any>` | optional | Additional context for the AI model |
-| **outputField** | `string` | ✅ | Target field to store the result |
-| **outputSchema** | `Record<string, any>` | optional | Validation schema for output |
-| **outputFormat** | `Enum<'text' \| 'json' \| 'number' \| 'boolean' \| 'array'>` | ✅ |  |
-| **classes** | `string[]` | optional | Valid classes for classification tasks |
-| **multiClass** | `boolean` | ✅ | Allow multiple classes to be selected |
-| **extractionSchema** | `Record<string, any>` | optional | JSON schema for structured extraction |
-| **maxLength** | `number` | optional | Maximum length for generated content |
-| **temperature** | `number` | optional | Model temperature override |
-| **fallbackValue** | `any` | optional | Fallback value if AI task fails |
-| **retryAttempts** | `integer` | ✅ |  |
-| **condition** | `string` | optional | Formula condition - task only runs if TRUE |
-| **description** | `string` | optional |  |
-| **active** | `boolean` | ✅ |  |
 
 
 ---
@@ -231,20 +165,6 @@ const result = AIOrchestration.parse(data);
 | **conflictResolution** | `Enum<'voting' \| 'priorityBased' \| 'consensusBased' \| 'coordinatorDecides'>` | optional | How conflicts between agents are resolved |
 | **timeout** | `integer` | optional | Maximum execution time in seconds for the group |
 | **active** | `boolean` | ✅ | Whether this agent group is active |
-
-
----
-
-## PostProcessingAction
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **type** | `Enum<'field_update' \| 'send_email' \| 'create_record' \| 'update_related' \| 'trigger_flow' \| 'webhook'>` | ✅ |  |
-| **name** | `string` | ✅ | Action name |
-| **config** | `Record<string, any>` | ✅ | Action-specific configuration |
-| **condition** | `string` | optional | Execute only if condition is TRUE |
 
 
 ---

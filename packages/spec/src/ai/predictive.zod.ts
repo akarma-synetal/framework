@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { TokenUsageSchema } from './cost.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Predictive Analytics Protocol
@@ -117,7 +118,7 @@ export const TrainingConfigSchema = lazySchema(() => z.object({
   testDataRatio: z.number().min(0).max(1).optional().default(0.1).describe('Proportion for testing'),
   
   /** Data Filtering */
-  dataFilter: z.string().optional().describe('Formula to filter training data'),
+  dataFilter: ExpressionInputSchema.optional().describe('Predicate (CEL) to filter training data.'),
   minRecords: z.number().int().optional().default(100).describe('Minimum records required'),
   maxRecords: z.number().int().optional().describe('Maximum records to use'),
   

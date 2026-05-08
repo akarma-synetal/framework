@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { SnakeCaseIdentifierSchema } from '../shared/identifiers.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Trigger events for workflow automation
@@ -255,7 +256,7 @@ export const WorkflowRuleSchema = lazySchema(() => z.object({
    * Condition to start the workflow.
    * If empty, runs on every trigger event.
    */
-  criteria: z.string().optional().describe('Formula condition. If TRUE, actions execute.'),
+  criteria: ExpressionInputSchema.optional().describe('Predicate (CEL). If TRUE, actions execute.'),
   
   /** Actions to execute immediately */
   actions: z.array(WorkflowActionSchema).optional().describe('Immediate actions'),
