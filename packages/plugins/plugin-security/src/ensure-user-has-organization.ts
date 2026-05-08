@@ -1,0 +1,155 @@
+// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+
+/**
+ * ensureUserHasOrganization — auto-create a personal org for new users.
+ *
+ * In multi-tenant mode, every record visible through the default
+ * `tenant_isolation` RLS policy must have an `organization_id`, and
+ * every authenticated user must have an `activeOrganizationId` on their
+ * session for that policy to evaluate to anything other than "deny
+ * all". A user with zero `sys_member` rows, however, can sign in
+ * successfully and reach the dashboard — the dashboard's
+ * `RequireOrganization` guard has a single-tenant carve-out that lets
+ * users with empty organization lists through, so they land on a UI
+ * that simply hides every record. The standard remedy ("invite users
+ * via an admin") doesn't apply to self-service signup.
+ *
+ * This helper, run right after a `sys_user` insert, ensures the new
+ * user has at least one organization by creating a personal workspace
+ * (named "<User>'s Workspace", slug `<username>-workspace`) and an
+ * owner-role `sys_member` row. The user's session will pick this up as
+ * their `activeOrganizationId` on the next sign-in / org-list refresh
+ * (better-auth's `setActiveOrganization` runs lazily when the picker
+ * sees exactly one membership).
+ *
+ * Idempotent: bails out if the user already has any `sys_member` row.
+ * Slug collisions retry with a numeric suffix; a cap of 5 attempts
+ * means a pathological username will fail loudly rather than loop.
+ */
+
+interface EnsureOptions {
+  logger?: {
+    info: (message: string, meta?: Record<string, any>) => void;
+    warn: (message: string, meta?: Record<string, any>) => void;
+  };
+}
+
+const SYSTEM_CTX = { isSystem: true };
+
+function genId(prefix: string): string {
+  const rand = Math.random().toString(36).slice(2, 10);
+  const ts = Date.now().toString(36);
+  return `${prefix}_${ts}${rand}`;
+}
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'workspace';
+}
+
+function deriveBaseName(user: { name?: string; email?: string; id: string }): string {
+  if (user.name && user.name.trim()) return user.name.trim();
+  if (user.email) {
+    const local = user.email.split('@')[0];
+    if (local) return local;
+  }
+  return user.id;
+}
+
+async function tryFind(ql: any, object: string, where: any, limit = 1): Promise<any[]> {
+  try {
+    const rows = await ql.find(object, { where, limit }, { context: SYSTEM_CTX });
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Ensure `user` has at least one `sys_member` row. Creates a personal
+ * organization owned by them if not.
+ *
+ * Returns `{ created: true, organizationId }` when a new org was made,
+ * or `{ created: false, reason }` when the user already has memberships
+ * or the operation was skipped.
+ */
+export async function ensureUserHasOrganization(
+  ql: any,
+  user: { id: string; name?: string; email?: string },
+  options: EnsureOptions = {},
+): Promise<{ created: boolean; organizationId?: string; reason?: string }> {
+  const logger = options.logger;
+  if (!ql || typeof ql.find !== 'function' || typeof ql.insert !== 'function') {
+    return { created: false, reason: 'objectql_unavailable' };
+  }
+  if (!user?.id) return { created: false, reason: 'invalid_user' };
+
+  // Idempotency gate: any existing membership means we're done.
+  const existing = await tryFind(ql, 'sys_member', { user_id: user.id }, 1);
+  if (existing.length > 0) {
+    return { created: false, reason: 'already_member' };
+  }
+
+  const base = deriveBaseName(user);
+  const orgName = `${base}'s Workspace`;
+  const baseSlug = slugify(base);
+
+  // Find a free slug. better-auth allows duplicates technically, but
+  // the dashboard renders the slug as a stable identifier so we keep
+  // them unique-per-platform for human-readable URLs.
+  let slug = `${baseSlug}-workspace`;
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    const collision = await tryFind(ql, 'sys_organization', { slug }, 1);
+    if (collision.length === 0) break;
+    slug = `${baseSlug}-workspace-${attempt + 1}`;
+    if (attempt === 5) {
+      logger?.warn?.(
+        `[security] could not find a free slug for personal org of ${user.email ?? user.id}`,
+      );
+      return { created: false, reason: 'slug_exhausted' };
+    }
+  }
+
+  const orgId = genId('org');
+  let orgRow: any = null;
+  try {
+    orgRow = await ql.insert(
+      'sys_organization',
+      { id: orgId, name: orgName, slug, logo: null, metadata: null },
+      { context: SYSTEM_CTX },
+    );
+  } catch (e) {
+    logger?.warn?.(`[security] failed to create personal org for ${user.email ?? user.id}`, {
+      error: (e as Error).message,
+    });
+    return { created: false, reason: 'org_insert_failed' };
+  }
+
+  const finalOrgId = orgRow?.id ?? orgId;
+
+  try {
+    await ql.insert(
+      'sys_member',
+      {
+        id: genId('mem'),
+        organization_id: finalOrgId,
+        user_id: user.id,
+        role: 'owner',
+      },
+      { context: SYSTEM_CTX },
+    );
+  } catch (e) {
+    logger?.warn?.(`[security] failed to create owner-member row for ${user.email ?? user.id}`, {
+      error: (e as Error).message,
+    });
+    return { created: false, reason: 'member_insert_failed', organizationId: finalOrgId };
+  }
+
+  logger?.info?.(
+    `[security] created personal organization "${orgName}" (${finalOrgId}) for ${user.email ?? user.id}`,
+  );
+  return { created: true, organizationId: finalOrgId };
+}

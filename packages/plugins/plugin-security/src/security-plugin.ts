@@ -8,6 +8,7 @@ import { FieldMasker } from './field-masker.js';
 import { PermissionDeniedError } from './errors.js';
 import { bootstrapPlatformAdmin } from './bootstrap-platform-admin.js';
 import { claimOrphanTenantRows } from './claim-orphan-tenant-rows.js';
+import { ensureUserHasOrganization } from './ensure-user-has-organization.js';
 import {
   securityObjects,
   securityDefaultPermissionSets,
@@ -343,14 +344,34 @@ export class SecurityPlugin implements Plugin {
     // signs up after boot is auto-promoted to platform admin without
     // requiring a server restart. The function itself is idempotent
     // and bails out as soon as any platform admin exists.
+    //
+    // Also, in multi-tenant mode, ensure every newly registered user
+    // has at least one organization — otherwise the default
+    // tenant_isolation RLS policy hides every record from them and
+    // the dashboard's RequireOrganization guard (which has a
+    // single-tenant carve-out for org-less users) lets them through
+    // to a UI showing "No data" everywhere.
     ql.registerMiddleware(async (opCtx: any, next: () => Promise<void>) => {
       await next();
       if (
         opCtx?.object === 'sys_user' &&
-        (opCtx?.operation === 'create' || opCtx?.operation === 'insert') &&
-        bootstrapRanOnce
+        (opCtx?.operation === 'create' || opCtx?.operation === 'insert')
       ) {
-        await runBootstrap();
+        if (bootstrapRanOnce) {
+          await runBootstrap();
+        }
+        if (this.multiTenant) {
+          const newUser = opCtx?.result ?? opCtx?.data;
+          if (newUser?.id) {
+            try {
+              await ensureUserHasOrganization(ql, newUser, { logger: ctx.logger });
+            } catch (e) {
+              ctx.logger.warn('[security] ensure-user-has-organization failed', {
+                error: (e as Error).message,
+              });
+            }
+          }
+        }
       }
     });
 

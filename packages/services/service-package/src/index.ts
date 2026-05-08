@@ -33,6 +33,23 @@ export interface PackageService {
 }
 
 /**
+ * Normalize the result of `objectql.execute()` into a row array.
+ *
+ * Different drivers return different shapes for raw SELECT statements:
+ *   - SQL driver (knex/SQLite) and Turso remote transport return rows
+ *     directly as an array.
+ *   - PostgreSQL (knex/pg) returns `{ rows, rowCount, ... }`.
+ *   - Some drivers may return `{ rows: [...] }` wrappers in other contexts.
+ *
+ * This helper accepts any of those shapes and always returns an array.
+ */
+function normalizeRows(result: any): any[] {
+  if (Array.isArray(result)) return result;
+  if (result && Array.isArray(result.rows)) return result.rows;
+  return [];
+}
+
+/**
  * Package Management Service Plugin
  *
  * Provides package publishing, retrieval, and management capabilities.
@@ -109,12 +126,13 @@ export class PackageServicePlugin implements Plugin {
 
           const args = version === 'latest' ? [packageId] : [packageId, version];
           const result = await objectql.execute!({ sql, args });
+          const rows = normalizeRows(result);
 
-          if (result.rows.length === 0) {
+          if (rows.length === 0) {
             return null;
           }
 
-          const row = result.rows[0];
+          const row = rows[0];
           return {
             id: row.id,
             version: row.version,
@@ -142,7 +160,7 @@ export class PackageServicePlugin implements Plugin {
             `,
           });
 
-          return result.rows.map((row: any) => ({
+          return normalizeRows(result).map((row: any) => ({
             id: row.id,
             version: row.version,
             manifest: JSON.parse(row.manifest),
