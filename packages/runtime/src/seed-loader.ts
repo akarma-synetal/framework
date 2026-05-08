@@ -327,7 +327,8 @@ export class SeedLoaderService implements ISeedLoaderService {
         where: { [targetField]: value },
         fields: ['id'],
         limit: 1,
-      });
+        context: { isSystem: true },
+      } as any);
       if (records && records.length > 0) {
         return String(records[0].id || records[0]._id);
       }
@@ -365,7 +366,7 @@ export class SeedLoaderService implements ISeedLoaderService {
             await this.engine.update(deferred.objectName, {
               id: recordId,
               [deferred.field]: resolvedId,
-            });
+            }, { context: { isSystem: true } } as any);
 
             // Update result stats
             const resultEntry = allResults.find(r => r.object === deferred.objectName);
@@ -406,6 +407,15 @@ export class SeedLoaderService implements ISeedLoaderService {
   // Internal: Write Operations
   // ==========================================================================
 
+  /**
+   * Seed writes always run as a privileged system context. This bypasses
+   * RBAC checks (so seeds can target system tables like `sys_*`) and
+   * disables the SecurityPlugin's auto-injection of `organization_id` /
+   * `owner_id` — seeds either declare those fields explicitly per
+   * record, or are intentionally cross-tenant / global.
+   */
+  private static readonly SEED_OPTIONS = { context: { isSystem: true } } as const;
+
   private async writeRecord(
     objectName: string,
     record: Record<string, unknown>,
@@ -415,10 +425,11 @@ export class SeedLoaderService implements ISeedLoaderService {
   ): Promise<{ action: 'inserted' | 'updated' | 'skipped'; id?: string }> {
     const externalIdValue = record[externalId];
     const existing = existingRecords?.get(String(externalIdValue ?? ''));
+    const opts = SeedLoaderService.SEED_OPTIONS as any;
 
     switch (mode) {
       case 'insert': {
-        const result = await this.engine.insert(objectName, record);
+        const result = await this.engine.insert(objectName, record, opts);
         return { action: 'inserted', id: this.extractId(result) };
       }
 
@@ -427,17 +438,17 @@ export class SeedLoaderService implements ISeedLoaderService {
           return { action: 'skipped' };
         }
         const id = this.extractId(existing);
-        await this.engine.update(objectName, { ...record, id });
+        await this.engine.update(objectName, { ...record, id }, opts);
         return { action: 'updated', id };
       }
 
       case 'upsert': {
         if (existing) {
           const id = this.extractId(existing);
-          await this.engine.update(objectName, { ...record, id });
+          await this.engine.update(objectName, { ...record, id }, opts);
           return { action: 'updated', id };
         } else {
-          const result = await this.engine.insert(objectName, record);
+          const result = await this.engine.insert(objectName, record, opts);
           return { action: 'inserted', id: this.extractId(result) };
         }
       }
@@ -446,18 +457,18 @@ export class SeedLoaderService implements ISeedLoaderService {
         if (existing) {
           return { action: 'skipped', id: this.extractId(existing) };
         }
-        const result = await this.engine.insert(objectName, record);
+        const result = await this.engine.insert(objectName, record, opts);
         return { action: 'inserted', id: this.extractId(result) };
       }
 
       case 'replace': {
         // Replace mode: just insert (caller should have cleared the table)
-        const result = await this.engine.insert(objectName, record);
+        const result = await this.engine.insert(objectName, record, opts);
         return { action: 'inserted', id: this.extractId(result) };
       }
 
       default: {
-        const result = await this.engine.insert(objectName, record);
+        const result = await this.engine.insert(objectName, record, opts);
         return { action: 'inserted', id: this.extractId(result) };
       }
     }
@@ -613,7 +624,8 @@ export class SeedLoaderService implements ISeedLoaderService {
     try {
       const records = await this.engine.find(objectName, {
         fields: ['id', externalId],
-      });
+        context: { isSystem: true },
+      } as any);
       for (const record of records || []) {
         const key = String(record[externalId] ?? '');
         if (key) {

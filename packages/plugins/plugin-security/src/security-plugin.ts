@@ -173,6 +173,48 @@ export class SecurityPlugin implements Plugin {
         }
       }
 
+      // 3.5. Auto-inject tenancy fields on insert.
+      //
+      // When an authenticated user inserts a record, the canonical
+      // tenant column (`organization_id`) and ownership column
+      // (`owner_id`) should be auto-populated from
+      // `ExecutionContext.tenantId` / `userId` so the row is visible
+      // to the same RLS policies that gate reads. Without this, the
+      // user creates a row that has `organization_id = NULL`, which
+      // the very next `find` will filter out as a wrong-tenant row —
+      // a confusing "I just created it but I can't see it" footgun.
+      //
+      // Only fills fields that:
+      //   - the object actually declares (so unrelated tables are
+      //     untouched)
+      //   - aren't already set in the payload (caller wins)
+      //   - have a corresponding value on the execution context.
+      if (
+        opCtx.operation === 'insert' &&
+        opCtx.data &&
+        typeof opCtx.data === 'object' &&
+        !Array.isArray(opCtx.data)
+      ) {
+        const fields = await this.getObjectFieldNames(metadata, opCtx.object, ql);
+        if (fields) {
+          const data = opCtx.data as Record<string, unknown>;
+          if (
+            opCtx.context?.tenantId &&
+            fields.has('organization_id') &&
+            (data.organization_id == null || data.organization_id === '')
+          ) {
+            data.organization_id = opCtx.context.tenantId;
+          }
+          if (
+            opCtx.context?.userId &&
+            fields.has('owner_id') &&
+            (data.owner_id == null || data.owner_id === '')
+          ) {
+            data.owner_id = opCtx.context.userId;
+          }
+        }
+      }
+
       // 3. RLS filter injection
       const allRlsPolicies = this.collectRLSPolicies(permissionSets, opCtx.object, opCtx.operation);
       if (allRlsPolicies.length > 0 && opCtx.ast) {

@@ -299,7 +299,7 @@ export class AppPlugin implements Plugin {
                          ctx.logger.info(`[Seeder] Seeding ${dataset.records.length} records for ${dataset.object}`);
                          for (const record of dataset.records) {
                              try {
-                                 await ql.insert(dataset.object, record);
+                                 await ql.insert(dataset.object, record, { context: { isSystem: true } } as any);
                              } catch (err: any) {
                                  ctx.logger.warn(`[Seeder] Failed to insert ${dataset.object} record:`, { error: err.message });
                              }
@@ -313,7 +313,7 @@ export class AppPlugin implements Plugin {
                  for (const dataset of normalizedDatasets) {
                      for (const record of dataset.records) {
                          try {
-                             await ql.insert(dataset.object, record);
+                             await ql.insert(dataset.object, record, { context: { isSystem: true } } as any);
                          } catch (insertErr: any) {
                              ctx.logger.warn(`[Seeder] Failed to insert ${dataset.object} record:`, { error: insertErr.message });
                          }
