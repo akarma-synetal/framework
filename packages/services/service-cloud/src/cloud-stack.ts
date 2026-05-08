@@ -20,6 +20,7 @@ import { MultiProjectPlugin } from './multi-project-plugin.js';
 import { createControlPlanePlugins } from './control-plane-preset.js';
 import { createStudioRuntimeConfigPlugin, createTemplatesRoutePlugin } from './multi-project-plugins.js';
 import { createCloudArtifactApiPlugin } from './cloud-artifact-api-plugin.js';
+import { resolveDefaultDataDir } from './data-dir.js';
 
 type IDataDriver = Contracts.IDataDriver;
 
@@ -70,7 +71,7 @@ export async function createCloudStack(config: CloudStackConfig): Promise<{
     const {
         authSecret,
         baseUrl,
-        controlDriverUrl = `file:${resolvePath(process.cwd(), '.objectstack/data/control.db')}`,
+        controlDriverUrl = `file:${resolvePath(resolveDefaultDataDir(), 'control.db')}`,
         controlDriverAuthToken,
         basePlugins,
         appBundles,
@@ -93,7 +94,7 @@ export async function createCloudStack(config: CloudStackConfig): Promise<{
     const explicitControlUrl = process.env.OS_CONTROL_DATABASE_URL?.trim();
     const legacyControlUrl = (process.env.OS_DATABASE_URL || process.env.TURSO_DATABASE_URL)?.trim();
     const controlDriverPromise = buildControlDriver(
-        explicitControlUrl || controlDriverUrl || legacyControlUrl || `file:${resolvePath(process.cwd(), '.objectstack/data/control.db')}`,
+        explicitControlUrl || controlDriverUrl || legacyControlUrl || `file:${resolvePath(resolveDefaultDataDir(), 'control.db')}`,
         process.env.OS_CONTROL_DATABASE_AUTH_TOKEN || process.env.OS_DATABASE_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN || controlDriverAuthToken,
     );
 
