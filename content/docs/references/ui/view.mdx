@@ -16,8 +16,8 @@ Migrated to shared/http.zod.ts. Re-exported here for backward compatibility.
 ## TypeScript Usage
 
 ```typescript
-import { AddRecordConfig, AppearanceConfig, CalendarConfig, ColumnSummary, FormField, GalleryConfig, GanttConfig, GroupingConfig, GroupingField, KanbanConfig, ListColumn, NavigationConfig, NavigationMode, PaginationConfig, RowColorConfig, RowHeight, SelectionConfig, TimelineConfig, UserActionsConfig, ViewData, ViewFilterRule, ViewSharing, ViewTab, VisualizationType } from '@objectstack/spec/ui';
-import type { AddRecordConfig, AppearanceConfig, CalendarConfig, ColumnSummary, FormField, GalleryConfig, GanttConfig, GroupingConfig, GroupingField, KanbanConfig, ListColumn, NavigationConfig, NavigationMode, PaginationConfig, RowColorConfig, RowHeight, SelectionConfig, TimelineConfig, UserActionsConfig, ViewData, ViewFilterRule, ViewSharing, ViewTab, VisualizationType } from '@objectstack/spec/ui';
+import { AddRecordConfig, AppearanceConfig, CalendarConfig, ColumnSummary, GalleryConfig, GanttConfig, GroupingConfig, GroupingField, KanbanConfig, ListColumn, NavigationConfig, NavigationMode, PaginationConfig, RowColorConfig, RowHeight, SelectionConfig, TimelineConfig, UserActionsConfig, ViewData, ViewFilterRule, ViewSharing, ViewTab, VisualizationType } from '@objectstack/spec/ui';
+import type { AddRecordConfig, AppearanceConfig, CalendarConfig, ColumnSummary, GalleryConfig, GanttConfig, GroupingConfig, GroupingField, KanbanConfig, ListColumn, NavigationConfig, NavigationMode, PaginationConfig, RowColorConfig, RowHeight, SelectionConfig, TimelineConfig, UserActionsConfig, ViewData, ViewFilterRule, ViewSharing, ViewTab, VisualizationType } from '@objectstack/spec/ui';
 
 // Validate data
 const result = AddRecordConfig.parse(data);
@@ -86,27 +86,6 @@ Aggregation function for column footer summary
 * `avg`
 * `min`
 * `max`
-
-
----
-
-## FormField
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **field** | `string` | ✅ | Field name (snake_case) |
-| **label** | `string` | optional | Display label override |
-| **placeholder** | `string` | optional | Placeholder text |
-| **helpText** | `string` | optional | Help/hint text |
-| **readonly** | `boolean` | optional | Read-only override |
-| **required** | `boolean` | optional | Required override |
-| **hidden** | `boolean` | optional | Hidden override |
-| **colSpan** | `integer` | optional | Column span in grid layout (1-4) |
-| **widget** | `string` | optional | Custom widget/component name |
-| **dependsOn** | `string` | optional | Parent field name for cascading |
-| **visibleOn** | `string` | optional | Visibility condition expression |
 
 
 ---

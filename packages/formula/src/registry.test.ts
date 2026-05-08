@@ -17,11 +17,25 @@ describe('ExpressionEngine registry', () => {
     if (!r.ok) expect(r.error.kind).toBe('dialect');
   });
 
-  it('returns dialect error for cron stub', () => {
+  it('routes cron dialect to cronEngine (validates schedule)', () => {
     const expr: Expression = { dialect: 'cron', source: '* * * * *' };
     const r = ExpressionEngine.evaluate(expr, {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe('* * * * *');
+  });
+
+  it('cron rejects malformed source', () => {
+    const r = ExpressionEngine.evaluate({ dialect: 'cron', source: 'not a cron' }, {});
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.kind).toBe('dialect');
+    if (!r.ok) expect(r.error.kind).toBe('parse');
+  });
+
+  it('routes template dialect to templateEngine', () => {
+    const r = ExpressionEngine.evaluate(
+      { dialect: 'template', source: 'Hello {{record.name}}' },
+      { record: { name: 'World' } },
+    );
+    expect(r).toEqual({ ok: true, value: 'Hello World' });
   });
 
   it('returns dialect error for unknown dialect', () => {

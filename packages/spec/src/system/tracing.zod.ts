@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Tracing Protocol - Distributed Tracing & Observability
@@ -324,7 +325,10 @@ export const TraceSamplingConfigSchema = lazySchema(() => z.object({
   composite: z.array(z.object({
     strategy: SamplingStrategyType.describe('Strategy type'),
     ratio: z.number().min(0).max(1).optional(),
-    condition: z.record(z.string(), z.unknown()).optional().describe('Condition for this strategy'),
+    condition: z.union([
+      z.record(z.string(), z.unknown()),
+      ExpressionInputSchema,
+    ]).optional().describe('Condition for this strategy — structured filter or CEL predicate'),
   })).optional(),
 
   /**

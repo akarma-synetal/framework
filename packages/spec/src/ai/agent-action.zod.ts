@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { TemplateExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * AI Agent Action Protocol
@@ -220,8 +221,8 @@ export const WorkflowActionParamsSchema = lazySchema(() => z.object({
   reportName: z.string().optional().describe('Report name'),
   emailTemplate: z.string().optional().describe('Email template'),
   recipients: z.array(z.string()).optional().describe('Email recipients'),
-  subject: z.string().optional().describe('Email subject'),
-  message: z.string().optional().describe('Notification/email message'),
+  subject: TemplateExpressionInputSchema.optional().describe('Email subject — supports {{var}} interpolation'),
+  message: TemplateExpressionInputSchema.optional().describe('Notification/email message — supports {{var}} interpolation'),
   taskData: z.record(z.string(), z.unknown()).optional().describe('Task creation data'),
   scheduleTime: z.string().optional().describe('Schedule time (ISO 8601)'),
   contextData: z.record(z.string(), z.unknown()).optional().describe('Additional context data'),

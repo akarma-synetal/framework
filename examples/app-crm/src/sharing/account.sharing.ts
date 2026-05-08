@@ -1,3 +1,4 @@
+import { P } from '@objectstack/spec';
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 /** Share accounts with sales managers/directors based on customer status */
@@ -6,7 +7,7 @@ export const AccountTeamSharingRule = {
   label: 'Account Team Sharing',
   object: 'account',
   type: 'criteria' as const,
-  condition: 'type = "customer" AND is_active = true',
+  condition: P`record.type == "customer" && record.is_active == true`,
   accessLevel: 'edit',
   sharedWith: { type: 'role', value: 'sales_manager' },
 };
@@ -18,7 +19,7 @@ export const TerritorySharingRules = [
     label: 'North America Territory',
     object: 'account',
     type: 'criteria' as const,
-    condition: 'billing_country IN ("US", "CA", "MX")',
+    condition: P`record.billing_country in ["US", "CA", "MX"]`,
     accessLevel: 'edit',
     sharedWith: { type: 'role', value: 'na_sales_team' },
   },
@@ -27,7 +28,7 @@ export const TerritorySharingRules = [
     label: 'Europe Territory',
     object: 'account',
     type: 'criteria' as const,
-    condition: 'billing_country IN ("UK", "DE", "FR", "IT", "ES")',
+    condition: P`record.billing_country in ["UK", "DE", "FR", "IT", "ES"]`,
     accessLevel: 'edit',
     sharedWith: { type: 'role', value: 'eu_sales_team' },
   },

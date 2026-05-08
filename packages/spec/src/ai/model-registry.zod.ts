@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { TemplateExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * AI Model Registry Protocol
@@ -117,8 +118,8 @@ export const PromptTemplateSchema = lazySchema(() => z.object({
   label: z.string().describe('Display name'),
   
   /** Template Content */
-  system: z.string().optional().describe('System prompt'),
-  user: z.string().describe('User prompt template with variables'),
+  system: TemplateExpressionInputSchema.optional().describe('System prompt — supports {{var}} interpolation'),
+  user: TemplateExpressionInputSchema.describe('User prompt template — supports {{var}} interpolation'),
   assistant: z.string().optional().describe('Assistant message prefix'),
   
   /** Variables */

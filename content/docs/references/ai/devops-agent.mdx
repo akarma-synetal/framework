@@ -106,8 +106,8 @@ project: 'objectstack-app',
 ## TypeScript Usage
 
 ```typescript
-import { CICDPipelineConfig, CodeGenerationConfig, CodeGenerationTarget, DeploymentStrategy, DevOpsAgent, DevOpsTool, DevelopmentConfig, GitHubIntegration, IntegrationConfig, MonitoringConfig, PipelineStage, TestingConfig, VercelIntegration, VersionManagement } from '@objectstack/spec/ai';
-import type { CICDPipelineConfig, CodeGenerationConfig, CodeGenerationTarget, DeploymentStrategy, DevOpsAgent, DevOpsTool, DevelopmentConfig, GitHubIntegration, IntegrationConfig, MonitoringConfig, PipelineStage, TestingConfig, VercelIntegration, VersionManagement } from '@objectstack/spec/ai';
+import { CICDPipelineConfig, CodeGenerationConfig, CodeGenerationTarget, DeploymentStrategy, DevOpsTool, DevelopmentConfig, GitHubIntegration, IntegrationConfig, MonitoringConfig, PipelineStage, TestingConfig, VercelIntegration, VersionManagement } from '@objectstack/spec/ai';
+import type { CICDPipelineConfig, CodeGenerationConfig, CodeGenerationTarget, DeploymentStrategy, DevOpsTool, DevelopmentConfig, GitHubIntegration, IntegrationConfig, MonitoringConfig, PipelineStage, TestingConfig, VercelIntegration, VersionManagement } from '@objectstack/spec/ai';
 
 // Validate data
 const result = CICDPipelineConfig.parse(data);
@@ -176,42 +176,6 @@ Code generation target
 | **healthCheckTimeout** | `integer` | ✅ | Health check timeout in seconds |
 | **autoRollback** | `boolean` | ✅ | Automatically rollback on failure |
 | **smokeTests** | `string[]` | optional | Smoke test commands to run post-deployment |
-
-
----
-
-## DevOpsAgent
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **name** | `string` | ✅ | Agent unique identifier |
-| **label** | `string` | ✅ | Agent display name |
-| **avatar** | `string` | optional |  |
-| **role** | `string` | ✅ | The persona/role (e.g. "Senior Support Engineer") |
-| **instructions** | `string` | ✅ | System Prompt / Prime Directives |
-| **model** | `Object` | optional |  |
-| **lifecycle** | `Object` | optional | State machine defining the agent conversation follow and constraints |
-| **skills** | `string[]` | optional | Skill names to attach (Agent→Skill→Tool architecture) |
-| **tools** | `Object[]` | optional | Direct tool references (legacy fallback) |
-| **knowledge** | `Object` | optional | RAG access |
-| **active** | `boolean` | ✅ |  |
-| **access** | `string[]` | optional | Who can chat with this agent |
-| **permissions** | `string[]` | optional | Required permissions or roles |
-| **tenantId** | `string` | optional | Tenant/Organization ID |
-| **visibility** | `Enum<'global' \| 'organization' \| 'private'>` | ✅ |  |
-| **planning** | `Object` | optional | Autonomous reasoning and planning configuration |
-| **memory** | `Object` | optional | Agent memory management |
-| **guardrails** | `Object` | optional | Safety guardrails for the agent |
-| **structuredOutput** | `Object` | optional | Structured output format and validation configuration |
-| **developmentConfig** | `Object` | ✅ | Development configuration |
-| **pipelines** | `Object[]` | optional | CI/CD pipelines |
-| **versionManagement** | `Object` | optional | Version management configuration |
-| **deploymentStrategy** | `Object` | optional | Deployment strategy |
-| **monitoring** | `Object` | optional | Monitoring configuration |
-| **integrations** | `Object` | ✅ | Integration configurations |
-| **selfIteration** | `Object` | optional | Self-iteration configuration |
 
 
 ---

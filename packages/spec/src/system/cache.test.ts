@@ -237,7 +237,7 @@ describe('CacheWarmupSchema', () => {
       strategy: 'scheduled',
       schedule: '0 0 * * *',
     });
-    expect(result.schedule).toBe('0 0 * * *');
+    expect(result.schedule).toEqual({ dialect: 'cron', source: '0 0 * * *' });
   });
 });
 

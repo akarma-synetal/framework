@@ -609,11 +609,50 @@ export class AutomationEngine implements IAutomationService {
      * Supports: comparisons (>, <, >=, <=, ==, !=, ===, !==),
      * boolean literals (true, false), and basic arithmetic.
      */
-    evaluateCondition(expression: string | { dialect?: string; source?: string }, variables: Map<string, unknown>): boolean {
-        // M9.3 transition shim: accept the new Expression envelope. Real wiring
-        // to ExpressionEngine.evaluate ships in M9.5.
-        const exprStr = typeof expression === 'string' ? expression : (expression?.source ?? '');
-        // Template replacement: {varName} → value
+    evaluateCondition(expression: string | { dialect?: string; source?: string; ast?: unknown }, variables: Map<string, unknown>): boolean {
+        // M9.5+ wiring: route Expression envelopes through @objectstack/formula
+        // ExpressionEngine. CEL is the default; legacy `{var}` template syntax
+        // is preserved as a fallback for back-compat.
+        const isEnvelope = typeof expression === 'object' && expression != null && 'dialect' in expression;
+        const dialect = isEnvelope ? (expression as { dialect?: string }).dialect : undefined;
+        const exprStr = typeof expression === 'string' ? expression : ((expression as { source?: string })?.source ?? '');
+
+        if (isEnvelope && dialect && dialect !== 'cel' && dialect !== 'flow' && dialect !== 'template') {
+            // Other dialects (cron, js) are not boolean predicates here.
+            return false;
+        }
+
+        // CEL path — bind `vars` scope for `{step.result}` style references via
+        // the equivalent `vars.step.result` CEL identifier path.
+        if (dialect === 'cel' || (isEnvelope && !dialect)) {
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                const { ExpressionEngine } = require('@objectstack/formula') as typeof import('@objectstack/formula');
+                const vars: Record<string, unknown> = {};
+                for (const [key, value] of variables) {
+                    // Convert "step.result" keys into nested object paths.
+                    const segs = key.split('.');
+                    let cursor = vars;
+                    for (let i = 0; i < segs.length - 1; i++) {
+                        if (typeof cursor[segs[i]] !== 'object' || cursor[segs[i]] === null) {
+                            cursor[segs[i]] = {};
+                        }
+                        cursor = cursor[segs[i]] as Record<string, unknown>;
+                    }
+                    cursor[segs[segs.length - 1]] = value;
+                }
+                const result = ExpressionEngine.evaluate(
+                    { dialect: 'cel', source: exprStr },
+                    { extra: { vars }, record: vars },
+                );
+                if (!result.ok) return false;
+                return Boolean(result.value);
+            } catch {
+                return false;
+            }
+        }
+
+        // Legacy template path: {varName} → value, then primitive compare.
         let resolved = exprStr;
         for (const [key, value] of variables) {
             resolved = resolved.split(`{${key}}`).join(String(value));

@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { FieldMappingSchema } from '../shared/mapping.zod';
-import { ExpressionInputSchema } from '../shared/expression.zod';
+import { ExpressionInputSchema, CronExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Data Sync Protocol - LEVEL 1: Simple Synchronization
@@ -276,7 +276,7 @@ export const DataSyncConfigSchema = lazySchema(() => z.object({
    * @example "0 * * * *" - Hourly
    * @example "*\/15 * * * *" - Every 15 minutes
    */
-  schedule: z.string().optional().describe('Cron schedule'),
+  schedule: CronExpressionInputSchema.optional().describe('Cron schedule'),
 
   /**
    * Whether sync is enabled
@@ -457,7 +457,7 @@ export const Sync = {
     sourceObject: string;
     destObject: string;
     mapping: Record<string, string>;
-    schedule?: string;
+    schedule?: string | import("../shared/expression.zod").Expression;
   }): DataSyncConfig => ({
     name: params.name,
     source: {
@@ -472,7 +472,7 @@ export const Sync = {
     syncMode: 'incremental',
     conflictResolution: 'latest_wins',
     batchSize: 100,
-    schedule: params.schedule,
+    schedule: typeof params.schedule === 'string' ? { dialect: 'cron' as const, source: params.schedule } : params.schedule,
     enabled: true,
   }),
 
@@ -485,7 +485,7 @@ export const Sync = {
     connectorInstanceId: string;
     externalResource: string;
     mapping: Record<string, string>;
-    schedule?: string;
+    schedule?: string | import("../shared/expression.zod").Expression;
   }): DataSyncConfig => ({
     name: params.name,
     source: {
@@ -501,7 +501,7 @@ export const Sync = {
     syncMode: 'incremental',
     conflictResolution: 'latest_wins',
     batchSize: 100,
-    schedule: params.schedule,
+    schedule: typeof params.schedule === 'string' ? { dialect: 'cron' as const, source: params.schedule } : params.schedule,
     enabled: true,
   }),
 
@@ -514,7 +514,7 @@ export const Sync = {
     connectorInstanceId: string;
     externalResource: string;
     mapping: Record<string, string>;
-    schedule?: string;
+    schedule?: string | import("../shared/expression.zod").Expression;
   }): DataSyncConfig => ({
     name: params.name,
     source: {
@@ -530,7 +530,7 @@ export const Sync = {
     syncMode: 'incremental',
     conflictResolution: 'latest_wins',
     batchSize: 100,
-    schedule: params.schedule,
+    schedule: typeof params.schedule === 'string' ? { dialect: 'cron' as const, source: params.schedule } : params.schedule,
     enabled: true,
   }),
 } as const;

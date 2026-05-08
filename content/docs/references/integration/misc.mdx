@@ -12,8 +12,8 @@ description: Misc protocol schemas
 ## TypeScript Usage
 
 ```typescript
-import { AckMode, ApiVersionConfig, BuildConfig, CdcConfig, DatabasePoolConfig, DeliveryGuarantee, DeploymentConfig, DlqConfig, DomainConfig, EdgeFunctionConfig, EnvironmentVariables, FileAccessPattern, FileFilterConfig, FileMetadataConfig, FileStorageProvider, FileVersioningConfig, GitHubActionsWorkflow, GitHubCommitConfig, GitHubIssueTracking, GitHubProvider, GitHubPullRequestConfig, GitHubReleaseConfig, GitHubRepository, GitRepositoryConfig, ProducerConfig, SaasProvider, SslConfig, StorageBucket, TopicQueue, VercelFramework, VercelMonitoring, VercelProject, VercelProvider, VercelTeam } from '@objectstack/spec/integration';
-import type { AckMode, ApiVersionConfig, BuildConfig, CdcConfig, DatabasePoolConfig, DeliveryGuarantee, DeploymentConfig, DlqConfig, DomainConfig, EdgeFunctionConfig, EnvironmentVariables, FileAccessPattern, FileFilterConfig, FileMetadataConfig, FileStorageProvider, FileVersioningConfig, GitHubActionsWorkflow, GitHubCommitConfig, GitHubIssueTracking, GitHubProvider, GitHubPullRequestConfig, GitHubReleaseConfig, GitHubRepository, GitRepositoryConfig, ProducerConfig, SaasProvider, SslConfig, StorageBucket, TopicQueue, VercelFramework, VercelMonitoring, VercelProject, VercelProvider, VercelTeam } from '@objectstack/spec/integration';
+import { AckMode, ApiVersionConfig, BuildConfig, CdcConfig, DatabasePoolConfig, DeliveryGuarantee, DeploymentConfig, DlqConfig, DomainConfig, EdgeFunctionConfig, EnvironmentVariables, FileAccessPattern, FileFilterConfig, FileMetadataConfig, FileStorageProvider, FileVersioningConfig, GitHubActionsWorkflow, GitHubCommitConfig, GitHubIssueTracking, GitHubProvider, GitHubReleaseConfig, GitHubRepository, GitRepositoryConfig, ProducerConfig, SaasProvider, SslConfig, StorageBucket, TopicQueue, VercelFramework, VercelMonitoring, VercelProject, VercelProvider, VercelTeam } from '@objectstack/spec/integration';
+import type { AckMode, ApiVersionConfig, BuildConfig, CdcConfig, DatabasePoolConfig, DeliveryGuarantee, DeploymentConfig, DlqConfig, DomainConfig, EdgeFunctionConfig, EnvironmentVariables, FileAccessPattern, FileFilterConfig, FileMetadataConfig, FileStorageProvider, FileVersioningConfig, GitHubActionsWorkflow, GitHubCommitConfig, GitHubIssueTracking, GitHubProvider, GitHubReleaseConfig, GitHubRepository, GitRepositoryConfig, ProducerConfig, SaasProvider, SslConfig, StorageBucket, TopicQueue, VercelFramework, VercelMonitoring, VercelProject, VercelProvider, VercelTeam } from '@objectstack/spec/integration';
 
 // Validate data
 const result = AckMode.parse(data);
@@ -317,23 +317,6 @@ GitHub provider type
 
 * `github`
 * `github_enterprise`
-
-
----
-
-## GitHubPullRequestConfig
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **titleTemplate** | `string` | optional | PR title template |
-| **bodyTemplate** | `string` | optional | PR body template |
-| **defaultReviewers** | `string[]` | optional | Default reviewers (usernames) |
-| **defaultAssignees** | `string[]` | optional | Default assignees (usernames) |
-| **defaultLabels** | `string[]` | optional | Default labels |
-| **draftByDefault** | `boolean` | ✅ | Create draft PRs by default |
-| **deleteHeadBranch** | `boolean` | ✅ | Delete head branch after merge |
 
 
 ---

@@ -10,6 +10,7 @@ import { FeedItemType, FeedFilterMode } from '../data/feed.zod';
  * Empty Properties Schema
  */
 import { lazySchema } from '../shared/lazy-schema';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 const EmptyProps = z.object({});
 
 /**
@@ -241,7 +242,7 @@ export const ElementFormPropsSchema = lazySchema(() => z.object({
   fields: z.array(z.string()).optional().describe('Fields to display (defaults to all editable fields)'),
   mode: z.enum(['create', 'edit']).optional().default('create').describe('Form mode'),
   submitLabel: I18nLabelSchema.optional().describe('Submit button label'),
-  onSubmit: z.string().optional().describe('Action expression on form submit'),
+  onSubmit: ExpressionInputSchema.optional().describe('Action expression on form submit (CEL)'),
   /** ARIA accessibility */
   aria: AriaPropsSchema.optional().describe('ARIA accessibility attributes'),
 }));

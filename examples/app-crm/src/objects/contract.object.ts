@@ -1,3 +1,4 @@
+import { P } from '@objectstack/spec';
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
@@ -188,14 +189,14 @@ export const Contract = ObjectSchema.create({
       type: 'script',
       severity: 'error',
       message: 'End Date must be after Start Date',
-      condition: 'end_date <= start_date',
+      condition: P`record.end_date <= record.start_date`,
     },
     {
       name: 'valid_contract_term',
       type: 'script',
       severity: 'error',
       message: 'Contract Term must match date range',
-      condition: 'MONTH_DIFF(end_date, start_date) != contract_term_months',
+      condition: P`((record.end_date - record.start_date) / 30) != record.contract_term_months`,
     },
   ],
   
@@ -206,7 +207,7 @@ export const Contract = ObjectSchema.create({
       objectName: 'contract',
       triggerType: 'scheduled',
       schedule: '0 0 * * *', // Daily at midnight
-      criteria: 'end_date <= TODAY() AND status = "activated"',
+      criteria: P`record.end_date <= today() && record.status == "activated"`,
       actions: [
         {
           name: 'mark_expired',
@@ -228,7 +229,7 @@ export const Contract = ObjectSchema.create({
       objectName: 'contract',
       triggerType: 'scheduled',
       schedule: '0 0 * * *', // Daily at midnight
-      criteria: 'DAYS_UNTIL(end_date) <= renewal_notice_days AND status = "activated"',
+      criteria: P`(record.end_date - today()) <= record.renewal_notice_days && record.status == "activated"`,
       actions: [
         {
           name: 'notify_renewal',

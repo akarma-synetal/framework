@@ -18,8 +18,8 @@ Enables business users to query data using natural language instead of writing c
 ## TypeScript Usage
 
 ```typescript
-import { Entity, FieldSynonymConfig, NLQAnalytics, NLQFieldMapping, NLQModelConfig, NLQParseResult, NLQRequest, NLQResponse, NLQTrainingExample, QueryContext, QueryIntent, QueryTemplate, Timeframe } from '@objectstack/spec/ai';
-import type { Entity, FieldSynonymConfig, NLQAnalytics, NLQFieldMapping, NLQModelConfig, NLQParseResult, NLQRequest, NLQResponse, NLQTrainingExample, QueryContext, QueryIntent, QueryTemplate, Timeframe } from '@objectstack/spec/ai';
+import { Entity, FieldSynonymConfig, NLQAnalytics, NLQFieldMapping, NLQParseResult, NLQRequest, NLQResponse, NLQTrainingExample, QueryContext, QueryIntent, QueryTemplate, Timeframe } from '@objectstack/spec/ai';
+import type { Entity, FieldSynonymConfig, NLQAnalytics, NLQFieldMapping, NLQParseResult, NLQRequest, NLQResponse, NLQTrainingExample, QueryContext, QueryIntent, QueryTemplate, Timeframe } from '@objectstack/spec/ai';
 
 // Validate data
 const result = Entity.parse(data);
@@ -88,30 +88,6 @@ const result = Entity.parse(data);
 | **object** | `string` | ✅ | Object name |
 | **field** | `string` | ✅ | Field name |
 | **confidence** | `number` | ✅ |  |
-
-
----
-
-## NLQModelConfig
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **modelId** | `string` | ✅ | Model from registry |
-| **systemPrompt** | `string` | optional | System prompt override |
-| **includeSchema** | `boolean` | ✅ | Include object schema in prompt |
-| **includeExamples** | `boolean` | ✅ | Include examples in prompt |
-| **enableIntentDetection** | `boolean` | ✅ |  |
-| **intentThreshold** | `number` | ✅ |  |
-| **enableEntityRecognition** | `boolean` | ✅ |  |
-| **entityRecognitionModel** | `string` | optional |  |
-| **enableFuzzyMatching** | `boolean` | ✅ | Fuzzy match field names |
-| **fuzzyMatchThreshold** | `number` | ✅ |  |
-| **enableTimeframeDetection** | `boolean` | ✅ |  |
-| **defaultTimeframe** | `string` | optional | Default timeframe if not specified |
-| **enableCaching** | `boolean` | ✅ |  |
-| **cacheTTL** | `integer` | ✅ | Cache TTL in seconds |
 
 
 ---

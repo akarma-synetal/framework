@@ -30,7 +30,7 @@ import { z } from 'zod';
  */
 
 /** Supported expression dialects. */
-export const ExpressionDialect = z.enum(['cel', 'js', 'cron']);
+export const ExpressionDialect = z.enum(['cel', 'js', 'cron', 'template']);
 export type ExpressionDialect = z.infer<typeof ExpressionDialect>;
 
 /**
@@ -85,6 +85,28 @@ export const ExpressionInputSchema = z.union([
   ExpressionSchema,
 ]);
 export type ExpressionInput = z.input<typeof ExpressionInputSchema>;
+
+/**
+ * Cron-typed input shape: a bare string is shorthand for `{ dialect: 'cron',
+ * source }` (not `cel`). Use this for `schedule` / `cronExpression` fields so
+ * authors can write `'0 9 * * 1-5'` without manually wrapping.
+ */
+export const CronExpressionInputSchema = z.union([
+  z.string().min(1).transform((source): Expression => ({ dialect: 'cron', source })),
+  ExpressionSchema,
+]);
+export type CronExpressionInput = z.input<typeof CronExpressionInputSchema>;
+
+/**
+ * Template-typed input shape: a bare string is shorthand for
+ * `{ dialect: 'template', source }`. Use this for notification subjects/bodies,
+ * titleFormat, prompt templates — anything with `{{var}}` interpolation.
+ */
+export const TemplateExpressionInputSchema = z.union([
+  z.string().min(1).transform((source): Expression => ({ dialect: 'template', source })),
+  ExpressionSchema,
+]);
+export type TemplateExpressionInput = z.input<typeof TemplateExpressionInputSchema>;
 
 /**
  * Predicate — an Expression whose evaluation is expected to be boolean.
@@ -149,3 +171,29 @@ export const F = cel;
 
 /** Predicate alias of {@link cel} — semantic shorthand for boolean conditions. */
 export const P = cel;
+
+/**
+ * Tagged template — produces a Mustache-template Expression envelope. Use for
+ * notification subjects, prompt bodies, titleFormat strings, etc. Variable
+ * scope is the same as CEL (`{{record.x}}`, `{{os.user.id}}`).
+ */
+export function tmpl(strings: TemplateStringsArray, ...values: unknown[]): Expression {
+  // Templates do not get JSON.stringify on substitution — interpolation happens
+  // at evaluate time via `{{path}}` markers, so we keep raw substitutions here.
+  let out = strings[0] ?? '';
+  for (let i = 0; i < values.length; i++) {
+    out += String(values[i]);
+    out += strings[i + 1] ?? '';
+  }
+  return { dialect: 'template', source: out };
+}
+
+/** Tagged template — produces a cron Expression envelope. */
+export function cron(strings: TemplateStringsArray, ...values: unknown[]): Expression {
+  let out = strings[0] ?? '';
+  for (let i = 0; i < values.length; i++) {
+    out += String(values[i]);
+    out += strings[i + 1] ?? '';
+  }
+  return { dialect: 'cron', source: out };
+}

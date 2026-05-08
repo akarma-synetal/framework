@@ -442,7 +442,7 @@ describe('ScheduledExportSchema', () => {
       },
     });
     expect(sched.name).toBe('weekly_account_export');
-    expect(sched.schedule.cronExpression).toBe('0 6 * * MON');
+    expect(sched.schedule.cronExpression).toEqual({ dialect: 'cron', source: '0 6 * * MON' });
     expect(sched.delivery.method).toBe('email');
     expect(sched.enabled).toBe(true);
   });
@@ -638,7 +638,7 @@ describe('ScheduleExportRequestSchema', () => {
       },
     });
     expect(req.name).toBe('weekly_account_export');
-    expect(req.schedule.cronExpression).toBe('0 6 * * MON');
+    expect(req.schedule.cronExpression).toEqual({ dialect: 'cron', source: '0 6 * * MON' });
     expect(req.delivery.method).toBe('email');
   });
 

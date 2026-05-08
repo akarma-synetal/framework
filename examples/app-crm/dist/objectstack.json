@@ -5579,7 +5579,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "annual_revenue < 0"
+            "source": "record.annual_revenue < 0"
           }
         },
         {
@@ -5599,7 +5599,10 @@
           "caseSensitive": false
         }
       ],
-      "titleFormat": "{account_number} - {name}",
+      "titleFormat": {
+        "dialect": "template",
+        "source": "{account_number} - {name}"
+      },
       "compactLayout": [
         "account_number",
         "name",
@@ -6177,7 +6180,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "end_date < start_date"
+            "source": "record.end_date < record.start_date"
           }
         },
         {
@@ -6193,11 +6196,14 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "actual_cost > budgeted_cost"
+            "source": "record.actual_cost > record.budgeted_cost"
           }
         }
       ],
-      "titleFormat": "{campaign_code} - {name}",
+      "titleFormat": {
+        "dialect": "template",
+        "source": "{campaign_code} - {name}"
+      },
       "compactLayout": [
         "campaign_code",
         "name",
@@ -6783,7 +6789,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "status = \"closed\" AND ISBLANK(resolution)"
+            "source": "record.status == \"closed\" && isBlank(record.resolution)"
           }
         },
         {
@@ -6799,7 +6805,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "is_escalated = true AND ISBLANK(escalation_reason)"
+            "source": "record.is_escalated == true && isBlank(record.escalation_reason)"
           }
         },
         {
@@ -6848,7 +6854,10 @@
           }
         }
       ],
-      "titleFormat": "{case_number} - {subject}",
+      "titleFormat": {
+        "dialect": "template",
+        "source": "{case_number} - {subject}"
+      },
       "compactLayout": [
         "case_number",
         "subject",
@@ -7511,7 +7520,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "email_opt_out = false AND ISBLANK(email)"
+            "source": "record.email_opt_out == false && isBlank(record.email)"
           }
         },
         {
@@ -7532,7 +7541,10 @@
           "caseSensitive": false
         }
       ],
-      "titleFormat": "{full_name}",
+      "titleFormat": {
+        "dialect": "template",
+        "source": "{full_name}"
+      },
       "compactLayout": [
         "full_name",
         "email",
@@ -8107,7 +8119,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "end_date <= start_date"
+            "source": "record.end_date <= record.start_date"
           }
         },
         {
@@ -8123,11 +8135,14 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "MONTH_DIFF(end_date, start_date) != contract_term_months"
+            "source": "((record.end_date - record.start_date) / 30) != record.contract_term_months"
           }
         }
       ],
-      "titleFormat": "{contract_number} - {account.name}",
+      "titleFormat": {
+        "dialect": "template",
+        "source": "{contract_number} - {account.name}"
+      },
       "compactLayout": [
         "contract_number",
         "account",
@@ -8817,7 +8832,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "ISBLANK(email)"
+            "source": "isBlank(record.email)"
           }
         },
         {
@@ -8833,7 +8848,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "is_converted = true AND ISCHANGED(company, email, first_name, last_name)"
+            "source": "record.is_converted == true && (record.company != previous.company || record.email != previous.email || record.first_name != previous.first_name || record.last_name != previous.last_name)"
           }
         }
       ],
@@ -8909,7 +8924,10 @@
           }
         }
       },
-      "titleFormat": "{full_name} - {company}",
+      "titleFormat": {
+        "dialect": "template",
+        "source": "{full_name} - {company}"
+      },
       "compactLayout": [
         "full_name",
         "company",
@@ -9523,7 +9541,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "close_date < TODAY() AND stage != \"closed_won\" AND stage != \"closed_lost\""
+            "source": "record.close_date < today() && record.stage != \"closed_won\" && record.stage != \"closed_lost\""
           }
         },
         {
@@ -9539,7 +9557,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "amount <= 0"
+            "source": "record.amount <= 0"
           }
         }
       ],
@@ -9643,7 +9661,10 @@
           }
         }
       },
-      "titleFormat": "{name} - {stage}",
+      "titleFormat": {
+        "dialect": "template",
+        "source": "{name} - {stage}"
+      },
       "compactLayout": [
         "name",
         "account",
@@ -10090,7 +10111,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "list_price < 0"
+            "source": "record.list_price < 0"
           }
         },
         {
@@ -10106,11 +10127,14 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "cost >= list_price"
+            "source": "record.cost >= record.list_price"
           }
         }
       ],
-      "titleFormat": "{product_code} - {name}",
+      "titleFormat": {
+        "dialect": "template",
+        "source": "{product_code} - {name}"
+      },
       "compactLayout": [
         "product_code",
         "name",
@@ -10305,7 +10329,10 @@
           "searchable": false,
           "multiple": false,
           "unique": false,
-          "defaultValue": "TODAY()",
+          "defaultValue": {
+            "dialect": "cel",
+            "source": "today()"
+          },
           "deleteBehavior": "set_null",
           "auditTrail": false,
           "hidden": false,
@@ -10595,7 +10622,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "expiration_date <= quote_date"
+            "source": "record.expiration_date <= record.quote_date"
           }
         },
         {
@@ -10611,11 +10638,14 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "discount > 100"
+            "source": "record.discount > 100"
           }
         }
       ],
-      "titleFormat": "{quote_number} - {name}",
+      "titleFormat": {
+        "dialect": "template",
+        "source": "{quote_number} - {name}"
+      },
       "compactLayout": [
         "quote_number",
         "name",
@@ -11196,7 +11226,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "status = \"completed\" AND ISBLANK(completed_date)"
+            "source": "record.status == \"completed\" && isBlank(record.completed_date)"
           }
         },
         {
@@ -11212,7 +11242,7 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "is_recurring = true AND ISBLANK(recurrence_type)"
+            "source": "record.is_recurring == true && isBlank(record.recurrence_type)"
           }
         },
         {
@@ -11228,11 +11258,14 @@
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "ISBLANK(related_to_account) AND ISBLANK(related_to_contact) AND ISBLANK(related_to_opportunity) AND ISBLANK(related_to_lead) AND ISBLANK(related_to_case)"
+            "source": "isBlank(record.related_to_account) && isBlank(record.related_to_contact) && isBlank(record.related_to_opportunity) && isBlank(record.related_to_lead) && isBlank(record.related_to_case)"
           }
         }
       ],
-      "titleFormat": "{subject}",
+      "titleFormat": {
+        "dialect": "template",
+        "source": "{subject}"
+      },
       "compactLayout": [
         "subject",
         "status",
@@ -13682,7 +13715,7 @@
                   "field": "number_of_employees",
                   "visibleOn": {
                     "dialect": "cel",
-                    "source": "rating >= 3"
+                    "source": "record.rating >= 3"
                   }
                 },
                 {
@@ -13690,7 +13723,7 @@
                   "required": true,
                   "visibleOn": {
                     "dialect": "cel",
-                    "source": "status == \"contacted\" || status == \"qualified\""
+                    "source": "record.status == \"contacted\" || record.status == \"qualified\""
                   }
                 },
                 {
@@ -17816,7 +17849,7 @@
           "type": "decision",
           "label": "Create Opportunity?",
           "config": {
-            "condition": "{createOpportunity} == true"
+            "condition": "vars.createOpportunity == true"
           }
         },
         {
@@ -17922,7 +17955,7 @@
           "target": "create_opportunity",
           "condition": {
             "dialect": "cel",
-            "source": "{createOpportunity} == true"
+            "source": "vars.createOpportunity == true"
           },
           "type": "default",
           "label": "Yes",
@@ -17934,7 +17967,7 @@
           "target": "mark_converted",
           "condition": {
             "dialect": "cel",
-            "source": "{createOpportunity} != true"
+            "source": "vars.createOpportunity != true"
           },
           "type": "default",
           "label": "No",
@@ -18022,7 +18055,7 @@
           "type": "decision",
           "label": "Manager Approved?",
           "config": {
-            "condition": "{approval_step_manager.result} == \"approved\""
+            "condition": "vars.approval_step_manager.result == \"approved\""
           }
         },
         {
@@ -18043,7 +18076,7 @@
           "type": "decision",
           "label": "Director Approved?",
           "config": {
-            "condition": "{approval_step_director.result} == \"approved\""
+            "condition": "vars.approval_step_director.result == \"approved\""
           }
         },
         {
@@ -18119,7 +18152,7 @@
           "target": "approval_step_director",
           "condition": {
             "dialect": "cel",
-            "source": "{approval_step_manager.result} == \"approved\""
+            "source": "vars.approval_step_manager.result == \"approved\""
           },
           "type": "default",
           "label": "Approved",
@@ -18131,7 +18164,7 @@
           "target": "notify_rejection",
           "condition": {
             "dialect": "cel",
-            "source": "{approval_step_manager.result} != \"approved\""
+            "source": "vars.approval_step_manager.result != \"approved\""
           },
           "type": "default",
           "label": "Rejected",
@@ -18150,7 +18183,7 @@
           "target": "mark_approved",
           "condition": {
             "dialect": "cel",
-            "source": "{approval_step_director.result} == \"approved\""
+            "source": "vars.approval_step_director.result == \"approved\""
           },
           "type": "default",
           "label": "Approved",
@@ -18162,7 +18195,7 @@
           "target": "notify_rejection",
           "condition": {
             "dialect": "cel",
-            "source": "{approval_step_director.result} != \"approved\""
+            "source": "vars.approval_step_director.result != \"approved\""
           },
           "type": "default",
           "label": "Rejected",
@@ -18987,7 +19020,7 @@
       "type": "criteria",
       "condition": {
         "dialect": "cel",
-        "source": "type = \"customer\" AND is_active = true"
+        "source": "record.type == \"customer\" && record.is_active == true"
       }
     },
     {
@@ -19003,7 +19036,7 @@
       "type": "criteria",
       "condition": {
         "dialect": "cel",
-        "source": "stage NOT IN (\"closed_won\", \"closed_lost\") AND amount >= 100000"
+        "source": "!(record.stage in [\"closed_won\", \"closed_lost\"]) && record.amount >= 100000"
       }
     },
     {
@@ -19019,7 +19052,7 @@
       "type": "criteria",
       "condition": {
         "dialect": "cel",
-        "source": "priority = \"critical\" AND is_closed = false"
+        "source": "record.priority == \"critical\" && record.is_closed == false"
       }
     },
     {
@@ -19035,7 +19068,7 @@
       "type": "criteria",
       "condition": {
         "dialect": "cel",
-        "source": "billing_country IN (\"US\", \"CA\", \"MX\")"
+        "source": "record.billing_country in [\"US\", \"CA\", \"MX\"]"
       }
     },
     {
@@ -19051,7 +19084,7 @@
       "type": "criteria",
       "condition": {
         "dialect": "cel",
-        "source": "billing_country IN (\"UK\", \"DE\", \"FR\", \"IT\", \"ES\")"
+        "source": "record.billing_country in [\"UK\", \"DE\", \"FR\", \"IT\", \"ES\"]"
       }
     }
   ],
@@ -19578,7 +19611,7 @@
       "handler": "contact_integrity",
       "body": {
         "language": "js",
-        "source": "\n    const { event, input } = ctx;\n    const api = ctx.api;\n    if ((event === \"beforeInsert\" || event === \"beforeUpdate\") && api) {\n      const email = typeof input.email === \"string\" ? input.email.toLowerCase() : \"\";\n      const account = typeof input.account === \"string\" ? input.account : ctx.previous?.account;\n      if (email && account) {\n        input.email = email;\n        const dup = await api.object(\"contact\").findOne({\n          filter: { email, account }\n        });\n        const dupId = dup?.id;\n        const selfId = ctx.previous?.id ?? input.id;\n        if (dup && dupId !== selfId) {\n          throw new Error(\n            `Another contact (${dupId}) with email ${email} already exists in this account.`\n          );\n        }\n      }\n    }\n    if (event === \"afterUpdate\" && api) {\n      const previous = ctx.previous;\n      const id = previous?.id ?? input.id;\n      if (!id) return;\n      const patch = {};\n      if (typeof input.email === \"string\" && input.email !== previous?.email) {\n        patch.contact_email = input.email;\n      }\n      if (typeof input.phone === \"string\" && input.phone !== previous?.phone) {\n        patch.contact_phone = input.phone;\n      }\n      if (Object.keys(patch).length === 0) return;\n      try {\n        await api.object(\"opportunity\").updateMany({\n          filter: { primary_contact: id },\n          doc: patch\n        });\n      } catch (err) {\n        console.warn(\"[contact_integrity] propagate to opportunity failed:\", err);\n      }\n    }\n    if (event === \"beforeDelete\" && api) {\n      const id = ctx.previous?.id;\n      if (!id) return;\n      const [openOpps, openQuotes, activeContracts] = await Promise.all([\n        api.object(\"opportunity\").count({\n          filter: { primary_contact: id, stage: { $nin: [\"closed_won\", \"closed_lost\"] } }\n        }),\n        api.object(\"quote\").count({\n          filter: { contact: id, status: { $nin: [\"rejected\", \"expired\"] } }\n        }),\n        api.object(\"contract\").count({\n          filter: { contact: id, status: \"activated\" }\n        })\n      ]);\n      const total = openOpps + openQuotes + activeContracts;\n      if (total > 0) {\n        throw new Error(\n          `Cannot delete contact: still referenced by ${openOpps} open opportunity(ies), ${openQuotes} active quote(s), ${activeContracts} active contract(s). Reassign first.`\n        );\n      }\n    }\n  ",
+        "source": "\n    const { event, input } = ctx;\n    const api = ctx.api;\n    if ((event === \"beforeInsert\" || event === \"beforeUpdate\") && api) {\n      const email = typeof input.email === \"string\" ? input.email.toLowerCase() : \"\";\n      const account = typeof input.account === \"string\" ? input.account : ctx.previous?.account;\n      if (email && account) {\n        input.email = email;\n        const dup = await api.object(\"contact\").findOne({\n          where: { email, account }\n        });\n        const dupId = dup?.id;\n        const selfId = ctx.previous?.id ?? input.id;\n        if (dup && dupId !== selfId) {\n          throw new Error(\n            `Another contact (${dupId}) with email ${email} already exists in this account.`\n          );\n        }\n      }\n    }\n    if (event === \"afterUpdate\" && api) {\n      const previous = ctx.previous;\n      const id = previous?.id ?? input.id;\n      if (!id) return;\n      const patch = {};\n      if (typeof input.email === \"string\" && input.email !== previous?.email) {\n        patch.contact_email = input.email;\n      }\n      if (typeof input.phone === \"string\" && input.phone !== previous?.phone) {\n        patch.contact_phone = input.phone;\n      }\n      if (Object.keys(patch).length === 0) return;\n      try {\n        await api.object(\"opportunity\").updateMany({\n          where: { primary_contact: id },\n          doc: patch\n        });\n      } catch (err) {\n        console.warn(\"[contact_integrity] propagate to opportunity failed:\", err);\n      }\n    }\n    if (event === \"beforeDelete\" && api) {\n      const id = ctx.previous?.id;\n      if (!id) return;\n      const [openOpps, openQuotes, activeContracts] = await Promise.all([\n        api.object(\"opportunity\").count({\n          where: { primary_contact: id, stage: { $nin: [\"closed_won\", \"closed_lost\"] } }\n        }),\n        api.object(\"quote\").count({\n          where: { contact: id, status: { $nin: [\"rejected\", \"expired\"] } }\n        }),\n        api.object(\"contract\").count({\n          where: { contact: id, status: \"activated\" }\n        })\n      ]);\n      const total = openOpps + openQuotes + activeContracts;\n      if (total > 0) {\n        throw new Error(\n          `Cannot delete contact: still referenced by ${openOpps} open opportunity(ies), ${openQuotes} active quote(s), ${activeContracts} active contract(s). Reassign first.`\n        );\n      }\n    }\n  ",
         "capabilities": [
           "api.read"
         ]

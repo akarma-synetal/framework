@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { TokenUsageSchema } from './cost.zod';
-import { ExpressionInputSchema } from '../shared/expression.zod';
+import { ExpressionInputSchema, CronExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * AI Agentic Orchestration Protocol
@@ -115,7 +115,7 @@ export const WorkflowFieldConditionSchema = lazySchema(() => z.object({
  */
 export const WorkflowScheduleSchema = lazySchema(() => z.object({
   type: z.enum(['cron', 'interval', 'daily', 'weekly', 'monthly']).default('cron'),
-  cron: z.string().optional().describe('Cron expression (required if type is "cron")'),
+  cron: CronExpressionInputSchema.optional().describe('Cron expression (required if type is "cron")'),
   interval: z.number().optional().describe('Interval in minutes (required if type is "interval")'),
   time: z.string().optional().describe('Time of day for daily schedules (HH:MM format)'),
   dayOfWeek: z.number().int().min(0).max(6).optional().describe('Day of week for weekly (0=Sunday)'),

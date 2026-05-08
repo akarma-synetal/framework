@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { CronExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Automation Execution Protocol
@@ -233,7 +234,7 @@ export const ScheduleStateSchema = lazySchema(() => z.object({
   flowName: z.string().describe('Flow machine name'),
 
   /** Schedule configuration */
-  cronExpression: z.string().describe('Cron expression (e.g., "0 9 * * MON-FRI")'),
+  cronExpression: CronExpressionInputSchema.describe('Cron expression — cron`0 9 * * MON-FRI`'),
   timezone: z.string().default('UTC').describe('IANA timezone for cron evaluation'),
 
   /** Runtime state */

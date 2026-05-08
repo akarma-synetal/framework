@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { FieldType } from '../data/field.zod';
+import { ExpressionInputSchema, TemplateExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * GraphQL Protocol Support
@@ -239,7 +240,7 @@ export const GraphQLQueryConfigSchema = lazySchema(() => z.object({
   cache: z.object({
     enabled: z.boolean().default(false).describe('Enable caching'),
     ttl: z.number().int().min(0).optional().describe('Cache TTL in seconds'),
-    key: z.string().optional().describe('Cache key template'),
+    key: TemplateExpressionInputSchema.optional().describe('Cache key template — supports {{var}} interpolation'),
   }).optional().describe('Query caching'),
 }));
 
@@ -397,7 +398,7 @@ export const GraphQLResolverConfigSchema = lazySchema(() => z.object({
     query: z.string().optional().describe('Query/SQL to execute'),
     
     /** For computed type */
-    expression: z.string().optional().describe('Computation expression'),
+    expression: ExpressionInputSchema.optional().describe('Computation expression — CEL formula, e.g. F`record.firstName + " " + record.lastName`'),
     dependencies: z.array(z.string()).optional().describe('Dependent fields'),
     
     /** For script type */

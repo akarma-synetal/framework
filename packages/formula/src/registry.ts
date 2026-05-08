@@ -13,6 +13,8 @@
 import type { Expression } from '@objectstack/spec';
 
 import { celEngine } from './cel-engine';
+import { cronEngine } from './cron-engine';
+import { templateEngine } from './template-engine';
 import type { DialectEngine, EvalContext, EvalResult } from './types';
 
 const registry = new Map<string, DialectEngine>();
@@ -42,10 +44,11 @@ function makeStub(dialect: string, reason: string): DialectEngine {
 
 // Real engines.
 register(celEngine);
+register(cronEngine);
+register(templateEngine);
 
-// Stubs — phased in by later milestones (M9.5+ for `js`, M9.6 for `cron`).
+// Stubs — `js` lives in @objectstack/plugin-js-vm (not yet shipped).
 register(makeStub('js', "dialect 'js' not registered. Install @objectstack/plugin-js-vm"));
-register(makeStub('cron', "dialect 'cron' not registered. Install @objectstack/plugin-cron"));
 
 /**
  * The unified evaluation entry point. Replaces the old direct calls to

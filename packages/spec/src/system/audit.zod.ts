@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Audit Log Architecture
@@ -339,29 +340,18 @@ export const SuspiciousActivityRuleSchema = lazySchema(() => z.object({
   eventTypes: z.array(AuditEventType).describe('Event types to monitor'),
   
   /**
-   * Detection condition
+   * Detection condition — accepts either a structured threshold/window object
+   * or a CEL predicate (escape hatch for advanced rules).
    */
-  condition: z.object({
-    /**
-     * Number of events that trigger the rule
-     */
-    threshold: z.number().int().positive().describe('Event threshold'),
-    
-    /**
-     * Time window in seconds
-     */
-    windowSeconds: z.number().int().positive().describe('Time window in seconds'),
-    
-    /**
-     * Grouping criteria (e.g., by actor.id, by ipAddress)
-     */
-    groupBy: z.array(z.string()).optional().describe('Grouping criteria'),
-    
-    /**
-     * Additional filters
-     */
-    filters: z.record(z.string(), z.unknown()).optional().describe('Additional filters'),
-  }).describe('Detection condition'),
+  condition: z.union([
+    z.object({
+      threshold: z.number().int().positive().describe('Event threshold'),
+      windowSeconds: z.number().int().positive().describe('Time window in seconds'),
+      groupBy: z.array(z.string()).optional().describe('Grouping criteria'),
+      filters: z.record(z.string(), z.unknown()).optional().describe('Additional filters'),
+    }),
+    ExpressionInputSchema,
+  ]).describe('Detection condition — structured threshold or CEL predicate'),
   
   /**
    * Actions to take when rule is triggered

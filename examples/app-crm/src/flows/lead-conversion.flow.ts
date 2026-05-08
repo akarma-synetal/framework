@@ -63,7 +63,7 @@ export const LeadConversionFlow: Flow = {
     },
     {
       id: 'decision_opportunity', type: 'decision', label: 'Create Opportunity?',
-      config: { condition: '{createOpportunity} == true' },
+      config: { condition: 'vars.createOpportunity == true' },
     },
     {
       id: 'create_opportunity', type: 'create_record', label: 'Create Opportunity',
@@ -105,8 +105,8 @@ export const LeadConversionFlow: Flow = {
     { id: 'e3', source: 'get_lead', target: 'create_account', type: 'default' },
     { id: 'e4', source: 'create_account', target: 'create_contact', type: 'default' },
     { id: 'e5', source: 'create_contact', target: 'decision_opportunity', type: 'default' },
-    { id: 'e6', source: 'decision_opportunity', target: 'create_opportunity', type: 'default', condition: '{createOpportunity} == true', label: 'Yes' },
-    { id: 'e7', source: 'decision_opportunity', target: 'mark_converted', type: 'default', condition: '{createOpportunity} != true', label: 'No' },
+    { id: 'e6', source: 'decision_opportunity', target: 'create_opportunity', type: 'default', condition: 'vars.createOpportunity == true', label: 'Yes' },
+    { id: 'e7', source: 'decision_opportunity', target: 'mark_converted', type: 'default', condition: 'vars.createOpportunity != true', label: 'No' },
     { id: 'e8', source: 'create_opportunity', target: 'mark_converted', type: 'default' },
     { id: 'e9', source: 'mark_converted', target: 'send_notification', type: 'default' },
     { id: 'e10', source: 'send_notification', target: 'end', type: 'default' },

@@ -1,3 +1,4 @@
+import { P } from '@objectstack/spec';
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
@@ -205,14 +206,14 @@ export const Case = ObjectSchema.create({
       type: 'script',
       severity: 'error',
       message: 'Resolution is required when closing a case',
-      condition: 'status = "closed" AND ISBLANK(resolution)',
+      condition: P`record.status == "closed" && isBlank(record.resolution)`,
     },
     {
       name: 'escalation_reason_required',
       type: 'script',
       severity: 'error',
       message: 'Escalation reason is required when escalating a case',
-      condition: 'is_escalated = true AND ISBLANK(escalation_reason)',
+      condition: P`record.is_escalated == true && isBlank(record.escalation_reason)`,
     },
     {
       name: 'case_status_progression',
@@ -237,7 +238,7 @@ export const Case = ObjectSchema.create({
       name: 'set_closed_flag',
       objectName: 'case',
       triggerType: 'on_create_or_update',
-      criteria: 'ISCHANGED(status)',
+      criteria: P`record.status != previous.status`,
       active: true,
       actions: [
         {
@@ -252,7 +253,7 @@ export const Case = ObjectSchema.create({
       name: 'set_closed_date',
       objectName: 'case',
       triggerType: 'on_update',
-      criteria: 'ISCHANGED(status) AND status = "closed"',
+      criteria: P`record.status != previous.status && record.status == "closed"`,
       active: true,
       actions: [
         {
@@ -267,7 +268,7 @@ export const Case = ObjectSchema.create({
       name: 'calculate_resolution_time',
       objectName: 'case',
       triggerType: 'on_update',
-      criteria: 'ISCHANGED(closed_date) AND NOT(ISBLANK(closed_date))',
+      criteria: P`record.closed_date != previous.closed_date && !(isBlank(record.closed_date))`,
       active: true,
       actions: [
         {
@@ -282,7 +283,7 @@ export const Case = ObjectSchema.create({
       name: 'notify_on_critical',
       objectName: 'case',
       triggerType: 'on_create_or_update',
-      criteria: 'priority = "critical"',
+      criteria: P`record.priority == "critical"`,
       active: true,
       actions: [
         {
@@ -297,7 +298,7 @@ export const Case = ObjectSchema.create({
       name: 'notify_on_escalation',
       objectName: 'case',
       triggerType: 'on_update',
-      criteria: 'ISCHANGED(is_escalated) AND is_escalated = true',
+      criteria: P`record.is_escalated != previous.is_escalated && record.is_escalated == true`,
       active: true,
       actions: [
         {

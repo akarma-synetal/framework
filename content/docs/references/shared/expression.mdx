@@ -63,7 +63,7 @@ const result = Expression.parse(data);
 
 | Property | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| **dialect** | `Enum<'cel' \| 'js' \| 'cron'>` | ✅ |  |
+| **dialect** | `Enum<'cel' \| 'js' \| 'cron' \| 'template'>` | ✅ |  |
 | **source** | `string` | optional |  |
 | **ast** | `any` | optional |  |
 | **meta** | `Object` | optional |  |
@@ -78,6 +78,7 @@ const result = Expression.parse(data);
 * `cel`
 * `js`
 * `cron`
+* `template`
 
 
 ---
@@ -100,7 +101,7 @@ const result = Expression.parse(data);
 
 | Property | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| **dialect** | `Enum<'cel' \| 'js' \| 'cron'>` | ✅ |  |
+| **dialect** | `Enum<'cel' \| 'js' \| 'cron' \| 'template'>` | ✅ |  |
 | **source** | `string` | optional |  |
 | **ast** | `any` | optional |  |
 | **meta** | `Object` | optional |  |

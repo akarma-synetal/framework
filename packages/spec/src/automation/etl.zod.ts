@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { CronExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * ETL (Extract, Transform, Load) Pipeline Protocol - LEVEL 2: Data Engineering
@@ -291,7 +292,7 @@ export const ETLPipelineSchema = lazySchema(() => z.object({
    * @example "0 *\/4 * * *" - Every 4 hours
    * @example "0 0 * * 0" - Weekly on Sunday
    */
-  schedule: z.string().optional().describe('Cron schedule expression'),
+  schedule: CronExpressionInputSchema.optional().describe('Cron schedule expression'),
 
   /**
    * Whether pipeline is enabled
@@ -415,7 +416,7 @@ export const ETL = {
     name: string;
     sourceTable: string;
     destTable: string;
-    schedule?: string;
+    schedule?: import("../shared/expression.zod").CronExpressionInput;
   }): ETLPipeline => ({
     name: params.name,
     source: {
@@ -428,7 +429,7 @@ export const ETL = {
       writeMode: 'upsert',
     },
     syncMode: 'incremental',
-    schedule: params.schedule,
+    schedule: typeof params.schedule === 'string' ? { dialect: 'cron', source: params.schedule } : params.schedule,
     enabled: true,
   }),
 
@@ -439,7 +440,7 @@ export const ETL = {
     name: string;
     apiConnector: string;
     destTable: string;
-    schedule?: string;
+    schedule?: import("../shared/expression.zod").CronExpressionInput;
   }): ETLPipeline => ({
     name: params.name,
     source: {
@@ -453,7 +454,7 @@ export const ETL = {
       writeMode: 'append',
     },
     syncMode: 'full',
-    schedule: params.schedule,
+    schedule: typeof params.schedule === 'string' ? { dialect: 'cron', source: params.schedule } : params.schedule,
     enabled: true,
   }),
 } as const;

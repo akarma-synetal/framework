@@ -1,3 +1,4 @@
+import { P } from '@objectstack/spec';
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
@@ -220,14 +221,14 @@ export const Opportunity = ObjectSchema.create({
       type: 'script',
       severity: 'warning',
       message: 'Close date should not be in the past unless opportunity is closed',
-      condition: 'close_date < TODAY() AND stage != "closed_won" AND stage != "closed_lost"',
+      condition: P`record.close_date < today() && record.stage != "closed_won" && record.stage != "closed_lost"`,
     },
     {
       name: 'amount_positive',
       type: 'script',
       severity: 'error',
       message: 'Amount must be greater than zero',
-      condition: 'amount <= 0',
+      condition: P`record.amount <= 0`,
     },
   ],
   
@@ -237,7 +238,7 @@ export const Opportunity = ObjectSchema.create({
       name: 'update_probability_by_stage',
       objectName: 'opportunity',
       triggerType: 'on_create_or_update',
-      criteria: 'ISCHANGED(stage)',
+      criteria: P`record.stage != previous.stage`,
       active: true,
       actions: [
         {
@@ -276,7 +277,7 @@ export const Opportunity = ObjectSchema.create({
       name: 'calculate_expected_revenue',
       objectName: 'opportunity',
       triggerType: 'on_create_or_update',
-      criteria: 'ISCHANGED(amount) OR ISCHANGED(probability)',
+      criteria: P`record.amount != previous.amount || record.probability != previous.probability`,
       active: true,
       actions: [
         {
@@ -291,7 +292,7 @@ export const Opportunity = ObjectSchema.create({
       name: 'notify_on_large_deal_won',
       objectName: 'opportunity',
       triggerType: 'on_update',
-      criteria: 'ISCHANGED(stage) AND stage = "closed_won" AND amount > 100000',
+      criteria: P`record.stage != previous.stage && record.stage == "closed_won" && record.amount > 100000`,
       active: true,
       actions: [
         {

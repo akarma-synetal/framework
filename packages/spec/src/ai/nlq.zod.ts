@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { TemplateExpressionInputSchema } from '../shared/expression.zod';
 import { TokenUsageSchema } from './cost.zod';
 
 /**
@@ -200,7 +201,7 @@ export const NLQModelConfigSchema = lazySchema(() => z.object({
   modelId: z.string().describe('Model from registry'),
   
   /** Prompt Engineering */
-  systemPrompt: z.string().optional().describe('System prompt override'),
+  systemPrompt: TemplateExpressionInputSchema.optional().describe('System prompt override — supports {{var}} interpolation'),
   includeSchema: z.boolean().default(true).describe('Include object schema in prompt'),
   includeExamples: z.boolean().default(true).describe('Include examples in prompt'),
   

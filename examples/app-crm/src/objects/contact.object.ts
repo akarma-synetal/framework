@@ -1,7 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
-import { F } from '@objectstack/spec';
+import { F, P } from '@objectstack/spec';
 
 export const Contact = ObjectSchema.create({
   name: 'contact',
@@ -202,7 +202,7 @@ export const Contact = ObjectSchema.create({
       type: 'script',
       severity: 'error',
       message: 'Email is required when Email Opt Out is not checked',
-      condition: 'email_opt_out = false AND ISBLANK(email)',
+      condition: P`record.email_opt_out == false && isBlank(record.email)`,
     },
     {
       name: 'email_unique_per_account',

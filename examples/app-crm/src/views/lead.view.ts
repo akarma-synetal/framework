@@ -1,3 +1,4 @@
+import { P } from '@objectstack/spec';
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { defineView } from '@objectstack/spec/ui';
@@ -647,12 +648,12 @@ export const LeadViews = defineView({
             },
             {
               field: 'number_of_employees',
-              visibleOn: 'rating >= 3',
+              visibleOn: P`record.rating >= 3`,
             },
             {
               field: 'owner',
               required: true,
-              visibleOn: 'status == "contacted" || status == "qualified"',
+              visibleOn: P`record.status == "contacted" || record.status == "qualified"`,
             },
             {
               field: 'notes',

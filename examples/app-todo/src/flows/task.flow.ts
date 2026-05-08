@@ -123,7 +123,7 @@ export const TaskCompletionFlow: Flow = {
     },
     {
       id: 'check_recurring', type: 'decision', label: 'Is Recurring Task?',
-      config: { condition: '{completedTask.is_recurring} == true' },
+      config: { condition: 'vars.completedTask.is_recurring == true' },
     },
     {
       id: 'create_next_task', type: 'create_record', label: 'Create Next Recurring Task',
@@ -147,8 +147,8 @@ export const TaskCompletionFlow: Flow = {
   edges: [
     { id: 'e1', source: 'start', target: 'get_task', type: 'default' },
     { id: 'e2', source: 'get_task', target: 'check_recurring', type: 'default' },
-    { id: 'e3', source: 'check_recurring', target: 'create_next_task', type: 'default', condition: '{completedTask.is_recurring} == true', label: 'Yes' },
-    { id: 'e4', source: 'check_recurring', target: 'end', type: 'default', condition: '{completedTask.is_recurring} != true', label: 'No' },
+    { id: 'e3', source: 'check_recurring', target: 'create_next_task', type: 'default', condition: 'vars.completedTask.is_recurring == true', label: 'Yes' },
+    { id: 'e4', source: 'check_recurring', target: 'end', type: 'default', condition: 'vars.completedTask.is_recurring != true', label: 'No' },
     { id: 'e5', source: 'create_next_task', target: 'end', type: 'default' },
   ],
 };

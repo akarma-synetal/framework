@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { PluginHealthStatusSchema } from '../kernel/plugin-lifecycle-advanced.zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * # Runtime AI Operations (AIOps) Protocol
@@ -118,8 +119,8 @@ export const SelfHealingActionSchema = lazySchema(() => z.object({
     /**
      * Custom condition expression
      */
-    customCondition: z.string().optional()
-      .describe('Custom trigger condition (e.g., "errorRate > 0.1")'),
+    customCondition: ExpressionInputSchema.optional()
+      .describe('Custom trigger condition — CEL predicate, e.g. P`metrics.errorRate > 0.1`'),
   }),
   
   /**

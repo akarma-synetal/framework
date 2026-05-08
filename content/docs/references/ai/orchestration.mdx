@@ -32,8 +32,8 @@ Use Cases:
 ## TypeScript Usage
 
 ```typescript
-import { AIOrchestrationExecutionResult, AIOrchestrationTrigger, AITaskType, AgentCommunicationProtocol, AgentGroupMember, AgentGroupRole, BatchAIOrchestrationExecution, MultiAgentGroup, WorkflowFieldCondition, WorkflowSchedule } from '@objectstack/spec/ai';
-import type { AIOrchestrationExecutionResult, AIOrchestrationTrigger, AITaskType, AgentCommunicationProtocol, AgentGroupMember, AgentGroupRole, BatchAIOrchestrationExecution, MultiAgentGroup, WorkflowFieldCondition, WorkflowSchedule } from '@objectstack/spec/ai';
+import { AIOrchestrationExecutionResult, AIOrchestrationTrigger, AITaskType, AgentCommunicationProtocol, AgentGroupMember, AgentGroupRole, BatchAIOrchestrationExecution, MultiAgentGroup, WorkflowFieldCondition } from '@objectstack/spec/ai';
+import type { AIOrchestrationExecutionResult, AIOrchestrationTrigger, AITaskType, AgentCommunicationProtocol, AgentGroupMember, AgentGroupRole, BatchAIOrchestrationExecution, MultiAgentGroup, WorkflowFieldCondition } from '@objectstack/spec/ai';
 
 // Validate data
 const result = AIOrchestrationExecutionResult.parse(data);
@@ -178,23 +178,6 @@ const result = AIOrchestrationExecutionResult.parse(data);
 | **field** | `string` | ✅ | Field name to monitor |
 | **operator** | `Enum<'changed' \| 'changed_to' \| 'changed_from' \| 'is' \| 'is_not'>` | ✅ |  |
 | **value** | `any` | optional | Value to compare against (for changed_to/changed_from/is/is_not) |
-
-
----
-
-## WorkflowSchedule
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **type** | `Enum<'cron' \| 'interval' \| 'daily' \| 'weekly' \| 'monthly'>` | ✅ |  |
-| **cron** | `string` | optional | Cron expression (required if type is "cron") |
-| **interval** | `number` | optional | Interval in minutes (required if type is "interval") |
-| **time** | `string` | optional | Time of day for daily schedules (HH:MM format) |
-| **dayOfWeek** | `integer` | optional | Day of week for weekly (0=Sunday) |
-| **dayOfMonth** | `integer` | optional | Day of month for monthly |
-| **timezone** | `string` | ✅ |  |
 
 
 ---

@@ -1,7 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
-import { F } from '@objectstack/spec';
+import { F, P } from '@objectstack/spec';
 
 /**
  * Campaign Object
@@ -216,14 +216,14 @@ export const Campaign = ObjectSchema.create({
       type: 'script',
       severity: 'error',
       message: 'End Date must be after Start Date',
-      condition: 'end_date < start_date',
+      condition: P`record.end_date < record.start_date`,
     },
     {
       name: 'actual_cost_within_budget',
       type: 'script',
       severity: 'warning',
       message: 'Actual Cost exceeds Budgeted Cost',
-      condition: 'actual_cost > budgeted_cost',
+      condition: P`record.actual_cost > record.budgeted_cost`,
     },
   ],
   
@@ -233,7 +233,7 @@ export const Campaign = ObjectSchema.create({
       name: 'campaign_completion_check',
       objectName: 'campaign',
       triggerType: 'on_read',
-      criteria: 'end_date < TODAY() AND status = "in_progress"',
+      criteria: P`record.end_date < today() && record.status == "in_progress"`,
       actions: [
         {
           name: 'mark_completed',

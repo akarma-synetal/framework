@@ -37,7 +37,7 @@ export const OpportunityApprovalFlow: Flow = {
     } as any,
     {
       id: 'decision_manager', type: 'decision', label: 'Manager Approved?',
-      config: { condition: '{approval_step_manager.result} == "approved"' },
+      config: { condition: 'vars.approval_step_manager.result == "approved"' },
     },
     {
       id: 'approval_step_director', type: 'connector_action', label: 'Sales Director Approval',
@@ -52,7 +52,7 @@ export const OpportunityApprovalFlow: Flow = {
     } as any,
     {
       id: 'decision_director', type: 'decision', label: 'Director Approved?',
-      config: { condition: '{approval_step_director.result} == "approved"' },
+      config: { condition: 'vars.approval_step_director.result == "approved"' },
     },
     {
       id: 'mark_approved', type: 'update_record', label: 'Mark as Approved',
@@ -76,11 +76,11 @@ export const OpportunityApprovalFlow: Flow = {
     { id: 'e1', source: 'start', target: 'get_opportunity', type: 'default' },
     { id: 'e2', source: 'get_opportunity', target: 'approval_step_manager', type: 'default' },
     { id: 'e3', source: 'approval_step_manager', target: 'decision_manager', type: 'default' },
-    { id: 'e4', source: 'decision_manager', target: 'approval_step_director', type: 'default', condition: '{approval_step_manager.result} == "approved"', label: 'Approved' },
-    { id: 'e5', source: 'decision_manager', target: 'notify_rejection', type: 'default', condition: '{approval_step_manager.result} != "approved"', label: 'Rejected' },
+    { id: 'e4', source: 'decision_manager', target: 'approval_step_director', type: 'default', condition: 'vars.approval_step_manager.result == "approved"', label: 'Approved' },
+    { id: 'e5', source: 'decision_manager', target: 'notify_rejection', type: 'default', condition: 'vars.approval_step_manager.result != "approved"', label: 'Rejected' },
     { id: 'e6', source: 'approval_step_director', target: 'decision_director', type: 'default' },
-    { id: 'e7', source: 'decision_director', target: 'mark_approved', type: 'default', condition: '{approval_step_director.result} == "approved"', label: 'Approved' },
-    { id: 'e8', source: 'decision_director', target: 'notify_rejection', type: 'default', condition: '{approval_step_director.result} != "approved"', label: 'Rejected' },
+    { id: 'e7', source: 'decision_director', target: 'mark_approved', type: 'default', condition: 'vars.approval_step_director.result == "approved"', label: 'Approved' },
+    { id: 'e8', source: 'decision_director', target: 'notify_rejection', type: 'default', condition: 'vars.approval_step_director.result != "approved"', label: 'Rejected' },
     { id: 'e9', source: 'mark_approved', target: 'notify_approval', type: 'default' },
     { id: 'e10', source: 'notify_approval', target: 'end', type: 'default' },
     { id: 'e11', source: 'notify_rejection', target: 'end', type: 'default' },

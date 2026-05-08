@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { TemplateExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Model Context Protocol (MCP)
@@ -349,7 +350,7 @@ export const MCPSamplingConfigSchema = lazySchema(() => z.object({
   modelPreferences: z.array(z.string()).optional().describe('Preferred model IDs in priority order'),
 
   /** System prompt for sampling context */
-  systemPrompt: z.string().optional().describe('System prompt for sampling context'),
+  systemPrompt: TemplateExpressionInputSchema.optional().describe('System prompt for sampling context — supports {{var}} interpolation'),
 }).describe('Sampling configuration for MCP'));
 
 // ==========================================

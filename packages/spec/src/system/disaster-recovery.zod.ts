@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { CronExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Backup Strategy Schema
@@ -51,7 +52,7 @@ export const BackupConfigSchema = lazySchema(() => z.object({
   /** Backup strategy */
   strategy: BackupStrategySchema.default('incremental').describe('Backup strategy'),
   /** Cron schedule for automated backups */
-  schedule: z.string().optional().describe('Cron expression for backup schedule (e.g., "0 2 * * *")'),
+  schedule: CronExpressionInputSchema.optional().describe('Cron expression for backup schedule — cron`0 2 * * *`'),
   /** Retention policy */
   retention: BackupRetentionSchema.describe('Backup retention policy'),
   /** Storage destination */
@@ -226,7 +227,7 @@ export const DisasterRecoveryPlanSchema = lazySchema(() => z.object({
     /** Enable periodic DR testing */
     enabled: z.boolean().default(false).describe('Enable automated DR testing'),
     /** Cron schedule for DR tests */
-    schedule: z.string().optional().describe('Cron expression for DR test schedule'),
+    schedule: CronExpressionInputSchema.optional().describe('Cron expression for DR test schedule'),
     /** Notification channel for test results */
     notificationChannel: z.string().optional().describe('Notification channel for DR test results'),
   }).optional().describe('Automated disaster recovery testing'),

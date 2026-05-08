@@ -115,7 +115,7 @@ export const TaskCreationActionSchema = lazySchema(() => z.object({
   subject: z.string().describe('Task subject/title'),
   description: z.string().optional().describe('Task description'),
   assignedTo: z.string().optional().describe('User ID or field reference for assignee'),
-  dueDate: z.string().optional().describe('Due date (ISO string or formula)'),
+  dueDate: ExpressionInputSchema.optional().describe('Due date — CEL expression evaluated at task creation, e.g. cel`now() + duration("P3D")`'),
   priority: z.string().optional().describe('Task priority'),
   relatedTo: z.string().optional().describe('Related record ID or field reference'),
   additionalFields: z.record(z.string(), z.unknown()).optional().describe('Additional custom fields'),

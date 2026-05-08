@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { CronExpressionInputSchema } from '../shared/expression.zod';
 import { AgentSchema, AIToolSchema } from './agent.zod';
 
 /**
@@ -551,7 +552,7 @@ export const DevOpsAgentSchema = lazySchema(() => AgentSchema.extend({
    */
   selfIteration: z.object({
     enabled: z.boolean().optional().default(true).describe('Enable self-iteration'),
-    iterationFrequency: z.string().optional().describe('Iteration frequency (cron expression)'),
+    iterationFrequency: CronExpressionInputSchema.optional().describe('Iteration frequency — cron expression'),
     optimizationGoals: z.array(z.enum([
       'performance',
       'security',
@@ -884,7 +885,7 @@ Always prioritize code quality, security, and maintainability.`,
   
   selfIteration: {
     enabled: true,
-    iterationFrequency: '0 0 * * 0', // Weekly on Sunday
+    iterationFrequency: { dialect: 'cron', source: '0 0 * * 0' }, // Weekly on Sunday
     optimizationGoals: ['code_quality', 'test_coverage', 'performance'],
     learningMode: 'balanced',
   },

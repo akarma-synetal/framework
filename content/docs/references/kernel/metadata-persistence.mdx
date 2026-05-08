@@ -12,8 +12,8 @@ description: Metadata Persistence protocol schemas
 ## TypeScript Usage
 
 ```typescript
-import { MetadataCollectionInfo, MetadataExportOptions, MetadataFallbackStrategy, MetadataFormat, MetadataImportOptions, MetadataLoadOptions, MetadataLoadResult, MetadataLoaderContract, MetadataManagerConfig, MetadataSaveOptions, MetadataSaveResult, MetadataStats, MetadataWatchEvent } from '@objectstack/spec/kernel';
-import type { MetadataCollectionInfo, MetadataExportOptions, MetadataFallbackStrategy, MetadataFormat, MetadataImportOptions, MetadataLoadOptions, MetadataLoadResult, MetadataLoaderContract, MetadataManagerConfig, MetadataSaveOptions, MetadataSaveResult, MetadataStats, MetadataWatchEvent } from '@objectstack/spec/kernel';
+import { MetadataCollectionInfo, MetadataFallbackStrategy, MetadataFormat, MetadataImportOptions, MetadataLoadResult, MetadataLoaderContract, MetadataManagerConfig, MetadataSaveOptions, MetadataSaveResult, MetadataStats, MetadataWatchEvent } from '@objectstack/spec/kernel';
+import type { MetadataCollectionInfo, MetadataFallbackStrategy, MetadataFormat, MetadataImportOptions, MetadataLoadResult, MetadataLoaderContract, MetadataManagerConfig, MetadataSaveOptions, MetadataSaveResult, MetadataStats, MetadataWatchEvent } from '@objectstack/spec/kernel';
 
 // Validate data
 const result = MetadataCollectionInfo.parse(data);
@@ -33,22 +33,6 @@ const result = MetadataCollectionInfo.parse(data);
 | **totalSize** | `integer` | optional | Total size in bytes |
 | **lastModified** | `string` | optional | Last modification date |
 | **location** | `string` | optional | Collection location |
-
-
----
-
-## MetadataExportOptions
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **output** | `string` | ✅ | Output file path |
-| **format** | `Enum<'json' \| 'yaml' \| 'typescript' \| 'javascript'>` | ✅ | Export format |
-| **filter** | `string` | optional | Filter items to export |
-| **includeStats** | `boolean` | ✅ | Include metadata statistics |
-| **compress** | `boolean` | ✅ | Compress output (gzip) |
-| **prettify** | `boolean` | ✅ | Pretty print output |
 
 
 ---
@@ -87,24 +71,6 @@ const result = MetadataCollectionInfo.parse(data);
 | **dryRun** | `boolean` | ✅ | Simulate import without saving |
 | **continueOnError** | `boolean` | ✅ | Continue if validation fails |
 | **transform** | `string` | optional | Transform items before import |
-
-
----
-
-## MetadataLoadOptions
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **patterns** | `string[]` | optional | File glob patterns |
-| **ifNoneMatch** | `string` | optional | ETag for conditional request |
-| **ifModifiedSince** | `string` | optional | Only load if modified after this date |
-| **validate** | `boolean` | ✅ | Validate against schema |
-| **useCache** | `boolean` | ✅ | Enable caching |
-| **filter** | `string` | optional | Filter predicate as string |
-| **limit** | `integer` | optional | Maximum items to load |
-| **recursive** | `boolean` | ✅ | Search subdirectories |
 
 
 ---

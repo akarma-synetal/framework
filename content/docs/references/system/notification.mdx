@@ -50,44 +50,12 @@ Supports variables for personalization and file attachments.
 ## TypeScript Usage
 
 ```typescript
-import { EmailTemplate, InAppNotification, NotificationChannel, NotificationConfig, PushNotification, SMSTemplate } from '@objectstack/spec/system';
-import type { EmailTemplate, InAppNotification, NotificationChannel, NotificationConfig, PushNotification, SMSTemplate } from '@objectstack/spec/system';
+import { NotificationChannel } from '@objectstack/spec/system';
+import type { NotificationChannel } from '@objectstack/spec/system';
 
 // Validate data
-const result = EmailTemplate.parse(data);
+const result = NotificationChannel.parse(data);
 ```
-
----
-
-## EmailTemplate
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **id** | `string` | ✅ | Template identifier |
-| **subject** | `string` | ✅ | Email subject |
-| **body** | `string` | ✅ | Email body content |
-| **bodyType** | `Enum<'text' \| 'html' \| 'markdown'>` | ✅ | Body content type |
-| **variables** | `string[]` | optional | Template variables |
-| **attachments** | `Object[]` | optional | Email attachments |
-
-
----
-
-## InAppNotification
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **title** | `string` | ✅ | Notification title |
-| **message** | `string` | ✅ | Notification message |
-| **type** | `Enum<'info' \| 'success' \| 'warning' \| 'error'>` | ✅ | Notification type |
-| **actionUrl** | `string` | optional | Action URL |
-| **dismissible** | `boolean` | ✅ | User dismissible |
-| **expiresAt** | `number` | optional | Expiration timestamp |
-
 
 ---
 
@@ -102,54 +70,6 @@ const result = EmailTemplate.parse(data);
 * `slack`
 * `teams`
 * `webhook`
-
-
----
-
-## NotificationConfig
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **id** | `string` | ✅ | Notification ID |
-| **name** | `string` | ✅ | Notification name |
-| **channel** | `Enum<'email' \| 'sms' \| 'push' \| 'in-app' \| 'slack' \| 'teams' \| 'webhook'>` | ✅ | Notification channel |
-| **template** | `Object \| Object \| Object \| Object` | ✅ | Notification template |
-| **recipients** | `Object` | ✅ | Recipients |
-| **schedule** | `Object` | optional | Scheduling |
-| **retryPolicy** | `Object` | optional | Retry policy |
-| **tracking** | `Object` | optional | Tracking configuration |
-
-
----
-
-## PushNotification
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **title** | `string` | ✅ | Notification title |
-| **body** | `string` | ✅ | Notification body |
-| **icon** | `string` | optional | Notification icon URL |
-| **badge** | `number` | optional | Badge count |
-| **data** | `Record<string, any>` | optional | Custom data |
-| **actions** | `Object[]` | optional | Notification actions |
-
-
----
-
-## SMSTemplate
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **id** | `string` | ✅ | Template identifier |
-| **message** | `string` | ✅ | SMS message content |
-| **maxLength** | `number` | ✅ | Maximum message length |
-| **variables** | `string[]` | optional | Template variables |
 
 
 ---

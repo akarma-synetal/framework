@@ -1,7 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
-import { F } from '@objectstack/spec';
+import { F, P } from '@objectstack/spec';
 import { LeadStateMachine } from './lead.state';
 
 export const Lead = ObjectSchema.create({
@@ -262,14 +262,14 @@ export const Lead = ObjectSchema.create({
       type: 'script',
       severity: 'error',
       message: 'Email is required',
-      condition: 'ISBLANK(email)',
+      condition: P`isBlank(record.email)`,
     },
     {
       name: 'cannot_edit_converted',
       type: 'script',
       severity: 'error',
       message: 'Cannot edit a converted lead',
-      condition: 'is_converted = true AND ISCHANGED(company, email, first_name, last_name)',
+      condition: P`record.is_converted == true && (record.company != previous.company || record.email != previous.email || record.first_name != previous.first_name || record.last_name != previous.last_name)`,
     },
   ],
   
@@ -278,7 +278,7 @@ export const Lead = ObjectSchema.create({
       name: 'auto_qualify_high_score_leads',
       objectName: 'lead',
       triggerType: 'on_create_or_update',
-      criteria: 'rating >= 4 AND status = "new"',
+      criteria: P`record.rating >= 4 && record.status == "new"`,
       active: true,
       actions: [
         {
@@ -293,7 +293,7 @@ export const Lead = ObjectSchema.create({
       name: 'notify_owner_on_high_score_lead',
       objectName: 'lead',
       triggerType: 'on_create_or_update',
-      criteria: 'ISCHANGED(rating) AND rating >= 4.5',
+      criteria: P`record.rating != previous.rating && record.rating >= 4.5`,
       active: true,
       actions: [
         {

@@ -40,31 +40,12 @@ encryption: \{ enabled: true, algorithm: 'AES-256-GCM' \},
 ## TypeScript Usage
 
 ```typescript
-import { BackupConfig, BackupRetention, BackupStrategy, DisasterRecoveryPlan, FailoverConfig, FailoverMode, RPO, RTO } from '@objectstack/spec/system';
-import type { BackupConfig, BackupRetention, BackupStrategy, DisasterRecoveryPlan, FailoverConfig, FailoverMode, RPO, RTO } from '@objectstack/spec/system';
+import { BackupRetention, BackupStrategy, FailoverConfig, FailoverMode, RPO, RTO } from '@objectstack/spec/system';
+import type { BackupRetention, BackupStrategy, FailoverConfig, FailoverMode, RPO, RTO } from '@objectstack/spec/system';
 
 // Validate data
-const result = BackupConfig.parse(data);
+const result = BackupRetention.parse(data);
 ```
-
----
-
-## BackupConfig
-
-Backup configuration
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **strategy** | `Enum<'full' \| 'incremental' \| 'differential'>` | ✅ | Backup strategy |
-| **schedule** | `string` | optional | Cron expression for backup schedule (e.g., "0 2 * * *") |
-| **retention** | `Object` | ✅ | Backup retention policy |
-| **destination** | `Object` | ✅ | Backup storage destination |
-| **encryption** | `Object` | optional | Backup encryption settings |
-| **compression** | `Object` | optional | Backup compression settings |
-| **verifyAfterBackup** | `boolean` | ✅ | Verify backup integrity after creation |
-
 
 ---
 
@@ -92,27 +73,6 @@ Backup strategy type
 * `full`
 * `incremental`
 * `differential`
-
-
----
-
-## DisasterRecoveryPlan
-
-Complete disaster recovery plan configuration
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **enabled** | `boolean` | ✅ | Enable disaster recovery plan |
-| **rpo** | `Object` | ✅ | Recovery Point Objective |
-| **rto** | `Object` | ✅ | Recovery Time Objective |
-| **backup** | `Object` | ✅ | Backup configuration |
-| **failover** | `Object` | optional | Multi-region failover configuration |
-| **replication** | `Object` | optional | Data replication settings |
-| **testing** | `Object` | optional | Automated disaster recovery testing |
-| **runbookUrl** | `string` | optional | URL to disaster recovery runbook/playbook |
-| **contacts** | `Object[]` | optional | Emergency contact list for DR incidents |
 
 
 ---

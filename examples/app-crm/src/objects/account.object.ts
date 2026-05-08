@@ -1,3 +1,4 @@
+import { P } from '@objectstack/spec';
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
@@ -172,7 +173,7 @@ export const Account = ObjectSchema.create({
       type: 'script',
       severity: 'error',
       message: 'Annual Revenue must be positive',
-      condition: 'annual_revenue < 0',
+      condition: P`record.annual_revenue < 0`,
     },
     {
       name: 'account_name_unique',
@@ -190,7 +191,7 @@ export const Account = ObjectSchema.create({
       name: 'update_last_activity',
       objectName: 'account',
       triggerType: 'on_update',
-      criteria: 'ISCHANGED(owner) OR ISCHANGED(type)',
+      criteria: P`record.owner != previous.owner || record.type != previous.type`,
       actions: [
         {
           name: 'set_activity_date',

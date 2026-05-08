@@ -576,6 +576,55 @@ export class ObjectQL implements IDataEngine {
   }
 
   /**
+   * Apply field defaults to an incoming insert payload. Defaults that are
+   * Expression envelopes (e.g. `{ dialect: 'cel', source: 'today()' }`,
+   * `{ dialect: 'cel', source: 'os.user.id' }`) are evaluated via
+   * `ExpressionEngine` against the calling user/org/now snapshot. Static
+   * defaults are applied verbatim. Records that already supplied a value for a
+   * field are left untouched.
+   *
+   * Implements ROADMAP §M9.9b — `defaultValue` accepts Expression so authors
+   * can replace "write a hook to default to today/current-user" with a
+   * declarative `defaultValue: cel\`today()\``.
+   */
+  private applyFieldDefaults(
+    object: string,
+    record: Record<string, unknown>,
+    execCtx?: ExecutionContext,
+    nowSnapshot?: Date,
+  ): Record<string, unknown> {
+    const schema = this.getSchema(object);
+    if (!schema || !Array.isArray((schema as any).fields)) return record;
+    const fields = (schema as any).fields as Array<{ name: string; defaultValue?: unknown }>;
+    const out = { ...record };
+    const now = nowSnapshot ?? new Date();
+    for (const f of fields) {
+      if (out[f.name] !== undefined) continue;
+      if (f.defaultValue == null) continue;
+      const dv = f.defaultValue;
+      if (typeof dv === 'object' && dv !== null && (dv as any).dialect && typeof (dv as any).source === 'string') {
+        const result = ExpressionEngine.evaluate(dv as any, {
+          now,
+          user: execCtx?.userId ? { id: String(execCtx.userId), role: execCtx?.roles?.[0] } : undefined,
+          org: execCtx?.tenantId ? { id: String(execCtx.tenantId) } : undefined,
+          record: out,
+          extra: { object },
+        });
+        if (result.ok) {
+          out[f.name] = result.value as unknown;
+        } else {
+          this.logger.warn('Failed to evaluate default expression', {
+            object, field: f.name, error: result.error,
+          });
+        }
+      } else {
+        out[f.name] = dv;
+      }
+    }
+    return out;
+  }
+
+  /**
    * Register contribution (Manifest)
    * 
    * Installs the manifest as a Package (the unit of installation),
@@ -1360,16 +1409,26 @@ export class ObjectQL implements IDataEngine {
 
       try {
         let result;
+        const nowSnap = new Date();
         if (Array.isArray(hookContext.input.data)) {
-          // Bulk Create
+          // Bulk Create — apply defaults per row
+          const rows = (hookContext.input.data as any[]).map((row) =>
+            this.applyFieldDefaults(object, row as Record<string, unknown>, opCtx.context, nowSnap),
+          );
           if (driver.bulkCreate) {
-               result = await driver.bulkCreate(object, hookContext.input.data as any[], hookContext.input.options as any);
+               result = await driver.bulkCreate(object, rows, hookContext.input.options as any);
           } else {
                // Fallback loop
-               result = await Promise.all((hookContext.input.data as any[]).map((item: any) => driver.create(object, item, hookContext.input.options as any)));
+               result = await Promise.all(rows.map((item) => driver.create(object, item, hookContext.input.options as any)));
           }
         } else {
-          result = await driver.create(object, hookContext.input.data as Record<string, unknown>, hookContext.input.options as any);
+          const row = this.applyFieldDefaults(
+            object,
+            hookContext.input.data as Record<string, unknown>,
+            opCtx.context,
+            nowSnap,
+          );
+          result = await driver.create(object, row, hookContext.input.options as any);
         }
 
         hookContext.event = 'afterInsert';

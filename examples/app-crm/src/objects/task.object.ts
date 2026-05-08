@@ -1,3 +1,4 @@
+import { P } from '@objectstack/spec';
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
@@ -200,21 +201,21 @@ export const Task = ObjectSchema.create({
       type: 'script',
       severity: 'error',
       message: 'Completed date is required when status is Completed',
-      condition: 'status = "completed" AND ISBLANK(completed_date)',
+      condition: P`record.status == "completed" && isBlank(record.completed_date)`,
     },
     {
       name: 'recurrence_fields_required',
       type: 'script',
       severity: 'error',
       message: 'Recurrence type is required for recurring tasks',
-      condition: 'is_recurring = true AND ISBLANK(recurrence_type)',
+      condition: P`record.is_recurring == true && isBlank(record.recurrence_type)`,
     },
     {
       name: 'related_to_required',
       type: 'script',
       severity: 'warning',
       message: 'At least one related record should be selected',
-      condition: 'ISBLANK(related_to_account) AND ISBLANK(related_to_contact) AND ISBLANK(related_to_opportunity) AND ISBLANK(related_to_lead) AND ISBLANK(related_to_case)',
+      condition: P`isBlank(record.related_to_account) && isBlank(record.related_to_contact) && isBlank(record.related_to_opportunity) && isBlank(record.related_to_lead) && isBlank(record.related_to_case)`,
     },
   ],
   
@@ -223,7 +224,7 @@ export const Task = ObjectSchema.create({
       name: 'set_completed_flag',
       objectName: 'task',
       triggerType: 'on_create_or_update',
-      criteria: 'ISCHANGED(status)',
+      criteria: P`record.status != previous.status`,
       active: true,
       actions: [
         {
@@ -238,7 +239,7 @@ export const Task = ObjectSchema.create({
       name: 'set_completed_date',
       objectName: 'task',
       triggerType: 'on_update',
-      criteria: 'ISCHANGED(status) AND status = "completed"',
+      criteria: P`record.status != previous.status && record.status == "completed"`,
       active: true,
       actions: [
         {
@@ -259,7 +260,7 @@ export const Task = ObjectSchema.create({
       name: 'check_overdue',
       objectName: 'task',
       triggerType: 'on_create_or_update',
-      criteria: 'due_date < TODAY() AND is_completed = false',
+      criteria: P`record.due_date < today() && record.is_completed == false`,
       active: true,
       actions: [
         {
@@ -274,7 +275,7 @@ export const Task = ObjectSchema.create({
       name: 'notify_on_urgent',
       objectName: 'task',
       triggerType: 'on_create_or_update',
-      criteria: 'priority = "urgent" AND is_completed = false',
+      criteria: P`record.priority == "urgent" && record.is_completed == false`,
       active: true,
       actions: [
         {

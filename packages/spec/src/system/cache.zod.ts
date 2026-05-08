@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { CronExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Application-Level Cache Protocol
@@ -138,7 +139,7 @@ export const CacheWarmupSchema = lazySchema(() => z.object({
   strategy: z.enum(['eager', 'lazy', 'scheduled']).default('lazy')
     .describe('Warmup strategy: eager (at startup), lazy (on first access), scheduled (cron)'),
   /** Cron schedule for scheduled warmup */
-  schedule: z.string().optional().describe('Cron expression for scheduled warmup'),
+  schedule: CronExpressionInputSchema.optional().describe('Cron expression for scheduled warmup'),
   /** Keys/patterns to warm up */
   patterns: z.array(z.string()).optional().describe('Key patterns to warm up (e.g., "user:*", "config:*")'),
   /** Maximum concurrent warmup operations */

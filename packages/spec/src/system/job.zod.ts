@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { CronExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Cron Schedule Schema
@@ -9,10 +10,7 @@ import { z } from 'zod';
 import { lazySchema } from '../shared/lazy-schema';
 export const CronScheduleSchema = lazySchema(() => z.object({
   type: z.literal('cron'),
-  expression: z.union([
-    z.string().min(1),
-    z.object({ dialect: z.literal('cron'), source: z.string().min(1), ast: z.unknown().optional() }),
-  ]).describe('Cron expression (e.g., "0 0 * * *" for daily at midnight). Build emits {dialect:"cron",source} envelope.'),
+  expression: CronExpressionInputSchema.describe('Cron expression — cron`0 0 * * *` for daily at midnight. Build emits {dialect:"cron",source} envelope.'),
   timezone: z.string().optional().default('UTC').describe('Timezone for cron execution (e.g., "America/New_York")'),
 }));
 

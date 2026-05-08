@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { CronExpressionInputSchema } from '../shared/expression.zod';
 import { BaseResponseSchema } from './contract.zod';
 
 /**
@@ -284,7 +285,7 @@ export const ScheduledExportSchema = lazySchema(() => z.object({
   filter: z.record(z.string(), z.unknown()).optional().describe('Record filter criteria'),
   templateId: z.string().optional().describe('Export template ID for field mappings'),
   schedule: z.object({
-    cronExpression: z.string().describe('Cron expression for schedule'),
+    cronExpression: CronExpressionInputSchema.describe('Cron expression for schedule'),
     timezone: z.string().default('UTC').describe('IANA timezone'),
   }).describe('Schedule timing configuration'),
   delivery: z.object({
@@ -406,7 +407,7 @@ export const ScheduleExportRequestSchema = lazySchema(() => z.object({
   filter: z.record(z.string(), z.unknown()).optional().describe('Record filter criteria'),
   templateId: z.string().optional().describe('Export template ID for field mappings'),
   schedule: z.object({
-    cronExpression: z.string().describe('Cron expression for schedule'),
+    cronExpression: CronExpressionInputSchema.describe('Cron expression for schedule'),
     timezone: z.string().default('UTC').describe('IANA timezone'),
   }).describe('Schedule timing configuration'),
   delivery: z.object({

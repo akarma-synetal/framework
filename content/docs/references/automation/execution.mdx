@@ -22,8 +22,8 @@ AWS Step Functions execution logs.
 ## TypeScript Usage
 
 ```typescript
-import { Checkpoint, ConcurrencyPolicy, ExecutionError, ExecutionErrorSeverity, ExecutionLog, ExecutionStatus, ExecutionStepLog, ScheduleState } from '@objectstack/spec/automation';
-import type { Checkpoint, ConcurrencyPolicy, ExecutionError, ExecutionErrorSeverity, ExecutionLog, ExecutionStatus, ExecutionStepLog, ScheduleState } from '@objectstack/spec/automation';
+import { Checkpoint, ConcurrencyPolicy, ExecutionError, ExecutionErrorSeverity, ExecutionLog, ExecutionStatus, ExecutionStepLog } from '@objectstack/spec/automation';
+import type { Checkpoint, ConcurrencyPolicy, ExecutionError, ExecutionErrorSeverity, ExecutionLog, ExecutionStatus, ExecutionStepLog } from '@objectstack/spec/automation';
 
 // Validate data
 const result = Checkpoint.parse(data);
@@ -151,33 +151,6 @@ const result = Checkpoint.parse(data);
 | **output** | `Record<string, any>` | optional | Output data produced by the node |
 | **error** | `Object` | optional | Error details if step failed |
 | **retryAttempt** | `integer` | optional | Retry attempt number (0 = first try) |
-
-
----
-
-## ScheduleState
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **id** | `string` | ✅ | Schedule instance ID |
-| **flowName** | `string` | ✅ | Flow machine name |
-| **cronExpression** | `string` | ✅ | Cron expression (e.g., "0 9 * * MON-FRI") |
-| **timezone** | `string` | ✅ | IANA timezone for cron evaluation |
-| **status** | `Enum<'active' \| 'paused' \| 'disabled' \| 'expired'>` | ✅ | Current schedule status |
-| **nextRunAt** | `string` | optional | Next scheduled execution timestamp |
-| **lastRunAt** | `string` | optional | Last execution timestamp |
-| **lastExecutionId** | `string` | optional | Execution ID of the last run |
-| **lastRunStatus** | `Enum<'pending' \| 'running' \| 'paused' \| 'completed' \| 'failed' \| 'cancelled' \| 'timed_out' \| 'retrying'>` | optional | Status of the last run |
-| **totalRuns** | `integer` | ✅ | Total number of executions |
-| **consecutiveFailures** | `integer` | ✅ | Consecutive failed executions |
-| **startDate** | `string` | optional | Schedule effective start date |
-| **endDate** | `string` | optional | Schedule expiration date |
-| **maxRuns** | `integer` | optional | Maximum total executions before auto-disable |
-| **createdAt** | `string` | ✅ | Schedule creation timestamp |
-| **updatedAt** | `string` | optional | Last update timestamp |
-| **createdBy** | `string` | optional | User who created the schedule |
 
 
 ---

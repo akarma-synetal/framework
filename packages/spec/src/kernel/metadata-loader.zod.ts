@@ -15,6 +15,7 @@ import { z } from 'zod';
  * Supported serialization formats for metadata
  */
 import { lazySchema } from '../shared/lazy-schema';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 export const MetadataFormatSchema = lazySchema(() => z.enum(['json', 'yaml', 'typescript', 'javascript']));
 
 /**
@@ -86,10 +87,10 @@ export const MetadataLoadOptionsSchema = lazySchema(() => z.object({
   useCache: z.boolean().default(true).describe('Enable caching'),
   
   /**
-   * Filter function (serialized as string)
-   * Example: "(item) => item.name.startsWith('sys_')"
+   * Filter predicate — CEL expression evaluated against each metadata item.
+   * Example: P`item.name.startsWith('sys_')`
    */
-  filter: z.string().optional().describe('Filter predicate as string'),
+  filter: ExpressionInputSchema.optional().describe('Filter predicate (CEL)'),
   
   /**
    * Maximum number of items to load
@@ -167,9 +168,9 @@ export const MetadataExportOptionsSchema = lazySchema(() => z.object({
   format: MetadataFormatSchema.default('json').describe('Export format'),
   
   /**
-   * Filter predicate as string
+   * Filter predicate — CEL expression evaluated against each metadata item.
    */
-  filter: z.string().optional().describe('Filter items to export'),
+  filter: ExpressionInputSchema.optional().describe('Filter items to export (CEL)'),
   
   /**
    * Include statistics in export

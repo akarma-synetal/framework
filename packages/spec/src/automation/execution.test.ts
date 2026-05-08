@@ -374,7 +374,7 @@ describe('ScheduleStateSchema', () => {
       createdBy: 'user_admin',
     });
     expect(state.id).toBe('sched_001');
-    expect(state.cronExpression).toBe('0 9 * * MON-FRI');
+    expect(state.cronExpression).toEqual({ dialect: 'cron', source: '0 9 * * MON-FRI' });
     expect(state.totalRuns).toBe(42);
     expect(state.timezone).toBe('America/New_York');
   });

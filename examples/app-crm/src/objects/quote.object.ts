@@ -1,3 +1,4 @@
+import { P, cel } from '@objectstack/spec';
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
@@ -73,7 +74,7 @@ export const Quote = ObjectSchema.create({
     quote_date: Field.date({
       label: 'Quote Date',
       required: true,
-      defaultValue: 'TODAY()',
+      defaultValue: cel`today()`,
     }),
     
     expiration_date: Field.date({
@@ -184,14 +185,14 @@ export const Quote = ObjectSchema.create({
       type: 'script',
       severity: 'error',
       message: 'Expiration Date must be after Quote Date',
-      condition: 'expiration_date <= quote_date',
+      condition: P`record.expiration_date <= record.quote_date`,
     },
     {
       name: 'valid_discount',
       type: 'script',
       severity: 'error',
       message: 'Discount cannot exceed 100%',
-      condition: 'discount > 100',
+      condition: P`record.discount > 100`,
     },
   ],
   
@@ -201,7 +202,7 @@ export const Quote = ObjectSchema.create({
       name: 'quote_expired_check',
       objectName: 'quote',
       triggerType: 'on_read',
-      criteria: 'expiration_date < TODAY() AND status NOT IN ("accepted", "rejected", "expired")',
+      criteria: P`record.expiration_date < today() && !(record.status in ["accepted", "rejected", "expired"])`,
       actions: [
         {
           name: 'mark_expired',

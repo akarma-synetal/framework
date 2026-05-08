@@ -1,3 +1,4 @@
+import { P } from '@objectstack/spec';
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
@@ -141,14 +142,14 @@ export const Product = ObjectSchema.create({
       type: 'script',
       severity: 'error',
       message: 'List Price must be positive',
-      condition: 'list_price < 0',
+      condition: P`record.list_price < 0`,
     },
     {
       name: 'cost_less_than_price',
       type: 'script',
       severity: 'warning',
       message: 'Cost should be less than List Price',
-      condition: 'cost >= list_price',
+      condition: P`record.cost >= record.list_price`,
     },
   ],
 });

@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { CronExpressionInputSchema } from '../shared/expression.zod';
 import { WebhookSchema } from '../automation/webhook.zod';
 import { ConnectorAuthConfigSchema } from '../shared/connector-auth.zod';
 import { FieldMappingSchema as BaseFieldMappingSchema } from '../shared/mapping.zod';
@@ -165,7 +166,7 @@ export const DataSyncConfigSchema = lazySchema(() => z.object({
   /**
    * Sync frequency (cron expression)
    */
-  schedule: z.string().optional().describe('Cron expression for scheduled sync'),
+  schedule: CronExpressionInputSchema.optional().describe('Cron expression for scheduled sync — cron`0 */15 * * *`'),
   
   /**
    * Enable real-time sync via webhooks

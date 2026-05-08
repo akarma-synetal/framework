@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { ExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Metrics Protocol - Performance and Operational Metrics
@@ -394,24 +395,16 @@ export const ServiceLevelIndicatorSchema = lazySchema(() => z.object({
   ]).describe('SLI type'),
 
   /**
-   * Success criteria
+   * Success criteria — structured threshold/operator OR a CEL predicate.
    */
-  successCriteria: z.object({
-    /**
-     * Threshold value
-     */
-    threshold: z.number().describe('Threshold value'),
-
-    /**
-     * Comparison operator
-     */
-    operator: z.enum(['lt', 'lte', 'gt', 'gte', 'eq']).describe('Comparison operator'),
-
-    /**
-     * Percentile (for latency SLIs)
-     */
-    percentile: z.number().min(0).max(1).optional().describe('Percentile (0-1)'),
-  }).describe('Success criteria'),
+  successCriteria: z.union([
+    z.object({
+      threshold: z.number().describe('Threshold value'),
+      operator: z.enum(['lt', 'lte', 'gt', 'gte', 'eq']).describe('Comparison operator'),
+      percentile: z.number().min(0).max(1).optional().describe('Percentile (0-1)'),
+    }),
+    ExpressionInputSchema,
+  ]).describe('Success criteria — structured or CEL predicate'),
 
   /**
    * Measurement window

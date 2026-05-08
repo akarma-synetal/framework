@@ -102,8 +102,8 @@ Authentication is now imported from the canonical auth/config.zod.ts.
 ## TypeScript Usage
 
 ```typescript
-import { CircuitBreakerConfig, ConnectorAction, ConnectorHealth, ConnectorStatus, ConnectorTrigger, ConnectorType, DataSyncConfig, ErrorCategory, ErrorMappingConfig, ErrorMappingRule, HealthCheckConfig, RateLimitStrategy, RetryConfig, RetryStrategy, SyncStrategy, WebhookConfig, WebhookEvent, WebhookSignatureAlgorithm } from '@objectstack/spec/integration';
-import type { CircuitBreakerConfig, ConnectorAction, ConnectorHealth, ConnectorStatus, ConnectorTrigger, ConnectorType, DataSyncConfig, ErrorCategory, ErrorMappingConfig, ErrorMappingRule, HealthCheckConfig, RateLimitStrategy, RetryConfig, RetryStrategy, SyncStrategy, WebhookConfig, WebhookEvent, WebhookSignatureAlgorithm } from '@objectstack/spec/integration';
+import { CircuitBreakerConfig, ConnectorAction, ConnectorHealth, ConnectorStatus, ConnectorTrigger, ConnectorType, ErrorCategory, ErrorMappingConfig, ErrorMappingRule, HealthCheckConfig, RateLimitStrategy, RetryConfig, RetryStrategy, SyncStrategy, WebhookConfig, WebhookEvent, WebhookSignatureAlgorithm } from '@objectstack/spec/integration';
+import type { CircuitBreakerConfig, ConnectorAction, ConnectorHealth, ConnectorStatus, ConnectorTrigger, ConnectorType, ErrorCategory, ErrorMappingConfig, ErrorMappingRule, HealthCheckConfig, RateLimitStrategy, RetryConfig, RetryStrategy, SyncStrategy, WebhookConfig, WebhookEvent, WebhookSignatureAlgorithm } from '@objectstack/spec/integration';
 
 // Validate data
 const result = CircuitBreakerConfig.parse(data);
@@ -199,25 +199,6 @@ Connector type
 * `message_queue`
 * `api`
 * `custom`
-
-
----
-
-## DataSyncConfig
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **strategy** | `Enum<'full' \| 'incremental' \| 'upsert' \| 'append_only'>` | ✅ | Synchronization strategy |
-| **direction** | `Enum<'import' \| 'export' \| 'bidirectional'>` | ✅ | Sync direction |
-| **schedule** | `string` | optional | Cron expression for scheduled sync |
-| **realtimeSync** | `boolean` | ✅ | Enable real-time sync |
-| **timestampField** | `string` | optional | Field to track last modification time |
-| **conflictResolution** | `Enum<'source_wins' \| 'target_wins' \| 'latest_wins' \| 'manual'>` | ✅ | Conflict resolution strategy |
-| **batchSize** | `number` | ✅ | Records per batch |
-| **deleteMode** | `Enum<'hard_delete' \| 'soft_delete' \| 'ignore'>` | ✅ | Delete handling mode |
-| **filters** | `Record<string, any>` | optional | Filter criteria for selective sync |
 
 
 ---

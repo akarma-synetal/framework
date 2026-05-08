@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { TemplateExpressionInputSchema } from '../shared/expression.zod';
 
 /**
  * Email Template Schema
@@ -35,12 +36,12 @@ export const EmailTemplateSchema = lazySchema(() => z.object({
   /**
    * Email subject line (supports variable interpolation)
    */
-  subject: z.string().describe('Email subject'),
+  subject: TemplateExpressionInputSchema.describe('Email subject — supports {{var}} interpolation'),
 
   /**
    * Email body content
    */
-  body: z.string().describe('Email body content'),
+  body: TemplateExpressionInputSchema.describe('Email body content — supports {{var}} interpolation'),
 
   /**
    * Content type of the email body
@@ -87,7 +88,7 @@ export const SMSTemplateSchema = lazySchema(() => z.object({
   /**
    * SMS message content (supports variable interpolation)
    */
-  message: z.string().describe('SMS message content'),
+  message: TemplateExpressionInputSchema.describe('SMS message content — supports {{var}} interpolation'),
 
   /**
    * Maximum character length for the SMS
@@ -131,7 +132,7 @@ export const PushNotificationSchema = lazySchema(() => z.object({
   /**
    * Notification body text
    */
-  body: z.string().describe('Notification body'),
+  body: TemplateExpressionInputSchema.describe('Notification body — supports {{var}} interpolation'),
 
   /**
    * Icon URL to display with notification
@@ -184,7 +185,7 @@ export const InAppNotificationSchema = lazySchema(() => z.object({
   /**
    * Notification message content
    */
-  message: z.string().describe('Notification message'),
+  message: TemplateExpressionInputSchema.describe('Notification message — supports {{var}} interpolation'),
 
   /**
    * Notification severity type

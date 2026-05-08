@@ -26,29 +26,12 @@ Defines protocols for AI-powered runtime operations including:
 ## TypeScript Usage
 
 ```typescript
-import { AIOpsAgentConfig, AnomalyDetectionConfig, AutoScalingPolicy, PerformanceOptimization, RootCauseAnalysisRequest, RootCauseAnalysisResult, SelfHealingAction, SelfHealingConfig } from '@objectstack/spec/ai';
-import type { AIOpsAgentConfig, AnomalyDetectionConfig, AutoScalingPolicy, PerformanceOptimization, RootCauseAnalysisRequest, RootCauseAnalysisResult, SelfHealingAction, SelfHealingConfig } from '@objectstack/spec/ai';
+import { AnomalyDetectionConfig, AutoScalingPolicy, PerformanceOptimization, RootCauseAnalysisRequest, RootCauseAnalysisResult } from '@objectstack/spec/ai';
+import type { AnomalyDetectionConfig, AutoScalingPolicy, PerformanceOptimization, RootCauseAnalysisRequest, RootCauseAnalysisResult } from '@objectstack/spec/ai';
 
 // Validate data
-const result = AIOpsAgentConfig.parse(data);
+const result = AnomalyDetectionConfig.parse(data);
 ```
-
----
-
-## AIOpsAgentConfig
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **agentId** | `string` | ✅ |  |
-| **pluginId** | `string` | ✅ |  |
-| **selfHealing** | `Object` | optional |  |
-| **autoScaling** | `Object[]` | optional |  |
-| **monitoring** | `Object` | optional |  |
-| **optimization** | `Object` | optional |  |
-| **incidentResponse** | `Object` | optional |  |
-
 
 ---
 
@@ -139,41 +122,6 @@ const result = AIOpsAgentConfig.parse(data);
 | **remediation** | `Object` | optional |  |
 | **overallConfidence** | `number` | ✅ |  |
 | **timestamp** | `string` | ✅ |  |
-
-
----
-
-## SelfHealingAction
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **id** | `string` | ✅ |  |
-| **type** | `Enum<'restart' \| 'scale' \| 'rollback' \| 'clear-cache' \| 'adjust-config' \| 'execute-script' \| 'notify'>` | ✅ |  |
-| **trigger** | `Object` | ✅ |  |
-| **parameters** | `Record<string, any>` | optional |  |
-| **maxAttempts** | `integer` | ✅ |  |
-| **cooldown** | `integer` | ✅ |  |
-| **timeout** | `integer` | ✅ |  |
-| **requireApproval** | `boolean` | ✅ |  |
-| **priority** | `integer` | ✅ | Action priority (lower number = higher priority) |
-
-
----
-
-## SelfHealingConfig
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **enabled** | `boolean` | ✅ |  |
-| **strategy** | `Enum<'conservative' \| 'moderate' \| 'aggressive'>` | ✅ |  |
-| **actions** | `Object[]` | ✅ |  |
-| **anomalyDetection** | `Object` | optional |  |
-| **maxConcurrentHealing** | `integer` | ✅ | Maximum number of simultaneous healing attempts |
-| **learning** | `Object` | optional |  |
 
 
 ---

@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { TemplateExpressionInputSchema } from '../../shared/expression.zod';
 import {
   ConnectorSchema,
 } from '../connector.zod';
@@ -143,12 +144,12 @@ export const GitHubPullRequestConfigSchema = lazySchema(() => z.object({
   /**
    * Default PR title template
    */
-  titleTemplate: z.string().optional().describe('PR title template'),
+  titleTemplate: TemplateExpressionInputSchema.optional().describe('PR title template — supports {{var}} interpolation'),
   
   /**
    * Default PR body template
    */
-  bodyTemplate: z.string().optional().describe('PR body template'),
+  bodyTemplate: TemplateExpressionInputSchema.optional().describe('PR body template — supports {{var}} interpolation'),
   
   /**
    * Default reviewers

@@ -14,8 +14,8 @@ Empty Properties Schema
 ## TypeScript Usage
 
 ```typescript
-import { AIChatWindowProps, ElementButtonProps, ElementFilterProps, ElementFormProps, ElementImageProps, ElementNumberProps, ElementRecordPickerProps, ElementTextProps, PageAccordionProps, PageCardProps, PageHeaderProps, PageTabsProps, RecordActivityProps, RecordChatterProps, RecordDetailsProps, RecordHighlightsProps, RecordPathProps, RecordRelatedListProps } from '@objectstack/spec/ui';
-import type { AIChatWindowProps, ElementButtonProps, ElementFilterProps, ElementFormProps, ElementImageProps, ElementNumberProps, ElementRecordPickerProps, ElementTextProps, PageAccordionProps, PageCardProps, PageHeaderProps, PageTabsProps, RecordActivityProps, RecordChatterProps, RecordDetailsProps, RecordHighlightsProps, RecordPathProps, RecordRelatedListProps } from '@objectstack/spec/ui';
+import { AIChatWindowProps, ElementButtonProps, ElementFilterProps, ElementImageProps, ElementNumberProps, ElementRecordPickerProps, ElementTextProps, PageAccordionProps, PageCardProps, PageHeaderProps, PageTabsProps, RecordActivityProps, RecordChatterProps, RecordDetailsProps, RecordHighlightsProps, RecordPathProps, RecordRelatedListProps } from '@objectstack/spec/ui';
+import type { AIChatWindowProps, ElementButtonProps, ElementFilterProps, ElementImageProps, ElementNumberProps, ElementRecordPickerProps, ElementTextProps, PageAccordionProps, PageCardProps, PageHeaderProps, PageTabsProps, RecordActivityProps, RecordChatterProps, RecordDetailsProps, RecordHighlightsProps, RecordPathProps, RecordRelatedListProps } from '@objectstack/spec/ui';
 
 // Validate data
 const result = AIChatWindowProps.parse(data);
@@ -65,22 +65,6 @@ const result = AIChatWindowProps.parse(data);
 | **targetVariable** | `string` | optional | Page variable to store filter state |
 | **layout** | `Enum<'inline' \| 'dropdown' \| 'sidebar'>` | ✅ | Filter display layout |
 | **showSearch** | `boolean` | ✅ | Show search input |
-| **aria** | `Object` | optional | ARIA accessibility attributes |
-
-
----
-
-## ElementFormProps
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **object** | `string` | ✅ | Object for the form |
-| **fields** | `string[]` | optional | Fields to display (defaults to all editable fields) |
-| **mode** | `Enum<'create' \| 'edit'>` | ✅ | Form mode |
-| **submitLabel** | `string` | optional | Submit button label |
-| **onSubmit** | `string` | optional | Action expression on form submit |
 | **aria** | `Object` | optional | ARIA accessibility attributes |
 
 

@@ -9,7 +9,7 @@ import { ActionSchema } from '../ui/action.zod';
 /**
  * API Operations Enum
  */
-import { ExpressionInputSchema } from '../shared/expression.zod';
+import { ExpressionInputSchema , TemplateExpressionInputSchema } from '../shared/expression.zod';
 import { lazySchema } from '../shared/lazy-schema';
 export const ApiMethod = z.enum([
   'get', 'list',          // Read
@@ -451,7 +451,7 @@ const ObjectSchemaBase = z.object({
     displayFormat: z.string().optional().describe('Auto-number format pattern (e.g., "CASE-{0000}", "INV-{YYYY}-{0000}")'),
     startNumber: z.number().int().min(0).optional().describe('Starting number for autonumber (default: 1)'),
   }).optional().describe('Record name generation configuration (Salesforce pattern)'),
-  titleFormat: z.string().optional().describe('Title expression (e.g. "{name} - {code}"). Overrides displayNameField.'),
+  titleFormat: TemplateExpressionInputSchema.optional().describe('Title template — supports {{record.field}} interpolation. Overrides displayNameField.'),
   compactLayout: z.array(z.string()).optional().describe('Primary fields for hover/cards/lookups'),
   
   /** 
