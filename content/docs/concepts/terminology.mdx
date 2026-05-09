@@ -98,6 +98,12 @@ The intermediate representation of a query or schema. The Data Protocol parses a
 ### Manifest
 The entry point configuration file (Kernel Protocol) for an ObjectStack Plugin. It declares dependencies, resources, and extensions using the Manifest schema.
 
+### Source (`objectstack.config.ts`)
+The **authoring** form of an ObjectStack app or host: a TypeScript module that calls `defineStack()` (or composes one with `composeStacks()`). Source files reference Zod schemas, helper functions and `import`s — they only run inside the build/dev toolchain. Edit the source when you change *what the app is*.
+
+### Artifact (`objectstack.json`)
+The **distribution** form, produced by `objectstack build`. A single self-contained JSON document — plus an optional `objectstack-runtime.<hash>.mjs` sidecar for compiled hooks — that includes the manifest, objects, views, flows and `requires: []` capability list. Artifacts are framework-agnostic, deterministic, signable, and the only thing a production runtime actually needs. `objectstack start` (or any host calling `createDefaultHostConfig()`) can boot directly from an artifact, with **no source files on the target machine**.
+
 ---
 
 ## Interface & Logic

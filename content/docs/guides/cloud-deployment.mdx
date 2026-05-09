@@ -41,6 +41,34 @@ single-app install.
 
 Leave `OS_MODE` unset (or set it to `standalone`) to use this mode.
 
+### Mode 1b — standalone from a pre-built artifact (no host config)
+
+Since `@objectstack/runtime@4.x` the standalone path is built into the
+framework: any directory containing a compiled `dist/objectstack.json` (or
+reachable via `OS_ARTIFACT_PATH`, including an `https://` URL) can be booted
+with the **stock CLI** — no `objectstack.config.ts` required.
+
+```bash
+# Local artifact in cwd
+cd examples/app-crm
+objectstack start                          # auto-detects ./dist/objectstack.json
+
+# Explicit artifact path
+OS_ARTIFACT_PATH=/srv/apps/crm/objectstack.json objectstack start
+
+# Remote artifact over HTTPS
+OS_ARTIFACT_PATH=https://example.com/crm/objectstack.json objectstack start
+```
+
+Internally the CLI calls `createDefaultHostConfig()` from
+`@objectstack/runtime`, which wraps `createStandaloneStack()` and exposes the
+artifact's `requires` / `objects` / `manifest`. This path is **standalone-only**
+— it has no dependency on `@objectstack/service-cloud` and is the recommended
+shape for shipping an app as a single JSON deployable.
+
+For the multi-project / control-plane variant, keep using `apps/objectos`'s
+`objectstack.config.ts` (Mode 2 below) which composes cloud plugins on top.
+
 ---
 
 ## Mode 2 — cloud

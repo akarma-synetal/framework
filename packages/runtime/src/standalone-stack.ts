@@ -38,6 +38,17 @@ export type StandaloneStackConfig = z.input<typeof StandaloneStackConfigSchema>;
 export interface StandaloneStackResult {
     plugins: any[];
     api: { enableProjectScoping: false; projectResolution: 'none' };
+    /**
+     * Top-level metadata copied from the loaded artifact bundle (when an
+     * artifact was successfully loaded). These are surfaced so callers
+     * that wrap this result as a `defineStack()`-shaped config (e.g. the
+     * CLI's `serve` command without a host `objectstack.config.ts`) can
+     * still drive tier resolution, capability detection and driver
+     * auto-registration off the artifact's declarations.
+     */
+    requires?: string[];
+    objects?: any[];
+    manifest?: any;
 }
 
 type ResolvedDriverKind = 'memory' | 'turso' | 'postgres' | 'mongodb' | 'sqlite';
@@ -160,11 +171,28 @@ export async function createStandaloneStack(config?: StandaloneStackConfig): Pro
     ];
     if (artifactBundle) plugins.push(new AppPlugin(artifactBundle));
 
+    // Surface artifact-declared metadata so a caller using this result
+    // directly as a `defineStack()`-shaped config (no host
+    // `objectstack.config.ts`) can still drive CLI tier resolution
+    // and driver auto-registration. We copy *references* — no clone — so
+    // the caller can `{ ...originalConfig, ...standaloneStack }` without
+    // double-merging large object arrays.
+    const requires: string[] | undefined =
+        Array.isArray(artifactBundle?.requires)
+            ? (artifactBundle.requires.filter((c: unknown) => typeof c === 'string') as string[])
+            : undefined;
+    const objects: any[] | undefined =
+        Array.isArray(artifactBundle?.objects) ? artifactBundle.objects : undefined;
+    const manifest: any | undefined = artifactBundle?.manifest;
+
     return {
         plugins,
         api: {
             enableProjectScoping: false,
             projectResolution: 'none',
         },
+        ...(requires ? { requires } : {}),
+        ...(objects ? { objects } : {}),
+        ...(manifest ? { manifest } : {}),
     };
 }

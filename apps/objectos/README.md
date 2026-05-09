@@ -22,6 +22,13 @@ Best for: local development, quick prototyping, CI.
 
 Point ObjectOS at a third-party app bundle compiled by `objectstack build` (e.g. `examples/app-crm`). The bundle is a JSON file plus a sibling `objectstack-runtime.<hash>.mjs` that carries the compiled hook handlers; both are loaded automatically.
 
+> **Tip:** for a pure single-bundle host you do **not** need `apps/objectos` at all
+> — just run `objectstack start` from any directory that contains a
+> `dist/objectstack.json` (or set `OS_ARTIFACT_PATH` to a file path or
+> `https://` URL). The framework now ships the standalone host as
+> `createDefaultHostConfig()` in `@objectstack/runtime`. Use `apps/objectos`
+> when you need cloud / multi-project / control-plane features on top.
+
 ```bash
 # Build the example app once
 pnpm --filter @objectstack/app-crm build

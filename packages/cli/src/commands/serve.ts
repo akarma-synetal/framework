@@ -63,7 +63,7 @@ const getAvailablePort = async (startPort: number): Promise<number> => {
 };
 
 export default class Serve extends Command {
-  static override description = 'Start ObjectStack server with plugins from configuration';
+  static override description = 'Start ObjectStack server. Reads `objectstack.config.ts` if present; otherwise falls back to `dist/objectstack.json` (or OS_ARTIFACT_PATH, including http(s):// URLs) as a portable artifact.';
 
   static override args = {
     config: Args.string({ description: 'Configuration file path', required: false, default: 'objectstack.config.ts' }),
@@ -115,16 +115,37 @@ export default class Serve extends Command {
 
     const absolutePath = path.resolve(process.cwd(), args.config!);
     const relativeConfig = path.relative(process.cwd(), absolutePath);
-    
-    if (!fs.existsSync(absolutePath)) {
-      printError(`Configuration file not found: ${absolutePath}`);
-      console.log(chalk.dim('  Hint: Run `objectstack init` to create a new project'));
-      this.exit(1);
+
+    // ── Artifact-first fallback ──────────────────────────────────────
+    // If the user did not author an `objectstack.config.ts`, but a
+    // compiled artifact is reachable (explicit OS_ARTIFACT_PATH —
+    // including http(s):// URLs — or the canonical
+    // `<cwd>/dist/objectstack.json`), boot from that artifact alone.
+    // This is the same capability previously hard-coded in
+    // `apps/objectos/objectstack.config.ts`, lifted into the framework
+    // so any project can `objectstack start` against just a
+    // `dist/objectstack.json`.
+    const configMissing = !fs.existsSync(absolutePath);
+    let useArtifactFallback = false;
+    if (configMissing) {
+      const { resolveDefaultArtifactPath } = await import('@objectstack/runtime');
+      const artifactSource = resolveDefaultArtifactPath();
+      if (!artifactSource) {
+        printError(`Configuration file not found: ${absolutePath}`);
+        console.log(chalk.dim('  Hint: Run `objectstack init` to create a new project,'));
+        console.log(chalk.dim('        or run `objectstack build` first, or set OS_ARTIFACT_PATH.'));
+        this.exit(1);
+      }
+      useArtifactFallback = true;
     }
 
     // Quiet loading — only show a single spinner line
     console.log('');
-    console.log(chalk.dim(`  Loading ${relativeConfig}...`));
+    if (useArtifactFallback) {
+      console.log(chalk.dim('  No objectstack.config.ts found — booting from artifact (default host)...'));
+    } else {
+      console.log(chalk.dim(`  Loading ${relativeConfig}...`));
+    }
 
     // Track loaded plugins for summary
     const loadedPlugins: string[] = [];
@@ -184,13 +205,17 @@ export default class Serve extends Command {
       // Load configuration
       // --prebuilt: load as native ESM (no esbuild, no bundle-require) —
       // intended for production where the config has been compiled to dist/.
-      const { mod } = flags.prebuilt
-        ? { mod: await import(absolutePath.startsWith('/') ? `file://${absolutePath}` : absolutePath) }
-        : await bundleRequire({ filepath: absolutePath });
+      // --artifact-fallback: skip config loading entirely; the default-host
+      // helper will synthesize a stack from the artifact JSON below.
+      const { mod } = useArtifactFallback
+        ? { mod: { default: {} as any } }
+        : flags.prebuilt
+          ? { mod: await import(absolutePath.startsWith('/') ? `file://${absolutePath}` : absolutePath) }
+          : await bundleRequire({ filepath: absolutePath });
 
       let config = mod.default || mod;
 
-      if (!config) {
+      if (!useArtifactFallback && !config) {
         throw new Error(`No default export found in ${args.config}`);
       }
 
@@ -211,13 +236,20 @@ export default class Serve extends Command {
       // Boot-mode dispatch: standalone goes directly through
       // `@objectstack/runtime` (no cloud dependencies). runtime/cloud
       // modes go through `@objectstack/service-cloud`.
-      if (shouldBootWithLibrary(config)) {
+      if (useArtifactFallback || shouldBootWithLibrary(config)) {
         // The boot stack returns only `{plugins, api}` — preserve the
         // original stack metadata (notably `requires`, `analyticsCubes`,
         // `tiers`) so the capability resolver further down can read it.
         const originalConfig = config;
         const resolvedMode = config.bootMode ?? process.env.OS_MODE ?? 'standalone';
-        if (resolvedMode === 'standalone') {
+        if (useArtifactFallback) {
+          // Artifact-only boot — no objectstack.config.ts authored.
+          // Always use the default-host helper which is standalone-only
+          // and never depends on @objectstack/service-cloud.
+          const { createDefaultHostConfig } = await import('@objectstack/runtime');
+          const bootResult = await createDefaultHostConfig();
+          config = { ...originalConfig, ...bootResult } as any;
+        } else if (resolvedMode === 'standalone') {
           const { createStandaloneStack } = await import('@objectstack/runtime');
           const bootResult = await createStandaloneStack(config.standalone);
           config = { ...originalConfig, ...bootResult } as any;

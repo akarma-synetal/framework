@@ -80,12 +80,16 @@ os g action approve        # Generate an action
 os g flow onboarding       # Generate an automation flow
 ```
 
-### Validate and build
+### Validate, build, and run
 
 ```bash
 os validate        # Check schema correctness
-os compile         # Generate production artifact
+os compile         # Generate production artifact → dist/objectstack.json
+os start           # Boot from the compiled artifact (no config file needed)
 ```
+
+The compiled `dist/objectstack.json` is a portable, self-describing deployment unit — see
+[CLI → Source vs Artifact](/docs/getting-started/cli#source-vs-artifact) for details.
 
 </Steps>
 

@@ -11,6 +11,10 @@ export type { RuntimeConfig } from './runtime.js';
 export { createStandaloneStack } from './standalone-stack.js';
 export type { StandaloneStackConfig, StandaloneStackResult } from './standalone-stack.js';
 
+// Export Default Host (artifact-first, no objectstack.config.ts required)
+export { createDefaultHostConfig, resolveDefaultArtifactPath } from './default-host.js';
+export type { DefaultHostConfigOptions, DefaultHostConfigResult } from './default-host.js';
+
 // Export Plugins
 export { DriverPlugin } from './driver-plugin.js';
 export { AppPlugin, collectBundleHooks, collectBundleFunctions, collectBundleActions } from './app-plugin.js';

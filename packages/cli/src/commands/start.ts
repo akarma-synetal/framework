@@ -7,7 +7,7 @@ import path from 'path';
 import { printHeader, printKV, printStep, printError } from '../utils/format.js';
 
 export default class Start extends Command {
-  static override description = 'Serve the pre-compiled artifact in production mode (requires objectstack build first)';
+  static override description = 'Serve the pre-compiled artifact in production mode (no objectstack.config.ts required; OS_ARTIFACT_PATH may be a file path or http(s):// URL)';
 
   static override flags = {
     ui: Flags.boolean({ description: 'Enable Studio UI at /_studio/' }),
@@ -20,16 +20,24 @@ export default class Start extends Command {
 
     printHeader('Production Mode');
 
-    const artifactPath = process.env.OS_ARTIFACT_PATH
+    const artifactPathInput = process.env.OS_ARTIFACT_PATH
       ?? path.resolve(process.cwd(), 'dist/objectstack.json');
 
-    if (!fs.existsSync(artifactPath)) {
+    // `OS_ARTIFACT_PATH` is allowed to be an `http(s)://` URL — the
+    // runtime's loadArtifactBundle() can fetch JSON over the network.
+    // Skip the existence check for URLs (validated lazily by the loader).
+    const isUrl = /^https?:\/\//i.test(artifactPathInput);
+    const artifactPath = isUrl ? artifactPathInput : path.resolve(process.cwd(), artifactPathInput);
+
+    if (!isUrl && !fs.existsSync(artifactPath)) {
       printError(`Artifact not found: ${path.relative(process.cwd(), artifactPath)}`);
-      console.error('  Run \x1b[33mobjectstack build\x1b[0m to compile your configuration first.');
+      console.error('  Run \x1b[33mobjectstack build\x1b[0m to compile your configuration first,');
+      console.error('  or set \x1b[33mOS_ARTIFACT_PATH\x1b[0m to a file path or http(s):// URL.');
       process.exit(1);
     }
 
-    printKV('Artifact', path.relative(process.cwd(), artifactPath), '📦');
+    const displayPath = isUrl ? artifactPath : path.relative(process.cwd(), artifactPath);
+    printKV('Artifact', displayPath, '📦');
     printStep('Starting server (production mode)...');
 
     const localEnv: NodeJS.ProcessEnv = {

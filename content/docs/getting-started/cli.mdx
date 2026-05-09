@@ -68,6 +68,12 @@ os compile           # Build production artifact → dist/objectstack.json
 | `os serve [config]` | | Start the ObjectStack server with plugin auto-detection |
 | `os studio [config]` | | Launch dev server with Console UI at `/_studio/` |
 
+### Production
+
+| Command | Description |
+|---------|-------------|
+| `os start` | Serve a pre-compiled `objectstack.json` artifact (no `objectstack.config.ts` required) |
+
 #### `os init`
 
 Scaffolds a new ObjectStack project with configuration, TypeScript setup, and initial metadata files.
@@ -194,6 +200,45 @@ In development mode, `/_studio/*` requests are proxied to a Vite dev server
 (spawned automatically on an internal port) with full HMR support. In
 production, pre-built static files are served directly.
 
+### Production
+
+#### `os start`
+
+Boots a production server **directly from a compiled `objectstack.json` artifact** — no
+`objectstack.config.ts` required. This is the canonical "deploy a built ObjectStack app"
+command: hand a server one JSON file (or a URL pointing at one) and it runs.
+
+```bash
+os start                                                    # Loads ./dist/objectstack.json
+os start --port 8080                                        # Pick a port
+OS_ARTIFACT_PATH=./build/myapp.json os start                # Custom artifact path
+OS_ARTIFACT_PATH=https://cdn.example.com/app.json os start  # Remote artifact (HTTP/HTTPS)
+```
+
+**Options:**
+- `-p, --port <port>` — Server port
+- `--ui` — Enable Studio UI at `/_studio/`
+- `-v, --verbose` — Verbose output
+
+**How it resolves the artifact:**
+1. `OS_ARTIFACT_PATH` env var — accepts a local file path **or** an `http(s)://` URL
+2. `<cwd>/dist/objectstack.json` — the canonical default
+
+**What it boots:**
+- Reads the artifact's `manifest`, `objects`, `views`, `flows`, …
+- Auto-registers the platform services declared in `requires: [...]` (e.g. `ai`, `automation`, `analytics`)
+- Picks a storage driver from `OS_DATABASE_URL` (defaults to in-memory if unset)
+- Runs `standalone` boot mode by default (no control plane, no auth) — set `AUTH_SECRET`
+  and use a host config (`apps/objectos`-style) if you need single- or multi-project mode.
+
+<Callout type="info">
+**`os start` vs `os serve`:** `os serve` boots from `objectstack.config.ts` (TypeScript source).
+`os start` boots from `objectstack.json` (compiled artifact) and falls back to the same
+default-host path if you happen to run it without a config but with an artifact present.
+The two commands ultimately go through the same kernel — they just differ in which input
+shape they accept. See [Source vs Artifact](#source-vs-artifact) below.
+</Callout>
+
 ### Build & Validate
 
 | Command | Description |
@@ -234,6 +279,11 @@ os compile --json                    # JSON output for CI pipelines
 
   Artifact: dist/objectstack.json (48.2 KB)
 ```
+
+The resulting `dist/objectstack.json` is a **portable, self-describing deployment unit** —
+you can hand it to `os start` (locally or on a server), publish it to a CDN, or fetch it
+over HTTP from another runtime. See [`os start`](#os-start) and
+[Source vs Artifact](#source-vs-artifact) for details.
 
 #### `os validate`
 
@@ -521,7 +571,33 @@ os studio
 
 # 6. Build for production
 os compile
+
+# 7. Deploy: ship just the artifact
+os start                                              # locally
+OS_ARTIFACT_PATH=https://cdn.you.com/app.json os start  # remote artifact
 ```
+
+## Source vs Artifact
+
+ObjectStack treats `objectstack.config.ts` and `objectstack.json` as two **forms of the same
+schema** — authoring source vs compiled artifact:
+
+| Aspect | `objectstack.config.ts` | `objectstack.json` |
+|---|---|---|
+| Role | Authoring source | Deployable artifact |
+| Format | TypeScript (`defineStack({...})`) | Pure JSON |
+| May contain code | Yes (`handler: async (ctx) => {...}`) | No — handlers are lowered to a sibling `objectstack-runtime.<hash>.mjs` |
+| Loaded by | `os serve` (via `bundle-require`) | `os start` (via `loadArtifactBundle` — file or `http(s)://`) |
+| Schema | `ObjectStackDefinitionSchema` | Same schema, plus `runtimeModule` reference |
+| Produced by | You (or `os generate`) | `os compile` / `os build` |
+
+The artifact is **fully self-describing**: its `requires: [...]` field declares which platform
+services (`ai`, `automation`, `analytics`, …) the runtime should auto-register, so `os start`
+needs nothing other than the JSON itself to bring up a working server.
+
+This is why an artifact is the canonical "portable deployment unit" — you can host it on
+S3 / GitHub raw / a CDN, and any ObjectStack runtime can fetch and execute it with no
+additional source code on the server.
 
 ## Next Steps
 
