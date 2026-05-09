@@ -360,6 +360,54 @@ export class AuthManager {
       }));
     }
 
+    // customSession() — augments the session payload with a derived `role`
+    // field so frontend gating (e.g. AppShell's `isAdmin = user.role === 'admin'`)
+    // works without each consumer having to re-query permission sets.
+    //
+    // Better-auth's `sys_user` table doesn't carry a `role` column; instead,
+    // platform-admin status lives in `sys_user_permission_set` rows that point
+    // at the `admin_full_access` permission set with `organization_id = null`
+    // (seeded by `bootstrapPlatformAdmin`). We resolve the link transitively
+    // and synthesize `user.role = 'admin'` for any user that holds it.
+    //
+    // Org-scoped roles (e.g. tenant admin) are not promoted here — those are
+    // surfaced via the `organization` plugin's `member` payload instead.
+    const dataEngine = this.config.dataEngine;
+    if (dataEngine) {
+      const { customSession } = await import('better-auth/plugins/custom-session');
+      plugins.push(customSession(async ({ user, session }) => {
+        try {
+          if (!user?.id) return { user, session };
+          const links = await dataEngine.find('sys_user_permission_set', {
+            where: { user_id: user.id },
+            limit: 50,
+          });
+          const platformLinks = (Array.isArray(links) ? links : []).filter(
+            (l: any) => !l.organization_id,
+          );
+          if (platformLinks.length === 0) return { user, session };
+
+          const sets = await dataEngine.find('sys_permission_set', { limit: 50 });
+          const adminSet = (Array.isArray(sets) ? sets : []).find(
+            (r: any) => r.name === 'admin_full_access',
+          );
+          if (!adminSet) return { user, session };
+
+          const isPlatformAdmin = platformLinks.some(
+            (l: any) => l.permission_set_id === adminSet.id,
+          );
+          if (!isPlatformAdmin) return { user, session };
+
+          return {
+            user: { ...user, role: 'admin' },
+            session,
+          };
+        } catch {
+          return { user, session };
+        }
+      }));
+    }
+
     return plugins;
   }
 

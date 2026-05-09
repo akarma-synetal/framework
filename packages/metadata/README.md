@@ -66,7 +66,7 @@ Loaders are pluggable data sources that know how to read/write metadata from dif
 | `FilesystemLoader`  | `file:`        | ✅   | ✅    | ✅    | Implemented  |
 | `MemoryLoader`      | `memory:`      | ✅   | ✅    | ❌    | Implemented  |
 | `RemoteLoader`      | `http:`        | ✅   | ✅    | ❌    | Implemented  |
-| `DatabaseLoader`    | `datasource:`  | ✅   | ✅    | ❌    | Implemented  |
+| `DatabaseLoader`    | `datasource:`  | ✅   | ✅    | ❌    | Implemented (read-through LRU cache) |
 
 ### 3. Serializers
 
@@ -118,6 +118,73 @@ Integrates with the ObjectStack kernel plugin system:
 - Can hydrate runtime metadata from a local project artifact (`dist/objectstack.json`)
 - Supports YAML, JSON, TypeScript, and JavaScript metadata formats
 - Keeps ObjectOS metadata read-only; database persistence is not auto-enabled
+
+#### Bootstrap Modes
+
+`MetadataPluginConfigSchema.bootstrap` controls how the plugin primes metadata
+on `start()`. Pick the mode that matches the deployment target:
+
+| Mode | When to use | Behavior |
+|:-----|:------------|:---------|
+| `eager` (default) | Local dev, traditional servers | Scans filesystem (or hydrates the artifact source if set) at boot. |
+| `lazy` | Cold-start sensitive runtimes, on-demand workloads | Skips the filesystem priming pass — reads flow through `MetadataManager.load*` / `list*` and registered loaders (incl. the DatabaseLoader read-through cache). An `artifactSource` is still honored if provided. |
+| `artifact-only` | **Edge / serverless / read-only production** | Refuses to touch the filesystem. Requires `artifactSource.mode = 'local-file'`. Throws if no artifact source is configured. |
+
+```typescript
+// Edge / serverless: fail-fast if no artifact is wired
+new MetadataPlugin({
+  config: { bootstrap: 'artifact-only' },
+  artifactSource: { mode: 'local-file', path: './dist/objectstack.json' },
+});
+
+// On-demand reads via DatabaseLoader, no FS scan
+new MetadataPlugin({
+  config: { bootstrap: 'lazy' },
+});
+```
+
+#### Persistence Write Gates
+
+`MetadataManagerConfigSchema.persistence` is a two-axis runtime gate that lets
+you freeze metadata mutation in sealed deployments while leaving reads open.
+Both flags default to `true` so dev / Studio flows are unaffected.
+
+| Flag | Effect when `false` |
+|:-----|:--------------------|
+| `persistence.writable` | `MetadataManager.register()` becomes a no-op (or throws when `validation.throwOnError` is set). Use for read-only project kernels booted from a compiled artifact. |
+| `persistence.overlayWritable` | `MetadataManager.saveOverlay()` is rejected. Use to disable Studio overlays in fully-frozen production deployments. |
+
+```typescript
+new MetadataManager({
+  persistence: { writable: false, overlayWritable: false },
+});
+```
+
+#### DatabaseLoader Read-Through Cache
+
+`DatabaseLoader` wraps `load` / `loadMany` / `list` / `stat` results in a
+generic LRU cache (see `src/utils/lru-cache.ts`). Writes invalidate the
+affected entries, so reads always observe writes made through the same loader
+instance; out-of-band SQL writes are honored within `ttl` milliseconds.
+
+Configuration lives under `cache.databaseLoader`:
+
+```typescript
+new MetadataManager({
+  datasource: 'default',
+  cache: {
+    enabled: true,
+    databaseLoader: {
+      enabled: true,
+      maxSize: 500,        // Max cached (type, name) entries
+      ttl: 60_000,          // Cache TTL in milliseconds
+    },
+  },
+});
+```
+
+The cache exposes diagnostic counters (`size` / `hits` / `misses` / `hitRate`)
+through `LRUCache.stats()` for `metrics` endpoints.
 
 ## Metadata Types
 

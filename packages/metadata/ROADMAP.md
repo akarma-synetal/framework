@@ -1,6 +1,6 @@
 # @objectstack/metadata — Roadmap
 
-> **Last Updated:** 2026-02-18  
+> **Last Updated:** 2026-05-09  
 > Development roadmap for the ObjectStack Metadata Service.
 
 ## Current Status (v3.0)
@@ -27,6 +27,10 @@
 | Kernel plugin                    | `MetadataPlugin` for ObjectStack kernel integration |
 | Migration executor               | ChangeSet-based DDL operations                  |
 | Structural validation            | Basic name/type/label validation                |
+| **DatabaseLoader read-through cache** | Generic `LRUCache` (lazy TTL, promote-on-get, write invalidation) wrapping `load`/`loadMany`/`list`/`stat`. Configured via `cache.databaseLoader`. |
+| **Bootstrap modes**              | `MetadataPluginConfig.bootstrap` = `eager` \| `lazy` \| `artifact-only` — supports edge / serverless / read-only deployments. |
+| **Persistence write gates**      | `MetadataManagerConfig.persistence.{ writable, overlayWritable }` — runtime freeze for sealed kernels. |
+| **Single-source schema discipline** | Canonical `MetadataManagerConfigSchema` / `MetadataFallbackStrategySchema` live in `kernel/metadata-loader.zod.ts` and are re-exported from `system/metadata-persistence.zod.ts`. |
 
 ### 🟡 Partially Implemented
 
