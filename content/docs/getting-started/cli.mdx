@@ -99,14 +99,38 @@ os init my-app --no-install       # Skip dependency installation
 
 #### `os dev`
 
-Starts development mode. When run inside a directory with `objectstack.config.ts`, it delegates to `os serve --dev`. When run from a monorepo root, it orchestrates all packages.
+Starts development mode. Three usage shapes:
+
+1. **With local source** (`objectstack.config.ts` in cwd) — auto-compiles to `dist/objectstack.json` if missing, then delegates to `os serve --dev`.
+2. **With a pre-built artifact** (`--artifact <path|url>`) — skips auto-compile and boots the artifact directly. No `objectstack.config.ts` needed in cwd. Useful for *trying out a published app in dev mode without cloning its source.*
+3. **Monorepo root** (cwd has `pnpm-workspace.yaml`) — orchestrates `pnpm -r dev` across packages.
 
 ```bash
-os dev              # Auto-detect: single package or monorepo
-os dev my-package   # Start specific workspace package
-os dev --ui         # Dev server with Console UI
-os dev -v           # Verbose output
+os dev                     # Auto-compile cwd config, then start
+os dev my-package          # Workspace package (monorepo orchestration mode)
+os dev --ui -v             # Dev server with Studio UI + verbose
+
+# Boot a remote artifact in dev mode (no local config needed)
+os dev --artifact https://raw.githubusercontent.com/<org>/<repo>/main/dist/objectstack.json
+
+# Override storage / auth on the fly
+os dev --database file:./data/test.db --auth-secret $(openssl rand -hex 32)
 ```
+
+**Options** (the runtime overrides mirror `os start` — each flag overrides the matching env var):
+
+| Flag | Env equivalent | Purpose |
+|---|---|---|
+| `-a, --artifact <path|url>` | `OS_ARTIFACT_PATH` | Boot a pre-built artifact directly; **skips auto-compile** |
+| `-d, --database <url>` | `OS_DATABASE_URL` | `file:…` / `libsql://` / `postgres://` / `mongodb://` / `memory://` |
+| `--database-driver <kind>` | `OS_DATABASE_DRIVER` | Force `sqlite` \| `turso` \| `postgres` \| `mongodb` \| `memory` |
+| `--database-auth-token <t>` | `OS_DATABASE_AUTH_TOKEN` | libsql/Turso token |
+| `--auth-secret <s>` | `AUTH_SECRET` | Override the dev-fallback secret |
+| `--project-id <id>` | `OS_PROJECT_ID` | Project identifier (default `proj_local`) |
+| `-p, --port <n>` | `PORT` | Listen port |
+| `--ui` | — | Force Studio UI on (already on by default in dev) |
+| `--no-compile` | — | Skip the auto-compile step (errors if no artifact present) |
+| `-v, --verbose` | — | Verbose output |
 
 #### `os serve`
 
@@ -209,27 +233,57 @@ Boots a production server **directly from a compiled `objectstack.json` artifact
 command: hand a server one JSON file (or a URL pointing at one) and it runs.
 
 ```bash
-os start                                                    # Loads ./dist/objectstack.json
-os start --port 8080                                        # Pick a port
-OS_ARTIFACT_PATH=./build/myapp.json os start                # Custom artifact path
-OS_ARTIFACT_PATH=https://cdn.example.com/app.json os start  # Remote artifact (HTTP/HTTPS)
+# Quick start — load ./dist/objectstack.json with sqlite at .objectstack/data/standalone.db
+os start
+
+# Pick everything via flags (no env vars needed)
+os start \
+  --artifact ./build/myapp.json \
+  --database file:./data/prod.db \
+  --auth-secret $(openssl rand -hex 32) \
+  --port 8080
+
+# Remote artifact + Turso/libSQL backing store
+os start \
+  --artifact https://cdn.example.com/app.json \
+  --database libsql://my-db.turso.io \
+  --database-auth-token $TURSO_TOKEN
+
+# Postgres
+os start --database "postgres://user:pass@host:5432/mydb"
+
+# Pure env-var style still works (Docker / Fly / k8s friendly)
+OS_ARTIFACT_PATH=./build/myapp.json \
+OS_DATABASE_URL=file:./data/prod.db \
+AUTH_SECRET=… \
+os start
 ```
 
-**Options:**
-- `-p, --port <port>` — Server port
-- `--ui` — Enable Studio UI at `/_studio/`
-- `-v, --verbose` — Verbose output
+**Options (all override the matching env var):**
 
-**How it resolves the artifact:**
-1. `OS_ARTIFACT_PATH` env var — accepts a local file path **or** an `http(s)://` URL
-2. `<cwd>/dist/objectstack.json` — the canonical default
+| Flag | Env equivalent | Purpose |
+|---|---|---|
+| `-a, --artifact <path|url>` | `OS_ARTIFACT_PATH` | File path or `http(s)://` URL to the compiled artifact |
+| `-d, --database <url>` | `OS_DATABASE_URL` | `file:…` / `libsql://` / `postgres://` / `mongodb://` / `memory://` |
+| `--database-driver <kind>` | `OS_DATABASE_DRIVER` | Force `sqlite` \| `turso` \| `postgres` \| `mongodb` \| `memory` when the URL is ambiguous |
+| `--database-auth-token <token>` | `OS_DATABASE_AUTH_TOKEN` | Auth token for libsql/Turso |
+| `--auth-secret <secret>` | `AUTH_SECRET` | Secret for `@objectstack/plugin-auth`; without it `/api/v1/auth/*` is skipped (server still runs) |
+| `--project-id <id>` | `OS_PROJECT_ID` | Project identifier (default `proj_local`) |
+| `-p, --port <port>` | `PORT` | Listen port (default `3000`) |
+| `--ui` | — | **Opt-in.** Mount Studio / Account / Console portals at `/_studio/`, `/_account/`, `/_console/`. Off by default in `os start` (Studio is a dev/admin surface). `os dev` mounts them by default. |
+| `-v, --verbose` | — | Verbose output |
+
+**Resolution priority (artifact):** `--artifact` > `OS_ARTIFACT_PATH` > `<cwd>/dist/objectstack.json`.
+**Resolution priority (database):** `--database` > `OS_DATABASE_URL` > `TURSO_DATABASE_URL` > `file:.objectstack/data/standalone.db`.
 
 **What it boots:**
 - Reads the artifact's `manifest`, `objects`, `views`, `flows`, …
-- Auto-registers the platform services declared in `requires: [...]` (e.g. `ai`, `automation`, `analytics`)
-- Picks a storage driver from `OS_DATABASE_URL` (defaults to in-memory if unset)
-- Runs `standalone` boot mode by default (no control plane, no auth) — set `AUTH_SECRET`
-  and use a host config (`apps/objectos`-style) if you need single- or multi-project mode.
+- Auto-registers the platform services declared in `requires: [...]` (e.g. `ai`, `automation`, `analytics`, `auth`, `ui`)
+- Auto-detects the driver from the database URL scheme (`memory://` → in-memory, `libsql://`/`https://` → Turso, `postgres[ql]://`/`pg://` → pg, `mongodb[+srv]://` → MongoDB, otherwise sqlite)
+- Runs `standalone` boot mode (no control plane). For single-/multi-project mode use a host config (`apps/objectos`-style).
+
+**Authentication:**
+The `auth` capability is auto-loaded only when both (1) the artifact declares `requires: [..., 'auth']` **and** (2) a secret is provided via `--auth-secret` or `AUTH_SECRET`. Without a secret, `AuthPlugin` is **silently skipped with a warning** — the server still boots and serves data/REST routes, only `/api/v1/auth/*` (login/register) is omitted. This is intentional: `os start` is happy to run an unauthenticated, internal-network deployment.
 
 <Callout type="info">
 **`os start` vs `os serve`:** `os serve` boots from `objectstack.config.ts` (TypeScript source).

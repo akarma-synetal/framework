@@ -23,9 +23,36 @@ export default class Dev extends Command {
       description: 'Plugin tier preset forwarded to `serve`: minimal | default | full',
     }),
     compile: Flags.boolean({
-      description: 'Compile objectstack.config.ts to dist/objectstack.json before starting (auto if artifact missing)',
+      description: 'Compile objectstack.config.ts to dist/objectstack.json before starting (auto if artifact missing). Ignored when --artifact is set.',
       default: false,
       allowNo: true,
+    }),
+
+    // ── Runtime overrides (mirror `os start`) ────────────────────────
+    // These let `os dev` consume a pre-built artifact and arbitrary
+    // storage/auth without an `objectstack.config.ts` in the cwd. When
+    // `--artifact` is set the auto-compile path is skipped — there's no
+    // source to compile from. All flags override the matching env var.
+    artifact: Flags.string({
+      char: 'a',
+      description: 'Path or http(s):// URL to a compiled objectstack.json (skips auto-compile; overrides $OS_ARTIFACT_PATH)',
+    }),
+    'project-id': Flags.string({
+      description: 'Project identifier (overrides $OS_PROJECT_ID, default proj_local)',
+    }),
+    database: Flags.string({
+      char: 'd',
+      description: 'Database URL: file:./db.sqlite | libsql://... | postgres://... | mongodb://... | memory:// (overrides $OS_DATABASE_URL)',
+    }),
+    'database-driver': Flags.string({
+      description: 'Force driver kind: sqlite | turso | postgres | mongodb | memory (overrides $OS_DATABASE_DRIVER)',
+      options: ['sqlite', 'turso', 'postgres', 'mongodb', 'memory'],
+    }),
+    'database-auth-token': Flags.string({
+      description: 'Auth token for libsql/Turso connections (overrides $OS_DATABASE_AUTH_TOKEN / $TURSO_AUTH_TOKEN)',
+    }),
+    'auth-secret': Flags.string({
+      description: 'Secret for @objectstack/plugin-auth (overrides $AUTH_SECRET; dev mode injects an insecure default if neither is set)',
     }),
   };
 
@@ -37,15 +64,33 @@ export default class Dev extends Command {
 
     // ── Single-Project Mode ──────────────────────────────────────────────────
     const configPath = path.resolve(process.cwd(), 'objectstack.config.ts');
-    if (packageName === 'all' && fs.existsSync(configPath)) {
-      printKV('Config', configPath, '📂');
+    const configExists = fs.existsSync(configPath);
 
-      const artifactPath = process.env.OS_ARTIFACT_PATH
-        ?? path.resolve(process.cwd(), 'dist/objectstack.json');
+    // `--artifact` lets `os dev` boot a pre-built artifact without any
+    // local config — semantically the same as `os start` but with the
+    // dev conveniences (NODE_ENV=development, dev-fallback AUTH_SECRET,
+    // --ui default-on, dev-mode error formatting).
+    const isUrl = !!flags.artifact && /^https?:\/\//i.test(flags.artifact);
+    const inferredArtifact = flags.artifact
+      ?? process.env.OS_ARTIFACT_PATH
+      ?? path.resolve(process.cwd(), 'dist/objectstack.json');
+    const artifactPath = isUrl ? flags.artifact! : path.resolve(process.cwd(), inferredArtifact);
+    const useArtifactDirect = !!flags.artifact || !configExists;
 
-      // Auto-compile when artifact is missing or --compile is explicitly requested.
-      const needsCompile = flags.compile || !fs.existsSync(artifactPath);
+    if (packageName === 'all' && (configExists || flags.artifact)) {
+      if (configExists && !flags.artifact) {
+        printKV('Config', configPath, '📂');
+      }
+
+      // Auto-compile only when we have a config AND no explicit artifact.
+      // Explicit `--artifact` means "use this, don't rebuild".
+      const needsCompile = !flags.artifact && (flags.compile || !fs.existsSync(artifactPath));
       if (needsCompile) {
+        if (!configExists) {
+          printError('No objectstack.config.ts and no --artifact given — nothing to start.');
+          console.error(chalk.yellow('  Run `objectstack init`, `objectstack build`, or pass `--artifact <path|url>`.'));
+          process.exit(1);
+        }
         printStep('Compiling objectstack.config.ts → dist/objectstack.json...');
         const binPath = process.argv[1];
         const compileResult = spawnSync(
@@ -61,15 +106,20 @@ export default class Dev extends Command {
 
       printStep('Starting dev server (local mode)...');
 
+      const projectId = flags['project-id'] ?? process.env.OS_PROJECT_ID ?? 'proj_local';
       const localEnv: NodeJS.ProcessEnv = {
         ...process.env,
         NODE_ENV: 'development',
-        // Defaults for local mode — user's .env / existing env takes precedence.
-        OS_PROJECT_ID: process.env.OS_PROJECT_ID ?? 'proj_local',
-        OS_ARTIFACT_PATH: process.env.OS_ARTIFACT_PATH ?? artifactPath,
+        OS_PROJECT_ID: projectId,
+        OS_ARTIFACT_PATH: artifactPath,
+        ...(flags.database ? { OS_DATABASE_URL: flags.database } : {}),
+        ...(flags['database-driver'] ? { OS_DATABASE_DRIVER: flags['database-driver'] } : {}),
+        ...(flags['database-auth-token'] ? { OS_DATABASE_AUTH_TOKEN: flags['database-auth-token'] } : {}),
+        ...(flags['auth-secret'] ? { AUTH_SECRET: flags['auth-secret'] } : {}),
       };
-      printKV('Project ID', localEnv.OS_PROJECT_ID!, '🎯');
-      printKV('Artifact', path.relative(process.cwd(), localEnv.OS_ARTIFACT_PATH!), '📦');
+      printKV('Project ID', projectId, '🎯');
+      printKV('Artifact', isUrl ? artifactPath : path.relative(process.cwd(), artifactPath), '📦');
+      if (flags.database) printKV('Database', redactDbUrl(flags.database), '🗄️');
 
       const port = flags.port ?? process.env.PORT;
       const binPath = process.argv[1];
@@ -97,7 +147,7 @@ export default class Dev extends Command {
 
       if (packageName === 'all' && !isWorkspaceRoot) {
         printError(`Config file not found in ${cwd}`);
-        console.error(chalk.yellow('  Run in a directory with objectstack.config.ts, or from the monorepo root.'));
+        console.error(chalk.yellow('  Run in a directory with objectstack.config.ts, pass --artifact <path|url>, or run from the monorepo root.'));
         process.exit(1);
       }
 
@@ -114,5 +164,13 @@ export default class Dev extends Command {
       printError(`Development mode failed: ${error.message || error}`);
       process.exit(1);
     }
+  }
+}
+
+function redactDbUrl(url: string): string {
+  try {
+    return url.replace(/(\/\/[^/@:]+):[^/@]+@/, '$1:****@');
+  } catch {
+    return url;
   }
 }
