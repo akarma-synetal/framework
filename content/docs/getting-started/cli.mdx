@@ -121,7 +121,7 @@ os dev --database file:./data/test.db --auth-secret $(openssl rand -hex 32)
 
 | Flag | Env equivalent | Purpose |
 |---|---|---|
-| `-a, --artifact <path|url>` | `OS_ARTIFACT_PATH` | Boot a pre-built artifact directly; **skips auto-compile** |
+| `-a, --artifact <path\|url>` | `OS_ARTIFACT_PATH` | Boot a pre-built artifact directly; **skips auto-compile** |
 | `-d, --database <url>` | `OS_DATABASE_URL` | `file:…` / `libsql://` / `postgres://` / `mongodb://` / `memory://` |
 | `--database-driver <kind>` | `OS_DATABASE_DRIVER` | Force `sqlite` \| `turso` \| `postgres` \| `mongodb` \| `memory` |
 | `--database-auth-token <t>` | `OS_DATABASE_AUTH_TOKEN` | libsql/Turso token |
@@ -263,7 +263,7 @@ os start
 
 | Flag | Env equivalent | Purpose |
 |---|---|---|
-| `-a, --artifact <path|url>` | `OS_ARTIFACT_PATH` | File path or `http(s)://` URL to the compiled artifact |
+| `-a, --artifact <path\|url>` | `OS_ARTIFACT_PATH` | File path or `http(s)://` URL to the compiled artifact |
 | `-d, --database <url>` | `OS_DATABASE_URL` | `file:…` / `libsql://` / `postgres://` / `mongodb://` / `memory://` |
 | `--database-driver <kind>` | `OS_DATABASE_DRIVER` | Force `sqlite` \| `turso` \| `postgres` \| `mongodb` \| `memory` when the URL is ambiguous |
 | `--database-auth-token <token>` | `OS_DATABASE_AUTH_TOKEN` | Auth token for libsql/Turso |

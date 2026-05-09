@@ -16,8 +16,8 @@ Defines the lifecycle and mutability of a metadata item.
 ## TypeScript Usage
 
 ```typescript
-import { MetadataCollectionInfo, MetadataDiffResult, MetadataExportOptions, MetadataFallbackStrategy, MetadataFormat, MetadataHistoryQueryOptions, MetadataHistoryQueryResult, MetadataHistoryRecord, MetadataHistoryRetentionPolicy, MetadataImportOptions, MetadataLoadOptions, MetadataLoadResult, MetadataLoaderContract, MetadataManagerConfig, MetadataRecord, MetadataSaveOptions, MetadataSaveResult, MetadataScope, MetadataSource, MetadataState, MetadataStats, MetadataWatchEvent, PackagePublishResult } from '@objectstack/spec/system';
-import type { MetadataCollectionInfo, MetadataDiffResult, MetadataExportOptions, MetadataFallbackStrategy, MetadataFormat, MetadataHistoryQueryOptions, MetadataHistoryQueryResult, MetadataHistoryRecord, MetadataHistoryRetentionPolicy, MetadataImportOptions, MetadataLoadOptions, MetadataLoadResult, MetadataLoaderContract, MetadataManagerConfig, MetadataRecord, MetadataSaveOptions, MetadataSaveResult, MetadataScope, MetadataSource, MetadataState, MetadataStats, MetadataWatchEvent, PackagePublishResult } from '@objectstack/spec/system';
+import { MetadataCollectionInfo, MetadataDiffResult, MetadataExportOptions, MetadataFormat, MetadataHistoryQueryOptions, MetadataHistoryQueryResult, MetadataHistoryRecord, MetadataHistoryRetentionPolicy, MetadataImportOptions, MetadataLoadOptions, MetadataLoadResult, MetadataLoaderContract, MetadataRecord, MetadataSaveOptions, MetadataSaveResult, MetadataScope, MetadataSource, MetadataState, MetadataStats, MetadataWatchEvent, PackagePublishResult } from '@objectstack/spec/system';
+import type { MetadataCollectionInfo, MetadataDiffResult, MetadataExportOptions, MetadataFormat, MetadataHistoryQueryOptions, MetadataHistoryQueryResult, MetadataHistoryRecord, MetadataHistoryRetentionPolicy, MetadataImportOptions, MetadataLoadOptions, MetadataLoadResult, MetadataLoaderContract, MetadataRecord, MetadataSaveOptions, MetadataSaveResult, MetadataScope, MetadataSource, MetadataState, MetadataStats, MetadataWatchEvent, PackagePublishResult } from '@objectstack/spec/system';
 
 // Validate data
 const result = MetadataCollectionInfo.parse(data);
@@ -67,17 +67,6 @@ const result = MetadataCollectionInfo.parse(data);
 | **namespaces** | `string[]` | optional |  |
 | **output** | `string` | ✅ | Output directory or file |
 | **format** | `Enum<'json' \| 'yaml' \| 'yml' \| 'ts' \| 'js' \| 'typescript' \| 'javascript'>` | ✅ |  |
-
-
----
-
-## MetadataFallbackStrategy
-
-### Allowed Values
-
-* `filesystem`
-* `memory`
-* `none`
 
 
 ---
@@ -230,24 +219,6 @@ const result = MetadataCollectionInfo.parse(data);
 | **supportsWrite** | `boolean` | optional |  |
 | **supportsCache** | `boolean` | optional |  |
 | **capabilities** | `Object` | ✅ |  |
-
-
----
-
-## MetadataManagerConfig
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **datasource** | `string` | optional | Datasource name reference for database persistence |
-| **tableName** | `string` | ✅ | Database table name for metadata storage |
-| **fallback** | `Enum<'filesystem' \| 'memory' \| 'none'>` | ✅ | Fallback strategy when datasource is unavailable |
-| **rootDir** | `string` | optional | Root directory for filesystem-based metadata |
-| **formats** | `Enum<'json' \| 'yaml' \| 'yml' \| 'ts' \| 'js' \| 'typescript' \| 'javascript'>[]` | optional | Enabled metadata formats |
-| **watch** | `boolean` | optional | Enable file watching for filesystem loaders |
-| **cache** | `boolean` | optional | Enable metadata caching |
-| **watchOptions** | `Object` | optional | File watcher options |
 
 
 ---

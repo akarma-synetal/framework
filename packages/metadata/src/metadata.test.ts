@@ -405,6 +405,81 @@ describe('MetadataManager', () => {
       expect((m as any).serializers.has('javascript')).toBe(true);
     });
   });
+
+  describe('persistence write gates', () => {
+    it('register() is a no-op when persistence.writable is false', async () => {
+      const m = new MetadataManager({
+        formats: ['json'],
+        loaders: [new MemoryLoader()],
+        persistence: { writable: false },
+      });
+      await m.register('object', 'account', { name: 'account' });
+      expect(await m.listNames('object')).toEqual([]);
+    });
+
+    it('register() throws when persistence.writable=false and validation.throwOnError', async () => {
+      const m = new MetadataManager({
+        formats: ['json'],
+        loaders: [new MemoryLoader()],
+        persistence: { writable: false },
+        validation: { throwOnError: true },
+      });
+      await expect(m.register('object', 'account', { name: 'account' })).rejects.toThrow(
+        /persistence\.writable=false/,
+      );
+    });
+
+    it('saveOverlay() is a no-op when persistence.overlayWritable is false', async () => {
+      const m = new MetadataManager({
+        formats: ['json'],
+        loaders: [new MemoryLoader()],
+        persistence: { overlayWritable: false },
+      });
+      await m.saveOverlay({
+        id: 'overlay-1',
+        baseType: 'object',
+        baseName: 'account',
+        scope: 'platform',
+        patch: { label: 'X' },
+      } as any);
+      expect(await m.getOverlay('object', 'account', 'platform')).toBeUndefined();
+    });
+
+    it('saveOverlay() throws when persistence.overlayWritable=false and validation.throwOnError', async () => {
+      const m = new MetadataManager({
+        formats: ['json'],
+        loaders: [new MemoryLoader()],
+        persistence: { overlayWritable: false },
+        validation: { throwOnError: true },
+      });
+      await expect(
+        m.saveOverlay({
+          id: 'overlay-1',
+          baseType: 'object',
+          baseName: 'account',
+          scope: 'platform',
+          patch: { label: 'X' },
+        } as any),
+      ).rejects.toThrow(/persistence\.overlayWritable=false/);
+    });
+
+    it('defaults preserve write behavior (writable=true, overlayWritable=true)', async () => {
+      const m = new MetadataManager({
+        formats: ['json'],
+        loaders: [new MemoryLoader()],
+      });
+      await m.register('object', 'account', { name: 'account' });
+      expect(await m.listNames('object')).toContain('account');
+      await m.saveOverlay({
+        id: 'overlay-1',
+        baseType: 'object',
+        baseName: 'account',
+        scope: 'platform',
+        patch: { label: 'X' },
+      } as any);
+      expect(await m.getOverlay('object', 'account', 'platform')).toBeDefined();
+    });
+  });
 });
 
 // ---------- MemoryLoader ----------
@@ -630,6 +705,82 @@ describe('MetadataPlugin', () => {
     await plugin.init(ctx);
     // Should not throw even when getServices fails
     await expect(plugin.start(ctx)).resolves.not.toThrow();
+  });
+
+  describe('bootstrap modes', () => {
+    it('eager (default) primes metadata from the filesystem', async () => {
+      const { MetadataPlugin } = await import('./plugin.js');
+      const plugin = new MetadataPlugin({ rootDir: '/tmp/test', watch: false });
+
+      const manager = (plugin as any).manager;
+      manager.loadMany = vi.fn().mockResolvedValue([]);
+
+      const ctx = createMockPluginContext();
+      await plugin.init(ctx);
+      await plugin.start(ctx);
+
+      // eager mode performs an FS scan via manager.loadMany() per registered type
+      expect(manager.loadMany).toHaveBeenCalled();
+    });
+
+    it('lazy bootstrap skips the filesystem priming pass', async () => {
+      const { MetadataPlugin } = await import('./plugin.js');
+      const plugin = new MetadataPlugin({
+        rootDir: '/tmp/test',
+        watch: false,
+        config: { bootstrap: 'lazy' },
+      });
+
+      const manager = (plugin as any).manager;
+      manager.loadMany = vi.fn().mockResolvedValue([]);
+
+      const ctx = createMockPluginContext();
+      await plugin.init(ctx);
+      await plugin.start(ctx);
+
+      // lazy mode never scans the filesystem — reads flow through registered loaders
+      expect(manager.loadMany).not.toHaveBeenCalled();
+      // lazy mode should announce its decision
+      expect(ctx.logger.info).toHaveBeenCalledWith(
+        expect.stringContaining('lazy bootstrap'),
+      );
+    });
+
+    it('artifact-only bootstrap throws when no artifactSource is configured', async () => {
+      const { MetadataPlugin } = await import('./plugin.js');
+      const plugin = new MetadataPlugin({
+        rootDir: '/tmp/test',
+        watch: false,
+        config: { bootstrap: 'artifact-only' },
+      });
+
+      const manager = (plugin as any).manager;
+      manager.loadMany = vi.fn().mockResolvedValue([]);
+
+      const ctx = createMockPluginContext();
+      await plugin.init(ctx);
+      await expect(plugin.start(ctx)).rejects.toThrow(/artifact-only/);
+      // Must NOT have scanned the filesystem
+      expect(manager.loadMany).not.toHaveBeenCalled();
+    });
+
+    it('artifact-only bootstrap rejects the not-yet-implemented artifact-api source', async () => {
+      const { MetadataPlugin } = await import('./plugin.js');
+      const plugin = new MetadataPlugin({
+        rootDir: '/tmp/test',
+        watch: false,
+        config: { bootstrap: 'artifact-only' },
+        artifactSource: { mode: 'artifact-api', url: 'https://example.com/artifact' },
+      });
+
+      const manager = (plugin as any).manager;
+      manager.loadMany = vi.fn().mockResolvedValue([]);
+
+      const ctx = createMockPluginContext();
+      await plugin.init(ctx);
+      await expect(plugin.start(ctx)).rejects.toThrow(/artifact-api/);
+      expect(manager.loadMany).not.toHaveBeenCalled();
+    });
   });
 });
 

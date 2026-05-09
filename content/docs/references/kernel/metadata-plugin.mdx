@@ -155,6 +155,7 @@ const result = MetadataBulkRegisterRequest.parse(data);
 | **validateOnWrite** | `boolean` | ✅ | Validate metadata on write |
 | **enableVersioning** | `boolean` | ✅ | Track metadata version history |
 | **cacheMaxItems** | `integer` | ✅ | Max items in memory cache |
+| **bootstrap** | `Enum<'eager' \| 'lazy' \| 'artifact-only'>` | ✅ | How metadata is primed at plugin start (eager / lazy / artifact-only) |
 
 
 ---

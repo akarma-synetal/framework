@@ -66,6 +66,23 @@ describe('HttpDispatcher', () => {
             });
         });
 
+        it('should handle PUT with compound name (3+ path segments)', async () => {
+            const context = { request: {} };
+            const body = { density: 'compact' };
+            // /metadata/lead/views/all_leads → type='lead', name='views/all_leads'
+            const path = '/lead/views/all_leads';
+
+            const result = await dispatcher.handleMetadata(path, context, 'PUT', body);
+
+            expect(result.handled).toBe(true);
+            expect(result.response?.status).toBe(200);
+            expect(mockProtocol.saveMetaItem).toHaveBeenCalledWith({
+                type: 'lead',
+                name: 'views/all_leads',
+                item: body,
+            });
+        });
+
         it('should fallback to MetadataService when protocol is missing saveMetaItem', async () => {
              // Mock protocol without saveMetaItem, but MetadataService with saveItem
             const mockMetaSvc = {

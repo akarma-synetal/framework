@@ -90,9 +90,19 @@ export class MetadataPlugin implements Plugin {
 
         const rootDir = this.options.rootDir || process.cwd();
 
+        // Sealed-runtime carve-out: `bootstrap: 'artifact-only'` MUST NOT touch
+        // the filesystem at all — that includes chokidar subscriptions. Force
+        // watch off in that mode regardless of `options.watch`. The other two
+        // modes ('eager', 'lazy') honor the user's flag; `lazy` + watch is a
+        // valid combination because chokidar attaches to `rootDir` directly,
+        // not as a side effect of any priming pass.
+        const bootstrapMode = this.options.config?.bootstrap ?? 'eager';
+        const effectiveWatch =
+            bootstrapMode === 'artifact-only' ? false : (this.options.watch ?? true);
+
         this.manager = new NodeMetadataManager({
             rootDir,
-            watch: this.options.watch ?? true,
+            watch: effectiveWatch,
             formats: ['yaml', 'json', 'typescript', 'javascript']
         });
 

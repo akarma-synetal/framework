@@ -19,6 +19,7 @@
     "logging",
     "masking",
     "message-queue",
+    "metadata-loader",
     "metadata-persistence",
     "metrics",
     "migration",

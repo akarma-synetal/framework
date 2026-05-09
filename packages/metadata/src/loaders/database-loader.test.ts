@@ -424,6 +424,192 @@ describe('DatabaseLoader', () => {
   });
 });
 
+// ---------- DatabaseLoader read-through cache ----------
+
+describe('DatabaseLoader read-through cache', () => {
+  let mockDriver: IDataDriver;
+
+  beforeEach(() => {
+    mockDriver = createMockDriver();
+  });
+
+  it('serves a second load() from cache without re-querying the driver', async () => {
+    const loader = new DatabaseLoader({ driver: mockDriver });
+    await loader.save('object', 'account', { name: 'account', label: 'Account' });
+
+    // findOne calls so far: save() did one lookup before insert.
+    const baseline = (mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    const first = await loader.load('object', 'account');
+    expect(first.data).toEqual({ name: 'account', label: 'Account' });
+
+    const callsAfterFirst = (mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(callsAfterFirst).toBe(baseline + 1);
+
+    const second = await loader.load('object', 'account');
+    expect(second.data).toEqual({ name: 'account', label: 'Account' });
+
+    // Second load should be a cache hit — no additional findOne.
+    expect((mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAfterFirst);
+
+    const stats = loader.getCacheStats();
+    expect(stats.enabled).toBe(true);
+    expect(stats.load!.hits).toBeGreaterThanOrEqual(1);
+  });
+
+  it('caches null (not-found) results to absorb miss storms', async () => {
+    const loader = new DatabaseLoader({ driver: mockDriver });
+
+    const first = await loader.load('object', 'ghost');
+    expect(first.data).toBeNull();
+    const callsAfterFirst = (mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    const second = await loader.load('object', 'ghost');
+    expect(second.data).toBeNull();
+
+    // No additional findOne — the negative result is cached.
+    expect((mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAfterFirst);
+  });
+
+  it('save() invalidates the (type, name) load cache', async () => {
+    const loader = new DatabaseLoader({ driver: mockDriver });
+
+    await loader.save('object', 'account', { name: 'account', label: 'V1' });
+    const v1 = await loader.load('object', 'account');
+    expect((v1.data as any).label).toBe('V1');
+
+    await loader.save('object', 'account', { name: 'account', label: 'V2' });
+    const v2 = await loader.load('object', 'account');
+    expect((v2.data as any).label).toBe('V2');
+  });
+
+  it('save() invalidates a previously cached null entry (negative → positive)', async () => {
+    const loader = new DatabaseLoader({ driver: mockDriver });
+
+    expect((await loader.load('object', 'account')).data).toBeNull();
+
+    await loader.save('object', 'account', { name: 'account', label: 'Created' });
+    const after = await loader.load('object', 'account');
+    expect(after.data).toEqual({ name: 'account', label: 'Created' });
+  });
+
+  it('caches loadMany() per type and invalidates on save', async () => {
+    const loader = new DatabaseLoader({ driver: mockDriver });
+
+    await loader.save('object', 'a', { name: 'a' });
+    const findCallsBefore = (mockDriver.find as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    const first = await loader.loadMany('object');
+    expect(first).toHaveLength(1);
+    const findCallsAfterFirst = (mockDriver.find as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(findCallsAfterFirst).toBe(findCallsBefore + 1);
+
+    // Second loadMany hits cache.
+    const second = await loader.loadMany('object');
+    expect(second).toHaveLength(1);
+    expect((mockDriver.find as ReturnType<typeof vi.fn>).mock.calls.length).toBe(findCallsAfterFirst);
+
+    // A save on the same type invalidates the loadMany cache.
+    await loader.save('object', 'b', { name: 'b' });
+    const third = await loader.loadMany('object');
+    expect(third).toHaveLength(2);
+  });
+
+  it('caches list() per type independently of load()', async () => {
+    const loader = new DatabaseLoader({ driver: mockDriver });
+
+    await loader.save('object', 'a', { name: 'a' });
+    await loader.save('object', 'b', { name: 'b' });
+
+    const findCallsBefore = (mockDriver.find as ReturnType<typeof vi.fn>).mock.calls.length;
+    const first = await loader.list('object');
+    expect(first).toEqual(expect.arrayContaining(['a', 'b']));
+    const findCallsAfterFirst = (mockDriver.find as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(findCallsAfterFirst).toBe(findCallsBefore + 1);
+
+    // Second list() is a cache hit.
+    await loader.list('object');
+    expect((mockDriver.find as ReturnType<typeof vi.fn>).mock.calls.length).toBe(findCallsAfterFirst);
+
+    // A save on the same type invalidates the list cache.
+    await loader.save('object', 'c', { name: 'c' });
+    const refreshed = await loader.list('object');
+    expect(refreshed).toEqual(expect.arrayContaining(['a', 'b', 'c']));
+  });
+
+  it('caches stat() per (type, name)', async () => {
+    const loader = new DatabaseLoader({ driver: mockDriver });
+    await loader.save('object', 'account', { name: 'account' });
+
+    const baseline = (mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length;
+    const s1 = await loader.stat('object', 'account');
+    expect(s1).not.toBeNull();
+    const afterFirst = (mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(afterFirst).toBe(baseline + 1);
+
+    await loader.stat('object', 'account');
+    expect((mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length).toBe(afterFirst);
+  });
+
+  it('delete() invalidates the load cache', async () => {
+    const loader = new DatabaseLoader({ driver: mockDriver });
+    await loader.save('object', 'account', { name: 'account' });
+    expect((await loader.load('object', 'account')).data).not.toBeNull();
+
+    await loader.delete('object', 'account');
+    const after = await loader.load('object', 'account');
+    expect(after.data).toBeNull();
+  });
+
+  it('disables caching when cache.enabled === false', async () => {
+    const loader = new DatabaseLoader({ driver: mockDriver, cache: { enabled: false } });
+    await loader.save('object', 'account', { name: 'account' });
+
+    const before = (mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length;
+    await loader.load('object', 'account');
+    await loader.load('object', 'account');
+    const after = (mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length;
+    // Both load() calls reach the driver.
+    expect(after - before).toBe(2);
+
+    const stats = loader.getCacheStats();
+    expect(stats.enabled).toBe(false);
+    expect(stats.load).toBeNull();
+  });
+
+  it('honors custom maxSize/ttl via cache options', async () => {
+    const loader = new DatabaseLoader({
+      driver: mockDriver,
+      cache: { enabled: true, maxSize: 1, ttl: 60_000 },
+    });
+    await loader.save('object', 'a', { name: 'a' });
+    await loader.save('object', 'b', { name: 'b' });
+
+    // Prime cache with 'a' then 'b' — capacity is 1, so 'a' is evicted.
+    await loader.load('object', 'a');
+    await loader.load('object', 'b');
+
+    const before = (mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length;
+    await loader.load('object', 'a'); // miss → driver hit
+    expect((mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before + 1);
+  });
+
+  it('invalidateAll() clears every cache shard', async () => {
+    const loader = new DatabaseLoader({ driver: mockDriver });
+    await loader.save('object', 'a', { name: 'a' });
+    await loader.load('object', 'a');
+    await loader.list('object');
+    await loader.loadMany('object');
+    await loader.stat('object', 'a');
+
+    loader.invalidateAll();
+
+    const before = (mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length;
+    await loader.load('object', 'a');
+    expect((mockDriver.findOne as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before + 1);
+  });
+});
+
 // ---------- MetadataManager + DatabaseLoader Integration ----------
 
 describe('MetadataManager with DatabaseLoader', () => {

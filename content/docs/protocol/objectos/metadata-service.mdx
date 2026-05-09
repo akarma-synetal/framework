@@ -170,6 +170,62 @@ await protocol.saveMetaItem({
 ```
 
 
+## Runtime Controls (v3.1+)
+
+Four orthogonal levers shape how `MetadataManager` and `MetadataPlugin` behave at boot and at request time. All four default to "dev-friendly" so existing code keeps working.
+
+### 1. Bootstrap Modes
+
+`MetadataPluginConfigSchema.bootstrap` decides what the plugin does on `start()`:
+
+| Mode | When to use | Behavior |
+| :--- | :--- | :--- |
+| `eager` (default) | Local dev, traditional servers | Scans filesystem (or hydrates from `artifactSource`) at boot. |
+| `lazy` | Cold-start sensitive runtimes, on-demand workloads | Skips the FS prime; reads flow through registered loaders (incl. DatabaseLoader cache). Honors `artifactSource` when set. |
+| `artifact-only` | Edge / serverless / read-only production | Refuses to touch the filesystem. Requires `artifactSource.mode = 'local-file'`. |
+
+```typescript
+new MetadataPlugin({
+  config: { bootstrap: 'artifact-only' },
+  artifactSource: { mode: 'local-file', path: './dist/objectstack.json' },
+});
+```
+
+### 2. Persistence Write Gates
+
+`MetadataManagerConfigSchema.persistence` is a two-axis runtime freeze. Both flags default to `true`.
+
+| Flag | Effect when `false` |
+| :--- | :--- |
+| `persistence.writable` | `register()` becomes a no-op (or throws when `validation.throwOnError`). |
+| `persistence.overlayWritable` | `saveOverlay()` is rejected. Disables Studio overlays in sealed deployments. |
+
+```typescript
+new MetadataManager({
+  persistence: { writable: false, overlayWritable: false },
+});
+```
+
+### 3. DatabaseLoader Read-Through Cache
+
+`DatabaseLoader` wraps `load` / `loadMany` / `list` / `stat` results in a generic LRU cache (lazy TTL, promote-on-get, write invalidation). Reads always observe writes performed through the same loader instance; out-of-band SQL writes are honored within `ttl` milliseconds.
+
+```typescript
+new MetadataManager({
+  datasource: 'default',
+  cache: {
+    enabled: true,
+    databaseLoader: { enabled: true, maxSize: 500, ttl: 60_000 },
+  },
+});
+```
+
+The cache exposes `LRUCache.stats()` (`size` / `hits` / `misses` / `hitRate`) for metrics.
+
+### 4. Single-Source Schema Discipline
+
+The canonical `MetadataManagerConfigSchema` and `MetadataFallbackStrategySchema` live in `kernel/metadata-loader.zod.ts`. The persistence-side module `system/metadata-persistence.zod.ts` re-exports them, so consumers observe a single TypeScript type regardless of import path. Drift between kernel-side runtime config and persistence-side typing is no longer possible.
+
 ## CLI & Tooling Integration
 
 The Metadata Service is designed to power the CLI.

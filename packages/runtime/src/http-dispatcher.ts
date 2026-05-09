@@ -789,9 +789,11 @@ export class HttpDispatcher {
             return { handled: true, response: this.success({ types: ['object', 'app', 'plugin'] }) };
         }
 
-        // GET /metadata/:type/:name/published → get published version
-        if (parts.length === 3 && parts[2] === 'published' && (!method || method === 'GET')) {
-            const [type, name] = parts;
+        // GET /metadata/:type/:name(/:subname...)/published → get published version
+        // Supports compound names like `lead/views/all_leads/published`.
+        if (parts.length >= 3 && parts[parts.length - 1] === 'published' && (!method || method === 'GET')) {
+            const type = parts[0];
+            const name = parts.slice(1, -1).join('/');
             const metadataService = await this.getService(CoreServiceName.enum.metadata);
             if (metadataService && typeof (metadataService as any).getPublished === 'function') {
                 const data = await (metadataService as any).getPublished(type, name);
@@ -809,9 +811,14 @@ export class HttpDispatcher {
             return { handled: true, response: this.error('Not found', 404) };
         }
 
-        // /metadata/:type/:name
-        if (parts.length === 2) {
-            const [type, name] = parts;
+        // /metadata/:type/:name where :name may itself contain slashes
+        // (e.g. /metadata/lead/views/all_leads → type='lead', name='views/all_leads').
+        // Compound names are how the client expresses sub-resources of a type
+        // (a view of an object, a flow under an automation, etc.) and the
+        // metadata service treats the full string as the lookup key.
+        if (parts.length >= 2) {
+            const type = parts[0];
+            const name = parts.slice(1).join('/');
             // Extract optional package filter from query string
             const packageId = query?.package || undefined;
 

@@ -12,8 +12,8 @@ description: Metadata Persistence protocol schemas
 ## TypeScript Usage
 
 ```typescript
-import { MetadataCollectionInfo, MetadataFallbackStrategy, MetadataFormat, MetadataImportOptions, MetadataLoadResult, MetadataLoaderContract, MetadataManagerConfig, MetadataSaveOptions, MetadataSaveResult, MetadataStats, MetadataWatchEvent } from '@objectstack/spec/kernel';
-import type { MetadataCollectionInfo, MetadataFallbackStrategy, MetadataFormat, MetadataImportOptions, MetadataLoadResult, MetadataLoaderContract, MetadataManagerConfig, MetadataSaveOptions, MetadataSaveResult, MetadataStats, MetadataWatchEvent } from '@objectstack/spec/kernel';
+import { MetadataCollectionInfo, MetadataFormat, MetadataImportOptions, MetadataLoadResult, MetadataLoaderContract, MetadataSaveOptions, MetadataSaveResult, MetadataStats, MetadataWatchEvent } from '@objectstack/spec/kernel';
+import type { MetadataCollectionInfo, MetadataFormat, MetadataImportOptions, MetadataLoadResult, MetadataLoaderContract, MetadataSaveOptions, MetadataSaveResult, MetadataStats, MetadataWatchEvent } from '@objectstack/spec/kernel';
 
 // Validate data
 const result = MetadataCollectionInfo.parse(data);
@@ -33,17 +33,6 @@ const result = MetadataCollectionInfo.parse(data);
 | **totalSize** | `integer` | optional | Total size in bytes |
 | **lastModified** | `string` | optional | Last modification date |
 | **location** | `string` | optional | Collection location |
-
-
----
-
-## MetadataFallbackStrategy
-
-### Allowed Values
-
-* `filesystem`
-* `memory`
-* `none`
 
 
 ---
@@ -104,26 +93,6 @@ const result = MetadataCollectionInfo.parse(data);
 | **supportsWatch** | `boolean` | ✅ | Supports file watching |
 | **supportsWrite** | `boolean` | ✅ | Supports write operations |
 | **supportsCache** | `boolean` | ✅ | Supports caching |
-
-
----
-
-## MetadataManagerConfig
-
-### Properties
-
-| Property | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| **datasource** | `string` | optional | Datasource name reference for database persistence |
-| **tableName** | `string` | ✅ | Database table name for metadata storage |
-| **fallback** | `Enum<'filesystem' \| 'memory' \| 'none'>` | ✅ | Fallback strategy when datasource is unavailable |
-| **rootDir** | `string` | optional | Root directory path |
-| **formats** | `Enum<'json' \| 'yaml' \| 'typescript' \| 'javascript'>[]` | ✅ | Enabled formats |
-| **cache** | `Object` | optional | Cache settings |
-| **watch** | `boolean` | ✅ | Enable file watching |
-| **watchOptions** | `Object` | optional | File watcher options |
-| **validation** | `Object` | optional | Validation settings |
-| **loaderOptions** | `Record<string, any>` | optional | Loader-specific configuration |
 
 
 ---

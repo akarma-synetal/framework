@@ -189,12 +189,10 @@
 
 ---
 
-## Phase 5: Performance & Production Readiness 🔴
+## Phase 5: Performance & Production Readiness 🟡
 
-- [ ] **Caching layer**
-  - Implement TTL-based cache with configurable `maxSize`
-  - Cache invalidation on write/overlay changes
-  - Support distributed cache (Redis) for multi-instance deployments
+- [x] **Local caching layer (in-process)** — generic `LRUCache` (lazy TTL, promote-on-get, size cap, hits/misses/hitRate stats) wired into `DatabaseLoader.{load,loadMany,list,stat}` with write invalidation. Configured via `cache.databaseLoader`.
+- [ ] **Distributed cache** — Redis adapter for multi-instance deployments; share invalidation events across nodes.
 - [ ] **Connection pooling**
   - Reuse `IDataDriver` connections efficiently
   - Handle connection failures gracefully with retry policy
@@ -202,8 +200,8 @@
   - Load multiple types in a single query where possible
   - Implement DataLoader-style batching for N+1 prevention
 - [ ] **Metrics & observability**
+  - Surface `LRUCache.stats()` through the kernel observability contract
   - Track load/save latency, cache hit rates, loader usage
-  - Expose metrics via kernel observability contract
 
 ---
 
@@ -216,7 +214,7 @@
 | 2     | v3.2    | Overlay persistence, REST API, UI support      | 🔴 Planned |
 | 3     | v3.3    | Schema validation & Zod dispatch               | 🔴 Planned |
 | 4     | v4.0    | Versioning, merge, sync, S3 loader             | 🔴 Planned |
-| 5     | v4.1    | Caching, pooling, observability                | 🔴 Planned |
+| 5     | v4.1    | Distributed cache, pooling, observability     | 🟡 In progress (local LRU done) |
 
 ---
 
