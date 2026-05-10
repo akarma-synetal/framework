@@ -60,7 +60,9 @@ export interface MetadataPluginOptions {
      * the filesystem. Only `local-file` is implemented now; `artifact-api` is
      * reserved for M3/M4.
      */
-    artifactSource?: { mode: 'local-file'; path: string } | { mode: 'artifact-api'; url: string };
+    artifactSource?:
+        | { mode: 'local-file'; path: string; fetchTimeoutMs?: number }
+        | { mode: 'artifact-api'; url: string; token?: string; commitId?: string; fetchTimeoutMs?: number };
     /**
      * Register the queryable system metadata-storage objects
      * (`sys_object`, `sys_view`, `sys_flow`, `sys_agent`, `sys_tool`) on this
@@ -170,10 +172,9 @@ export class MetadataPlugin implements Plugin {
             // production deployments where the running process must not depend
             // on local source files.
             if (src?.mode === 'local-file') {
-                await this._loadFromLocalFile(ctx, src.path);
+                await this._loadFromLocalFile(ctx, src.path, src.fetchTimeoutMs);
             } else if (src?.mode === 'artifact-api') {
-                ctx.logger.error('[MetadataPlugin] bootstrap=artifact-only requires an implemented artifactSource; artifact-api is not yet available');
-                throw new Error('[MetadataPlugin] artifact-only bootstrap requires artifactSource.mode="local-file" (artifact-api not yet implemented)');
+                await this._loadFromArtifactApi(ctx, src);
             } else {
                 throw new Error('[MetadataPlugin] bootstrap=artifact-only requires options.artifactSource to be set');
             }
@@ -184,19 +185,18 @@ export class MetadataPlugin implements Plugin {
             // An artifact source, if present, is still honored so projects can
             // pin a known set of metadata at boot without paying the FS scan.
             if (src?.mode === 'local-file') {
-                await this._loadFromLocalFile(ctx, src.path);
+                await this._loadFromLocalFile(ctx, src.path, src.fetchTimeoutMs);
             } else if (src?.mode === 'artifact-api') {
-                ctx.logger.warn('[MetadataPlugin] artifact-api source is not yet implemented; lazy mode will rely on registered loaders only');
+                await this._loadFromArtifactApi(ctx, src);
             } else {
                 ctx.logger.info('[MetadataPlugin] lazy bootstrap — skipping filesystem priming; metadata loads on demand');
             }
         } else {
             // 'eager' (default): preserve historical behavior.
             if (src?.mode === 'local-file') {
-                await this._loadFromLocalFile(ctx, src.path);
+                await this._loadFromLocalFile(ctx, src.path, src.fetchTimeoutMs);
             } else if (src?.mode === 'artifact-api') {
-                ctx.logger.warn('[MetadataPlugin] artifact-api source is not yet implemented; falling back to file-system scan');
-                await this._loadFromFileSystem(ctx);
+                await this._loadFromArtifactApi(ctx, src);
             } else {
                 await this._loadFromFileSystem(ctx);
             }
@@ -216,60 +216,58 @@ export class MetadataPlugin implements Plugin {
         }
     }
 
-    private async _loadFromLocalFile(ctx: PluginContext, filePath: string): Promise<void> {
-        const isUrl = /^https?:\/\//i.test(filePath);
-        ctx.logger.info(
-            `[MetadataPlugin] Loading metadata from ${isUrl ? 'remote URL' : 'local artifact file'}`,
-            { path: filePath },
-        );
-
-        let raw: unknown;
+    /**
+     * Fetch JSON content from a URL with configurable timeout.
+     */
+    private async _fetchJson(url: string, fetchTimeoutMs?: number, token?: string): Promise<unknown> {
+        const envTimeout = Number(process.env.OS_ARTIFACT_FETCH_TIMEOUT_MS);
+        const timeoutMs = fetchTimeoutMs
+            ?? (Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : undefined)
+            ?? 60_000;
+        const controller = new AbortController();
+        const timer = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
         try {
-            let content: string;
-            if (isUrl) {
-                const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 15_000);
-                try {
-                    const res = await fetch(filePath, {
-                        redirect: 'follow',
-                        signal: controller.signal,
-                        headers: { Accept: 'application/json, */*;q=0.5' },
-                    });
-                    if (!res.ok) {
-                        throw new Error(`HTTP ${res.status} ${res.statusText}`);
-                    }
-                    content = await res.text();
-                } finally {
-                    clearTimeout(timer);
-                }
-            } else {
-                content = await readFile(filePath, 'utf8');
-            }
-            raw = JSON.parse(content);
+            const headers: Record<string, string> = { Accept: 'application/json, */*;q=0.5' };
+            if (token) headers.Authorization = `Bearer ${token}`;
+            const res = await fetch(url, { redirect: 'follow', signal: controller.signal, headers });
+            if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+            const content = await res.text();
+            return JSON.parse(content);
         } catch (e: any) {
-            throw new Error(`[MetadataPlugin] Cannot read artifact ${isUrl ? 'URL' : 'file'} at "${filePath}": ${e.message}`);
+            if (e?.name === 'AbortError') {
+                throw new Error(
+                    `fetch timed out after ${timeoutMs}ms — set artifactSource.fetchTimeoutMs or OS_ARTIFACT_FETCH_TIMEOUT_MS to extend it (0 disables)`,
+                );
+            }
+            throw e;
+        } finally {
+            if (timer) clearTimeout(timer);
         }
+    }
 
-        // Dynamically import to avoid pulling @objectstack/spec/cloud into every
-        // bundle — it includes heavy Zod schemas and is only needed in local mode.
+    /**
+     * Parse raw artifact JSON (envelope or bare definition) and register all
+     * metadata items into the MetadataManager.
+     */
+    private async _parseAndRegisterArtifact(ctx: PluginContext, raw: unknown, label: string): Promise<number> {
         const { ProjectArtifactSchema } = await import('@objectstack/spec/cloud');
         const { ObjectStackDefinitionSchema } = await import('@objectstack/spec');
 
         let metadata: Record<string, unknown[]>;
 
-        // Detect envelope vs bare ObjectStackDefinition.
         const obj = raw as any;
         if (obj?.schemaVersion && obj?.commitId && obj?.metadata !== undefined) {
-            // Already an artifact envelope — validate and unwrap.
             const artifact = ProjectArtifactSchema.parse(obj);
             metadata = artifact.metadata as Record<string, unknown[]>;
+        } else if (obj?.success && obj?.data?.metadata) {
+            // Unwrap cloud API envelope: { success: true, data: { metadata: {...} } }
+            const artifact = ProjectArtifactSchema.parse(obj.data);
+            metadata = artifact.metadata as Record<string, unknown[]>;
         } else {
-            // Bare ObjectStackDefinition produced by `objectstack compile`.
             const def = ObjectStackDefinitionSchema.parse(obj);
             const canonical = JSON.stringify(def, Object.keys(def).sort());
             const checksum = createHash('sha256').update(canonical).digest('hex');
             const projectId = this.options.projectId ?? 'proj_local';
-            // Wrap into envelope and validate to confirm the structure is correct.
             ProjectArtifactSchema.parse({
                 schemaVersion: '0.1',
                 projectId,
@@ -280,17 +278,6 @@ export class MetadataPlugin implements Plugin {
             metadata = def as Record<string, unknown[]>;
         }
 
-        // Register artifact items into a MemoryLoader so they are visible to
-        // both `loadMany()` (used by ObjectQL's sync path) and `list()` (used
-        // by REST meta endpoints). `register()` alone only writes to the in-memory
-        // registry Map which `loadMany()` does not read.
-        //
-        // The artifact format flattens packages into top-level arrays
-        // (`objects`, `views`, …) without per-item provenance. The package id
-        // lives only on `metadata.manifest.id`. We tag each item with
-        // `_packageId` here so REST list responses can carry it through —
-        // Studio's metadata sidebar uses this tag to compute the package
-        // path needed for record navigation.
         const memLoader = new MemoryLoader();
         const manifestPackageId =
             (metadata as any)?.manifest?.id ?? (metadata as any)?.id ?? undefined;
@@ -302,7 +289,6 @@ export class MetadataPlugin implements Plugin {
             for (const item of items) {
                 const name = (item as any)?.name;
                 if (!name) continue;
-                // Tag with owning package id (idempotent: respect existing tag).
                 if (manifestPackageId && (item as any)._packageId === undefined) {
                     (item as any)._packageId = manifestPackageId;
                 }
@@ -312,13 +298,66 @@ export class MetadataPlugin implements Plugin {
             }
         }
 
-        // Mount the loader so `loadMany` queries hit it.
         this.manager.registerLoader(memLoader);
+        ctx.logger.info('[MetadataPlugin] Artifact metadata loaded', { source: label, totalRegistered });
+        return totalRegistered;
+    }
 
-        ctx.logger.info('[MetadataPlugin] Artifact metadata loaded', {
-            path: filePath,
-            totalRegistered,
-        });
+    private async _loadFromLocalFile(ctx: PluginContext, filePath: string, fetchTimeoutMs?: number): Promise<void> {
+        const isUrl = /^https?:\/\//i.test(filePath);
+        ctx.logger.info(
+            `[MetadataPlugin] Loading metadata from ${isUrl ? 'remote URL' : 'local artifact file'}`,
+            { path: filePath },
+        );
+
+        let raw: unknown;
+        try {
+            if (isUrl) {
+                raw = await this._fetchJson(filePath, fetchTimeoutMs);
+            } else {
+                const content = await readFile(filePath, 'utf8');
+                raw = JSON.parse(content);
+            }
+        } catch (e: any) {
+            throw new Error(`[MetadataPlugin] Cannot read artifact ${isUrl ? 'URL' : 'file'} at "${filePath}": ${e.message}`);
+        }
+
+        await this._parseAndRegisterArtifact(ctx, raw, filePath);
+    }
+
+    /**
+     * P2: Load metadata from the cloud artifact API endpoint.
+     */
+    private async _loadFromArtifactApi(
+        ctx: PluginContext,
+        src: { url: string; token?: string; commitId?: string; fetchTimeoutMs?: number },
+    ): Promise<void> {
+        const projectId = this.options.projectId;
+        if (!projectId) {
+            throw new Error('[MetadataPlugin] artifact-api source requires options.projectId to be set');
+        }
+
+        // Build the artifact URL:
+        //   ${url}/api/v1/cloud/projects/${projectId}/artifact[?commit=${commitId}]
+        let artifactUrl = src.url.replace(/\/+$/, '');
+        // If the URL already contains /api/v1, use it as-is; otherwise append default path.
+        if (!/\/api\/v\d+\/cloud\/projects\//i.test(artifactUrl)) {
+            artifactUrl = `${artifactUrl}/api/v1/cloud/projects/${projectId}/artifact`;
+        }
+        if (src.commitId) {
+            artifactUrl += `${artifactUrl.includes('?') ? '&' : '?'}commit=${encodeURIComponent(src.commitId)}`;
+        }
+
+        ctx.logger.info('[MetadataPlugin] Loading metadata from artifact API', { url: artifactUrl });
+
+        let raw: unknown;
+        try {
+            raw = await this._fetchJson(artifactUrl, src.fetchTimeoutMs, src.token);
+        } catch (e: any) {
+            throw new Error(`[MetadataPlugin] Cannot load artifact from API "${artifactUrl}": ${e.message}`);
+        }
+
+        await this._parseAndRegisterArtifact(ctx, raw, artifactUrl);
     }
 
     private async _loadFromFileSystem(ctx: PluginContext): Promise<void> {

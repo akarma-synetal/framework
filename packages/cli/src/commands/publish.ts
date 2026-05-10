@@ -30,6 +30,11 @@ export default class Publish extends Command {
       description: 'API key for ObjectStack Cloud',
       env: 'OS_CLOUD_API_KEY',
     }),
+    timeout: Flags.integer({
+      description: 'Upload timeout in milliseconds (use a higher value on slow networks; 0 disables timeout)',
+      env: 'OS_CLOUD_TIMEOUT_MS',
+      default: 60_000,
+    }),
   };
 
   async run(): Promise<void> {
@@ -60,14 +65,32 @@ export default class Publish extends Command {
       const serverUrl = `${flags.server}/api/v1/cloud/projects/${flags.project}/metadata`;
       printStep(`Publishing to ${serverUrl}...`);
 
-      const response = await fetch(serverUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(flags.token && { Authorization: `Bearer ${flags.token}` }),
-        },
-        body: artifactRaw,
-      });
+      const response = await (async () => {
+        const controller = new AbortController();
+        const timer = flags.timeout > 0
+          ? setTimeout(() => controller.abort(), flags.timeout)
+          : undefined;
+        try {
+          return await fetch(serverUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(flags.token && { Authorization: `Bearer ${flags.token}` }),
+            },
+            body: artifactRaw,
+            signal: controller.signal,
+          });
+        } catch (err: any) {
+          if (err?.name === 'AbortError') {
+            throw new Error(
+              `Upload timed out after ${flags.timeout}ms. Use --timeout <ms> or set OS_CLOUD_TIMEOUT_MS to extend it (0 disables).`,
+            );
+          }
+          throw err;
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
+      })();
 
       if (!response.ok) {
         let errMsg: string;

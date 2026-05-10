@@ -1,153 +1,79 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 /**
- * Cloud-side Artifact API plugin.
+ * Cloud-side Artifact API plugin (P0 + P1).
  *
- * Exposes the M3 Artifact API endpoints that runtime-mode nodes (see
- * `runtime-stack.ts` / `objectos-stack.ts`) call to discover their per-
- * request project and download its compiled artifact:
+ * P0: Pluggable storage via IStorageService (fallback to local FS with warning).
+ * P1: Version history via sys_project_revision, commit-aware GET, rollback.
  *
- *   GET /api/v1/cloud/resolve-hostname?host={hostname}
- *     → { success, data: { projectId, organizationId?, runtime? } }
- *
- *   GET /api/v1/cloud/projects/:id/artifact
- *     → { success, data: ProjectArtifact + { runtime? } }
- *
- * Implementation notes:
- *
- *   - Project rows live in the control-plane DB (`sys_project`). We
- *     resolve a hostname by exact `hostname` match. The wildcard `*`
- *     marker matches any host (used by the system project).
- *   - The artifact response is assembled from the project's metadata
- *     (`metadata.artifact_path` / `artifact_paths`) plus a `runtime`
- *     block carrying the project's database addressing (driver / URL /
- *     auth token from `sys_project_credential`). The artifact's
- *     `metadata` array is loaded by reading the file(s) at
- *     `artifact_path` and merging their `metadata` sections — same shape
- *     fs-bundle-resolver consumes for in-process kernels.
- *
- * This plugin is registered alongside the multi-project stack (see
- * `cloud-stack.ts`) so the cloud control plane and the runtime nodes
- * speak the same protocol whether they share a process or not.
+ * Endpoints:
+ *   GET  /cloud/resolve-hostname?host=...
+ *   GET  /cloud/projects/:id/artifact[?commit=...]
+ *   POST /cloud/projects/:id/metadata
+ *   GET  /cloud/projects/:id/revisions?limit=&cursor=
+ *   POST /cloud/projects/:id/revisions/:commit/activate
  */
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve as resolvePath, isAbsolute, dirname } from 'node:path';
-import { createHash } from 'node:crypto';
-import type { IHttpServer } from '@objectstack/spec/contracts';
-import type { IDataDriver } from '@objectstack/spec/contracts';
+import { randomUUID } from 'node:crypto';
+import type { IHttpServer, IDataDriver } from '@objectstack/spec/contracts';
+import type { IStorageService } from '@objectstack/spec/contracts';
+import {
+    ok, fail, parseMetadata, extractArtifactPaths, sha256Hex,
+    mergeArtifactMetadata, resolveProjectByHost, readProjectCredentials,
+    buildRuntimeBlock,
+} from './cloud-artifact-helpers.js';
+import type { SysProjectRow } from './cloud-artifact-helpers.js';
 
 type AnyContext = any;
 
-interface CloudArtifactApiPluginOptions {
-    /** Promise resolving to the control-plane driver — same one cloud-stack uses. */
+export interface CloudArtifactApiPluginOptions {
+    /** Promise resolving to the control-plane driver. */
     controlDriverPromise: Promise<{ driver: IDataDriver; driverName: string; databaseUrl: string }>;
     /** API prefix (default `/api/v1`). */
     apiPrefix?: string;
     /** Filesystem root for relative `artifact_path` values (default `process.cwd()`). */
     artifactRoot?: string;
-    /** Bearer token required on requests (optional — when unset, endpoints are open to localhost callers). */
+    /** Bearer token required on requests. */
     apiKey?: string;
-}
-
-interface SysProjectRow {
-    id: string;
-    organization_id?: string;
-    hostname?: string;
-    database_driver?: string;
-    database_url?: string;
-    database_auth_token?: string;
-    metadata?: Record<string, unknown> | string;
-    is_system?: boolean | number;
-}
-
-interface SysCredentialRow {
-    id: string;
-    project_id: string;
-    database_driver?: string;
-    database_url?: string;
-    database_auth_token?: string;
-}
-
-function ok<T>(data: T) { return { success: true, data }; }
-function fail(message: string, status = 400) { return { status, body: { success: false, error: message } }; }
-
-function parseMetadata(raw: any): Record<string, unknown> {
-    if (!raw) return {};
-    if (typeof raw === 'string') {
-        try { return JSON.parse(raw) ?? {}; } catch { return {}; }
-    }
-    if (typeof raw === 'object') return raw as Record<string, unknown>;
-    return {};
-}
-
-function extractArtifactPaths(metadata: Record<string, unknown>): string[] {
-    const out: string[] = [];
-    const single = metadata.artifact_path;
-    if (typeof single === 'string') out.push(single);
-    const list = metadata.artifact_paths;
-    if (Array.isArray(list)) {
-        for (const p of list) if (typeof p === 'string') out.push(p);
-    }
-    return out;
-}
-
-function sha256Hex(input: string): string {
-    return createHash('sha256').update(input).digest('hex');
-}
-
-/**
- * Known per-category metadata keys recognised by ObjectOS at boot. We
- * lift these top-level arrays out of each loaded bundle into the
- * envelope's `metadata` block. Unknown keys are also captured so future
- * spec additions don't require a code update here.
- */
-const KNOWN_METADATA_CATEGORIES = new Set([
-    'objects', 'fields', 'views', 'apps', 'pages', 'dashboards', 'reports',
-    'flows', 'workflows', 'triggers', 'agents', 'tools', 'skills',
-    'permissions', 'permissionSets', 'roles', 'profiles', 'translations',
-    'datasources', 'datasets', 'actions', 'apis', 'i18n', 'sharingRules',
-    'ragPipelines', 'data',
-]);
-
-/**
- * Merge metadata blocks from multiple artifact files into a single
- * envelope. Accepts either of two bundle shapes:
- *
- *   1. The v0 ProjectArtifact envelope (`{ metadata: { objects: [...] } }`)
- *   2. The current `objectstack compile` output, which writes category
- *      arrays at the top level (`{ objects: [...], apps: [...] }`).
- *
- * Per-category arrays are concatenated in file order; downstream
- * consumers de-dupe by name when registering.
- */
-function mergeArtifactMetadata(bundles: any[]): Record<string, any[]> {
-    const merged: Record<string, any[]> = {};
-
-    const ingest = (source: Record<string, any>) => {
-        for (const [key, value] of Object.entries(source)) {
-            if (!Array.isArray(value)) continue;
-            if (!KNOWN_METADATA_CATEGORIES.has(key) && key !== 'manifest') {
-                // Still capture array-shaped unknown categories — passthrough.
-                if (typeof key !== 'string') continue;
-            }
-            const bucket = merged[key] ?? (merged[key] = []);
-            bucket.push(...value);
-        }
+    /** Pluggable storage backend. When omitted, tries kernel's `file-storage` service; falls back to local FS. */
+    storage?: {
+        service?: 'file-storage' | IStorageService;
+        keyPrefix?: string;
     };
-
-    for (const b of bundles) {
-        if (!b || typeof b !== 'object') continue;
-        // Shape 1: nested under .metadata
-        const nested = (b as any).metadata;
-        if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-            ingest(nested);
-        }
-        // Shape 2: flat (current compile output)
-        ingest(b as Record<string, any>);
-    }
-    return merged;
 }
+
+// ---------------------------------------------------------------------------
+// Local-FS fallback adapter (mirrors IStorageService subset)
+// ---------------------------------------------------------------------------
+
+interface StorageLike {
+    upload(key: string, data: Buffer): Promise<void>;
+    download(key: string): Promise<Buffer>;
+    exists(key: string): Promise<boolean>;
+}
+
+function createLocalFsStorage(root: string): StorageLike {
+    const abs = (key: string) => resolvePath(root, key);
+    return {
+        async upload(key, data) {
+            const p = abs(key);
+            await mkdir(dirname(p), { recursive: true });
+            await writeFile(p, data);
+        },
+        async download(key) {
+            return readFile(abs(key));
+        },
+        async exists(key) {
+            try { await readFile(abs(key)); return true; } catch { return false; }
+        },
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Legacy local-file reader (for backward-compat artifact_path rows)
+// ---------------------------------------------------------------------------
 
 async function readArtifactFile(absPath: string): Promise<any | null> {
     try {
@@ -159,59 +85,56 @@ async function readArtifactFile(absPath: string): Promise<any | null> {
     }
 }
 
-async function resolveProjectByHost(driver: IDataDriver, host: string): Promise<SysProjectRow | null> {
-    if (!host) return null;
-    // Exact match first.
-    const direct = await (driver.findOne as any)('sys_project', { where: { hostname: host } });
-    if (direct) return direct as SysProjectRow;
-    // Then any project flagged as a wildcard catch-all (`hostname = '*'`).
-    const wildcard = await (driver.findOne as any)('sys_project', { where: { hostname: '*' } });
-    if (wildcard) return wildcard as SysProjectRow;
-    return null;
-}
-
-async function readProjectCredentials(driver: IDataDriver, projectId: string): Promise<SysCredentialRow | null> {
-    try {
-        const row = await (driver.findOne as any)('sys_project_credential', {
-            where: { project_id: projectId },
-        });
-        return (row ?? null) as SysCredentialRow | null;
-    } catch {
-        return null;
-    }
-}
-
-function buildRuntimeBlock(project: SysProjectRow, cred: SysCredentialRow | null) {
-    const driver = (cred?.database_driver ?? project.database_driver ?? '').trim();
-    const url = (cred?.database_url ?? project.database_url ?? '').trim();
-    if (!driver || !url) return undefined;
-    const out: Record<string, any> = {
-        organizationId: project.organization_id,
-        hostname: project.hostname,
-        databaseDriver: driver,
-        databaseUrl: url,
-    };
-    const token = cred?.database_auth_token ?? project.database_auth_token;
-    if (token) out.databaseAuthToken = token;
-    return out;
-}
+// ---------------------------------------------------------------------------
+// Plugin factory
+// ---------------------------------------------------------------------------
 
 export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOptions): any {
     const prefix = options.apiPrefix ?? '/api/v1';
     const artifactRoot = options.artifactRoot ?? process.env.OS_PROJECT_ARTIFACT_ROOT ?? process.cwd();
     const requiredKey = options.apiKey ?? process.env.OS_CLOUD_API_KEY;
+    const keyPrefix = options.storage?.keyPrefix ?? 'artifacts';
 
     return {
         name: 'com.objectstack.cloud.artifact-api',
-        version: '1.0.0',
+        version: '2.0.0',
         init: async (_ctx: AnyContext) => {},
         start: async (ctx: AnyContext) => {
             let server: IHttpServer | undefined;
-            try {
-                server = ctx.getService('http.server') as IHttpServer | undefined;
-            } catch { return; }
+            try { server = ctx.getService('http.server') as IHttpServer | undefined; } catch { return; }
             if (!server) return;
 
+            // --- Resolve storage backend ---
+            let storage: StorageLike | null = null;
+            let storageAdapterName = 'local-fs';
+
+            // 1. Explicit IStorageService instance
+            if (options.storage?.service && typeof options.storage.service !== 'string') {
+                storage = options.storage.service as unknown as StorageLike;
+                storageAdapterName = 'file-storage:custom';
+            }
+            // 2. Kernel's file-storage service
+            if (!storage) {
+                try {
+                    const svc = ctx.getService('file-storage') as IStorageService | undefined;
+                    if (svc && typeof svc.upload === 'function') {
+                        storage = svc as unknown as StorageLike;
+                        storageAdapterName = 'file-storage';
+                    }
+                } catch { /* not registered */ }
+            }
+            // 3. Fallback to local filesystem
+            if (!storage) {
+                console.warn(
+                    '[CloudArtifactAPI] No IStorageService registered (file-storage). ' +
+                    'Falling back to local filesystem at ' + artifactRoot + '. ' +
+                    'Register StorageServicePlugin for S3/production deployments.',
+                );
+                storage = createLocalFsStorage(artifactRoot);
+                storageAdapterName = 'local-fs';
+            }
+
+            // --- Helpers ---
             const checkAuth = (req: any): { ok: true } | { ok: false; status: number; body: any } => {
                 if (!requiredKey) return { ok: true };
                 const header = (req.headers?.authorization ?? req.headers?.Authorization ?? '') as string;
@@ -230,56 +153,89 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
                 }
             };
 
-            // ---- GET /cloud/resolve-hostname?host=... ------------------------------
+            const storageKey = (projectId: string, commitId: string) =>
+                `${keyPrefix}/${projectId}/${commitId}.json`;
+
+            // ================================================================
+            // GET /cloud/resolve-hostname?host=...
+            // ================================================================
             server.get(`${prefix}/cloud/resolve-hostname`, async (req: any, res: any) => {
                 const auth = checkAuth(req);
                 if (!auth.ok) return res.status(auth.status).json(auth.body);
                 const host = String(req.query?.host ?? req.query?.hostname ?? '').trim();
-                if (!host) return res.status(400).json({ success: false, error: 'host query parameter is required' });
+                if (!host) return res.status(400).json(fail('host query parameter is required'));
 
                 const driver = await getDriver();
-                if (!driver) return res.status(503).json({ success: false, error: 'control plane unavailable' });
+                if (!driver) return res.status(503).json(fail('control plane unavailable', 503));
 
                 const project = await resolveProjectByHost(driver, host);
-                if (!project) return res.status(404).json({ success: false, error: `No project bound to hostname '${host}'` });
+                if (!project) return res.status(404).json(fail(`No project bound to hostname '${host}'`, 404));
 
                 const cred = await readProjectCredentials(driver, project.id);
                 const runtime = buildRuntimeBlock(project, cred);
-                return res.json(ok({
-                    projectId: project.id,
-                    organizationId: project.organization_id,
-                    runtime,
-                }));
+                return res.json(ok({ projectId: project.id, organizationId: project.organization_id, runtime }));
             });
 
-            // ---- GET /cloud/projects/:id/artifact ----------------------------------
+            // ================================================================
+            // GET /cloud/projects/:id/artifact[?commit=...]
+            // ================================================================
             server.get(`${prefix}/cloud/projects/:id/artifact`, async (req: any, res: any) => {
                 const auth = checkAuth(req);
                 if (!auth.ok) return res.status(auth.status).json(auth.body);
                 const projectId = String(req.params?.id ?? '').trim();
-                if (!projectId) return res.status(400).json({ success: false, error: 'project id required' });
+                if (!projectId) return res.status(400).json(fail('project id required'));
 
                 const driver = await getDriver();
-                if (!driver) return res.status(503).json({ success: false, error: 'control plane unavailable' });
+                if (!driver) return res.status(503).json(fail('control plane unavailable', 503));
 
                 const project = (await (driver.findOne as any)('sys_project', { where: { id: projectId } })) as SysProjectRow | null;
-                if (!project) return res.status(404).json({ success: false, error: `Project '${projectId}' not found` });
+                if (!project) return res.status(404).json(fail(`Project '${projectId}' not found`, 404));
 
-                const metadata = parseMetadata(project.metadata);
-                const paths = extractArtifactPaths(metadata);
+                const requestedCommit = String(req.query?.commit ?? '').trim();
+
+                // --- Try loading from storage via revision table (P1 path) ---
+                let revisionBundle: any | null = null;
+                try {
+                    let rev: any = null;
+                    if (requestedCommit) {
+                        rev = await (driver.findOne as any)('sys_project_revision', {
+                            where: { project_id: projectId, commit_id: requestedCommit },
+                        });
+                        if (!rev) return res.status(404).json(fail(`Revision '${requestedCommit}' not found for project '${projectId}'`, 404));
+                    } else {
+                        rev = await (driver.findOne as any)('sys_project_revision', {
+                            where: { project_id: projectId, is_current: true },
+                        });
+                    }
+                    if (rev?.storage_key) {
+                        const exists = await storage!.exists(rev.storage_key);
+                        if (exists) {
+                            const buf = await storage!.download(rev.storage_key);
+                            revisionBundle = JSON.parse(buf.toString('utf-8'));
+                        }
+                    }
+                } catch (err: any) {
+                    // Revision table may not exist yet (pre-migration); fall through to legacy path.
+                    console.warn('[CloudArtifactAPI] revision lookup failed, falling through to legacy path:', err?.message);
+                }
+
+                // --- Legacy path: read from artifact_path on disk ---
                 const bundles: any[] = [];
-                for (const p of paths) {
-                    const abs = isAbsolute(p) ? p : resolvePath(artifactRoot, p);
-                    const bundle = await readArtifactFile(abs);
-                    if (bundle) bundles.push(bundle);
+                if (revisionBundle) {
+                    bundles.push(revisionBundle);
+                } else {
+                    const metadata = parseMetadata(project.metadata);
+                    const paths = extractArtifactPaths(metadata);
+                    for (const p of paths) {
+                        const abs = isAbsolute(p) ? p : resolvePath(artifactRoot, p);
+                        const bundle = await readArtifactFile(abs);
+                        if (bundle) bundles.push(bundle);
+                    }
                 }
 
                 const cred = await readProjectCredentials(driver, project.id);
                 const runtime = buildRuntimeBlock(project, cred);
 
-                // Use the first bundle's commitId / builtAt / manifest if
-                // present so consumers can rev-cache; otherwise mint a stable
-                // synthetic value derived from the merged content.
                 const first = bundles[0] ?? {};
                 const mergedMetadata = mergeArtifactMetadata(bundles);
                 const functions = bundles.flatMap((b) => Array.isArray(b?.functions) ? b.functions : []);
@@ -304,56 +260,214 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
                 return res.json(ok(envelope));
             });
 
-            // ---- POST /cloud/projects/:id/metadata --------------------------------
-            // Receives a compiled artifact (objectstack compile output) and stores
-            // it on the project row so the GET /artifact endpoint can serve it.
+            // ================================================================
+            // POST /cloud/projects/:id/metadata
+            // ================================================================
             server.post(`${prefix}/cloud/projects/:id/metadata`, async (req: any, res: any) => {
                 const auth = checkAuth(req);
                 if (!auth.ok) return res.status(auth.status).json(auth.body);
                 const projectId = String(req.params?.id ?? '').trim();
-                if (!projectId) return res.status(400).json({ success: false, error: 'project id required' });
+                if (!projectId) return res.status(400).json(fail('project id required'));
 
                 const driver = await getDriver();
-                if (!driver) return res.status(503).json({ success: false, error: 'control plane unavailable' });
+                if (!driver) return res.status(503).json(fail('control plane unavailable', 503));
 
                 const project = (await (driver.findOne as any)('sys_project', { where: { id: projectId } })) as SysProjectRow | null;
-                if (!project) return res.status(404).json({ success: false, error: `Project '${projectId}' not found` });
+                if (!project) return res.status(404).json(fail(`Project '${projectId}' not found`, 404));
 
-                // Accept the raw artifact body (output of `objectstack compile`).
                 const body = req.body ?? {};
                 if (typeof body !== 'object' || Array.isArray(body)) {
-                    return res.status(400).json({ success: false, error: 'Request body must be a JSON object' });
+                    return res.status(400).json(fail('Request body must be a JSON object'));
                 }
 
-                // Persist the artifact as a file under artifactRoot/<projectId>/artifact.json
-                // and update sys_project.metadata.artifact_path so GET /artifact can find it.
-                const artifactDir = resolvePath(artifactRoot, projectId);
-                const artifactFile = resolvePath(artifactDir, 'artifact.json');
+                const bodyStr = JSON.stringify(body);
+                const bodyBuf = Buffer.from(bodyStr, 'utf-8');
+                const fullHash = sha256Hex(bodyStr);
+                const commitId = (body as any).commitId ?? fullHash.slice(0, 16);
+                const checksum = (body as any).checksum ?? { algorithm: 'sha256', value: fullHash };
+                const key = storageKey(projectId, commitId);
 
+                // 1. Upload to storage (content-addressable: skip if same key exists)
                 try {
-                    await mkdir(artifactDir, { recursive: true });
-                    await writeFile(artifactFile, JSON.stringify(body, null, 2), 'utf-8');
+                    const exists = await storage!.exists(key);
+                    if (!exists) {
+                        await storage!.upload(key, bodyBuf);
+                    }
                 } catch (err: any) {
-                    console.error('[CloudArtifactAPI] Failed to write artifact:', err?.message ?? err);
-                    return res.status(500).json({ success: false, error: 'Failed to persist artifact' });
+                    console.error('[CloudArtifactAPI] Failed to upload artifact:', err?.message ?? err);
+                    return res.status(500).json(fail('Failed to persist artifact', 500));
                 }
 
-                // Update the project row's metadata to point at the new file.
-                const existingMeta = parseMetadata(project.metadata);
-                const updatedMeta = { ...existingMeta, artifact_path: artifactFile };
+                // 2. Insert revision row + flip is_current
+                let revisionCreated = false;
                 try {
-                    await (driver.update as any)('sys_project', { id: projectId }, { metadata: JSON.stringify(updatedMeta) });
+                    // Check if revision already exists for this commit
+                    const existing = await (driver.findOne as any)('sys_project_revision', {
+                        where: { project_id: projectId, commit_id: commitId },
+                    });
+
+                    if (!existing) {
+                        // Flip old current → false
+                        try {
+                            const oldCurrent = await (driver.findOne as any)('sys_project_revision', {
+                                where: { project_id: projectId, is_current: true },
+                            });
+                            if (oldCurrent) {
+                                await (driver.update as any)('sys_project_revision', oldCurrent.id, { is_current: false });
+                            }
+                        } catch { /* table may not exist yet */ }
+
+                        await (driver.create as any)('sys_project_revision', {
+                            id: randomUUID(),
+                            project_id: projectId,
+                            commit_id: commitId,
+                            checksum: typeof checksum === 'object' ? checksum.value : String(checksum),
+                            storage_key: key,
+                            storage_adapter: storageAdapterName,
+                            size_bytes: bodyBuf.byteLength,
+                            built_at: (body as any).builtAt ?? new Date().toISOString(),
+                            built_with: (body as any).builtWith ? JSON.stringify((body as any).builtWith) : null,
+                            published_at: new Date().toISOString(),
+                            note: (body as any).note ?? null,
+                            is_current: true,
+                        });
+                        revisionCreated = true;
+                    } else {
+                        // Re-publish same commit: just ensure it's current
+                        if (!existing.is_current) {
+                            try {
+                                const oldCurrent = await (driver.findOne as any)('sys_project_revision', {
+                                    where: { project_id: projectId, is_current: true },
+                                });
+                                if (oldCurrent && oldCurrent.id !== existing.id) {
+                                    await (driver.update as any)('sys_project_revision', oldCurrent.id, { is_current: false });
+                                }
+                            } catch { /* ok */ }
+                            await (driver.update as any)('sys_project_revision', existing.id, { is_current: true });
+                        }
+                        revisionCreated = false;
+                    }
+                } catch (err: any) {
+                    // Non-fatal: revision table may not be migrated yet.
+                    console.warn('[CloudArtifactAPI] Failed to write revision row (table may not exist yet):', err?.message);
+                }
+
+                // 3. Update sys_project.metadata.current_commit_id (and legacy artifact_path)
+                const existingMeta = parseMetadata(project.metadata);
+                const updatedMeta = { ...existingMeta, current_commit_id: commitId, artifact_storage_key: key };
+                try {
+                    await (driver.update as any)('sys_project', projectId, { metadata: JSON.stringify(updatedMeta) });
                 } catch (err: any) {
                     console.error('[CloudArtifactAPI] Failed to update project metadata:', err?.message ?? err);
-                    // Non-fatal — artifact file is already written; GET /artifact will work next boot.
                 }
 
-                // Compute commitId / checksum for the response.
-                const bodyStr = JSON.stringify(body);
-                const commitId = (body as any).commitId ?? sha256Hex(bodyStr).slice(0, 16);
-                const checksum = (body as any).checksum ?? { algorithm: 'sha256', value: sha256Hex(bodyStr) };
+                return res.json(ok({
+                    projectId,
+                    commitId,
+                    checksum,
+                    storageKey: key,
+                    revisionCreated,
+                }));
+            });
 
-                return res.json(ok({ projectId, commitId, checksum }));
+            // ================================================================
+            // GET /cloud/projects/:id/revisions?limit=&cursor=
+            // ================================================================
+            server.get(`${prefix}/cloud/projects/:id/revisions`, async (req: any, res: any) => {
+                const auth = checkAuth(req);
+                if (!auth.ok) return res.status(auth.status).json(auth.body);
+                const projectId = String(req.params?.id ?? '').trim();
+                if (!projectId) return res.status(400).json(fail('project id required'));
+
+                const driver = await getDriver();
+                if (!driver) return res.status(503).json(fail('control plane unavailable', 503));
+
+                const limit = Math.min(Math.max(parseInt(req.query?.limit ?? '20', 10) || 20, 1), 100);
+                const cursor = String(req.query?.cursor ?? '').trim();
+
+                try {
+                    const query: any = {
+                        where: { project_id: projectId },
+                        orderBy: [{ field: 'published_at', direction: 'desc' }],
+                        limit: limit + 1,
+                    };
+                    if (cursor) {
+                        query.where.published_at = { $lt: cursor };
+                    }
+                    const rows = await (driver.find as any)('sys_project_revision', query);
+                    const hasMore = rows.length > limit;
+                    const items = hasMore ? rows.slice(0, limit) : rows;
+                    const nextCursor = hasMore ? items[items.length - 1]?.published_at : undefined;
+
+                    return res.json(ok({
+                        items: items.map((r: any) => ({
+                            commitId: r.commit_id,
+                            checksum: r.checksum,
+                            storageKey: r.storage_key,
+                            sizeBytes: r.size_bytes,
+                            builtAt: r.built_at,
+                            publishedAt: r.published_at,
+                            publishedBy: r.published_by,
+                            note: r.note,
+                            isCurrent: !!r.is_current,
+                        })),
+                        nextCursor,
+                    }));
+                } catch (err: any) {
+                    console.error('[CloudArtifactAPI] Failed to list revisions:', err?.message ?? err);
+                    return res.status(500).json(fail('Failed to list revisions', 500));
+                }
+            });
+
+            // ================================================================
+            // POST /cloud/projects/:id/revisions/:commit/activate
+            // ================================================================
+            server.post(`${prefix}/cloud/projects/:id/revisions/:commit/activate`, async (req: any, res: any) => {
+                const auth = checkAuth(req);
+                if (!auth.ok) return res.status(auth.status).json(auth.body);
+                const projectId = String(req.params?.id ?? '').trim();
+                const commitId = String(req.params?.commit ?? '').trim();
+                if (!projectId || !commitId) return res.status(400).json(fail('project id and commit id required'));
+
+                const driver = await getDriver();
+                if (!driver) return res.status(503).json(fail('control plane unavailable', 503));
+
+                try {
+                    const target = await (driver.findOne as any)('sys_project_revision', {
+                        where: { project_id: projectId, commit_id: commitId },
+                    });
+                    if (!target) return res.status(404).json(fail(`Revision '${commitId}' not found`, 404));
+
+                    // Flip old current → false
+                    const oldCurrent = await (driver.findOne as any)('sys_project_revision', {
+                        where: { project_id: projectId, is_current: true },
+                    });
+                    if (oldCurrent && oldCurrent.id !== target.id) {
+                        await (driver.update as any)('sys_project_revision', oldCurrent.id, { is_current: false });
+                    }
+
+                    // Set target as current
+                    await (driver.update as any)('sys_project_revision', target.id, { is_current: true });
+
+                    // Update sys_project.metadata.current_commit_id
+                    const project = await (driver.findOne as any)('sys_project', { where: { id: projectId } });
+                    if (project) {
+                        const meta = parseMetadata(project.metadata);
+                        meta.current_commit_id = commitId;
+                        meta.artifact_storage_key = target.storage_key;
+                        await (driver.update as any)('sys_project', projectId, { metadata: JSON.stringify(meta) });
+                    }
+
+                    return res.json(ok({
+                        projectId,
+                        commitId,
+                        activated: true,
+                        previousCommitId: oldCurrent?.commit_id ?? null,
+                    }));
+                } catch (err: any) {
+                    console.error('[CloudArtifactAPI] Failed to activate revision:', err?.message ?? err);
+                    return res.status(500).json(fail('Failed to activate revision', 500));
+                }
             });
         },
         stop: async (_ctx: AnyContext) => {},
