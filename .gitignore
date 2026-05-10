@@ -98,3 +98,4 @@ apps/*/.next/docs/
 playwright-report/
 test-results/
 playwright/.cache/
+apps/cloud/artifacts/

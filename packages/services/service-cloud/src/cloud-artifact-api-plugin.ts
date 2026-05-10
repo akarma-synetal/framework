@@ -195,6 +195,7 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
 
                 // --- Try loading from storage via revision table (P1 path) ---
                 let revisionBundle: any | null = null;
+                let revisionRow: any = null;
                 try {
                     let rev: any = null;
                     if (requestedCommit) {
@@ -212,6 +213,7 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
                         if (exists) {
                             const buf = await storage!.download(rev.storage_key);
                             revisionBundle = JSON.parse(buf.toString('utf-8'));
+                            revisionRow = rev;
                         }
                     }
                 } catch (err: any) {
@@ -240,10 +242,17 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
                 const mergedMetadata = mergeArtifactMetadata(bundles);
                 const functions = bundles.flatMap((b) => Array.isArray(b?.functions) ? b.functions : []);
                 const manifest = first.manifest ?? { plugins: [], drivers: [], engines: {} };
-                const commitId = first.commitId
+                // Prefer revision row's identity (authoritative for published artifacts);
+                // fall back to bundle's own commitId; finally synthesize from content.
+                const commitId = revisionRow?.commit_id
+                    ?? first.commitId
                     ?? sha256Hex(JSON.stringify(mergedMetadata) + ':' + JSON.stringify(functions)).slice(0, 16);
-                const checksum = first.checksum
-                    ?? { algorithm: 'sha256', value: sha256Hex(JSON.stringify({ mergedMetadata, functions, manifest })) };
+                // checksum: ProjectArtifactSchema requires a 64-char hex string.
+                const computedChecksumHex = sha256Hex(JSON.stringify({ mergedMetadata, functions, manifest }));
+                const firstChecksum = typeof first.checksum === 'string'
+                    ? first.checksum
+                    : (first.checksum?.value ?? undefined);
+                const checksum = revisionRow?.checksum ?? firstChecksum ?? computedChecksumHex;
 
                 const envelope = {
                     schemaVersion: '0.1',
@@ -284,7 +293,11 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
                 const bodyBuf = Buffer.from(bodyStr, 'utf-8');
                 const fullHash = sha256Hex(bodyStr);
                 const commitId = (body as any).commitId ?? fullHash.slice(0, 16);
-                const checksum = (body as any).checksum ?? { algorithm: 'sha256', value: fullHash };
+                // ProjectArtifactSchema demands a 64-char hex string for checksum.
+                const incomingChecksum = (body as any).checksum;
+                const checksum = typeof incomingChecksum === 'string'
+                    ? incomingChecksum
+                    : (incomingChecksum?.value ?? fullHash);
                 const key = storageKey(projectId, commitId);
 
                 // 1. Upload to storage (content-addressable: skip if same key exists)
@@ -321,7 +334,7 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
                             id: randomUUID(),
                             project_id: projectId,
                             commit_id: commitId,
-                            checksum: typeof checksum === 'object' ? checksum.value : String(checksum),
+                            checksum: typeof checksum === 'string' ? checksum : fullHash,
                             storage_key: key,
                             storage_adapter: storageAdapterName,
                             size_bytes: bodyBuf.byteLength,

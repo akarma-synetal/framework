@@ -112,7 +112,10 @@ export default class Publish extends Command {
       printSuccess('Artifact published successfully');
       printKV('  Project', flags.project);
       if (data?.commitId) printKV('  Commit', data.commitId);
-      if (data?.checksum?.value) printKV('  Checksum', data.checksum.value.slice(0, 16));
+      const checksumStr = typeof data?.checksum === 'string'
+        ? data.checksum
+        : (data?.checksum?.value ?? null);
+      if (checksumStr) printKV('  Checksum', String(checksumStr).slice(0, 16));
       printKV('  Server', flags.server);
 
     } catch (error) {
