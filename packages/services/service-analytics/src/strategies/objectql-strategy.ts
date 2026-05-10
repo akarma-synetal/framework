@@ -117,22 +117,55 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
 
   // ── Helpers ──────────────────────────────────────────────────────
 
+  /**
+   * Resolve a member ref to a `{ sql, type? }` definition.
+   *
+   * Mirrors `NativeSQLStrategy.lookupMember` so the two strategies
+   * accept the same naming conventions:
+   *   1. `<cube>.<field>`           — canonical analytics qualifier.
+   *   2. `<lookup>.<field>`         — relation traversal (e.g. `account.industry`).
+   *      Tries literal key, then underscore-flattened key, then falls
+   *      back to a synthetic dim whose `sql` is the dotted path so the
+   *      ObjectQL aggregate engine can traverse it via the lookup field.
+   *   3. `<field>`                  — bare column on the cube's table.
+   */
+  private lookupMember(
+    cube: Cube,
+    member: string,
+    kind: 'dimension' | 'measure',
+  ): { sql: string; type?: string } | undefined {
+    const bag = kind === 'dimension' ? cube.dimensions : cube.measures;
+    if (bag[member]) return bag[member];
+    if (member.includes('.')) {
+      const [first, ...rest] = member.split('.');
+      const tail = rest.join('.');
+      if (first === cube.name && bag[tail]) return bag[tail];
+      if (bag[tail]) return bag[tail];
+      const flat = member.replace(/\./g, '_');
+      if (bag[flat]) return bag[flat];
+      if (kind === 'dimension') return { sql: member, type: 'string' };
+    } else if (bag[member]) {
+      return bag[member];
+    }
+    return undefined;
+  }
+
   private resolveFieldName(cube: Cube, member: string, kind: 'dimension' | 'measure' | 'any'): string {
-    const fieldName = member.includes('.') ? member.split('.')[1] : member;
     if (kind === 'dimension' || kind === 'any') {
-      const dim = cube.dimensions[fieldName];
+      const dim = this.lookupMember(cube, member, 'dimension');
       if (dim) return dim.sql.replace(/^\$/, '');
     }
     if (kind === 'measure' || kind === 'any') {
-      const measure = cube.measures[fieldName];
+      const measure = this.lookupMember(cube, member, 'measure');
       if (measure) return measure.sql.replace(/^\$/, '');
     }
-    return fieldName;
+    return member.includes('.') ? member.split('.')[1] : member;
   }
 
   private resolveMeasureAggregation(cube: Cube, measureName: string): { field: string; method: string } {
-    const fieldName = measureName.includes('.') ? measureName.split('.')[1] : measureName;
-    const direct = cube.measures[fieldName];
+    const direct = this.lookupMember(cube, measureName, 'measure') as
+      | { sql: string; type: string }
+      | undefined;
     if (direct) {
       return {
         field: direct.sql.replace(/^\$/, ''),
@@ -143,6 +176,7 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
     // canonical name is just `${field}` (e.g. measure 'amount' of type 'sum').
     // This matches the convention used by clients that build measure names
     // from (field, function) pairs (e.g. the data-objectstack adapter).
+    const fieldName = measureName.includes('.') ? measureName.split('.')[1] : measureName;
     const aggTypes = ['count', 'sum', 'avg', 'min', 'max', 'count_distinct'];
     for (const type of aggTypes) {
       const suffix = `_${type}`;
@@ -189,8 +223,7 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
     const fields: Array<{ name: string; type: string }> = [];
     if (query.dimensions) {
       for (const dim of query.dimensions) {
-        const fieldName = dim.includes('.') ? dim.split('.')[1] : dim;
-        const d = cube.dimensions[fieldName];
+        const d = this.lookupMember(cube, dim, 'dimension');
         fields.push({ name: dim, type: d?.type || 'string' });
       }
     }

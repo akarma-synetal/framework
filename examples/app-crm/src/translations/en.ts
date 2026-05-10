@@ -545,7 +545,7 @@ export const en: TranslationData = {
         total_contacts: { title: 'Total Contacts', description: 'People in our address book' },
         open_leads: { title: 'Open Leads', description: 'Unconverted leads in the funnel' },
         revenue_trend: { title: 'Revenue Trend', description: 'Closed-won revenue over the last 12 months' },
-        revenue_by_lead_source: { title: 'Revenue by Lead Source', description: 'YTD closed-won revenue split by originating lead source' },
+        revenue_by_industry: { title: 'Revenue by Industry', description: 'YTD closed-won revenue split by customer industry' },
         pipeline_by_stage: { title: 'Pipeline by Stage', description: 'Open opportunity value by sales stage' },
         new_accounts_by_month: { title: 'New Accounts', description: 'Account creation cadence — last 6 months' },
         top_accounts_by_revenue: { title: 'Top Accounts by Revenue', description: 'Largest customers ranked by annual revenue' },

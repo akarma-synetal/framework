@@ -44,11 +44,15 @@ export class NativeSQLStrategy implements AnalyticsStrategy {
     const params: unknown[] = [];
     const selectClauses: string[] = [];
     const groupByClauses: string[] = [];
+    const tableName = this.extractObjectName(cube);
+    // Map of relation alias → JOIN clause. Populated lazily as dotted
+    // dimensions/measures/filters are resolved.
+    const joins = new Map<string, string>();
 
     // Build SELECT for dimensions
     if (query.dimensions && query.dimensions.length > 0) {
       for (const dim of query.dimensions) {
-        const colExpr = this.resolveDimensionSql(cube, dim);
+        const colExpr = this.resolveDimensionSql(cube, dim, tableName, joins);
         selectClauses.push(`${colExpr} AS "${dim}"`);
         groupByClauses.push(colExpr);
       }
@@ -57,7 +61,7 @@ export class NativeSQLStrategy implements AnalyticsStrategy {
     // Build SELECT for measures
     if (query.measures && query.measures.length > 0) {
       for (const measure of query.measures) {
-        const aggExpr = this.resolveMeasureSql(cube, measure);
+        const aggExpr = this.resolveMeasureSql(cube, measure, tableName, joins);
         selectClauses.push(`${aggExpr} AS "${measure}"`);
       }
     }
@@ -67,7 +71,7 @@ export class NativeSQLStrategy implements AnalyticsStrategy {
     const normalizedFilters = normalizeAnalyticsFilters(query);
     if (normalizedFilters.length > 0) {
       for (const filter of normalizedFilters) {
-        const colExpr = this.resolveFieldSql(cube, filter.member);
+        const colExpr = this.resolveFieldSql(cube, filter.member, tableName, joins);
         const clause = this.buildFilterClause(colExpr, filter.operator, filter.values, params);
         if (clause) whereClauses.push(clause);
       }
@@ -76,7 +80,7 @@ export class NativeSQLStrategy implements AnalyticsStrategy {
     // Build time dimension filters
     if (query.timeDimensions && query.timeDimensions.length > 0) {
       for (const td of query.timeDimensions) {
-        const colExpr = this.resolveFieldSql(cube, td.dimension);
+        const colExpr = this.resolveFieldSql(cube, td.dimension, tableName, joins);
         if (td.dateRange) {
           const range = Array.isArray(td.dateRange) ? td.dateRange : [td.dateRange, td.dateRange];
           if (range.length === 2) {
@@ -87,8 +91,10 @@ export class NativeSQLStrategy implements AnalyticsStrategy {
       }
     }
 
-    const tableName = this.extractObjectName(cube);
     let sql = `SELECT ${selectClauses.join(', ')} FROM "${tableName}"`;
+    if (joins.size > 0) {
+      sql += ' ' + Array.from(joins.values()).join(' ');
+    }
     if (whereClauses.length > 0) {
       sql += ` WHERE ${whereClauses.join(' AND ')}`;
     }
@@ -111,18 +117,109 @@ export class NativeSQLStrategy implements AnalyticsStrategy {
 
   // ── Helpers ──────────────────────────────────────────────────────
 
-  private resolveDimensionSql(cube: Cube, member: string): string {
-    const fieldName = member.includes('.') ? member.split('.')[1] : member;
-    const dim = cube.dimensions[fieldName];
-    return dim ? dim.sql : fieldName;
+  /**
+   * Resolve a dimension/measure/filter SQL expression that may reference a
+   * related table via dot notation (e.g. `account.industry`).
+   *
+   * When the resolved `sql` contains a dot, treat the prefix as a lookup
+   * field on the cube's table and synthesise a `LEFT JOIN` against the
+   * related table. The convention (matching the auto-cube generator and
+   * ObjectStack object schemas) is:
+   *
+   *   <parentTable>.<lookupField> = <lookupField>.id
+   *
+   * i.e. the lookup field name on the parent table equals the related
+   * table name. This holds for all `Field.lookup({ object: '...' })`
+   * declarations where the field is named after its target object.
+   *
+   * Returns the qualified SQL reference (e.g. `"account"."industry"`).
+   * Pure column references (no dot) are returned as-is.
+   */
+  private qualifyAndRegisterJoin(
+    rawSql: string,
+    parentTable: string,
+    joins: Map<string, string>,
+  ): string {
+    if (!rawSql.includes('.')) return rawSql;
+    // Only the first dotted hop is supported (single-level relation).
+    const [alias, ...rest] = rawSql.split('.');
+    if (!alias || rest.length === 0) return rawSql;
+    const column = rest.join('.');
+    if (!joins.has(alias)) {
+      joins.set(
+        alias,
+        `LEFT JOIN "${alias}" ON "${parentTable}"."${alias}" = "${alias}"."id"`,
+      );
+    }
+    return `"${alias}"."${column}"`;
   }
 
-  private resolveMeasureSql(cube: Cube, member: string): string {
-    const fieldName = member.includes('.') ? member.split('.')[1] : member;
-    const measure = cube.measures[fieldName];
+  /**
+   * Resolve a member reference (dimension, measure, or filter field) to its
+   * cube definition.
+   *
+   * Accepts three naming conventions:
+   *   1. `<cube>.<field>` — the canonical analytics qualifier (stripped to `<field>`).
+   *   2. `<lookup>.<field>` — a relation traversal (e.g. `account.industry`).
+   *      First tried as the literal key, then as the underscore-flattened
+   *      key (`account_industry`), and finally returned as a synthetic
+   *      definition whose `sql` is the dotted reference so the JOIN
+   *      machinery can pick it up.
+   *   3. `<field>` — a bare field name on the cube's table.
+   */
+  private lookupMember(
+    cube: Cube,
+    member: string,
+    kind: 'dimension' | 'measure',
+  ): { sql: string; type?: string } | undefined {
+    const bag = kind === 'dimension' ? cube.dimensions : cube.measures;
+    // Direct hit on the registered key (handles `cube.field` and exact dotted keys).
+    if (bag[member]) return bag[member];
+    if (member.includes('.')) {
+      const [first, ...rest] = member.split('.');
+      const tail = rest.join('.');
+      // `<cube>.<field>` style.
+      if (first === cube.name && bag[tail]) return bag[tail];
+      // Plain second-segment lookup (legacy behaviour).
+      if (bag[tail]) return bag[tail];
+      // Underscore-flattened relation lookup (e.g. `account_industry`).
+      const flat = member.replace(/\./g, '_');
+      if (bag[flat]) return bag[flat];
+      // Synthetic relation traversal — let qualifyAndRegisterJoin handle it.
+      if (kind === 'dimension') {
+        return { sql: member, type: 'string' };
+      }
+    } else if (bag[member]) {
+      return bag[member];
+    }
+    return undefined;
+  }
+
+  private resolveDimensionSql(
+    cube: Cube,
+    member: string,
+    parentTable: string,
+    joins: Map<string, string>,
+  ): string {
+    const dim = this.lookupMember(cube, member, 'dimension');
+    const raw = dim ? dim.sql : (member.includes('.') ? member.split('.')[1] : member);
+    return this.qualifyAndRegisterJoin(raw, parentTable, joins);
+  }
+
+  private resolveMeasureSql(
+    cube: Cube,
+    member: string,
+    parentTable: string,
+    joins: Map<string, string>,
+  ): string {
+    const measure = this.lookupMember(cube, member, 'measure') as
+      | { sql: string; type: string }
+      | undefined;
     if (!measure) return `COUNT(*)`;
 
-    const col = measure.sql;
+    const col = measure.sql === '*'
+      ? '*'
+      : this.qualifyAndRegisterJoin(measure.sql, parentTable, joins);
     switch (measure.type) {
       case 'count': return 'COUNT(*)';
       case 'sum': return `SUM(${col})`;
@@ -134,12 +231,17 @@ export class NativeSQLStrategy implements AnalyticsStrategy {
     }
   }
 
-  private resolveFieldSql(cube: Cube, member: string): string {
+  private resolveFieldSql(
+    cube: Cube,
+    member: string,
+    parentTable: string,
+    joins: Map<string, string>,
+  ): string {
+    const dim = this.lookupMember(cube, member, 'dimension');
+    if (dim) return this.qualifyAndRegisterJoin(dim.sql, parentTable, joins);
+    const measure = this.lookupMember(cube, member, 'measure');
+    if (measure) return this.qualifyAndRegisterJoin(measure.sql, parentTable, joins);
     const fieldName = member.includes('.') ? member.split('.')[1] : member;
-    const dim = cube.dimensions[fieldName];
-    if (dim) return dim.sql;
-    const measure = cube.measures[fieldName];
-    if (measure) return measure.sql;
     return fieldName;
   }
 
@@ -180,8 +282,7 @@ export class NativeSQLStrategy implements AnalyticsStrategy {
     const fields: Array<{ name: string; type: string }> = [];
     if (query.dimensions) {
       for (const dim of query.dimensions) {
-        const fieldName = dim.includes('.') ? dim.split('.')[1] : dim;
-        const d = cube.dimensions[fieldName];
+        const d = this.lookupMember(cube, dim, 'dimension');
         fields.push({ name: dim, type: d?.type || 'string' });
       }
     }

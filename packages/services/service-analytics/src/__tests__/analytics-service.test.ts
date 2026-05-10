@@ -171,6 +171,89 @@ describe('NativeSQLStrategy', () => {
     expect(params).toContain('completed');
   });
 
+  it('should auto-emit LEFT JOIN for dotted dimension/measure SQL', async () => {
+    const oppCube: Cube = {
+      name: 'opportunity',
+      title: 'Opportunities',
+      sql: 'opportunity',
+      public: true,
+      measures: {
+        count: { name: 'count', label: 'Count', type: 'count', sql: '*' },
+        account_revenue: {
+          name: 'account_revenue',
+          label: 'Account Revenue (Sum)',
+          type: 'sum',
+          sql: 'account.annual_revenue',
+        },
+      },
+      dimensions: {
+        stage: { name: 'stage', label: 'Stage', type: 'string', sql: 'stage' },
+        account_industry: {
+          name: 'account_industry',
+          label: 'Industry',
+          type: 'string',
+          sql: 'account.industry',
+        },
+      },
+    };
+    const ctx = {
+      getCube: () => oppCube,
+      queryCapabilities: () => ({ nativeSql: true, objectqlAggregate: false, inMemory: false }),
+      executeRawSql: vi.fn(),
+    };
+
+    const { sql } = await strategy.generateSql(
+      {
+        cube: 'opportunity',
+        dimensions: ['opportunity.account_industry'],
+        measures: ['opportunity.account_revenue', 'opportunity.count'],
+      },
+      ctx,
+    );
+
+    // Single LEFT JOIN registered for the `account` relation, reused by
+    // both the dimension and the measure.
+    expect(sql).toContain('LEFT JOIN "account" ON "opportunity"."account" = "account"."id"');
+    expect(sql.match(/LEFT JOIN/g)?.length).toBe(1);
+    expect(sql).toContain('"account"."industry"');
+    expect(sql).toContain('SUM("account"."annual_revenue")');
+    expect(sql).toContain('GROUP BY "account"."industry"');
+    // Plain columns remain unqualified for backwards compatibility.
+    expect(sql).toContain('COUNT(*)');
+  });
+
+  it('should resolve client-style `<lookup>.<field>` member references', async () => {
+    const oppCube: Cube = {
+      name: 'opportunity',
+      title: 'Opportunities',
+      sql: 'opportunity',
+      public: true,
+      measures: {
+        amount_sum: { name: 'amount_sum', label: 'Amount (Sum)', type: 'sum', sql: 'amount' },
+      },
+      dimensions: {
+        // Frontend will send `account.industry`; cube key uses underscore.
+        account_industry: {
+          name: 'account_industry', label: 'Industry', type: 'string', sql: 'account.industry',
+        },
+      },
+    };
+    const ctx = {
+      getCube: () => oppCube,
+      queryCapabilities: () => ({ nativeSql: true, objectqlAggregate: false, inMemory: false }),
+      executeRawSql: vi.fn(),
+    };
+
+    const { sql } = await strategy.generateSql(
+      { cube: 'opportunity', dimensions: ['account.industry'], measures: ['amount_sum'] },
+      ctx,
+    );
+
+    expect(sql).toContain('LEFT JOIN "account" ON "opportunity"."account" = "account"."id"');
+    expect(sql).toContain('"account"."industry" AS "account.industry"');
+    expect(sql).toContain('SUM(amount)');
+  });
+
   it('should execute query and return structured result', async () => {
     const mockRows = [
       { 'orders.status': 'completed', 'orders.count': 5, 'orders.total_amount': 500 },

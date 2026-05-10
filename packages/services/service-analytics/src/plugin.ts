@@ -9,7 +9,10 @@ import type { DriverCapabilities } from './strategies/types.js';
 
 /**
  * Minimal IDataEngine surface required for the auto-bridge.
- * ObjectQL exposes `aggregate(object, { where, groupBy, aggregations: [{ function, field, alias }] })`.
+ * ObjectQL exposes:
+ *   - `aggregate(object, { where, groupBy, aggregations: [{ function, field, alias }] })`
+ *   - `execute(sql, options)` for raw SQL pass-through (enables NativeSQLStrategy
+ *     and lets the analytics layer emit JOINs for relation traversal).
  */
 interface DataEngineLike {
   aggregate(object: string, options: {
@@ -17,6 +20,7 @@ interface DataEngineLike {
     groupBy?: string[];
     aggregations?: Array<{ function: string; field: string; alias: string }>;
   }): Promise<unknown[]>;
+  execute?(command: unknown, options?: Record<string, unknown>): Promise<unknown>;
 }
 
 /**
@@ -147,12 +151,50 @@ export class AnalyticsServicePlugin implements Plugin {
       autoBridged = true;
     }
 
+    // Auto-bridge raw SQL when the data engine exposes `execute()` and the
+    // caller did not supply their own `executeRawSql`. This unlocks
+    // NativeSQLStrategy (priority 10) which can emit `LEFT JOIN`s for
+    // dotted dimension/measure references like `account.industry`.
+    let executeRawSql = this.options.executeRawSql;
+    let autoBridgedRawSql = false;
+    if (!executeRawSql) {
+      const tryGetExecutor = (): DataEngineLike | undefined => {
+        try {
+          const svc = ctx.getService<DataEngineLike>('data');
+          return svc && typeof svc.execute === 'function' ? svc : undefined;
+        } catch {
+          return undefined;
+        }
+      };
+      // Always wire the bridge — resolution happens at call time, mirroring
+      // the executeAggregate auto-bridge above. This way plugin-init order
+      // does not matter as long as `data` exists by the time a query runs.
+      executeRawSql = async (_objectName, sql, params) => {
+        const engine = tryGetExecutor();
+        if (!engine || !engine.execute) {
+          throw new Error(
+            '[Analytics] Cannot execute raw SQL: no IDataEngine ("data") service with execute() is registered.',
+          );
+        }
+        // NativeSQLStrategy emits `$1, $2, …` placeholders. Knex (used by
+        // driver-sql) speaks `?` placeholders, so translate.
+        const knexSql = sql.replace(/\$(\d+)/g, '?');
+        const result = await engine.execute(knexSql, { args: params });
+        if (Array.isArray(result)) return result as Record<string, unknown>[];
+        if (result && typeof result === 'object' && 'rows' in (result as Record<string, unknown>)) {
+          return (result as { rows: Record<string, unknown>[] }).rows;
+        }
+        return [];
+      };
+      autoBridgedRawSql = true;
+    }
+
     // Default capabilities: when we have an aggregate bridge, advertise
     // ObjectQL support so ObjectQLStrategy is selected. Callers can still
     // override via options.queryCapabilities.
     const queryCapabilities = this.options.queryCapabilities
       ?? (() => ({
-        nativeSql: !!this.options.executeRawSql,
+        nativeSql: !!executeRawSql,
         objectqlAggregate: !!executeAggregate,
         inMemory: false,
       }));
@@ -161,13 +203,16 @@ export class AnalyticsServicePlugin implements Plugin {
       cubes: this.options.cubes,
       logger: ctx.logger,
       queryCapabilities,
-      executeRawSql: this.options.executeRawSql,
+      executeRawSql,
       executeAggregate,
       fallbackService,
     };
 
     if (autoBridged) {
       ctx.logger.info('[Analytics] Auto-bridged executeAggregate → "data" service (IDataEngine)');
+    }
+    if (autoBridgedRawSql) {
+      ctx.logger.info('[Analytics] Auto-bridged executeRawSql → "data" service (IDataEngine.execute)');
     }
 
     this.service = new AnalyticsService(config);

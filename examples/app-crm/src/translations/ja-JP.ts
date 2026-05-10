@@ -544,7 +544,7 @@ export const jaJP: TranslationData = {
         total_contacts: { title: '取引先責任者数', description: '名簿に登録された取引先責任者' },
         open_leads: { title: 'オープンリード', description: '未取引開始のリード' },
         revenue_trend: { title: '売上トレンド', description: '過去12か月の成立済み売上' },
-        revenue_by_lead_source: { title: '業種別売上', description: '本年度の成立済み売上をリードソース別に分類' },
+        revenue_by_industry: { title: '業種別売上', description: '本年度の成立済み売上を業種別に分類' },
         pipeline_by_stage: { title: 'フェーズ別パイプライン', description: '営業フェーズ別のオープン商談金額' },
         new_accounts_by_month: { title: '新規取引先', description: '過去6か月の取引先作成ペース' },
         top_accounts_by_revenue: { title: '売上上位取引先', description: '年商で順位付けした主要顧客' },
