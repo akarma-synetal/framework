@@ -226,6 +226,77 @@ You should see two `sys_project_revision` rows — the second one
 
 ---
 
+## 7. Public artifact API (visibility)
+
+By default every project is **private** — only the authenticated `/cloud/*`
+routes can read it. To support marketplace listings, OSS templates, share
+links, or live documentation demos, switch a project to **public** or
+**unlisted**.
+
+```ts
+// sys_project.visibility — defined in packages/platform-objects/src/tenant/sys-project.object.ts
+visibility: 'private' | 'unlisted' | 'public'   // default: 'private'
+```
+
+| Mode       | `/pub/v1/.../artifact` (no commit) | `/pub/v1/.../artifact?commit=<id>` | `/pub/v1/.../revisions` | `/pub/v1/.../manifest.json` |
+|------------|:-----------------------------------:|:------------------------------------:|:------------------------:|:----------------------------:|
+| `private`  | 404                                 | 404                                  | 404                      | 404                          |
+| `unlisted` | 404                                 | ✅ 200                               | 404                      | 404                          |
+| `public`   | ✅ 200 (current)                    | ✅ 200                               | ✅ 200                   | ✅ 200                       |
+
+`unlisted` requires the caller to know the exact `commit` — it is meant for
+share-preview links you mail to colleagues, not for crawling.
+
+### Public endpoints
+
+- `GET /api/v1/pub/v1/projects/:id/artifact[?commit=<id>]`
+  Returns the same envelope as the private route. **No auth header required.**
+  Sets `Cache-Control: public, max-age=31536000, immutable` and
+  `ETag: "<commitId>"` so a CDN (Cloudflare, CloudFront, …) in front of the
+  control plane serves it from the edge for free.
+- `GET /api/v1/pub/v1/projects/:id/revisions?limit=N` — public history.
+- `GET /api/v1/pub/v1/projects/:id/manifest.json` — lightweight project info
+  (`projectId`, `displayName`, `currentCommitId`, `currentChecksum`, `builtAt`).
+
+### Flipping visibility
+
+```bash
+# Via the platform REST (control plane)
+curl -X PATCH https://cloud.example.com/api/v1/data/sys_project/proj_crm \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"visibility":"public"}'
+```
+
+Or via SQL on the control DB:
+
+```sql
+UPDATE sys_project SET visibility='public' WHERE id='proj_crm';
+```
+
+> ⚠️ **Before going public, audit the artifact** — it includes every field
+> name, view config, AI prompt, and formula. Treat it like committing to a
+> public Git repo: never embed credentials or PII in metadata.
+
+### Pulling a public artifact from another runtime
+
+```ts
+import { MetadataPlugin } from '@objectstack/metadata';
+
+new MetadataPlugin({
+    artifactSource: {
+        mode: 'artifact-api',
+        url: 'https://cloud.objectstack.dev',
+        // No token needed for /pub routes
+        // Use the public path explicitly:
+        // url: 'https://cloud.objectstack.dev/api/v1/pub/v1/projects/proj_crm'
+    },
+    bootstrap: 'artifact-only',
+});
+```
+
+---
+
 ## See also
 
 - [`packages/services/service-cloud`](https://github.com/objectstack-ai/framework/tree/main/packages/services/service-cloud) — control-plane plugin source

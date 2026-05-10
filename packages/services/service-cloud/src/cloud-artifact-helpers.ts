@@ -20,6 +20,7 @@ export interface SysProjectRow {
     database_auth_token?: string;
     metadata?: Record<string, unknown> | string;
     is_system?: boolean | number;
+    visibility?: 'private' | 'unlisted' | 'public';
 }
 
 export interface SysCredentialRow {

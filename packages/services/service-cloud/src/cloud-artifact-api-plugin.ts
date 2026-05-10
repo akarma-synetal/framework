@@ -496,6 +496,172 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
                     return res.status(500).json(fail('Failed to activate revision', 500));
                 }
             });
+
+            // ================================================================
+            // PUBLIC API — /pub/v1/projects/:id/*
+            // ----------------------------------------------------------------
+            // Unauthenticated routes that respect sys_project.visibility:
+            //   - private  → 404 (looks like the project doesn't exist)
+            //   - unlisted → must include ?commit=<id> (no enumeration)
+            //   - public   → free read
+            //
+            // Responses are content-addressable and immutable per commitId, so
+            // we set strong caching headers — a CDN in front of this server
+            // (Cloudflare, CloudFront, …) can serve everything from the edge.
+            // ================================================================
+
+            const publicPrefix = `${prefix}/pub/v1/projects/:id`;
+
+            const checkVisibility = (
+                project: SysProjectRow,
+                requestedCommit: string,
+            ): { ok: true } | { ok: false; status: number; body: any } => {
+                const visibility = project.visibility ?? 'private';
+                if (visibility === 'private') {
+                    // Don't reveal existence of private projects.
+                    return { ok: false, status: 404, body: fail('not found', 404) };
+                }
+                if (visibility === 'unlisted' && !requestedCommit) {
+                    // Refuse enumeration; force callers to know the exact commit.
+                    return { ok: false, status: 404, body: fail('not found', 404) };
+                }
+                return { ok: true };
+            };
+
+            // GET /pub/v1/projects/:id/manifest.json — lightweight project info
+            server.get(`${publicPrefix}/manifest.json`, async (req: any, res: any) => {
+                const projectId = String(req.params?.id ?? '').trim();
+                if (!projectId) return res.status(404).json(fail('not found', 404));
+
+                const driver = await getDriver();
+                if (!driver) return res.status(503).json(fail('control plane unavailable', 503));
+
+                const project = (await (driver.findOne as any)('sys_project', { where: { id: projectId } })) as SysProjectRow | null;
+                if (!project) return res.status(404).json(fail('not found', 404));
+
+                // For manifest we treat unlisted as private (no enumeration).
+                if ((project.visibility ?? 'private') !== 'public') {
+                    return res.status(404).json(fail('not found', 404));
+                }
+
+                const current = await (driver.findOne as any)('sys_project_revision', {
+                    where: { project_id: projectId, is_current: true },
+                });
+
+                if (typeof res.set === 'function') {
+                    res.set('Cache-Control', 'public, max-age=60');
+                }
+                return res.json(ok({
+                    projectId: project.id,
+                    organizationId: project.organization_id,
+                    displayName: (project as any).display_name ?? null,
+                    visibility: project.visibility,
+                    currentCommitId: current?.commit_id ?? null,
+                    currentChecksum: current?.checksum ?? null,
+                    builtAt: current?.built_at ?? null,
+                }));
+            });
+
+            // GET /pub/v1/projects/:id/artifact[?commit=...]
+            server.get(`${publicPrefix}/artifact`, async (req: any, res: any) => {
+                const projectId = String(req.params?.id ?? '').trim();
+                if (!projectId) return res.status(404).json(fail('not found', 404));
+
+                const driver = await getDriver();
+                if (!driver) return res.status(503).json(fail('control plane unavailable', 503));
+
+                const project = (await (driver.findOne as any)('sys_project', { where: { id: projectId } })) as SysProjectRow | null;
+                if (!project) return res.status(404).json(fail('not found', 404));
+
+                const requestedCommit = String(req.query?.commit ?? '').trim();
+                const vis = checkVisibility(project, requestedCommit);
+                if (!vis.ok) return res.status(vis.status).json(vis.body);
+
+                let rev: any = null;
+                try {
+                    if (requestedCommit) {
+                        rev = await (driver.findOne as any)('sys_project_revision', {
+                            where: { project_id: projectId, commit_id: requestedCommit },
+                        });
+                    } else {
+                        rev = await (driver.findOne as any)('sys_project_revision', {
+                            where: { project_id: projectId, is_current: true },
+                        });
+                    }
+                } catch { /* no revision table yet */ }
+
+                if (!rev?.storage_key) return res.status(404).json(fail('not found', 404));
+
+                const exists = await storage!.exists(rev.storage_key);
+                if (!exists) return res.status(404).json(fail('not found', 404));
+
+                const buf = await storage!.download(rev.storage_key);
+                const body = JSON.parse(buf.toString('utf-8'));
+
+                // Always emit a consistent envelope, even if the stored bundle
+                // is "bare" (no top-level commitId/checksum). The revision row
+                // is authoritative for identity.
+                const envelope = {
+                    schemaVersion: body.schemaVersion ?? '0.1',
+                    projectId: project.id,
+                    commitId: rev.commit_id,
+                    checksum: rev.checksum,
+                    metadata: body.metadata ?? body,
+                    functions: Array.isArray(body.functions) ? body.functions : [],
+                    manifest: body.manifest ?? { plugins: [], drivers: [], engines: {} },
+                    builtAt: rev.built_at ?? body.builtAt ?? null,
+                };
+
+                if (typeof res.set === 'function') {
+                    // commitId is a content-hash → safe to cache forever.
+                    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+                    res.set('ETag', `"${rev.commit_id}"`);
+                    res.set('X-Commit-Id', rev.commit_id);
+                }
+                return res.json(ok(envelope));
+            });
+
+            // GET /pub/v1/projects/:id/revisions — public history (only for `public`)
+            server.get(`${publicPrefix}/revisions`, async (req: any, res: any) => {
+                const projectId = String(req.params?.id ?? '').trim();
+                if (!projectId) return res.status(404).json(fail('not found', 404));
+
+                const driver = await getDriver();
+                if (!driver) return res.status(503).json(fail('control plane unavailable', 503));
+
+                const project = (await (driver.findOne as any)('sys_project', { where: { id: projectId } })) as SysProjectRow | null;
+                if (!project) return res.status(404).json(fail('not found', 404));
+
+                // Listing reveals history → only allow on `public`.
+                if ((project.visibility ?? 'private') !== 'public') {
+                    return res.status(404).json(fail('not found', 404));
+                }
+
+                const limit = Math.min(Math.max(Number(req.query?.limit ?? 20), 1), 100);
+                let rows: any[] = [];
+                try {
+                    rows = (await (driver.find as any)('sys_project_revision', {
+                        where: { project_id: projectId },
+                        orderBy: [{ field: 'published_at', direction: 'desc' }],
+                        limit,
+                    })) ?? [];
+                } catch { /* no revision table */ }
+
+                if (typeof res.set === 'function') {
+                    res.set('Cache-Control', 'public, max-age=30');
+                }
+                return res.json(ok({
+                    items: rows.map((r) => ({
+                        commitId: r.commit_id,
+                        checksum: r.checksum,
+                        sizeBytes: r.size_bytes,
+                        builtAt: r.built_at,
+                        publishedAt: r.published_at,
+                        note: r.note,
+                        isCurrent: !!r.is_current,
+                    })),
+                }));
+            });
         },
         stop: async (_ctx: AnyContext) => {},
     };

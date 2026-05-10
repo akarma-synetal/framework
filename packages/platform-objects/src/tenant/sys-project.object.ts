@@ -148,6 +148,22 @@ export const SysProject = ObjectSchema.create({
       unique: true,
       description: 'Canonical hostname for this project (e.g. acme-dev.objectstack.app or api.acme.com). UNIQUE. Auto-set on creation; can be overridden for custom domains.',
     }),
+
+    visibility: Field.select({
+      label: 'Visibility',
+      required: true,
+      defaultValue: 'private',
+      description:
+        'Public exposure of this project artifacts. ' +
+        '`private` (default) requires authentication for every read. ' +
+        '`unlisted` allows downloading a specific commit when the URL includes ?commit=<id> (used for share-preview links). ' +
+        '`public` exposes both the current artifact and the revision history at /pub/v1/projects/:id/* (suitable for marketplace, OSS, and live-doc demos).',
+      options: [
+        { value: 'private', label: 'Private' },
+        { value: 'unlisted', label: 'Unlisted (link sharing)' },
+        { value: 'public', label: 'Public' },
+      ],
+    }),
   },
 
   indexes: [
