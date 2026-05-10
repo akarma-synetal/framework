@@ -157,7 +157,7 @@ describe('NativeSQLStrategy', () => {
       cube: 'orders',
       measures: ['orders.count', 'orders.total_amount'],
       dimensions: ['orders.status'],
-      filters: [{ member: 'orders.status', operator: 'equals', values: ['completed'] }],
+      where: { 'orders.status': 'completed' },
       limit: 10,
     };
 
@@ -481,7 +481,7 @@ describe('AnalyticsService', () => {
     const query: AnalyticsQuery = {
       cube: 'case',
       measures: ['case.count'],
-      filters: [{ member: 'case.is_closed', operator: 'equals', values: ['false'] }],
+      where: { 'case.is_closed': false },
     };
 
     const result = await service.query(query);

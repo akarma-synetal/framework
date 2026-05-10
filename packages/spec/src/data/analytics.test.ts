@@ -331,11 +331,7 @@ describe('AnalyticsQuerySchema', () => {
     const query = AnalyticsQuerySchema.parse({
       measures: ['orders.count', 'orders.total_revenue'],
       dimensions: ['orders.status'],
-      filters: [{
-        member: 'orders.status',
-        operator: 'equals',
-        values: ['completed'],
-      }],
+      where: { 'orders.status': 'completed' },
       timeDimensions: [{
         dimension: 'orders.created_at',
         granularity: 'month',
@@ -348,7 +344,7 @@ describe('AnalyticsQuerySchema', () => {
     });
 
     expect(query.dimensions).toEqual(['orders.status']);
-    expect(query.filters).toHaveLength(1);
+    expect(query.where).toEqual({ 'orders.status': 'completed' });
     expect(query.timeDimensions).toHaveLength(1);
     expect(query.limit).toBe(100);
     expect(query.timezone).toBe('America/New_York');
@@ -366,12 +362,15 @@ describe('AnalyticsQuerySchema', () => {
     expect(query.timeDimensions![0].dateRange).toEqual(['2023-01-01', '2023-01-31']);
   });
 
-  it('should accept all valid filter operators', () => {
-    const operators = ['equals', 'notEquals', 'contains', 'notContains', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'set', 'notSet', 'inDateRange'];
-    for (const op of operators) {
+  it('should accept all FilterCondition operators in `where`', () => {
+    const operators: Array<[string, unknown]> = [
+      ['$eq', 'a'], ['$ne', 'a'], ['$gt', 1], ['$gte', 1], ['$lt', 1], ['$lte', 1],
+      ['$in', ['a', 'b']], ['$nin', ['a', 'b']], ['$contains', 'foo'],
+    ];
+    for (const [op, val] of operators) {
       expect(() => AnalyticsQuerySchema.parse({
         measures: ['m.count'],
-        filters: [{ member: 'm.dim', operator: op }],
+        where: { 'm.dim': { [op]: val } },
       })).not.toThrow();
     }
   });
@@ -386,13 +385,6 @@ describe('AnalyticsQuerySchema', () => {
 
   it('should reject query without measures', () => {
     expect(() => AnalyticsQuerySchema.parse({})).toThrow();
-  });
-
-  it('should reject query with invalid filter operator', () => {
-    expect(() => AnalyticsQuerySchema.parse({
-      measures: ['orders.count'],
-      filters: [{ member: 'orders.status', operator: 'invalid_op' }],
-    })).toThrow();
   });
 
   it('should reject query with invalid timeDimension granularity', () => {

@@ -39,19 +39,6 @@ export interface AnalyticsQuery {
      * ```
      */
     where?: Record<string, unknown>;
-
-    /**
-     * Legacy cube-style filters. Prefer {@link where} for new code.
-     * When both are present, implementations MUST combine them with
-     * logical AND.
-     *
-     * @deprecated Use `where` for spec consistency with the Query DSL.
-     */
-    filters?: Array<{
-        member: string;
-        operator: string;
-        values?: string[];
-    }>;
     /** Time dimension configuration */
     timeDimensions?: Array<{
         dimension: string;

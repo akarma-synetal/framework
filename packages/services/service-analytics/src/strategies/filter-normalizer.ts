@@ -3,20 +3,19 @@
 /**
  * Filter Normalization for the Analytics Layer
  *
- * The analytics endpoint accepts filters in two equivalent shapes:
+ * The analytics endpoint accepts filters via the canonical `where`
+ * field per the unified Query DSL (`spec/data/query.zod.ts`):
  *
- *   1. Cube-style array: `[{ member, operator, values: string[] }]`
- *   2. MongoDB-style FilterCondition: `{ field: value }` /
- *      `{ field: { $op: value } }` / `{ $and: [...] }`  — the
- *      canonical filter grammar defined in `spec/data/filter.zod.ts`
- *      and used elsewhere in the spec (find queries, dashboard widget
- *      `filter`, etc.).
+ *   - MongoDB-style FilterCondition: `{ field: value }` /
+ *     `{ field: { $op: value } }` / `{ $and: [...] }` — defined in
+ *     `spec/data/filter.zod.ts` and used by `find()`, dashboard
+ *     widget `filter`, RLS, etc.
  *
- * `normalizeAnalyticsFilters` flattens either shape into the cube-style
- * array used internally by the SQL/Mongo pipeline strategies. Strategies
- * stay simple — they only need to know one filter shape — and the spec
- * is honoured: dashboard metadata is authored once in the canonical
- * MongoDB form and the server normalizes at the boundary.
+ * `normalizeAnalyticsFilters` flattens the FilterCondition tree into
+ * the internal array form used by the SQL/Mongo pipeline strategies.
+ * Strategies stay simple — they only need to know one shape — and the
+ * spec is honoured: dashboard metadata is authored once in the
+ * canonical MongoDB form and the server normalizes at the boundary.
  */
 
 export interface NormalizedAnalyticsFilter {
@@ -39,7 +38,7 @@ const MONGO_TO_CUBE_OP: Record<string, string> = {
   $exists: 'set',
 };
 
-/** Stringify a filter value as the cube spec requires `values: string[]`. */
+/** Stringify a filter value as the internal pipeline requires `values: string[]`. */
 function stringifyForCube(v: unknown): string {
   if (v == null) return '';
   if (typeof v === 'boolean') return v ? '1' : '0';
@@ -103,39 +102,17 @@ function flattenCondition(cond: Record<string, unknown>, out: NormalizedAnalytic
 }
 
 /**
- * Normalize an analytics query's filters into a uniform cube-style array.
- *
- * Reads BOTH the canonical `where` (FilterCondition per spec/data/
- * filter.zod.ts) AND the legacy `filters` (cube-style array) fields,
- * combining them with logical AND. New code should use `where`; the
- * legacy `filters` shape is kept for backward compatibility.
+ * Normalize an analytics query's `where` (FilterCondition) into the
+ * internal array form used by all strategies.
  */
-export function normalizeAnalyticsFilters(query: { where?: unknown; filters?: unknown } | unknown): NormalizedAnalyticsFilter[] {
+export function normalizeAnalyticsFilters(query: { where?: unknown } | unknown): NormalizedAnalyticsFilter[] {
   if (!query || typeof query !== 'object') return [];
 
   const out: NormalizedAnalyticsFilter[] = [];
-  const q = query as { where?: unknown; filters?: unknown };
+  const where = (query as { where?: unknown }).where;
 
-  // Canonical: `where` is FilterConditionSchema (MongoDB-style).
-  if (q.where && typeof q.where === 'object' && !Array.isArray(q.where)) {
-    flattenCondition(q.where as Record<string, unknown>, out);
-  }
-
-  // Legacy cube-style array of {member, operator, values}.
-  if (Array.isArray(q.filters)) {
-    for (const f of q.filters) {
-      if (!f || typeof f !== 'object') continue;
-      const entry = f as { member?: string; operator?: string; values?: unknown };
-      if (!entry.member || !entry.operator) continue;
-      const values = Array.isArray(entry.values)
-        ? (entry.values as unknown[]).map(v => String(v))
-        : entry.values != null ? [String(entry.values)] : [];
-      out.push({ member: entry.member, operator: entry.operator, values });
-    }
-  } else if (q.filters && typeof q.filters === 'object' && !Array.isArray(q.filters)) {
-    // Tolerate legacy callers that placed a FilterCondition object in
-    // `filters` (the previous transitional spec briefly allowed this).
-    flattenCondition(q.filters as Record<string, unknown>, out);
+  if (where && typeof where === 'object' && !Array.isArray(where)) {
+    flattenCondition(where as Record<string, unknown>, out);
   }
 
   return out;

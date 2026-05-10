@@ -222,13 +222,11 @@ describe('MemoryAnalyticsService', () => {
       expect(result.rows[0]['orders.avgAmount']).toBe(160); // 800/5
     });
 
-    it('should apply filters', async () => {
+    it('should apply filters via canonical `where`', async () => {
       const result = await service.query({
         cube: 'orders',
         measures: ['orders.count', 'orders.totalAmount'],
-        filters: [
-          { member: 'orders.status', operator: 'equals', values: ['completed'] }
-        ]
+        where: { 'orders.status': 'completed' },
       });
 
       expect(result.rows).toHaveLength(1);
@@ -236,11 +234,11 @@ describe('MemoryAnalyticsService', () => {
       expect(result.rows[0]['orders.totalAmount']).toBe(600); // 100+200+300
     });
 
-    it('should accept MongoDB-style FilterCondition (short-form equality)', async () => {
+    it('should accept FilterCondition (short-form equality)', async () => {
       const result = await service.query({
         cube: 'orders',
         measures: ['orders.count', 'orders.totalAmount'],
-        filters: { status: 'completed' } as any,
+        where: { status: 'completed' },
       });
 
       expect(result.rows).toHaveLength(1);
@@ -248,21 +246,21 @@ describe('MemoryAnalyticsService', () => {
       expect(result.rows[0]['orders.totalAmount']).toBe(600);
     });
 
-    it('should accept MongoDB-style FilterCondition with $in operator', async () => {
+    it('should accept FilterCondition with $in operator', async () => {
       const result = await service.query({
         cube: 'orders',
         measures: ['orders.count'],
-        filters: { status: { $in: ['completed', 'pending'] } } as any,
+        where: { status: { $in: ['completed', 'pending'] } },
       });
 
       expect(result.rows[0]['orders.count']).toBe(4); // 3 completed + 1 pending
     });
 
-    it('should accept MongoDB-style FilterCondition with $gte operator', async () => {
+    it('should accept FilterCondition with $gte operator', async () => {
       const result = await service.query({
         cube: 'orders',
         measures: ['orders.count'],
-        filters: { amount: { $gte: 200 } } as any,
+        where: { amount: { $gte: 200 } },
       });
 
       expect(result.rows[0]['orders.count']).toBe(2); // 200, 300
@@ -371,9 +369,7 @@ describe('MemoryAnalyticsService', () => {
       const result = await service.generateSql({
         cube: 'orders',
         measures: ['orders.count'],
-        filters: [
-          { member: 'orders.status', operator: 'equals', values: ['completed'] }
-        ]
+        where: { 'orders.status': 'completed' },
       });
 
       expect(result.sql).toContain('WHERE');

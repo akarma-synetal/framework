@@ -135,12 +135,11 @@ export class AnalyticsService implements IAnalyticsService {
       throw new Error('Cube name is required in analytics query');
     }
 
-    const normalized = this.normalizeQuery(query);
-    this.ensureCube(normalized);
-    const strategy = this.resolveStrategy(normalized);
-    this.logger.debug(`[Analytics] Query on cube "${normalized.cube}" → ${strategy.name}`);
+    this.ensureCube(query);
+    const strategy = this.resolveStrategy(query);
+    this.logger.debug(`[Analytics] Query on cube "${query.cube}" → ${strategy.name}`);
 
-    return strategy.execute(normalized, this.strategyCtx);
+    return strategy.execute(query, this.strategyCtx);
   }
 
   /**
@@ -176,53 +175,14 @@ export class AnalyticsService implements IAnalyticsService {
       throw new Error('Cube name is required for SQL generation');
     }
 
-    const normalized = this.normalizeQuery(query);
-    this.ensureCube(normalized);
-    const strategy = this.resolveStrategy(normalized);
-    this.logger.debug(`[Analytics] generateSql on cube "${normalized.cube}" → ${strategy.name}`);
+    this.ensureCube(query);
+    const strategy = this.resolveStrategy(query);
+    this.logger.debug(`[Analytics] generateSql on cube "${query.cube}" → ${strategy.name}`);
 
-    return strategy.generateSql(normalized, this.strategyCtx);
+    return strategy.generateSql(query, this.strategyCtx);
   }
 
   // ── Internal ─────────────────────────────────────────────────────
-
-  /**
-   * Normalise a query into a canonical shape that strategies can rely on:
-   *
-   * 1. **Filters as object** — Some clients (e.g. dashboard widget translators)
-   *    send `filters` as a Mongo-style object `{ stage: { $nin: [...] } }`
-   *    instead of the schema's `Array<{ member, operator, values }>`. We
-   *    translate the object form into the array form so existing strategies
-   *    work unchanged.
-   * 2. Other shapes are returned as-is.
-   */
-  private normalizeQuery(query: AnalyticsQuery): AnalyticsQuery {
-    const filters = query.filters as unknown;
-    if (!filters || Array.isArray(filters)) return query;
-    if (typeof filters !== 'object') return query;
-
-    const arr: AnalyticsQuery['filters'] = [];
-    for (const [member, raw] of Object.entries(filters as Record<string, unknown>)) {
-      if (raw && typeof raw === 'object' && !Array.isArray(raw) && !(raw instanceof Date)) {
-        for (const [op, val] of Object.entries(raw as Record<string, unknown>)) {
-          const mapped = mongoOperatorToFilter(op, val);
-          if (!mapped) continue;
-          if (mapped.multi) {
-            arr.push({ member, operator: mapped.operator, values: mapped.values });
-          } else if (mapped.values.length === 0) {
-            arr.push({ member, operator: mapped.operator, values: [] });
-          } else {
-            for (const v of mapped.values) arr.push({ member, operator: mapped.operator, values: [v] });
-          }
-        }
-      } else if (Array.isArray(raw)) {
-        arr.push({ member, operator: 'in', values: raw.map(String) });
-      } else {
-        arr.push({ member, operator: 'equals', values: [String(raw)] });
-      }
-    }
-    return { ...query, filters: arr };
-  }
 
   /**
    * Ensure a cube exists for the given query and that it knows about every
@@ -296,14 +256,6 @@ export class AnalyticsService implements IAnalyticsService {
       const key = stripPrefix(d);
       if (dimensions[key]) continue;
       dimensions[key] = { name: key, label: key, type: 'string', sql: key };
-    }
-
-    if (Array.isArray(query.filters)) {
-      for (const f of query.filters) {
-        const key = stripPrefix(f.member);
-        if (dimensions[key] || measures[key]) continue;
-        dimensions[key] = { name: key, label: key, type: 'string', sql: key };
-      }
     }
 
     if (query.where && typeof query.where === 'object' && !Array.isArray(query.where)) {
@@ -391,39 +343,6 @@ export function inferMeasure(key: string): { name: string; label: string; type: 
     }
   }
   return { name: key, label: key, type: 'sum', sql: key };
-}
-
-/**
- * Translate a Mongo-style filter operator (e.g. `$gte`, `$nin`, `$regex`)
- * into the AnalyticsQuery filter shape (`operator` + flat `values` array).
- *
- * Multi-value Mongo operators (`$in`, `$nin`) are returned as a single
- * filter clause with multiple values — the calling normaliser splits them
- * into one filter per value so downstream strategies that take `values[0]`
- * still produce the correct AND-combined SQL (`col != $1 AND col != $2`).
- *
- * Returns `null` when the operator can't be safely represented (e.g.
- * unsupported complex operators).
- */
-function mongoOperatorToFilter(
-  op: string,
-  val: unknown,
-): { operator: 'equals' | 'notEquals' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'notContains' | 'in' | 'notIn' | 'set' | 'notSet' | 'inDateRange'; values: string[]; multi?: boolean } | null {
-  const toStrArr = (v: unknown): string[] =>
-    v == null ? [] : Array.isArray(v) ? v.map(String) : [String(v)];
-  switch (op) {
-    case '$eq':       return { operator: 'equals', values: toStrArr(val) };
-    case '$ne':       return { operator: 'notEquals', values: toStrArr(val) };
-    case '$gt':       return { operator: 'gt', values: toStrArr(val) };
-    case '$gte':      return { operator: 'gte', values: toStrArr(val) };
-    case '$lt':       return { operator: 'lt', values: toStrArr(val) };
-    case '$lte':      return { operator: 'lte', values: toStrArr(val) };
-    case '$in':       return { operator: 'in', values: toStrArr(val), multi: true };
-    case '$nin':      return { operator: 'notIn', values: toStrArr(val), multi: true };
-    case '$regex':    return { operator: 'contains', values: toStrArr(val) };
-    case '$exists':   return val ? { operator: 'set', values: [] } : { operator: 'notSet', values: [] };
-    default:          return null;
-  }
 }
 
 /**

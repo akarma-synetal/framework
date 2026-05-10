@@ -374,28 +374,10 @@ export class MemoryAnalyticsService implements IAnalyticsService {
     if (!query || typeof query !== 'object') return [];
 
     const out: Array<{ member: string; operator: string; values: string[] }> = [];
-    const q = query as { where?: unknown; filters?: unknown };
+    const where = (query as { where?: unknown }).where;
 
-    // Canonical: `where` is FilterConditionSchema (MongoDB-style).
-    if (q.where && typeof q.where === 'object' && !Array.isArray(q.where)) {
-      this.flattenFilterCondition(q.where as Record<string, unknown>, out);
-    }
-
-    // Legacy cube-style `filters` array.
-    if (Array.isArray(q.filters)) {
-      for (const f of q.filters) {
-        if (!f || typeof f !== 'object') continue;
-        const entry = f as { member?: string; operator?: string; values?: unknown };
-        if (!entry.member || !entry.operator) continue;
-        const values = Array.isArray(entry.values)
-          ? (entry.values as unknown[]).map(v => String(v))
-          : entry.values != null ? [String(entry.values)] : [];
-        out.push({ member: entry.member, operator: entry.operator, values });
-      }
-    } else if (q.filters && typeof q.filters === 'object') {
-      // Tolerate legacy callers that placed a FilterCondition object in
-      // `filters` (the previous transitional spec briefly allowed this).
-      this.flattenFilterCondition(q.filters as Record<string, unknown>, out);
+    if (where && typeof where === 'object' && !Array.isArray(where)) {
+      this.flattenFilterCondition(where as Record<string, unknown>, out);
     }
 
     return out;

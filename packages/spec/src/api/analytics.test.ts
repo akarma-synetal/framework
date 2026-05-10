@@ -49,14 +49,12 @@ describe('AnalyticsQueryRequestSchema', () => {
     expect(req.format).toBe('csv');
   });
 
-  it('should accept query with filters and time dimensions', () => {
+  it('should accept query with where (canonical) and time dimensions', () => {
     const req = AnalyticsQueryRequestSchema.parse({
       query: {
         measures: ['total_revenue'],
         dimensions: ['product_category'],
-        filters: [
-          { member: 'status', operator: 'equals', values: ['active'] },
-        ],
+        where: { status: 'active' },
         timeDimensions: [
           { dimension: 'created_at', granularity: 'month', dateRange: 'Last 7 days' },
         ],
@@ -66,7 +64,7 @@ describe('AnalyticsQueryRequestSchema', () => {
       cube: 'sales',
       format: 'xlsx',
     });
-    expect(req.query.filters).toHaveLength(1);
+    expect(req.query.where).toEqual({ status: 'active' });
     expect(req.query.timeDimensions).toHaveLength(1);
   });
 

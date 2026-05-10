@@ -144,7 +144,7 @@ export const AnalyticsQuerySchema = lazySchema(() => z.object({
    * (see {@link FilterConditionSchema} in `data/filter.zod.ts` and
    * {@link QuerySchema} in `data/query.zod.ts`). This is the same
    * MongoDB-style filter used by `find()`, dashboard widget `filter`,
-   * RLS conditions, etc. Use this for new code.
+   * RLS conditions, etc.
    *
    * @example
    * ```ts
@@ -152,23 +152,6 @@ export const AnalyticsQuerySchema = lazySchema(() => z.object({
    * ```
    */
   where: FilterConditionSchema.optional().describe('Filtering criteria (canonical Query DSL FilterCondition)'),
-
-  /**
-   * Cube-style explicit filters — **legacy**. Retained for backward
-   * compatibility with existing Cube.dev-style consumers. New code
-   * SHOULD use {@link AnalyticsQuerySchema.shape.where} instead, which
-   * matches the rest of the Query DSL.
-   *
-   * Implementations MUST accept both `where` and `filters` and combine
-   * them with logical AND.
-   *
-   * @deprecated Prefer `where` for spec consistency.
-   */
-  filters: z.array(z.object({
-    member: z.string().describe('Dimension or Measure'),
-    operator: z.enum(['equals', 'notEquals', 'contains', 'notContains', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'set', 'notSet', 'inDateRange']),
-    values: z.array(z.string()).optional(),
-  })).optional().describe('Legacy cube-style filters; prefer `where`'),
 
   timeDimensions: z.array(z.object({
     dimension: z.string(),
