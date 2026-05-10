@@ -1,0 +1,189 @@
+---
+title: Publish, Versioning & Preview
+description: End-to-end pipeline — `objectstack compile` → `objectstack publish` → cloud control plane stores immutable revisions in object storage → ObjectOS runtime pulls via artifact-api. Includes rollback and pinned-commit preview.
+---
+
+# Publish, Versioning & Preview
+
+The cloud control plane keeps **every** publish as an immutable revision in
+object storage and lets runtime nodes boot off any historical commit.
+This page walks through the full loop:
+
+```
+┌───────────┐   compile    ┌──────────────────┐   publish   ┌────────────────────┐   pull (artifact-api)   ┌──────────────┐
+│ source    │ ───────────▶ │ dist/object-     │ ──────────▶ │ Cloud control      │ ──────────────────────▶ │ ObjectOS     │
+│ tree      │              │ stack.json       │             │ plane (revisions)  │                         │ runtime node │
+└───────────┘              └──────────────────┘             └────────────────────┘                         └──────────────┘
+                                                                      │
+                                                                      ├── object storage
+                                                                      │   (file-storage / S3)
+                                                                      └── sys_project_revision
+                                                                          (commitId, checksum,
+                                                                           is_current, …)
+```
+
+---
+
+## 1. Compile
+
+```bash
+objectstack compile
+# → dist/objectstack.json   (envelope: { schemaVersion, commitId, metadata, … })
+```
+
+The artifact is **content-addressable**: `commitId` is a sha256 prefix of the
+canonicalised metadata. Identical content always produces the same `commitId`,
+so re-publishing is a no-op upload.
+
+---
+
+## 2. Publish
+
+```bash
+objectstack publish dist/objectstack.json \
+  --project proj_crm \
+  --server  http://localhost:4000
+```
+
+Common flags:
+
+| Flag                | Env var               | Default                  | Notes |
+|---------------------|-----------------------|--------------------------|-------|
+| `--server`, `-s`    | `OS_CLOUD_URL`        | `http://localhost:4000`  | Control-plane URL |
+| `--project`, `-p`   | `OS_PROJECT_ID`       | — (required)             | Target project id |
+| `--token`,   `-t`   | `OS_CLOUD_API_KEY`    | —                        | Bearer token (when auth is enabled) |
+| `--timeout`         | `OS_CLOUD_TIMEOUT_MS` | `60000` (60 s)           | Set higher for slow networks; `0` disables |
+
+`publish` POSTs to `/api/v1/cloud/projects/:id/metadata`. The control plane:
+
+1. Computes / verifies `commitId`.
+2. **Uploads** to object storage at `artifacts/${projectId}/${commitId}.json`
+   (no-op if the key already exists — content-addressable).
+3. **Inserts** a `sys_project_revision` row, flips the previous current row to
+   `is_current = false`, and marks the new one `is_current = true`.
+4. Updates `sys_project.metadata.current_commit_id`.
+
+---
+
+## 3. Storage backend
+
+The plugin resolves storage in this order:
+
+1. Explicit `options.storage.service` (passed by host code)
+2. Kernel-registered `file-storage` service (`@objectstack/service-storage`)
+3. Local filesystem fallback (warns at boot)
+
+To switch to S3 in production, register the storage service in your
+control-plane config:
+
+```ts
+// apps/cloud/objectstack.config.ts
+import { StorageServicePlugin } from '@objectstack/service-storage';
+
+plugins: [
+  StorageServicePlugin({
+    adapter: 's3',
+    s3: { bucket: 'objectstack-artifacts', region: 'us-east-1', /* … */ },
+  }),
+  // … cloud plugins
+]
+```
+
+No other code changes are required — `cloud-artifact-api-plugin` will pick it
+up automatically.
+
+---
+
+## 4. Cloud HTTP API
+
+All endpoints live under `/api/v1/cloud/projects/:id/`.
+
+| Method & Path                                | Purpose |
+|----------------------------------------------|---------|
+| `POST /metadata`                             | Publish a new revision (called by CLI) |
+| `GET  /artifact`                             | Get the **current** artifact (envelope) |
+| `GET  /artifact?commit=<sha>`                | Get a **pinned** revision |
+| `GET  /revisions?limit=&cursor=`             | List revisions (most-recent first) |
+| `POST /revisions/:commit/activate`           | Roll back / forward — flip `is_current` |
+| `GET  /resolve-hostname?host=<host>`         | Tenant routing helper used by ObjectOS |
+
+Errors follow the standard `{ success: false, error: '…' }` shape. Unknown
+commits return **404** with a descriptive message.
+
+---
+
+## 5. Runtime — `artifact-api` source
+
+ObjectOS runtime nodes can boot off any cloud revision without ever touching
+the source tree:
+
+```ts
+import { MetadataPlugin } from '@objectstack/metadata';
+
+new MetadataPlugin({
+  bootstrap: 'artifact-only',           // skip filesystem watcher
+  artifactSource: {
+    mode: 'artifact-api',
+    url:  'https://cloud.example.com',
+    projectId: 'proj_crm',
+    commitId: '9707264f0450e8ba',        // optional — omit for latest
+    token: process.env.OS_CLOUD_API_KEY, // optional
+    fetchTimeoutMs: 60_000,              // optional, default 60 s
+  },
+});
+```
+
+The plugin merges the cloud envelope’s `metadata` block, dynamically imports
+`@objectstack/spec/cloud` for Zod validation, and registers every metadata
+item before the kernel marks itself ready.
+
+> **Tip — slow networks:** override the timeout per-plugin
+> (`fetchTimeoutMs`) or globally via `OS_ARTIFACT_FETCH_TIMEOUT_MS`.
+
+---
+
+## 6. Rollback
+
+Every publish is preserved. To roll back:
+
+```bash
+curl -X POST http://localhost:4000/api/v1/cloud/projects/proj_crm/revisions/9ce1bd48dd7022b8/activate
+```
+
+The next `GET /artifact` (no `?commit`) — and any runtime node restarted
+without a pinned `commitId` — will pick up the older revision. Roll forward
+the same way.
+
+---
+
+## 7. Local end-to-end smoke test
+
+```bash
+# Terminal 1 — cloud control plane
+cd apps/cloud
+OS_MODE=cloud PORT=4000 \
+  AUTH_SECRET=local-dev-secret-must-be-at-least-32-chars-long \
+  pnpm dev
+
+# Terminal 2 — compile + publish twice
+cd examples/app-crm
+objectstack compile
+OS_PROJECT_ID=proj_crm objectstack publish
+
+# tweak any object label, recompile, publish again
+
+# Terminal 3 — list revisions
+curl http://localhost:4000/api/v1/cloud/projects/proj_crm/revisions | jq
+```
+
+You should see two `sys_project_revision` rows — the second one
+`isCurrent: true` — and the artifact body for either one accessible via
+`GET /artifact?commit=<id>`.
+
+---
+
+## See also
+
+- [`packages/services/service-cloud`](https://github.com/objectstack-ai/framework/tree/main/packages/services/service-cloud) — control-plane plugin source
+- [`packages/metadata`](https://github.com/objectstack-ai/framework/tree/main/packages/metadata) — `MetadataPlugin` and the `artifact-api` loader
+- [Cloud Deployment](./cloud-deployment) — running cloud / standalone modes

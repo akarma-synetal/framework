@@ -1,6 +1,6 @@
 # @objectstack/metadata — Roadmap
 
-> **Last Updated:** 2026-05-09  
+> **Last Updated:** 2026-05-10  
 > Development roadmap for the ObjectStack Metadata Service.
 
 ## Current Status (v3.0)
@@ -31,6 +31,7 @@
 | **Bootstrap modes**              | `MetadataPluginConfig.bootstrap` = `eager` \| `lazy` \| `artifact-only` — supports edge / serverless / read-only deployments. |
 | **Persistence write gates**      | `MetadataManagerConfig.persistence.{ writable, overlayWritable }` — runtime freeze for sealed kernels. |
 | **Single-source schema discipline** | Canonical `MetadataManagerConfigSchema` / `MetadataFallbackStrategySchema` live in `kernel/metadata-loader.zod.ts` and are re-exported from `system/metadata-persistence.zod.ts`. |
+| **`artifact-api` runtime source**   | `MetadataPlugin` can boot from a remote control-plane artifact (`artifactSource: { mode: 'artifact-api', url, projectId, commitId? }`). Wired across `eager` / `lazy` / `artifact-only` bootstrap modes. Configurable timeout via `fetchTimeoutMs` or `OS_ARTIFACT_FETCH_TIMEOUT_MS` (default 60 s). |
 
 ### 🟡 Partially Implemented
 
@@ -181,11 +182,21 @@
 - [ ] Selective sync by type, namespace, or package
 - [ ] Conflict detection across instances
 
-### 4d. S3/Cloud Loader
+### 4d. S3/Cloud Loader ✅ (delegated)
 
-- [ ] Implement `S3Loader` for cloud-native metadata storage
-- [ ] Support `s3:` protocol in `MetadataLoaderContract`
-- [ ] Integrate with object storage for large metadata bundles
+Storage backend has moved out of `MetadataPlugin` and into the dedicated
+`IStorageService` contract (`@objectstack/spec/contracts/storage-service`).
+`@objectstack/service-storage` ships local-FS and S3 adapters; the cloud
+control plane (`packages/services/service-cloud/src/cloud-artifact-api-plugin.ts`)
+uses the kernel-registered `file-storage` service for content-addressable
+artifact persistence (`artifacts/${projectId}/${commitId}.json`).
+
+- [x] Object-storage abstraction available via `StorageServicePlugin`
+- [x] Cloud `artifact-api` reads/writes through `IStorageService`
+- [x] `MetadataPlugin` consumes published artifacts via the
+      `artifactSource: { mode: 'artifact-api' }` source — no direct S3
+      coupling needed in the metadata layer.
+- See [Publish, Versioning & Preview](../../content/docs/guides/publish-and-preview.mdx).
 
 ---
 

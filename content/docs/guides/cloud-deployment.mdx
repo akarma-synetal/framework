@@ -237,3 +237,17 @@ If step 3 returns control-plane objects instead of the project's own, the
 host-based routing did not kick in — check that `envRegistry` is wired (see
 `apps/objectos/server/bootstrap.ts`) and that `sys_project.hostname` was
 populated.
+
+---
+
+## Artifact publishing & versioning
+
+Once a project exists, deploy metadata changes by **compiling and publishing**
+artifacts rather than mutating tables directly. Each `objectstack publish`
+creates an immutable revision in object storage; runtime nodes pull the
+current (or pinned) commit via the `artifact-api` source.
+
+See [Publish, Versioning & Preview](./publish-and-preview) for the full loop —
+storage backends (`StorageServicePlugin` local / S3), the
+`/api/v1/cloud/projects/:id/{revisions,artifact,activate}` endpoints, and the
+`MetadataPlugin` `artifactSource: { mode: 'artifact-api' }` runtime config.

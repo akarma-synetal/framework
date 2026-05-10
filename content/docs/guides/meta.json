@@ -29,6 +29,7 @@
     "---Operations---",
     "deployment-vercel",
     "cloud-deployment",
+    "publish-and-preview",
     "single-project-mode",
     "objectql-migration",
     "error-handling-client",
