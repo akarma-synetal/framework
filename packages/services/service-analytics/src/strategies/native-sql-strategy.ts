@@ -3,6 +3,7 @@
 import type { AnalyticsQuery, AnalyticsResult } from '@objectstack/spec/contracts';
 import type { Cube } from '@objectstack/spec/data';
 import type { AnalyticsStrategy, StrategyContext } from './types.js';
+import { normalizeAnalyticsFilters, coerceFilterValueForSql } from './filter-normalizer.js';
 
 /**
  * NativeSQLStrategy — Priority 1
@@ -63,8 +64,9 @@ export class NativeSQLStrategy implements AnalyticsStrategy {
 
     // Build WHERE clause
     const whereClauses: string[] = [];
-    if (query.filters && query.filters.length > 0) {
-      for (const filter of query.filters) {
+    const normalizedFilters = normalizeAnalyticsFilters(query.filters);
+    if (normalizedFilters.length > 0) {
+      for (const filter of normalizedFilters) {
         const colExpr = this.resolveFieldSql(cube, filter.member);
         const clause = this.buildFilterClause(colExpr, filter.operator, filter.values, params);
         if (clause) whereClauses.push(clause);
@@ -152,7 +154,7 @@ export class NativeSQLStrategy implements AnalyticsStrategy {
 
     if (operator === 'in' || operator === 'notIn') {
       if (!values || values.length === 0) return null;
-      const placeholders = values.map(v => { params.push(v); return `$${params.length}`; }).join(', ');
+      const placeholders = values.map(v => { params.push(coerceFilterValueForSql(v)); return `$${params.length}`; }).join(', ');
       return `${col} ${operator === 'in' ? 'IN' : 'NOT IN'} (${placeholders})`;
     }
 
@@ -162,7 +164,10 @@ export class NativeSQLStrategy implements AnalyticsStrategy {
     if (operator === 'contains' || operator === 'notContains') {
       params.push(`%${values[0]}%`);
     } else {
-      params.push(values[0]);
+      // Coerce so booleans/numbers bind as their native SQL types
+      // (avoids '1' (text) vs 1 (integer) mismatches against typed
+      // boolean columns under SQLite/Postgres).
+      params.push(coerceFilterValueForSql(values[0]));
     }
     return `${col} ${sqlOp} $${params.length}`;
   }

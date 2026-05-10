@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { FilterConditionSchema } from './filter.zod';
 
 /**
  * Analytics/Semantic Layer Protocol
@@ -138,11 +139,31 @@ export const AnalyticsQuerySchema = lazySchema(() => z.object({
   measures: z.array(z.string()).describe('List of metrics to calculate'),
   dimensions: z.array(z.string()).optional().describe('List of dimensions to group by'),
   
-  filters: z.array(z.object({
-    member: z.string().describe('Dimension or Measure'),
-    operator: z.enum(['equals', 'notEquals', 'contains', 'notContains', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'set', 'notSet', 'inDateRange']),
-    values: z.array(z.string()).optional(),
-  })).optional(),
+  /**
+   * Filters can be expressed in two equivalent ways:
+   *
+   * 1. **Cube-style** (legacy explicit form, kept for backward
+   *    compatibility with existing analytics consumers):
+   *    `[{ member, operator, values: string[] }, ...]`
+   *
+   * 2. **MongoDB-style FilterCondition** (canonical filter shape used
+   *    everywhere else in the spec — `find()`, dashboard widget
+   *    `filter`, etc. See {@link FilterConditionSchema}). Supports
+   *    implicit equality, `$eq/$ne/$gt/$gte/$lt/$lte/$in/$nin/...`
+   *    operator wrappers, and `$and/$or/$not` logical combinators.
+   *
+   * Implementations MUST accept either shape. The two forms are
+   * semantically equivalent; the MongoDB shape is the spec-canonical
+   * one and dashboard widget metadata uses it directly.
+   */
+  filters: z.union([
+    z.array(z.object({
+      member: z.string().describe('Dimension or Measure'),
+      operator: z.enum(['equals', 'notEquals', 'contains', 'notContains', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'set', 'notSet', 'inDateRange']),
+      values: z.array(z.string()).optional(),
+    })),
+    FilterConditionSchema,
+  ]).optional(),
   
   timeDimensions: z.array(z.object({
     dimension: z.string(),

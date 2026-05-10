@@ -25,12 +25,30 @@ export interface AnalyticsQuery {
     measures: string[];
     /** Dimensions to group by (e.g. ['orders.status', 'orders.createdAt']) */
     dimensions?: string[];
-    /** Filter conditions */
-    filters?: Array<{
-        member: string;
-        operator: string;
-        values?: string[];
-    }>;
+    /**
+     * Filter conditions. Two equivalent shapes are accepted:
+     *
+     * 1. **Cube-style array**: `[{ member, operator, values: string[] }]`
+     *    (legacy explicit form).
+     *
+     * 2. **MongoDB-style FilterCondition**: a recursive object using
+     *    implicit equality and `$eq/$ne/$gt/$gte/$lt/$lte/$in/$nin/...`
+     *    operator wrappers — the canonical filter shape used elsewhere
+     *    in the spec (find queries, dashboard widget metadata, etc.).
+     *    See `spec/data/filter.zod.ts` for the full grammar.
+     *
+     * Both shapes are semantically equivalent. Implementations MUST
+     * accept either; consumers that emit the spec-canonical
+     * FilterCondition can pass it directly (e.g. dashboard widget
+     * `filter` from `dashboard.zod.ts`).
+     */
+    filters?:
+        | Array<{
+            member: string;
+            operator: string;
+            values?: string[];
+          }>
+        | Record<string, unknown>;
     /** Time dimension configuration */
     timeDimensions?: Array<{
         dimension: string;

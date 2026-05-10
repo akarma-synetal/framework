@@ -68,19 +68,31 @@ export class MemoryAnalyticsService implements IAnalyticsService {
     const pipeline: Record<string, any>[] = [];
 
     // Stage 1: $match for filters
-    if (query.filters && query.filters.length > 0) {
+    // Filters can arrive in two shapes (per spec/data/analytics.zod.ts):
+    //   - Array of { member, operator, values } (cube-style, legacy)
+    //   - FilterCondition (MongoDB-style — canonical spec shape, used by
+    //     dashboard widget metadata directly).
+    // Normalize both into the cube-style array before processing so the
+    // existing pipeline logic stays untouched.
+    const normalizedFilters = this.normalizeFilters(query.filters);
+    if (normalizedFilters.length > 0) {
       const matchStage: Record<string, any> = {};
-      for (const filter of query.filters) {
+      for (const filter of normalizedFilters) {
         const mongoOp = this.convertOperatorToMongo(filter.operator);
         const fieldPath = this.resolveFieldPath(cube, filter.member);
-        
+
         if (filter.values && filter.values.length > 0) {
+          // Coerce each filter value to a sensible runtime type so
+          // `$eq` against in-memory numeric/boolean records still
+          // matches. The cube spec serialises values as `string[]`,
+          // but the in-memory driver compares with strict equality.
+          const coerced = filter.values.map(v => this.coerceFilterValue(v));
           if (mongoOp === '$in') {
-            matchStage[fieldPath] = { $in: filter.values };
+            matchStage[fieldPath] = { $in: coerced };
           } else if (mongoOp === '$nin') {
-            matchStage[fieldPath] = { $nin: filter.values };
+            matchStage[fieldPath] = { $nin: coerced };
           } else {
-            matchStage[fieldPath] = { [mongoOp]: filter.values[0] };
+            matchStage[fieldPath] = { [mongoOp]: coerced[0] };
           }
         } else if (mongoOp === '$exists') {
           matchStage[fieldPath] = { $exists: filter.operator === 'set' };
@@ -302,12 +314,14 @@ export class MemoryAnalyticsService implements IAnalyticsService {
 
     // Build WHERE clause
     const whereClauses: string[] = [];
-    if (query.filters && query.filters.length > 0) {
-      for (const filter of query.filters) {
+    const normalizedFilters = this.normalizeFilters(query.filters);
+    if (normalizedFilters.length > 0) {
+      for (const filter of normalizedFilters) {
         const fieldPath = this.resolveFieldPath(cube, filter.member);
         const sqlOp = this.operatorToSql(filter.operator);
         if (filter.values && filter.values.length > 0) {
-          whereClauses.push(`${fieldPath} ${sqlOp} '${filter.values[0]}'`);
+          const literal = this.toSqlLiteral(filter.values[0]);
+          whereClauses.push(`${fieldPath} ${sqlOp} ${literal}`);
         }
       }
     }
@@ -338,6 +352,174 @@ export class MemoryAnalyticsService implements IAnalyticsService {
   // ===================================
   // Helper Methods
   // ===================================
+
+  /**
+   * Normalize filters into a cube-style array regardless of input shape.
+   *
+   * Accepts:
+   *   - undefined / null → []
+   *   - cube-style array `[{member, operator, values}]` → returned as-is
+   *   - MongoDB FilterCondition object (per spec/data/filter.zod.ts):
+   *       * implicit equality:  `{is_active: true}`
+   *       * operator wrapper:   `{stage: {$nin: [...]}}`
+   *       * mixed:              `{stage: 'won', amount: {$gte: 100}}`
+   *     → flattened into one cube-style entry per (field, operator) pair
+   *
+   * Logical combinators (`$and`, `$or`, `$not`) are not yet expanded into
+   * the cube pipeline; for current dashboard widget metadata the implicit
+   * top-level AND of fields is sufficient. `$and` clauses are flattened
+   * into the same AND list.
+   */
+  private normalizeFilters(filters: unknown): Array<{ member: string; operator: string; values: string[] }> {
+    if (!filters) return [];
+
+    if (Array.isArray(filters)) {
+      // Already cube-style. Defensive copy + ensure values is array.
+      const out: Array<{ member: string; operator: string; values: string[] }> = [];
+      for (const f of filters) {
+        if (!f || typeof f !== 'object') continue;
+        const entry = f as { member?: string; operator?: string; values?: unknown };
+        if (!entry.member || !entry.operator) continue;
+        const values = Array.isArray(entry.values)
+          ? (entry.values as unknown[]).map(v => String(v))
+          : entry.values != null ? [String(entry.values)] : [];
+        out.push({ member: entry.member, operator: entry.operator, values });
+      }
+      return out;
+    }
+
+    if (typeof filters !== 'object') return [];
+
+    const out: Array<{ member: string; operator: string; values: string[] }> = [];
+    this.flattenFilterCondition(filters as Record<string, unknown>, out);
+    return out;
+  }
+
+  private flattenFilterCondition(
+    cond: Record<string, unknown>,
+    out: Array<{ member: string; operator: string; values: string[] }>,
+  ): void {
+    for (const [key, raw] of Object.entries(cond)) {
+      if (raw == null) continue;
+
+      // Logical combinators
+      if (key === '$and' && Array.isArray(raw)) {
+        for (const sub of raw) {
+          if (sub && typeof sub === 'object') {
+            this.flattenFilterCondition(sub as Record<string, unknown>, out);
+          }
+        }
+        continue;
+      }
+      // $or / $not are not yet supported in the cube pipeline; ignore so
+      // a partial query still runs rather than failing entirely.
+      if (key === '$or' || key === '$not') continue;
+
+      // Operator wrapper: { field: { $op: value, ... } }
+      if (typeof raw === 'object' && !Array.isArray(raw) && !(raw instanceof Date)) {
+        const wrapper = raw as Record<string, unknown>;
+        const opEntries = Object.keys(wrapper).filter(k => k.startsWith('$'));
+        if (opEntries.length > 0) {
+          for (const opKey of opEntries) {
+            const cubeOp = this.mongoOperatorToCubeOperator(opKey);
+            if (!cubeOp) continue;
+            const v = wrapper[opKey];
+            const values = Array.isArray(v)
+              ? v.map(x => this.stringifyForCube(x))
+              : [this.stringifyForCube(v)];
+            out.push({ member: key, operator: cubeOp, values });
+          }
+          continue;
+        }
+        // Otherwise treat as nested relation (e.g. {profile: {verified: true}}).
+        // Flatten with dot-prefixed keys.
+        for (const [nestedKey, nestedVal] of Object.entries(wrapper)) {
+          this.flattenFilterCondition({ [`${key}.${nestedKey}`]: nestedVal }, out);
+        }
+        continue;
+      }
+
+      // Implicit equality: { field: scalar | array }
+      const values = Array.isArray(raw)
+        ? raw.map(x => this.stringifyForCube(x))
+        : [this.stringifyForCube(raw)];
+      out.push({
+        member: key,
+        operator: Array.isArray(raw) ? 'in' : 'equals',
+        values,
+      });
+    }
+  }
+
+  /**
+   * Map MongoDB-style `$op` keys (from FilterCondition) to the cube-style
+   * operator names accepted by `convertOperatorToMongo` / `operatorToSql`.
+   */
+  private mongoOperatorToCubeOperator(op: string): string | null {
+    switch (op) {
+      case '$eq': return 'equals';
+      case '$ne': return 'notEquals';
+      case '$gt': return 'gt';
+      case '$gte': return 'gte';
+      case '$lt': return 'lt';
+      case '$lte': return 'lte';
+      case '$in': return 'in';
+      case '$nin': return 'notIn';
+      case '$contains': return 'contains';
+      case '$notContains': return 'notContains';
+      case '$exists': return 'set';
+      default: return null;
+    }
+  }
+
+  /**
+   * Stringify a filter value for cube-style storage. Booleans become
+   * `'1'/'0'` so that downstream consumers expecting SQLite-style
+   * numeric booleans match correctly. The in-memory pipeline uses
+   * {@link coerceFilterValue} to recover real JS types from these
+   * strings.
+   */
+  private stringifyForCube(v: unknown): string {
+    if (v == null) return '';
+    if (typeof v === 'boolean') return v ? '1' : '0';
+    if (v instanceof Date) return v.toISOString();
+    if (typeof v === 'object') return JSON.stringify(v);
+    return String(v);
+  }
+
+  /**
+   * Recover a runtime value from its cube-stringified form for in-memory
+   * comparison. Booleans, integers, floats and ISO-date-like strings are
+   * coerced; everything else stays as a string.
+   */
+  private coerceFilterValue(s: string): unknown {
+    if (s === 'true') return true;
+    if (s === 'false') return false;
+    if (s === 'null') return null;
+    // Numeric strings: integer or float (no leading zeros except '0')
+    if (/^-?\d+$/.test(s)) {
+      const n = Number(s);
+      if (Number.isFinite(n)) return n;
+    }
+    if (/^-?\d+\.\d+$/.test(s)) {
+      const n = Number(s);
+      if (Number.isFinite(n)) return n;
+    }
+    return s;
+  }
+
+  /**
+   * Type-aware SQL literal formatter. Booleans and numbers are emitted
+   * unquoted; everything else is single-quoted with embedded quotes
+   * escaped.
+   */
+  private toSqlLiteral(s: string): string {
+    if (s === 'true') return '1';
+    if (s === 'false') return '0';
+    if (s === 'null') return 'NULL';
+    if (/^-?\d+(\.\d+)?$/.test(s)) return s;
+    return `'${s.replace(/'/g, "''")}'`;
+  }
 
   private resolveFieldPath(cube: Cube, member: string): string {
     // Handle both "cube.field" and "field" formats
@@ -445,6 +627,8 @@ export class MemoryAnalyticsService implements IAnalyticsService {
       'gte': '$gte',
       'lt': '$lt',
       'lte': '$lte',
+      'in': '$in',
+      'notIn': '$nin',
       'set': '$exists',
       'notSet': '$exists',
       'inDateRange': '$gte', // Will need special handling

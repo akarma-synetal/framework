@@ -3,6 +3,7 @@
 import type { AnalyticsQuery, AnalyticsResult } from '@objectstack/spec/contracts';
 import type { Cube } from '@objectstack/spec/data';
 import type { AnalyticsStrategy, StrategyContext } from './types.js';
+import { normalizeAnalyticsFilters, coerceFilterValueForSql } from './filter-normalizer.js';
 
 /**
  * ObjectQLStrategy — Priority 2
@@ -44,8 +45,9 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
 
     // Build filter from query filters
     const filter: Record<string, unknown> = {};
-    if (query.filters && query.filters.length > 0) {
-      for (const f of query.filters) {
+    const normalizedFilters = normalizeAnalyticsFilters(query.filters);
+    if (normalizedFilters.length > 0) {
+      for (const f of normalizedFilters) {
         const fieldName = this.resolveFieldName(cube, f.member, 'any');
         filter[fieldName] = this.convertFilter(f.operator, f.values);
       }
@@ -163,17 +165,19 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
     if (operator === 'notSet') return null;
     if (!values || values.length === 0) return undefined;
 
+    const v0 = coerceFilterValueForSql(values[0]);
+    const all = values.map(coerceFilterValueForSql);
     switch (operator) {
-      case 'equals': return values[0];
-      case 'notEquals': return { $ne: values[0] };
-      case 'gt': return { $gt: values[0] };
-      case 'gte': return { $gte: values[0] };
-      case 'lt': return { $lt: values[0] };
-      case 'lte': return { $lte: values[0] };
+      case 'equals': return v0;
+      case 'notEquals': return { $ne: v0 };
+      case 'gt': return { $gt: v0 };
+      case 'gte': return { $gte: v0 };
+      case 'lt': return { $lt: v0 };
+      case 'lte': return { $lte: v0 };
       case 'contains': return { $regex: values[0] };
-      case 'in': return { $in: values };
-      case 'notIn': return { $nin: values };
-      default: return values[0];
+      case 'in': return { $in: all };
+      case 'notIn': return { $nin: all };
+      default: return v0;
     }
   }
 

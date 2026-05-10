@@ -298,10 +298,22 @@ export class AnalyticsService implements IAnalyticsService {
       dimensions[key] = { name: key, label: key, type: 'string', sql: key };
     }
 
-    for (const f of query.filters || []) {
-      const key = stripPrefix(f.member);
-      if (dimensions[key] || measures[key]) continue;
-      dimensions[key] = { name: key, label: key, type: 'string', sql: key };
+    if (Array.isArray(query.filters)) {
+      for (const f of query.filters) {
+        const key = stripPrefix(f.member);
+        if (dimensions[key] || measures[key]) continue;
+        dimensions[key] = { name: key, label: key, type: 'string', sql: key };
+      }
+    } else if (query.filters && typeof query.filters === 'object') {
+      // MongoDB-style FilterCondition: top-level keys (excluding logical
+      // combinators) are field names. We only need them to seed an
+      // ad-hoc cube definition for free-form queries.
+      for (const key of Object.keys(query.filters)) {
+        if (key.startsWith('$')) continue;
+        const stripped = stripPrefix(key);
+        if (dimensions[stripped] || measures[stripped]) continue;
+        dimensions[stripped] = { name: stripped, label: stripped, type: 'string', sql: stripped };
+      }
     }
 
     for (const td of query.timeDimensions || []) {

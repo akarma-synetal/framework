@@ -236,6 +236,38 @@ describe('MemoryAnalyticsService', () => {
       expect(result.rows[0]['orders.totalAmount']).toBe(600); // 100+200+300
     });
 
+    it('should accept MongoDB-style FilterCondition (short-form equality)', async () => {
+      const result = await service.query({
+        cube: 'orders',
+        measures: ['orders.count', 'orders.totalAmount'],
+        filters: { status: 'completed' } as any,
+      });
+
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]['orders.count']).toBe(3);
+      expect(result.rows[0]['orders.totalAmount']).toBe(600);
+    });
+
+    it('should accept MongoDB-style FilterCondition with $in operator', async () => {
+      const result = await service.query({
+        cube: 'orders',
+        measures: ['orders.count'],
+        filters: { status: { $in: ['completed', 'pending'] } } as any,
+      });
+
+      expect(result.rows[0]['orders.count']).toBe(4); // 3 completed + 1 pending
+    });
+
+    it('should accept MongoDB-style FilterCondition with $gte operator', async () => {
+      const result = await service.query({
+        cube: 'orders',
+        measures: ['orders.count'],
+        filters: { amount: { $gte: 200 } } as any,
+      });
+
+      expect(result.rows[0]['orders.count']).toBe(2); // 200, 300
+    });
+
     it('should support sorting', async () => {
       const result = await service.query({
         cube: 'orders',
