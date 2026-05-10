@@ -46,22 +46,12 @@ compatibility_flags = ["nodejs_compat"]
 class_name = "ObjectOSContainer"
 image = "registry.cloudflare.com/<account-id>/objectos:latest"
 max_instances = 5
-instance_type = "standard"
+instance_type = "standard-1"
 
-# Non-secret environment passed to the container at start-up.
-# Secrets (OS_DATABASE_URL, AUTH_SECRET, …) are injected via
-# `wrangler secret put` and surface as env vars inside the container.
-[containers.env]
-NODE_ENV = "production"
-PORT = "3000"
-HOST = "0.0.0.0"
-OS_KERNEL_CACHE_SIZE = "50"
-OS_KERNEL_TTL_MS = "1800000"
-OS_ENV_CACHE_TTL_MS = "300000"
-# Default control-plane URL. Override in production by setting
-# OS_CLOUD_URL via `wrangler secret put` to point at apps/cloud.
-# Leave unset for single-project local mode.
-# OS_CLOUD_URL = "https://cloud.<your-domain>"
+# Non-secret environment is set on the `ObjectOSContainer` class
+# (`envVars` field in cloudflare/worker.ts). Secrets (OS_DATABASE_URL,
+# AUTH_SECRET, …) are injected via `wrangler secret put` and surface as
+# env vars inside the container at process spawn time.
 
 # ── Durable Object binding for the container class ──────────────────────
 [[durable_objects.bindings]]

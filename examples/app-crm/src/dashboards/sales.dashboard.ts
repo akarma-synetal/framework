@@ -257,5 +257,26 @@ export const SalesDashboard: Dashboard = {
         density: 'comfortable',
       },
     },
+
+    // ─── Row 5: Pivot — Stage × Lead Source ───────────────────────────
+    {
+      id: 'pipeline_stage_by_source',
+      title: 'Pipeline by Stage × Lead Source',
+      description: 'Cross-tab of open opportunity amount by stage and source',
+      type: 'pivot',
+      object: 'opportunity',
+      filter: { stage: { $nin: ['closed_won', 'closed_lost'] } },
+      colorVariant: 'default',
+      layout: { x: 0, y: 14, w: 12, h: 4 },
+      options: {
+        rowField: 'stage',
+        columnField: 'lead_source',
+        valueField: 'amount',
+        aggregation: 'sum',
+        showRowTotals: true,
+        showColumnTotals: true,
+        format: '$,.0f',
+      },
+    },
   ],
 };

@@ -349,3 +349,44 @@ on separate ports with `OS_CLOUD_URL=http://<cloud-host>:<port>` on the
 runtime node. Browser users add `127.0.0.1 crm.localhost` to `/etc/hosts`
 and visit `http://crm.localhost:<runtime-port>/`. The framework code
 paths exercised are identical to the in-process test above.
+
+## Cloudflare Containers deployment
+
+ObjectOS runs as a long-lived Node.js process and is **not** Workers-compatible
+(better-sqlite3 native bindings, `node:fs`, `node:child_process`). It can,
+however, run on **Cloudflare Containers** (GA 2025) using the existing
+`Dockerfile`.
+
+Files:
+
+- `Dockerfile` — production image (Node 22, port 3000).
+- `wrangler.toml` — Worker + Container binding.
+- `cloudflare/worker.ts` — fetch handler that proxies HTTP into the
+  `ObjectOSContainer` Durable Object.
+
+Quick start (see `wrangler.toml` for the full workflow):
+
+```bash
+# Build from repo root (Dockerfile expects the full pnpm workspace)
+docker build -f apps/objectos/Dockerfile \
+  -t registry.cloudflare.com/<account-id>/objectos:latest .
+
+wrangler containers push registry.cloudflare.com/<account-id>/objectos:latest
+
+# Push secrets — control plane MUST point at remote libSQL/Turso, the
+# container filesystem is ephemeral.
+wrangler secret put OS_DATABASE_URL --config apps/objectos/wrangler.toml
+wrangler secret put OS_DATABASE_AUTH_TOKEN --config apps/objectos/wrangler.toml
+wrangler secret put AUTH_SECRET --config apps/objectos/wrangler.toml
+
+wrangler deploy --config apps/objectos/wrangler.toml
+```
+
+Required runtime env vars (set as Cloudflare secrets, not in `wrangler.toml`):
+
+| Var | Purpose |
+|---|---|
+| `OS_DATABASE_URL` | `libsql://<db>.turso.io` — control DB. Do **not** use `file:/data/...` on Containers; the local disk is wiped on cold-start. |
+| `OS_DATABASE_AUTH_TOKEN` | Turso auth token. |
+| `AUTH_SECRET` | Cookie/session signing secret. |
+| `OS_CLOUD_URL` *(optional)* | Point at an `apps/cloud` deployment for multi-project mode. Omit for single-project local mode. |

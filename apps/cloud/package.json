@@ -39,11 +39,14 @@
     "hono": "^4.12.18"
   },
   "devDependencies": {
+    "@cloudflare/containers": "^0.3.3",
+    "@cloudflare/workers-types": "^4.20260510.1",
     "@objectstack/cli": "workspace:*",
     "esbuild": "^0.28.0",
     "ts-node": "^10.9.2",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "wrangler": "^4.90.0"
   }
 }
