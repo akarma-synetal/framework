@@ -1140,9 +1140,9 @@
                 "title": "Revenue Trend",
                 "description": "Closed-won revenue over the last 12 months"
               },
-              "revenue_by_industry": {
-                "title": "Revenue by Industry",
-                "description": "YTD closed-won revenue split by account industry"
+              "revenue_by_lead_source": {
+                "title": "Revenue by Lead Source",
+                "description": "YTD closed-won revenue split by originating lead source"
               },
               "pipeline_by_stage": {
                 "title": "Pipeline by Stage",
@@ -2499,9 +2499,9 @@
                 "title": "收入趋势",
                 "description": "过去 12 个月的已成交收入"
               },
-              "revenue_by_industry": {
-                "title": "行业收入分布",
-                "description": "本年度已成交收入按客户行业拆分"
+              "revenue_by_lead_source": {
+                "title": "线索来源收入分布",
+                "description": "本年度已成交收入按线索来源拆分"
               },
               "pipeline_by_stage": {
                 "title": "阶段管道分布",
@@ -3758,9 +3758,9 @@
                 "title": "売上トレンド",
                 "description": "過去12か月の成立済み売上"
               },
-              "revenue_by_industry": {
+              "revenue_by_lead_source": {
                 "title": "業種別売上",
-                "description": "本年度の成立済み売上を取引先業種で分類"
+                "description": "本年度の成立済み売上をリードソース別に分類"
               },
               "pipeline_by_stage": {
                 "title": "フェーズ別パイプライン",
@@ -5017,9 +5017,9 @@
                 "title": "Tendencia de ingresos",
                 "description": "Ingresos cerrados ganados de los últimos 12 meses"
               },
-              "revenue_by_industry": {
-                "title": "Ingresos por industria",
-                "description": "Ingresos YTD ganados separados por industria de la cuenta"
+              "revenue_by_lead_source": {
+                "title": "Ingresos por origen de lead",
+                "description": "Ingresos YTD ganados separados por origen del lead"
               },
               "pipeline_by_stage": {
                 "title": "Pipeline por etapa",
@@ -15438,9 +15438,9 @@
           }
         },
         {
-          "id": "revenue_by_industry",
-          "title": "Revenue by Industry",
-          "description": "YTD closed-won revenue split by account industry",
+          "id": "revenue_by_lead_source",
+          "title": "Revenue by Lead Source",
+          "description": "YTD closed-won revenue split by originating lead source",
           "type": "donut",
           "chartConfig": {
             "type": "donut",
@@ -15463,7 +15463,7 @@
               "$gte": "{current_year_start}"
             }
           },
-          "categoryField": "account.industry",
+          "categoryField": "lead_source",
           "valueField": "amount",
           "aggregate": "sum",
           "layout": {
@@ -15518,7 +15518,7 @@
           "chartConfig": {
             "type": "bar",
             "xAxis": {
-              "field": "created_date",
+              "field": "created_at",
               "title": "Month",
               "showGridLines": false,
               "logarithmic": false
@@ -15540,11 +15540,11 @@
           "colorVariant": "purple",
           "object": "account",
           "filter": {
-            "created_date": {
+            "created_at": {
               "$gte": "{last_6_months}"
             }
           },
-          "categoryField": "created_date",
+          "categoryField": "created_at",
           "aggregate": "count",
           "layout": {
             "x": 6,
@@ -15623,29 +15623,33 @@
           "scope": "dashboard"
         },
         {
-          "field": "account.industry",
-          "label": "Industry",
+          "field": "lead_source",
+          "label": "Lead Source",
           "type": "select",
           "options": [
             {
-              "value": "technology",
-              "label": "Technology"
+              "value": "web",
+              "label": "Web"
             },
             {
-              "value": "finance",
-              "label": "Finance"
+              "value": "referral",
+              "label": "Referral"
             },
             {
-              "value": "healthcare",
-              "label": "Healthcare"
+              "value": "partner",
+              "label": "Partner"
             },
             {
-              "value": "retail",
-              "label": "Retail"
+              "value": "event",
+              "label": "Event"
             },
             {
-              "value": "manufacturing",
-              "label": "Manufacturing"
+              "value": "cold_call",
+              "label": "Cold Call"
+            },
+            {
+              "value": "advertising",
+              "label": "Advertising"
             }
           ],
           "scope": "dashboard"
