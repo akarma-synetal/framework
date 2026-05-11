@@ -165,6 +165,9 @@ importers:
       '@libsql/client':
         specifier: ^0.17.3
         version: 0.17.3
+      '@objectstack/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@objectstack/driver-memory':
         specifier: workspace:*
         version: link:../../packages/plugins/driver-memory
@@ -232,9 +235,6 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^4.20260510.1
         version: 4.20260510.1
-      '@objectstack/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
       esbuild:
         specifier: ^0.28.0
         version: 0.28.0
@@ -453,6 +453,9 @@ importers:
       '@libsql/client':
         specifier: ^0.17.3
         version: 0.17.3
+      '@objectstack/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@objectstack/driver-memory':
         specifier: workspace:*
         version: link:../../packages/plugins/driver-memory
@@ -526,9 +529,6 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^4.20260510.1
         version: 4.20260510.1
-      '@objectstack/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
       esbuild:
         specifier: ^0.28.0
         version: 0.28.0

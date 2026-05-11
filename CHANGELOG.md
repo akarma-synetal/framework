@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Slimmer production Docker images (`apps/objectos`, `apps/cloud`)
+- **3-stage builder → pruner → runner Dockerfiles**: full pnpm workspace is restored only in the builder; the pruner runs `pnpm --filter ... deploy --prod --legacy /deploy` to materialize a flat, devDeps-stripped tree; the runner copies just `/deploy` plus the freshly built `dist/` of the target app. CMD now runs `node node_modules/@objectstack/cli/bin/run.js serve dist/objectstack.config.js --prebuilt` directly — no `pnpm` at runtime.
+- **`@objectstack/cli` promoted to `dependencies`** in both `apps/objectos/package.json` and `apps/cloud/package.json` so the production entrypoint survives `--prod` pruning.
+- **Surgical `.pnpm/` pruning** in the pruner stage removes large transitive packages that are not exercised by the runtime path (`next`, `@next/swc-*`, `playwright-core`, `@playwright/*`, `typescript`, `happy-dom`, `@rolldown/*`, `@img/sharp-libvips-*`, `@cloudflare/workers-types`, `@esbuild/*`, `lightningcss-*`, `caniuse-lite`). Together with stripping `*.map`, test directories, and Markdown, this lands the final image at ~690 MB (down from 1.93 GB), a 64% reduction. Both images still pass `/api/v1/health` and Docker's HEALTHCHECK end-to-end.
+
 ### Added — Cloudflare Containers deployment for `apps/objectos` & `apps/cloud`
 - **`apps/{objectos,cloud}/scripts/deploy-cloudflare.sh`** — Idempotent `build → push → deploy` pipeline. Reads config from `.env.cloudflare` (gitignored) or env vars; auto-tags images with the current git short SHA; in-place rewrites the `image = "..."` line in `wrangler.toml` (BSD/GNU sed compatible); supports `--tag`, `--skip-build`, `--skip-push`, `--skip-deploy`, `--dry-run`. Forces `--platform linux/amd64` (Cloudflare Containers requirement).
 - **`apps/{objectos,cloud}/scripts/setup-cloudflare-secrets.sh`** — Bulk `wrangler secret put` from a local `.env.cloudflare.secrets` file. Per-app key allow-list lets one shared file feed both Workers; unset keys are skipped (not cleared). Safe to re-run.

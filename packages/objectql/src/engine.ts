@@ -56,7 +56,15 @@ function planFormulaProjection(
   // see complete data. Static dependency analysis on AST is M9.7 work.
   if (Array.isArray(requestedFields) && requestedFields.length > 0) {
     if (!projected.has('id')) projected.add('id');
-    for (const fname of allFieldNames) projected.add(fname);
+    for (const fname of allFieldNames) {
+      // Skip formula fields themselves — they are virtual and not
+      // projectable by the underlying driver. Without this guard the
+      // SQL driver emits `SELECT response_rate ...` which fails as
+      // "no such column" and the driver returns [] (silently).
+      const fdef = (schema.fields as any)[fname];
+      if (fdef?.type === 'formula') continue;
+      projected.add(fname);
+    }
     return { plan, projected: Array.from(projected) };
   }
   // Implicit/full projection — leave projected undefined so the driver
