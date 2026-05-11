@@ -69,7 +69,11 @@ describe('ProjectProvisioningService.provisionProject', () => {
     });
 
     const objects = created.map((c) => c.object);
-    expect(objects).toEqual(['sys_project', 'sys_project_credential']);
+    expect(objects).toEqual([
+      'sys_project',
+      'sys_project_credential',
+      'sys_project_member',
+    ]);
 
     const projectRow = created.find((c) => c.object === 'sys_project')!.data;
     expect(projectRow.organization_id).toBe('org-42');
@@ -82,6 +86,15 @@ describe('ProjectProvisioningService.provisionProject', () => {
     expect(projectRow.slug).toBeUndefined();
     expect(projectRow.project_type).toBeUndefined();
     expect(projectRow.region).toBeUndefined();
+
+    // Creator should be seeded as the initial owner so /projects/:id/members
+    // returns at least one row immediately after provisioning.
+    const memberRow = created.find((c) => c.object === 'sys_project_member')!.data;
+    expect(memberRow.project_id).toBe(projectRow.id);
+    expect(memberRow.user_id).toBe('user-1');
+    expect(memberRow.role).toBe('owner');
+    expect(memberRow.invited_by).toBe('user-1');
+    expect(memberRow.organization_id).toBe('org-42');
 
     expect(result.warnings).toBeUndefined();
   });

@@ -4,11 +4,11 @@
  * Tests for the public, unauthenticated artifact API
  * (`/pub/v1/projects/:id/*`) and its visibility gating.
  *
- *   - sys_project.visibility = 'private'  → 404 on every public route
- *   - sys_project.visibility = 'unlisted' → 404 on /artifact without ?commit=,
- *                                            200 on /artifact?commit=<id>,
- *                                            404 on /revisions and /manifest.json
+ *   - sys_project.visibility = 'private'  → 404 on /artifact without ?commit=
+ *                                            (and on /revisions + /manifest.json),
+ *                                            200 on /artifact?commit=<id> (share-by-link)
  *   - sys_project.visibility = 'public'   → 200 on all three routes
+ *   - sys_project.visibility = 'unlisted' (legacy) is coerced to 'private'
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -121,25 +121,29 @@ describe('public artifact API (/pub/v1/projects/:id/*)', () => {
         await plugin.init(ctx); await plugin.start(ctx);
     }
 
-    // --- private --------------------------------------------------------------
-    it('private project: all public routes return 404 (no leak)', async () => {
+    // --- private (share-by-link) ---------------------------------------------
+    it('private project: enumeration routes return 404, but ?commit= returns 200', async () => {
         await boot([{ id: 'proj_a', organization_id: 'org_1', visibility: 'private' }]);
 
-        const a = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/artifact');
-        const b = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/artifact', { query: { commit: 'cafebabe' } });
-        const c = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/revisions');
-        const d = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/manifest.json');
-        expect([a.status, b.status, c.status, d.status]).toEqual([404, 404, 404, 404]);
+        const enumArtifact = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/artifact');
+        const shareByLink = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/artifact', { query: { commit: 'cafebabe' } });
+        const revs = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/revisions');
+        const mani = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/manifest.json');
+        expect([enumArtifact.status, shareByLink.status, revs.status, mani.status]).toEqual([404, 200, 404, 404]);
+        expect(shareByLink.body.data.commitId).toBe('cafebabe');
     });
 
     it('private project: defaults when visibility is undefined', async () => {
         await boot([{ id: 'proj_a', organization_id: 'org_1' /* no visibility */ }]);
-        const r = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/artifact', { query: { commit: 'cafebabe' } });
-        expect(r.status).toBe(404);
+        // Defaulted-to-private: enumeration is hidden but share-by-link works.
+        const noCommit = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/artifact');
+        expect(noCommit.status).toBe(404);
+        const withCommit = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/artifact', { query: { commit: 'cafebabe' } });
+        expect(withCommit.status).toBe(200);
     });
 
-    // --- unlisted -------------------------------------------------------------
-    it('unlisted project: 404 without ?commit=, 200 with ?commit=', async () => {
+    // --- unlisted (legacy → coerced to private) ------------------------------
+    it('legacy `unlisted` rows behave like `private` (share-by-link)', async () => {
         await boot([{ id: 'proj_a', organization_id: 'org_1', visibility: 'unlisted' }]);
 
         const enumAttempt = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/artifact');
@@ -151,7 +155,7 @@ describe('public artifact API (/pub/v1/projects/:id/*)', () => {
         expect(ok.body.data.commitId).toBe('cafebabe');
     });
 
-    it('unlisted project: revisions and manifest are still hidden', async () => {
+    it('legacy `unlisted` rows still hide /revisions and /manifest.json', async () => {
         await boot([{ id: 'proj_a', organization_id: 'org_1', visibility: 'unlisted' }]);
         const revs = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/revisions');
         const mani = await server.invoke('GET', '/api/v1/pub/v1/projects/proj_a/manifest.json');
