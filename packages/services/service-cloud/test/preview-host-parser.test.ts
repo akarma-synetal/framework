@@ -4,25 +4,25 @@ import { describe, it, expect } from 'vitest';
 import { parsePreviewHost, projectIdToShort } from '../src/preview/host-parser.js';
 
 describe('parsePreviewHost', () => {
-    describe('commit-pinned (12 hex)', () => {
+    describe('commit-pinned (16 hex)', () => {
         it('parses prod hostname', () => {
-            const r = parsePreviewHost('abc123def456--7f3e9a01.preview.objectstack.ai');
-            expect(r).toEqual({ kind: 'commit', pidShort: '7f3e9a01', ref: 'abc123def456' });
+            const r = parsePreviewHost('abc123def4567890--7f3e9a01.preview.objectstack.ai');
+            expect(r).toEqual({ kind: 'commit', pidShort: '7f3e9a01', ref: 'abc123def4567890' });
         });
 
         it('parses localhost hostname (RFC 6761)', () => {
-            const r = parsePreviewHost('abc123def456--7f3e9a01.localhost');
-            expect(r).toEqual({ kind: 'commit', pidShort: '7f3e9a01', ref: 'abc123def456' });
+            const r = parsePreviewHost('abc123def4567890--7f3e9a01.localhost');
+            expect(r).toEqual({ kind: 'commit', pidShort: '7f3e9a01', ref: 'abc123def4567890' });
         });
 
         it('strips :port', () => {
-            const r = parsePreviewHost('abc123def456--7f3e9a01.localhost:4100');
-            expect(r).toEqual({ kind: 'commit', pidShort: '7f3e9a01', ref: 'abc123def456' });
+            const r = parsePreviewHost('abc123def4567890--7f3e9a01.localhost:4100');
+            expect(r).toEqual({ kind: 'commit', pidShort: '7f3e9a01', ref: 'abc123def4567890' });
         });
 
         it('lowercases input', () => {
-            const r = parsePreviewHost('ABC123DEF456--7F3E9A01.PREVIEW.OBJECTSTACK.AI');
-            expect(r).toEqual({ kind: 'commit', pidShort: '7f3e9a01', ref: 'abc123def456' });
+            const r = parsePreviewHost('ABC123DEF4567890--7F3E9A01.PREVIEW.OBJECTSTACK.AI');
+            expect(r).toEqual({ kind: 'commit', pidShort: '7f3e9a01', ref: 'abc123def4567890' });
         });
     });
 
@@ -102,8 +102,8 @@ describe('parsePreviewHost', () => {
     });
 
     describe('commit/branch disambiguation', () => {
-        it('exactly 12 hex → commit', () => {
-            expect(parsePreviewHost('0123456789ab--7f3e9a01.localhost')?.kind).toBe('commit');
+        it('exactly 16 hex → commit', () => {
+            expect(parsePreviewHost('0123456789abcdef--7f3e9a01.localhost')?.kind).toBe('commit');
         });
 
         it('11 hex → branch (slug regex still matches)', () => {
@@ -111,7 +111,7 @@ describe('parsePreviewHost', () => {
         });
 
         it('13 hex → branch (slug regex still matches)', () => {
-            expect(parsePreviewHost('0123456789abc--7f3e9a01.localhost')?.kind).toBe('branch');
+            expect(parsePreviewHost('0123456789abcde--7f3e9a01.localhost')?.kind).toBe('branch');
         });
     });
 });

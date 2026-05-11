@@ -7,7 +7,8 @@
  *   • `pidShort` is exactly 8 lowercase hex chars (= first 8 hex chars of
  *     a project UUID, dashes stripped).
  *   • `ref` is either:
- *       - exactly 12 lowercase hex chars  → a commit-pinned preview, or
+ *       - exactly 16 lowercase hex chars  → a commit-pinned preview
+ *         (publish derives commitId = sha256(artifact).slice(0,16)), or
  *       - a branch slug (matches BRANCH_SLUG_RE elsewhere) → branch-tracking.
  *   • `<base>` is one of the configured preview base domains, e.g.
  *     `preview.objectstack.ai` (prod) or `localhost[:port]` (dev,
@@ -24,18 +25,18 @@
  * pure string function so it can be unit-tested without a registry.
  */
 
-const HEX12_RE = /^[0-9a-f]{12}$/;
+const COMMIT_HEX_RE = /^[0-9a-f]{16}$/;
 const PID_SHORT_RE = /^[0-9a-f]{8}$/;
 /** Same shape as BRANCH_SLUG_RE in routes/branches.ts. Duplicated here to
  *  avoid pulling that file into the parser's import graph. */
 const BRANCH_SLUG_RE = /^[a-z0-9][a-z0-9._/-]{0,62}$/;
 
 export interface PreviewHost {
-    /** 'commit' = ref is a 12-hex commit id; 'branch' = ref is a slug. */
+    /** 'commit' = ref is a 16-hex commit id; 'branch' = ref is a slug. */
     kind: 'commit' | 'branch';
     /** First 8 hex chars of the project's UUID (no dashes). */
     pidShort: string;
-    /** Either a 12-hex commit id or a branch slug. */
+    /** Either a 16-hex commit id or a branch slug. */
     ref: string;
 }
 
@@ -111,7 +112,7 @@ export function parsePreviewHost(host: string, config?: PreviewParseConfig): Pre
     if (!PID_SHORT_RE.test(pidShort)) return null;
     if (!ref) return null;
 
-    if (HEX12_RE.test(ref)) {
+    if (COMMIT_HEX_RE.test(ref)) {
         return { kind: 'commit', pidShort, ref };
     }
     if (BRANCH_SLUG_RE.test(ref)) {

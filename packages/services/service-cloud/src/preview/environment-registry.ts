@@ -31,7 +31,7 @@ type IDataDriver = Contracts.IDataDriver;
 interface CompositeProject {
     id: string;                     // composite key: `${projectId}:${commitId}`
     projectId: string;              // real project UUID
-    commitId: string;               // pinned 12-hex (or longer) commit id
+    commitId: string;               // pinned 16-hex commit id
     organization_id?: string;
     /** Set when the entry was resolved via a branch slug. */
     branchName?: string;

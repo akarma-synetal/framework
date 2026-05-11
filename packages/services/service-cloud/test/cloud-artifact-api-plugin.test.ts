@@ -89,9 +89,14 @@ class FakeDriver {
         const where = query?.where ?? {};
         if (table === 'sys_project') {
             return this.projects.filter((p) => Object.entries(where).every(([k, v]) => {
-                if (v && typeof v === 'object' && '$like' in (v as any)) {
-                    const pattern = String((v as any).$like).replace(/%/g, '.*');
-                    return new RegExp(`^${pattern}$`).test(String((p as any)[k] ?? ''));
+                if (v && typeof v === 'object') {
+                    if ('$like' in (v as any)) {
+                        const pattern = String((v as any).$like).replace(/%/g, '.*');
+                        return new RegExp(`^${pattern}$`).test(String((p as any)[k] ?? ''));
+                    }
+                    if ('$contains' in (v as any)) {
+                        return String((p as any)[k] ?? '').includes(String((v as any).$contains));
+                    }
                 }
                 return (p as any)[k] === v;
             })).slice(0, query?.limit ?? 100);

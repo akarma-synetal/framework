@@ -63,9 +63,9 @@ describe('PreviewEnvironmentRegistry', () => {
                 '7f3e9a01': { projectId: '7f3e9a01-1234-5678-9abc-def012345678' },
             });
             const reg = makeRegistry(client);
-            const r = await reg.resolveByHostname('abc123def456--7f3e9a01.preview.objectstack.ai');
+            const r = await reg.resolveByHostname('abc123def4567890--7f3e9a01.preview.objectstack.ai');
             expect(r).not.toBeNull();
-            expect(r!.projectId).toBe('7f3e9a01-1234-5678-9abc-def012345678:abc123def456');
+            expect(r!.projectId).toBe('7f3e9a01-1234-5678-9abc-def012345678:abc123def4567890');
             expect(client.lookups).toBe(1);
             expect(client.headLookups).toBe(0);
             expect(FakeDriver.instances).toBe(1);
@@ -76,7 +76,7 @@ describe('PreviewEnvironmentRegistry', () => {
                 '7f3e9a01': { projectId: '7f3e9a01-1234-5678-9abc-def012345678' },
             });
             const reg = makeRegistry(client);
-            const host = 'abc123def456--7f3e9a01.preview.objectstack.ai';
+            const host = 'abc123def4567890--7f3e9a01.preview.objectstack.ai';
             await reg.resolveByHostname(host);
             await reg.resolveByHostname(host);
             await reg.resolveByHostname(host);
@@ -89,10 +89,10 @@ describe('PreviewEnvironmentRegistry', () => {
                 '7f3e9a01': { projectId: '7f3e9a01-1234-5678-9abc-def012345678' },
             });
             const reg = makeRegistry(client);
-            await reg.resolveByHostname('abc123def456--7f3e9a01.preview.objectstack.ai');
-            const peek = reg.peekById('7f3e9a01-1234-5678-9abc-def012345678:abc123def456');
+            await reg.resolveByHostname('abc123def4567890--7f3e9a01.preview.objectstack.ai');
+            const peek = reg.peekById('7f3e9a01-1234-5678-9abc-def012345678:abc123def4567890');
             expect(peek).not.toBeNull();
-            expect(peek!.project.commitId).toBe('abc123def456');
+            expect(peek!.project.commitId).toBe('abc123def4567890');
             expect(peek!.project.projectId).toBe('7f3e9a01-1234-5678-9abc-def012345678');
         });
     });
@@ -101,18 +101,18 @@ describe('PreviewEnvironmentRegistry', () => {
         it('resolves a branch host using its current head', async () => {
             const client = new FakeClient(
                 { '7f3e9a01': { projectId: 'proj-1' } },
-                { 'proj-1': { main: { commitId: 'abc123def456' } } },
+                { 'proj-1': { main: { commitId: 'abc123def4567890' } } },
             );
             const reg = makeRegistry(client);
             const r = await reg.resolveByHostname('main--7f3e9a01.preview.objectstack.ai');
-            expect(r!.projectId).toBe('proj-1:abc123def456');
+            expect(r!.projectId).toBe('proj-1:abc123def4567890');
             expect(client.headLookups).toBe(1);
         });
 
         it('re-checks branch head on every request (per-request semantics)', async () => {
             const client = new FakeClient(
                 { '7f3e9a01': { projectId: 'proj-1' } },
-                { 'proj-1': { main: { commitId: 'abc123def456' } } },
+                { 'proj-1': { main: { commitId: 'abc123def4567890' } } },
             );
             const reg = makeRegistry(client);
             const host = 'main--7f3e9a01.preview.objectstack.ai';
@@ -128,18 +128,18 @@ describe('PreviewEnvironmentRegistry', () => {
         it('evicts and rebuilds when branch head advances', async () => {
             const client = new FakeClient(
                 { '7f3e9a01': { projectId: 'proj-1' } },
-                { 'proj-1': { main: { commitId: 'aaaaaaaaaaaa' } } },
+                { 'proj-1': { main: { commitId: 'aaaaaaaaaaaaaaaa' } } },
             );
             const reg = makeRegistry(client);
             const host = 'main--7f3e9a01.preview.objectstack.ai';
             const first = await reg.resolveByHostname(host);
-            expect(first!.projectId).toBe('proj-1:aaaaaaaaaaaa');
+            expect(first!.projectId).toBe('proj-1:aaaaaaaaaaaaaaaa');
 
             // Advance the head.
-            client.branches['proj-1']!.main = { commitId: 'bbbbbbbbbbbb' };
+            client.branches['proj-1']!.main = { commitId: 'bbbbbbbbbbbbbbbb' };
 
             const second = await reg.resolveByHostname(host);
-            expect(second!.projectId).toBe('proj-1:bbbbbbbbbbbb');
+            expect(second!.projectId).toBe('proj-1:bbbbbbbbbbbbbbbb');
             expect(client.artifactInvalidations).toBeGreaterThanOrEqual(1);
             expect(FakeDriver.instances).toBe(2); // fresh driver for the new commit
         });
@@ -167,7 +167,7 @@ describe('PreviewEnvironmentRegistry', () => {
         it('singleflights concurrent first-resolve requests', async () => {
             const client = new FakeClient(
                 { '7f3e9a01': { projectId: 'proj-1' } },
-                { 'proj-1': { main: { commitId: 'aaaaaaaaaaaa' } } },
+                { 'proj-1': { main: { commitId: 'aaaaaaaaaaaaaaaa' } } },
             );
             const reg = makeRegistry(client);
             const host = 'main--7f3e9a01.preview.objectstack.ai';
@@ -176,9 +176,9 @@ describe('PreviewEnvironmentRegistry', () => {
                 reg.resolveByHostname(host),
                 reg.resolveByHostname(host),
             ]);
-            expect(a!.projectId).toBe('proj-1:aaaaaaaaaaaa');
-            expect(b!.projectId).toBe('proj-1:aaaaaaaaaaaa');
-            expect(c!.projectId).toBe('proj-1:aaaaaaaaaaaa');
+            expect(a!.projectId).toBe('proj-1:aaaaaaaaaaaaaaaa');
+            expect(b!.projectId).toBe('proj-1:aaaaaaaaaaaaaaaa');
+            expect(c!.projectId).toBe('proj-1:aaaaaaaaaaaaaaaa');
             expect(client.lookups).toBe(1);
             // One head fetch during initial build, no per-request re-check
             // because all three calls dedupe through `pending`.
@@ -193,10 +193,10 @@ describe('PreviewEnvironmentRegistry', () => {
                 '7f3e9a01': { projectId: 'proj-1' },
             });
             const reg = makeRegistry(client);
-            await reg.resolveByHostname('abc123def456--7f3e9a01.localhost');
-            expect(reg.peekById('proj-1:abc123def456')).not.toBeNull();
+            await reg.resolveByHostname('abc123def4567890--7f3e9a01.localhost');
+            expect(reg.peekById('proj-1:abc123def4567890')).not.toBeNull();
             reg.clear();
-            expect(reg.peekById('proj-1:abc123def456')).toBeNull();
+            expect(reg.peekById('proj-1:abc123def4567890')).toBeNull();
         });
     });
 });

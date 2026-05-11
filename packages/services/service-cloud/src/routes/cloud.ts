@@ -82,13 +82,15 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
 
         try {
             // The short id is a UUID prefix without dashes; the stored
-            // `sys_project.id` is a canonical UUID *with* dashes. Use a
-            // suffix-stripped LIKE: the first 8 hex chars of the UUID
-            // are always the bytes before the first dash, so we can
-            // match `${raw.slice(0,8)}%` and then post-filter exact.
+            // `sys_project.id` is a canonical UUID *with* dashes. The first
+            // 8 hex chars of the UUID are always the bytes before the first
+            // dash. Most drivers expose `$contains` (LIKE %x%); we use that
+            // to over-fetch a small candidate set, then post-filter to an
+            // exact prefix match. UUIDs make collisions on 8 hex chars rare,
+            // and we cap the candidate scan at 16 rows.
             const headHex = raw.slice(0, 8);
             const candidates = (await (driver.find as any)('sys_project', {
-                where: { id: { $like: `${headHex}%` } },
+                where: { id: { $contains: headHex } },
                 limit: 16,
             })) as Array<{ id: string; organization_id?: string }>;
             const matches = candidates.filter((p) => p.id.replace(/-/g, '').toLowerCase().startsWith(raw));
