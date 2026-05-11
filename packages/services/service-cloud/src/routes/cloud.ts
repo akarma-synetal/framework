@@ -59,6 +59,57 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
     });
 
     // ================================================================
+    // GET /cloud/projects-by-short-id/:short
+    // Resolve a project's UUID prefix (>= 8 hex chars, dashes stripped)
+    // to its full id. Used by the preview runtime, which encodes project
+    // ids as 8-hex subdomains. Returns 404 on no match, 409 on ambiguity.
+    //
+    // The URL deliberately sits at `projects-by-short-id` (NOT
+    // `projects/by-short-id`) so it never collides with the catch-all
+    // `:id` param of `/cloud/projects/:id/...` routes — those would
+    // shadow this one in registration-order matchers.
+    // ================================================================
+    server.get(`${prefix}/cloud/projects-by-short-id/:short`, async (req: any, res: any) => {
+        const auth = checkAuth(req);
+        if (!auth.ok) return res.status(auth.status).json(auth.body);
+        const raw = String(req.params?.short ?? '').trim().toLowerCase();
+        if (!/^[0-9a-f]{8,32}$/.test(raw)) {
+            return res.status(400).json(fail('short id must be 8-32 lowercase hex chars (no dashes)'));
+        }
+
+        const driver = await getDriver();
+        if (!driver) return controlPlaneUnavailable(res);
+
+        try {
+            // The short id is a UUID prefix without dashes; the stored
+            // `sys_project.id` is a canonical UUID *with* dashes. Use a
+            // suffix-stripped LIKE: the first 8 hex chars of the UUID
+            // are always the bytes before the first dash, so we can
+            // match `${raw.slice(0,8)}%` and then post-filter exact.
+            const headHex = raw.slice(0, 8);
+            const candidates = (await (driver.find as any)('sys_project', {
+                where: { id: { $like: `${headHex}%` } },
+                limit: 16,
+            })) as Array<{ id: string; organization_id?: string }>;
+            const matches = candidates.filter((p) => p.id.replace(/-/g, '').toLowerCase().startsWith(raw));
+            if (matches.length === 0) {
+                return res.status(404).json(fail(`No project matches short id '${raw}'`, 404));
+            }
+            if (matches.length > 1) {
+                return res.status(409).json(fail(
+                    `Short id '${raw}' is ambiguous (matches ${matches.length} projects)`,
+                    409,
+                ));
+            }
+            const p = matches[0];
+            return res.json(ok({ projectId: p.id, organizationId: p.organization_id }));
+        } catch (err: any) {
+            console.error('[CloudArtifactAPI] by-short-id lookup failed:', err?.message ?? err);
+            return res.status(500).json(fail('lookup failed', 500));
+        }
+    });
+
+    // ================================================================
     // GET /cloud/projects/:id/artifact[?commit=...]
     // ================================================================
     server.get(`${prefix}/cloud/projects/:id/artifact`, async (req: any, res: any) => {

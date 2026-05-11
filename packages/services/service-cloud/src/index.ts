@@ -121,3 +121,13 @@ export type { ArtifactKernelFactoryConfig } from './artifact-kernel-factory.js';
 
 export { createObjectOSStack } from './objectos-stack.js';
 export type { ObjectOSStackConfig, ObjectOSStackResult } from './objectos-stack.js';
+
+// ── Preview-mode stack (sandbox previews of pinned commits / branches) ───────
+export { createPreviewStack } from './preview/preview-stack.js';
+export type { PreviewStackConfig, PreviewStackResult } from './preview/preview-stack.js';
+export { parsePreviewHost, projectIdToShort } from './preview/host-parser.js';
+export type { PreviewHost, PreviewParseConfig } from './preview/host-parser.js';
+export { PreviewEnvironmentRegistry } from './preview/environment-registry.js';
+export type { PreviewEnvironmentRegistryConfig } from './preview/environment-registry.js';
+export { PreviewKernelFactory } from './preview/kernel-factory.js';
+export type { PreviewKernelFactoryConfig } from './preview/kernel-factory.js';

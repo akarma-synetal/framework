@@ -85,6 +85,19 @@ class FakeDriver {
         }
         return null;
     }
+    async find(table: string, query: any): Promise<any[]> {
+        const where = query?.where ?? {};
+        if (table === 'sys_project') {
+            return this.projects.filter((p) => Object.entries(where).every(([k, v]) => {
+                if (v && typeof v === 'object' && '$like' in (v as any)) {
+                    const pattern = String((v as any).$like).replace(/%/g, '.*');
+                    return new RegExp(`^${pattern}$`).test(String((p as any)[k] ?? ''));
+                }
+                return (p as any)[k] === v;
+            })).slice(0, query?.limit ?? 100);
+        }
+        return [];
+    }
 }
 
 describe('createCloudArtifactApiPlugin', () => {
@@ -153,6 +166,43 @@ describe('createCloudArtifactApiPlugin', () => {
         await bootPlugin(new FakeDriver([{ id: 'p', hostname: 'h' }]));
         const res = await server.invoke('GET', '/api/v1/cloud/resolve-hostname', {});
         expect(res.status).toBe(400);
+    });
+
+    describe('GET /cloud/projects-by-short-id/:short', () => {
+        it('resolves an 8-hex prefix to the full project id', async () => {
+            const driver = new FakeDriver([
+                { id: '7f3e9a01-1234-5678-9abc-def012345678', organization_id: 'org_x', hostname: 'a.com' },
+                { id: 'aaaaaaaa-1111-2222-3333-444444444444', hostname: 'b.com' },
+            ]);
+            await bootPlugin(driver);
+
+            const res = await server.invoke('GET', '/api/v1/cloud/projects-by-short-id/:short', { params: { short: '7f3e9a01' } });
+            expect(res.status).toBe(200);
+            expect(res.body.data.projectId).toBe('7f3e9a01-1234-5678-9abc-def012345678');
+            expect(res.body.data.organizationId).toBe('org_x');
+        });
+
+        it('returns 404 when no project matches', async () => {
+            await bootPlugin(new FakeDriver([{ id: 'aaaaaaaa-1111-2222-3333-444444444444', hostname: 'a' }]));
+            const res = await server.invoke('GET', '/api/v1/cloud/projects-by-short-id/:short', { params: { short: 'deadbeef' } });
+            expect(res.status).toBe(404);
+        });
+
+        it('returns 400 for malformed input', async () => {
+            await bootPlugin(new FakeDriver([{ id: 'p', hostname: 'h' }]));
+            const res = await server.invoke('GET', '/api/v1/cloud/projects-by-short-id/:short', { params: { short: 'zzz' } });
+            expect(res.status).toBe(400);
+        });
+
+        it('returns 409 on ambiguous prefix', async () => {
+            const driver = new FakeDriver([
+                { id: '7f3e9a01-1111-1111-1111-111111111111', hostname: 'a.com' },
+                { id: '7f3e9a01-2222-2222-2222-222222222222', hostname: 'b.com' },
+            ]);
+            await bootPlugin(driver);
+            const res = await server.invoke('GET', '/api/v1/cloud/projects-by-short-id/:short', { params: { short: '7f3e9a01' } });
+            expect(res.status).toBe(409);
+        });
     });
 
     it('serves an artifact assembled from metadata.artifact_path', async () => {

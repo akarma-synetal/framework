@@ -144,39 +144,92 @@ export class ArtifactApiClient {
 
     /**
      * Fetch the compiled artifact for a project.
+     *
+     * When `opts.commit` is set, requests that specific revision via the
+     * existing `?commit=` query param. Different commits are cached
+     * independently (the cache key includes the commit id) so the preview
+     * runtime can hold multiple versions in memory simultaneously.
      */
-    async fetchArtifact(projectId: string): Promise<ProjectArtifactResponse | null> {
-        const cached = this.artifactCache.get(projectId);
+    async fetchArtifact(projectId: string, opts?: { commit?: string }): Promise<ProjectArtifactResponse | null> {
+        const commit = opts?.commit?.trim() || '';
+        const cacheKey = commit ? `${projectId}@${commit}` : projectId;
+        const cached = this.artifactCache.get(cacheKey);
         if (cached && cached.expiresAt > Date.now()) return cached.value;
 
-        const inflight = this.pendingArtifact.get(projectId);
+        const inflight = this.pendingArtifact.get(cacheKey);
         if (inflight) return inflight;
 
         const promise = (async () => {
             try {
-                const url = `${this.base}/api/v1/cloud/projects/${encodeURIComponent(projectId)}/artifact`;
+                const qs = commit ? `?commit=${encodeURIComponent(commit)}` : '';
+                const url = `${this.base}/api/v1/cloud/projects/${encodeURIComponent(projectId)}/artifact${qs}`;
                 const res = await this.request(url);
                 if (res === null) return null;
                 const body = res.success === false ? null : (res.data ?? res);
                 if (!body || typeof body !== 'object') return null;
                 if (!body.metadata) {
-                    this.logger.warn?.('[ArtifactApiClient] artifact response missing `metadata`', { projectId });
+                    this.logger.warn?.('[ArtifactApiClient] artifact response missing `metadata`', { projectId, commit });
                     return null;
                 }
                 const value = body as ProjectArtifactResponse;
-                this.artifactCache.set(projectId, { value, expiresAt: Date.now() + this.cacheTtlMs });
+                this.artifactCache.set(cacheKey, { value, expiresAt: Date.now() + this.cacheTtlMs });
                 return value;
             } finally {
-                this.pendingArtifact.delete(projectId);
+                this.pendingArtifact.delete(cacheKey);
             }
         })();
-        this.pendingArtifact.set(projectId, promise);
+        this.pendingArtifact.set(cacheKey, promise);
         return promise;
+    }
+
+    /**
+     * Resolve an 8-hex project short id (first 8 hex chars of the UUID,
+     * dashes stripped) to the full projectId. Used by the preview
+     * runtime, which encodes project ids in subdomains.
+     *
+     * Returns `null` on 404 or ambiguity (the control plane returns 409
+     * if the prefix matches more than one project).
+     */
+    async lookupProjectByShortId(shortId: string): Promise<{ projectId: string; organizationId?: string } | null> {
+        const short = String(shortId ?? '').trim().toLowerCase();
+        if (!/^[0-9a-f]{8,}$/.test(short)) return null;
+        const url = `${this.base}/api/v1/cloud/projects-by-short-id/${encodeURIComponent(short)}`;
+        const res = await this.request(url);
+        if (res === null) return null;
+        const body = res.success === false ? null : (res.data ?? res);
+        if (!body || typeof body.projectId !== 'string' || !body.projectId) return null;
+        return { projectId: body.projectId, organizationId: body.organizationId };
+    }
+
+    /**
+     * Fetch the head commit of a branch. Returns the commit id (and the
+     * matching revision row's `published_at` for cache-validity checks).
+     * Reuses the existing `GET /cloud/projects/:id/branches` endpoint.
+     */
+    async fetchBranchHead(
+        projectId: string,
+        branchName: string,
+    ): Promise<{ commitId: string; publishedAt?: string | null } | null> {
+        const url = `${this.base}/api/v1/cloud/projects/${encodeURIComponent(projectId)}/branches`;
+        const res = await this.request(url);
+        if (res === null) return null;
+        const body = res.success === false ? null : (res.data ?? res);
+        const branches = Array.isArray(body?.branches) ? body.branches : [];
+        const target = String(branchName ?? '').trim().toLowerCase();
+        const found = branches.find((b: any) => String(b?.branch ?? '').toLowerCase() === target);
+        if (!found?.headCommitId) return null;
+        return { commitId: String(found.headCommitId), publishedAt: found.headPublishedAt ?? null };
     }
 
     /** Drop cached entries for a project (and any matching hostname). */
     invalidate(projectId: string): void {
+        // Cache keys are `${projectId}` for HEAD or `${projectId}@${commit}`
+        // for pinned reads (preview runtime). Drop both shapes.
         this.artifactCache.delete(projectId);
+        const prefix = `${projectId}@`;
+        for (const key of Array.from(this.artifactCache.keys())) {
+            if (key.startsWith(prefix)) this.artifactCache.delete(key);
+        }
         for (const [host, entry] of this.hostnameCache) {
             if (entry.value.projectId === projectId) this.hostnameCache.delete(host);
         }

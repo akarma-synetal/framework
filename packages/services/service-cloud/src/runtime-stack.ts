@@ -122,6 +122,14 @@ export interface RuntimeStackResult {
 export async function createRuntimeStack(config?: RuntimeStackConfig): Promise<RuntimeStackResult> {
     const cfg = RuntimeStackConfigSchema.parse(config ?? {});
 
+    // ── Preview-mode short-circuit ────────────────────────────────────────
+    // When OS_PREVIEW_MODE=1, this process becomes a sandbox preview node:
+    // hostnames `<ref>--<pidShort>.<base>` resolve to (project, commit)
+    // pairs and each pair gets a fresh in-memory kernel. Talks to the same
+    // control-plane URL as the normal cloud-connected branch.
+    const previewMode = (process.env.OS_PREVIEW_MODE ?? '').trim().toLowerCase();
+    const isPreview = previewMode === '1' || previewMode === 'true' || previewMode === 'yes';
+
     // ── ObjectStack Cloud-connected branch ────────────────────────────────
     // Default: route every per-project boot through ObjectStack Cloud
     // (https://cloud.objectstack.ai) — no local control-plane DB, projects
@@ -132,6 +140,20 @@ export async function createRuntimeStack(config?: RuntimeStackConfig): Promise<R
     const rawCloudUrl = cfg.cloudUrl ?? process.env.OS_CLOUD_URL ?? DEFAULT_CLOUD_URL;
     const cloudUrl = rawCloudUrl.trim();
     const localOptOut = cloudUrl === '' || cloudUrl.toLowerCase() === 'local' || cloudUrl.toLowerCase() === 'off';
+    if (isPreview) {
+        if (localOptOut) {
+            throw new Error(
+                '[runtime-stack] OS_PREVIEW_MODE requires OS_CLOUD_URL to point at a control plane ' +
+                '(got "local"/"off"). Preview nodes always pull artifacts from a remote cloud.',
+            );
+        }
+        const { createPreviewStack } = await import('./preview/preview-stack.js');
+        return createPreviewStack({
+            controlPlaneUrl: cloudUrl,
+            controlPlaneApiKey: cfg.cloudApiKey ?? process.env.OS_CLOUD_API_KEY,
+            apiPrefix: cfg.apiPrefix,
+        }) as Promise<RuntimeStackResult>;
+    }
     if (!localOptOut) {
         return createObjectOSStack({
             controlPlaneUrl: cloudUrl,
