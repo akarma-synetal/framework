@@ -355,6 +355,45 @@ describe('ObjectQL Engine', () => {
             expect(mockDriver.find).toHaveBeenCalledTimes(1);
         });
 
+        it('should drop formula fields from driver projection and evaluate them after fetch', async () => {
+            // Regression: planFormulaProjection used to add ALL schema fields
+            // (including the formula fields themselves) back to projected,
+            // which caused the SQL driver to emit `SELECT response_rate ...`
+            // and fail silently with [] (no such column).
+            vi.mocked(SchemaRegistry.getObject).mockReturnValue({
+                name: 'campaign',
+                fields: {
+                    id: { type: 'text' },
+                    name: { type: 'text' },
+                    budgeted_cost: { type: 'number' },
+                    actual_cost: { type: 'number' },
+                    response_rate: {
+                        type: 'formula',
+                        expression: { dialect: 'cel', source: 'record.budgeted_cost - record.actual_cost' },
+                    },
+                },
+            } as any);
+
+            vi.mocked(mockDriver.find).mockResolvedValueOnce([
+                { id: 'c1', name: 'Campaign A', budgeted_cost: 100, actual_cost: 30 },
+            ]);
+
+            const result = await engine.find('campaign', {
+                fields: ['id', 'name', 'response_rate'],
+            } as any);
+
+            // Driver should NOT receive the formula field in its projection
+            const driverCall = vi.mocked(mockDriver.find).mock.calls[0]?.[1] as any;
+            expect(driverCall.fields).toContain('id');
+            expect(driverCall.fields).toContain('name');
+            expect(driverCall.fields).toContain('budgeted_cost');
+            expect(driverCall.fields).toContain('actual_cost');
+            expect(driverCall.fields).not.toContain('response_rate');
+
+            // But the result still carries the computed formula value
+            expect(result[0].response_rate).toBe(70);
+        });
+
         it('should handle null values gracefully during expand', async () => {
             vi.mocked(SchemaRegistry.getObject).mockImplementation((name) => {
                 if (name === 'task') return {
