@@ -25,6 +25,7 @@ import type { SysProjectRow } from '../cloud-artifact-helpers.js';
 import { buildStorageKey, readLegacyArtifactFile } from './storage.js';
 import type { RouteDeps } from './types.js';
 import { makeCheckAuth, makeGetDriver, controlPlaneUnavailable } from './types.js';
+import { normalizeBranch, setBranchHead, DEFAULT_BRANCH } from './branches.js';
 
 export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void {
     const {
@@ -181,6 +182,15 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
             : (incomingChecksum?.value ?? fullHash);
         const key = keyFor(project.organization_id, projectId, commitId);
 
+        // Branch — query string takes precedence over body so that the CLI
+        // can pass `?branch=foo` even when streaming a raw artifact body.
+        let branch: string;
+        try {
+            branch = normalizeBranch(req.query?.branch ?? (body as any).branch);
+        } catch (err: any) {
+            return res.status(400).json(fail(err?.message ?? 'invalid branch', 400));
+        }
+
         // 1. Upload to storage (content-addressable: skip if same key exists)
         try {
             const exists = await storage.exists(key);
@@ -192,8 +202,9 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
             return res.status(500).json(fail('Failed to persist artifact', 500));
         }
 
-        // 2. Insert revision row + flip is_current
+        // 2. Insert revision row + flip is_current + flip is_branch_head
         let revisionCreated = false;
+        let revisionId: string | null = null;
         try {
             const existing = await (driver.findOne as any)('sys_project_revision', {
                 where: { project_id: projectId, commit_id: commitId },
@@ -209,8 +220,9 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
                     }
                 } catch { /* table may not exist yet */ }
 
+                revisionId = randomUUID();
                 await (driver.create as any)('sys_project_revision', {
-                    id: randomUUID(),
+                    id: revisionId,
                     project_id: projectId,
                     commit_id: commitId,
                     checksum: typeof checksum === 'string' ? checksum : fullHash,
@@ -222,10 +234,13 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
                     published_at: new Date().toISOString(),
                     note: (body as any).note ?? (req.query?.note ? String(req.query.note) : null),
                     is_current: true,
+                    branch,
+                    is_branch_head: true,
                 });
                 revisionCreated = true;
             } else {
-                // Re-publish same commit: just ensure it's current
+                revisionId = existing.id;
+                // Re-publish same commit: ensure it's current AND that branch head reflects this push
                 if (!existing.is_current) {
                     try {
                         const oldCurrent = await (driver.findOne as any)('sys_project_revision', {
@@ -237,7 +252,12 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
                     } catch { /* ok */ }
                     await (driver.update as any)('sys_project_revision', existing.id, { is_current: true });
                 }
-                revisionCreated = false;
+            }
+
+            // Always (re-)apply branch head pointer so that re-publishing the
+            // same commit on a different branch correctly moves the head.
+            if (revisionId) {
+                await setBranchHead(driver, projectId, branch, revisionId);
             }
         } catch (err: any) {
             console.warn('[CloudArtifactAPI] Failed to write revision row (table may not exist yet):', err?.message);
@@ -258,6 +278,7 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
             checksum,
             storageKey: key,
             revisionCreated,
+            branch,
         }));
     });
 
@@ -275,6 +296,15 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
 
         const limit = Math.min(Math.max(parseInt(req.query?.limit ?? '20', 10) || 20, 1), 100);
         const cursor = String(req.query?.cursor ?? '').trim();
+        const branchFilterRaw = req.query?.branch;
+        let branchFilter: string | null = null;
+        if (branchFilterRaw !== undefined && branchFilterRaw !== null && String(branchFilterRaw).trim() !== '') {
+            try {
+                branchFilter = normalizeBranch(branchFilterRaw);
+            } catch (err: any) {
+                return res.status(400).json(fail(err?.message ?? 'invalid branch filter', 400));
+            }
+        }
 
         try {
             const query: any = {
@@ -284,6 +314,14 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
             };
             if (cursor) {
                 query.where.published_at = { $lt: cursor };
+            }
+            if (branchFilter) {
+                // Match either explicit branch value or NULL (treated as default)
+                if (branchFilter === DEFAULT_BRANCH) {
+                    query.where.$or = [{ branch: branchFilter }, { branch: null }];
+                } else {
+                    query.where.branch = branchFilter;
+                }
             }
             const rows = await (driver.find as any)('sys_project_revision', query);
             const hasMore = rows.length > limit;
@@ -301,8 +339,11 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
                     publishedBy: r.published_by,
                     note: r.note,
                     isCurrent: !!r.is_current,
+                    branch: (r.branch && String(r.branch).trim()) || DEFAULT_BRANCH,
+                    isBranchHead: !!r.is_branch_head,
                 })),
                 nextCursor,
+                branch: branchFilter,
             }));
         } catch (err: any) {
             console.error('[CloudArtifactAPI] Failed to list revisions:', err?.message ?? err);

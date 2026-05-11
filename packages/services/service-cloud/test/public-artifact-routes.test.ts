@@ -21,7 +21,9 @@ class FakeHttpServer {
     routes: Route[] = [];
     get(path: string, handler: (req: any, res: any) => any) { this.routes.push({ method: 'GET', path, handler }); }
     post(path: string, handler: (req: any, res: any) => any) { this.routes.push({ method: 'POST', path, handler }); }
-    async invoke(method: 'GET' | 'POST', urlPath: string, opts: { query?: Record<string, string>; headers?: Record<string, string> } = {}): Promise<Captured> {
+    delete(path: string, handler: (req: any, res: any) => any) { this.routes.push({ method: 'DELETE', path, handler }); }
+    put() {} patch() {}
+    async invoke(method: 'GET' | 'POST' | 'DELETE', urlPath: string, opts: { query?: Record<string, string>; headers?: Record<string, string> } = {}): Promise<Captured> {
         const route = this.routes.find((r) => r.method === method && pathMatches(r.path, urlPath));
         if (!route) return { status: 404, body: { error: 'no route' }, headers: {} };
         const params = extractParams(route.path, urlPath);

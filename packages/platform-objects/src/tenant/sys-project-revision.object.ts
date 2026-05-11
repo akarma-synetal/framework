@@ -137,12 +137,34 @@ export const SysProjectRevision = ObjectSchema.create({
       description:
         'Whether this revision is the active one for the project. At most one row per project carries `true`.',
     }),
+
+    branch: Field.text({
+      label: 'Branch',
+      required: false,
+      defaultValue: 'main',
+      maxLength: 63,
+      description:
+        'Logical branch this revision belongs to (e.g. `main`, `staging`, `feature-billing`). ' +
+        'Default `main`. Branch names are slugs `^[a-z0-9][a-z0-9._/-]{0,62}$` and must not look ' +
+        'like a 12-hex commit prefix (would collide with preview URL parsing).',
+    }),
+
+    is_branch_head: Field.boolean({
+      label: 'Is Branch Head',
+      required: false,
+      defaultValue: false,
+      description:
+        'Whether this revision is the latest published commit on its branch. At most one ' +
+        'row per (project_id, branch) carries `true`. Used by branch-tracking preview URLs.',
+    }),
   },
 
   indexes: [
     { fields: ['project_id', 'commit_id'], unique: true },
     { fields: ['project_id', 'is_current'] },
     { fields: ['project_id', 'published_at'] },
+    { fields: ['project_id', 'branch', 'is_branch_head'] },
+    { fields: ['project_id', 'branch', 'published_at'] },
   ],
 
   enable: {

@@ -207,10 +207,18 @@ function RealProjectOverview({ projectId }: { projectId: string }) {
             <div className="mt-2 truncate font-mono text-sm font-medium">
               {currentRevision ? currentRevision.commitId.slice(0, 12) : '—'}
             </div>
-            <div className="mt-1 truncate text-xs text-muted-foreground">
-              {currentRevision?.publishedAt
-                ? `Published ${new Date(currentRevision.publishedAt).toLocaleDateString()}`
-                : 'No artifact published yet'}
+            <div className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground">
+              {currentRevision ? (
+                <>
+                  <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground/80">
+                    <GitCommit className="h-2.5 w-2.5" />
+                    {currentRevision.branch ?? 'main'}
+                  </span>
+                  <span>· {new Date(currentRevision.publishedAt).toLocaleDateString()}</span>
+                </>
+              ) : (
+                'No artifact published yet'
+              )}
             </div>
           </Card>
 
@@ -295,6 +303,9 @@ function RealProjectOverview({ projectId }: { projectId: string }) {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <code className="font-mono text-sm">{r.commitId.slice(0, 12)}</code>
+                          {r.branch && r.branch !== 'main' && (
+                            <Badge variant="outline" className="text-[10px]">{r.branch}</Badge>
+                          )}
                           {r.isCurrent && (
                             <Badge variant="secondary" className="text-[10px]">current</Badge>
                           )}

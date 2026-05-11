@@ -25,6 +25,7 @@ import type { IHttpServer, IDataDriver, IStorageService } from '@objectstack/spe
 import { resolveStorage } from './routes/storage.js';
 import { registerCloudRoutes } from './routes/cloud.js';
 import { registerPublicRoutes } from './routes/public.js';
+import { registerBranchRoutes } from './routes/branches.js';
 import type { RouteDeps } from './routes/types.js';
 
 type AnyContext = any;
@@ -74,6 +75,7 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
 
             registerCloudRoutes(server, deps);
             registerPublicRoutes(server, deps);
+            registerBranchRoutes(server, deps);
         },
         stop: async (_ctx: AnyContext) => {},
     };

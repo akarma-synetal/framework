@@ -381,21 +381,61 @@ export interface ProjectRevisionRow {
   publishedBy: string | null;
   note: string | null;
   isCurrent: boolean;
+  branch: string;
+  isBranchHead: boolean;
 }
 
-export function useRevisions(projectId: string | undefined) {
+export function useRevisions(projectId: string | undefined, opts?: { branch?: string }) {
   const client = useClient() as any;
   const [items, setItems] = useState<ProjectRevisionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const branch = opts?.branch;
 
   const reload = useCallback(async () => {
     if (!projectId || !client?.projects?.listRevisions) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await client.projects.listRevisions(projectId, { limit: 100 });
-      setItems(res.items ?? []);
+      const res = await client.projects.listRevisions(projectId, { limit: 100, branch });
+      setItems((res.items ?? []) as ProjectRevisionRow[]);
+    } catch (err) {
+      setError(err as Error);
+    } finally {
+      setLoading(false);
+    }
+  }, [client, projectId, branch]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  return { items, loading, error, reload };
+}
+
+export interface ProjectBranchRow {
+  branch: string;
+  headCommitId: string;
+  headRevisionId: string;
+  revisionCount: number;
+  headPublishedAt: string | null;
+  headNote: string | null;
+  isCurrent: boolean;
+}
+
+export function useBranches(projectId: string | undefined) {
+  const client = useClient() as any;
+  const [items, setItems] = useState<ProjectBranchRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const reload = useCallback(async () => {
+    if (!projectId || !client?.projects?.listBranches) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await client.projects.listBranches(projectId);
+      setItems((res?.branches ?? []) as ProjectBranchRow[]);
     } catch (err) {
       setError(err as Error);
     } finally {
@@ -408,6 +448,32 @@ export function useRevisions(projectId: string | undefined) {
   }, [reload]);
 
   return { items, loading, error, reload };
+}
+
+export function useBranchMutations() {
+  const client = useClient() as any;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const rename = useCallback(
+    async (projectId: string, from: string, to: string) => {
+      if (!client?.projects?.renameBranch) throw new Error('Client not ready');
+      setBusy(true); setError(null);
+      try { return await client.projects.renameBranch(projectId, from, to); }
+      catch (e) { setError(e as Error); throw e; }
+      finally { setBusy(false); }
+    }, [client]);
+
+  const remove = useCallback(
+    async (projectId: string, name: string) => {
+      if (!client?.projects?.deleteBranch) throw new Error('Client not ready');
+      setBusy(true); setError(null);
+      try { return await client.projects.deleteBranch(projectId, name); }
+      catch (e) { setError(e as Error); throw e; }
+      finally { setBusy(false); }
+    }, [client]);
+
+  return { rename, remove, busy, error };
 }
 
 export interface ProjectMemberRow {

@@ -39,6 +39,12 @@ export default class Publish extends Command {
       char: 'n',
       description: 'Optional human-readable note to attach to this revision',
     }),
+    branch: Flags.string({
+      char: 'b',
+      description: 'Logical branch this publish belongs to (e.g. main, staging, feature-x). Default: main.',
+      env: 'OS_PUBLISH_BRANCH',
+      default: 'main',
+    }),
   };
 
   async run(): Promise<void> {
@@ -66,8 +72,11 @@ export default class Publish extends Command {
       printSuccess(`Loaded artifact (${(artifactRaw.length / 1024).toFixed(1)} KB)`);
 
       // 2. POST to the control-plane publish endpoint
-      const noteQs = flags.note ? `?note=${encodeURIComponent(flags.note)}` : '';
-      const serverUrl = `${flags.server}/api/v1/cloud/projects/${flags.project}/metadata${noteQs}`;
+      const qsParams = new URLSearchParams();
+      if (flags.note) qsParams.set('note', flags.note);
+      if (flags.branch) qsParams.set('branch', flags.branch);
+      const qs = qsParams.toString();
+      const serverUrl = `${flags.server}/api/v1/cloud/projects/${flags.project}/metadata${qs ? `?${qs}` : ''}`;
       printStep(`Publishing to ${serverUrl}...`);
 
       const response = await (async () => {
@@ -116,6 +125,7 @@ export default class Publish extends Command {
       console.log('');
       printSuccess('Artifact published successfully');
       printKV('  Project', flags.project);
+      printKV('  Branch', data?.branch ?? flags.branch);
       if (data?.commitId) printKV('  Commit', data.commitId);
       const checksumStr = typeof data?.checksum === 'string'
         ? data.checksum

@@ -736,11 +736,14 @@ export class ObjectStackClient {
     /**
      * List published artifact revisions for a project. Each revision has
      * an immutable commitId (content-addressable) and storage_key.
+     * Optional `branch` filter narrows to a single logical branch
+     * (default branch `main` also matches rows with NULL `branch`).
      */
-    listRevisions: async (id: string, opts?: { limit?: number; cursor?: string }) => {
+    listRevisions: async (id: string, opts?: { limit?: number; cursor?: string; branch?: string }) => {
       const params = new URLSearchParams();
       if (opts?.limit) params.set('limit', String(opts.limit));
       if (opts?.cursor) params.set('cursor', opts.cursor);
+      if (opts?.branch) params.set('branch', opts.branch);
       const qs = params.toString();
       const res = await this.fetch(
         `${this.baseUrl}/api/v1/cloud/projects/${encodeURIComponent(id)}/revisions${qs ? `?${qs}` : ''}`,
@@ -756,9 +759,65 @@ export class ObjectStackClient {
           publishedBy: string | null;
           note: string | null;
           isCurrent: boolean;
+          branch: string;
+          isBranchHead: boolean;
         }>;
         nextCursor: string | null;
+        branch: string | null;
       }>(res);
+    },
+
+    /**
+     * List logical branches for a project. Each branch has a head commit
+     * (latest published revision on that branch) and a count of revisions.
+     * Branches without a head row (e.g. all rows demoted) are omitted.
+     */
+    listBranches: async (id: string) => {
+      const res = await this.fetch(
+        `${this.baseUrl}/api/v1/cloud/projects/${encodeURIComponent(id)}/branches`,
+      );
+      return this.unwrapResponse<{
+        projectId: string;
+        branches: Array<{
+          branch: string;
+          headCommitId: string;
+          headRevisionId: string;
+          revisionCount: number;
+          headPublishedAt: string | null;
+          headNote: string | null;
+          isCurrent: boolean;
+        }>;
+      }>(res);
+    },
+
+    /**
+     * Rename a branch. Updates every revision row in `from` to `to`.
+     * 409 if `to` already has rows.
+     */
+    renameBranch: async (id: string, from: string, to: string) => {
+      const res = await this.fetch(
+        `${this.baseUrl}/api/v1/cloud/projects/${encodeURIComponent(id)}/branches/${encodeURIComponent(from)}/rename`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ newName: to }),
+        },
+      );
+      return this.unwrapResponse<{ projectId: string; from: string; to: string; renamed: number }>(res);
+    },
+
+    /**
+     * Delete (demote) a branch. Soft-removal — clears `is_branch_head` on
+     * every row in this branch; the revisions themselves remain. The
+     * `main` branch and any branch carrying the active revision cannot be
+     * deleted.
+     */
+    deleteBranch: async (id: string, name: string) => {
+      const res = await this.fetch(
+        `${this.baseUrl}/api/v1/cloud/projects/${encodeURIComponent(id)}/branches/${encodeURIComponent(name)}`,
+        { method: 'DELETE' },
+      );
+      return this.unwrapResponse<{ projectId: string; branch: string; demoted: number; totalRevisions: number }>(res);
     },
 
     /**
