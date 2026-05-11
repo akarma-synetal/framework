@@ -22,7 +22,13 @@ RUN corepack enable
 
 # CI=true so pnpm skips interactive prompts (e.g. node_modules cleanup
 # confirmation that fails with ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY).
-ENV CI=true
+# Route both corepack's pnpm-tarball download and pnpm's own package
+# downloads through a fast public mirror — the default registry.npmjs.org
+# is unreliable from many networks (CN). Override at build time with
+# `--build-arg COREPACK_NPM_REGISTRY=…` if you have your own mirror.
+ENV CI=true \
+    COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
+    npm_config_registry=https://registry.npmmirror.com
 
 # ── Layer 1: pre-fetch deps from lockfile only ──────────────────────────────
 # `pnpm fetch` populates the virtual store from `pnpm-lock.yaml` alone (no
