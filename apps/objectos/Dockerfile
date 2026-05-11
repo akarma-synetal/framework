@@ -64,7 +64,7 @@ COPY examples ./examples
 COPY apps/objectos ./apps/objectos
 
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm install --frozen-lockfile --offline --prod=false
+    pnpm install --frozen-lockfile --prefer-offline --prod=false
 
 # Build apps/objectos + all its workspace transitive deps.
 RUN pnpm --filter '@objectstack/objectos...' build

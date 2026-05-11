@@ -51,7 +51,7 @@ COPY examples ./examples
 COPY apps/cloud ./apps/cloud
 
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm install --frozen-lockfile --offline --prod=false
+    pnpm install --frozen-lockfile --prefer-offline --prod=false
 RUN pnpm --filter '@objectstack/cloud...' build
 
 # ──────────────────────────────────────────────────────────────────────────
