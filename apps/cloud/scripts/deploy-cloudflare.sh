@@ -38,12 +38,34 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${CF_ACCOUNT_ID:-}" ]]; then
-  echo "✗ CF_ACCOUNT_ID is required (set in $ENV_FILE or env)" >&2
+# Accept both modern (CLOUDFLARE_*) and legacy (CF_*) env names.
+# Wrangler v4 emits a deprecation warning for CF_ACCOUNT_ID, so promote
+# whatever we have to CLOUDFLARE_ACCOUNT_ID and re-export.
+: "${CLOUDFLARE_ACCOUNT_ID:=${CF_ACCOUNT_ID:-}}"
+: "${CF_ACCOUNT_ID:=${CLOUDFLARE_ACCOUNT_ID:-}}"
+: "${CLOUDFLARE_API_TOKEN:=${CF_API_TOKEN:-}}"
+export CLOUDFLARE_ACCOUNT_ID CF_ACCOUNT_ID CLOUDFLARE_API_TOKEN
+
+if [[ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
+  echo "✗ CLOUDFLARE_ACCOUNT_ID is required (set in $ENV_FILE or env)" >&2
   echo "  Run: npx wrangler whoami" >&2
   exit 1
 fi
-: "${CF_IMAGE_REGISTRY:=registry.cloudflare.com/$CF_ACCOUNT_ID}"
+
+# Preflight auth: wrangler emits a cryptic 'Unauthorized' when neither a
+# token nor a `wrangler login` session exists. Catch it early.
+if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+  if ! npx --yes wrangler whoami >/dev/null 2>&1; then
+    echo "✗ Not authenticated with Cloudflare." >&2
+    echo "  Add one of these to $ENV_FILE (or export to env):" >&2
+    echo "    CLOUDFLARE_API_TOKEN=<token from https://dash.cloudflare.com/profile/api-tokens>" >&2
+    echo "  …or run \`npx wrangler login\` once on this machine." >&2
+    echo "  Token needs: Workers Scripts:Edit, Account → Cloudflare Images:Edit (containers)." >&2
+    exit 1
+  fi
+fi
+
+: "${CF_IMAGE_REGISTRY:=registry.cloudflare.com/$CLOUDFLARE_ACCOUNT_ID}"
 IMAGE="$CF_IMAGE_REGISTRY/$CF_IMAGE_NAME:$CF_IMAGE_TAG"
 
 echo "════════════════════════════════════════════════════════════════"
@@ -73,7 +95,23 @@ fi
 if [[ $SKIP_PUSH -eq 0 ]]; then
   echo ""
   echo "▶ [2/3] wrangler containers push"
-  run npx --yes wrangler containers push "$IMAGE"
+  if [[ $DRY_RUN -eq 1 ]]; then
+    echo "[dry-run] npx --yes wrangler containers push $IMAGE"
+  else
+    if ! npx --yes wrangler containers push "$IMAGE"; then
+      echo "" >&2
+      echo "✗ wrangler containers push failed." >&2
+      echo "  Common causes:" >&2
+      echo "  • API token / OAuth session missing scope" >&2
+      echo "      Cloudflare Images:Edit (container registry push)" >&2
+      echo "      Workers Scripts:Edit  (cf:deploy step)" >&2
+      echo "  • Account not enrolled in Cloudflare Containers beta" >&2
+      echo "      https://developers.cloudflare.com/containers/" >&2
+      echo "  • Token regenerated; refresh CLOUDFLARE_API_TOKEN in $ENV_FILE" >&2
+      echo "" >&2
+      exit 1
+    fi
+  fi
 else
   echo "▶ [2/3] skipped (--skip-push)"
 fi
