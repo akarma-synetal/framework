@@ -113,9 +113,10 @@ function RealProjectOverview({ projectId }: { projectId: string }) {
     (project?.metadata as Record<string, any> | undefined)?.provisioningError as
       | { message?: string; failedAt?: string }
       | undefined;
-  const visibility = ((project as any)?.visibility ?? 'private') as
+  const visibilityRaw = ((project as any)?.visibility ?? 'private') as string;
+  // Legacy `unlisted` rows collapse into `private` (share-by-link).
+  const visibility = (visibilityRaw === 'unlisted' ? 'private' : visibilityRaw) as
     | 'private'
-    | 'unlisted'
     | 'public';
   const currentRevision = useMemo(
     () => revisions.find((r) => r.isCurrent) ?? revisions[0] ?? null,
@@ -125,10 +126,14 @@ function RealProjectOverview({ projectId }: { projectId: string }) {
   const baseOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const apiBase = `${baseOrigin}/api/v1`;
   const studioUrl = `${baseOrigin}/_studio/projects/${projectId}`;
+  // `private` projects allow anonymous download with an exact ?commit=<id>.
+  // The bare /artifact endpoint (no commit) is only reachable when `public`.
   const publicArtifactUrl =
-    visibility === 'private'
-      ? null
-      : `${baseOrigin}/api/v1/pub/v1/projects/${projectId}/artifact`;
+    visibility === 'public'
+      ? `${baseOrigin}/api/v1/pub/v1/projects/${projectId}/artifact`
+      : currentRevision?.commitId
+        ? `${baseOrigin}/api/v1/pub/v1/projects/${projectId}/artifact?commit=${currentRevision.commitId}`
+        : null;
   const cliPublishCmd = `OS_CLOUD_URL=${baseOrigin} OS_PROJECT_ID=${projectId} objectstack publish`;
 
   const copyToClipboard = async (value: string, label: string) => {
@@ -425,10 +430,8 @@ function RealProjectOverview({ projectId }: { projectId: string }) {
                   <div className="mt-2 text-sm font-medium capitalize">{visibility}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {visibility === 'public'
-                      ? 'Discoverable & artifact public'
-                      : visibility === 'unlisted'
-                      ? 'Hidden but artifact public'
-                      : 'Org members only'}
+                      ? 'Listed & freely downloadable'
+                      : 'Share-by-link (anon needs ?commit=)'}
                   </div>
                 </Card>
 
@@ -917,20 +920,22 @@ function UrlRow({
 
 function VisibilityControl({
   projectId,
-  value,
+  value: rawValue,
   onChanged,
   updating,
   update,
 }: {
   projectId: string;
-  value: 'private' | 'unlisted' | 'public';
+  value: 'private' | 'unlisted' | 'public' | string;
   onChanged: () => void;
   updating: boolean;
-  update: (id: string, v: 'private' | 'unlisted' | 'public') => Promise<unknown>;
+  update: (id: string, v: 'private' | 'public') => Promise<unknown>;
 }) {
+  // Legacy `unlisted` rows display as `private` (share-by-link).
+  const value: 'private' | 'public' = rawValue === 'public' ? 'public' : 'private';
   const [editing, setEditing] = useState(false);
   const handleChange = async (next: string) => {
-    const v = next as 'private' | 'unlisted' | 'public';
+    const v = next as 'private' | 'public';
     if (v === value) {
       setEditing(false);
       return;
@@ -952,17 +957,15 @@ function VisibilityControl({
       setEditing(false);
     }
   };
-  const variant =
-    value === 'public' ? 'default' : value === 'unlisted' ? 'secondary' : 'outline';
+  const variant = value === 'public' ? 'default' : 'outline';
   if (editing) {
     return (
       <Select value={value} onValueChange={handleChange} disabled={updating}>
-        <SelectTrigger className="h-7 w-[120px] text-xs">
+        <SelectTrigger className="h-7 w-[140px] text-xs">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="private">Private</SelectItem>
-          <SelectItem value="unlisted">Unlisted</SelectItem>
           <SelectItem value="public">Public</SelectItem>
         </SelectContent>
       </Select>
@@ -973,16 +976,14 @@ function VisibilityControl({
       type="button"
       onClick={() => setEditing(true)}
       className="inline-flex items-center"
-      title="Click to change visibility"
+      title={
+        value === 'public'
+          ? 'Public — listed and freely downloadable. Click to change.'
+          : 'Private — share-by-link (anonymous downloads need an exact ?commit=). Click to change.'
+      }
     >
       <Badge variant={variant} className="cursor-pointer gap-1 text-xs">
-        {value === 'public' ? (
-          <Eye className="h-3 w-3" />
-        ) : value === 'unlisted' ? (
-          <Globe className="h-3 w-3" />
-        ) : (
-          <Lock className="h-3 w-3" />
-        )}
+        {value === 'public' ? <Eye className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
         {value}
       </Badge>
     </button>

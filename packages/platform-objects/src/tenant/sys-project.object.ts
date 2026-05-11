@@ -155,13 +155,12 @@ export const SysProject = ObjectSchema.create({
       defaultValue: 'private',
       description:
         'Public exposure of this project artifacts. ' +
-        '`private` (default) requires authentication for every read. ' +
-        '`unlisted` allows downloading a specific commit when the URL includes ?commit=<id> (used for share-preview links). ' +
-        '`public` exposes both the current artifact and the revision history at /pub/v1/projects/:id/* (suitable for marketplace, OSS, and live-doc demos).',
+        '`private` (default) hides the project from /pub/v1 enumeration, but allows anonymous artifact downloads when the URL includes ?commit=<id> (share-by-link). ' +
+        'Members always retain full authenticated access. ' +
+        '`public` lists the project and freely exposes both the current artifact and the revision history at /pub/v1/projects/:id/* (suitable for marketplace, OSS, and live-doc demos).',
       options: [
-        { value: 'private', label: 'Private' },
-        { value: 'unlisted', label: 'Unlisted (link sharing)' },
-        { value: 'public', label: 'Public' },
+        { value: 'private', label: 'Private (share-by-link)' },
+        { value: 'public', label: 'Public (listed)' },
       ],
     }),
   },

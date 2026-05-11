@@ -352,7 +352,7 @@ export function useUpdateVisibility() {
   const [error, setError] = useState<Error | null>(null);
 
   const updateVisibility = useCallback(
-    async (projectId: string, visibility: 'private' | 'unlisted' | 'public') => {
+    async (projectId: string, visibility: 'private' | 'public') => {
       if (!client?.projects?.updateVisibility) throw new Error('Client not ready');
       setUpdating(true);
       setError(null);

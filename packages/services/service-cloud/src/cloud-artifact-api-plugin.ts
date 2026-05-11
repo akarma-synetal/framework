@@ -614,12 +614,15 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
                 project: SysProjectRow,
                 requestedCommit: string,
             ): { ok: true } | { ok: false; status: number; body: any } => {
-                const visibility = project.visibility ?? 'private';
-                if (visibility === 'private') {
-                    // Don't reveal existence of private projects.
-                    return { ok: false, status: 404, body: fail('not found', 404) };
-                }
-                if (visibility === 'unlisted' && !requestedCommit) {
+                // Visibility model (post-merge):
+                //   `public`  → listed; anonymous download of any/current revision; enumerable.
+                //   `private` → hidden from enumeration; anonymous download ONLY with
+                //               exact ?commit=<id> (share-by-link). Members still get
+                //               full authenticated access via /cloud/projects/:id/*.
+                //   (Legacy `unlisted` rows are coerced to `private`.)
+                const raw = project.visibility ?? 'private';
+                const visibility = raw === 'unlisted' ? 'private' : raw;
+                if (visibility === 'private' && !requestedCommit) {
                     // Refuse enumeration; force callers to know the exact commit.
                     return { ok: false, status: 404, body: fail('not found', 404) };
                 }
@@ -637,7 +640,7 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
                 const project = (await (driver.findOne as any)('sys_project', { where: { id: projectId } })) as SysProjectRow | null;
                 if (!project) return res.status(404).json(fail('not found', 404));
 
-                // For manifest we treat unlisted as private (no enumeration).
+                // For manifest we only expose `public` (no enumeration of `private`).
                 if ((project.visibility ?? 'private') !== 'public') {
                     return res.status(404).json(fail('not found', 404));
                 }

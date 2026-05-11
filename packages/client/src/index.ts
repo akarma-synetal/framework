@@ -719,11 +719,13 @@ export class ObjectStackClient {
     },
 
     /**
-     * Update the visibility of this project ('private' | 'unlisted' | 'public').
-     * Controls who can read the compiled artifact via the public `/pub/v1`
-     * routes. Default is 'private'.
+     * Update the visibility of this project ('private' | 'public').
+     * `private` (default) hides the project from /pub/v1 enumeration but
+     * still allows anonymous artifact downloads when the URL includes an
+     * exact `?commit=<id>` (share-by-link). `public` lists the project and
+     * freely exposes all revisions.
      */
-    updateVisibility: async (id: string, visibility: 'private' | 'unlisted' | 'public') => {
+    updateVisibility: async (id: string, visibility: 'private' | 'public') => {
       const res = await this.fetch(`${this.baseUrl}/api/v1/cloud/projects/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         body: JSON.stringify({ visibility }),

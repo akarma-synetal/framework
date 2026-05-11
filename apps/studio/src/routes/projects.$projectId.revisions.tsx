@@ -44,7 +44,10 @@ function ProjectRevisionsComponent() {
   const [pendingCommit, setPendingCommit] = useState<string | null>(null);
 
   const project = detail?.project;
-  const visibility = (project as any)?.visibility ?? 'private';
+  const rawVisibility = (project as any)?.visibility ?? 'private';
+  // Legacy `unlisted` rows collapse into `private` (share-by-link).
+  const visibility: 'private' | 'public' =
+    rawVisibility === 'public' ? 'public' : 'private';
   const baseOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
   const currentCommit = useMemo(
@@ -53,10 +56,9 @@ function ProjectRevisionsComponent() {
   );
 
   const buildArtifactUrl = (commitId: string): string => {
-    if (visibility === 'public' || visibility === 'unlisted') {
-      return `${baseOrigin}/api/v1/pub/v1/projects/${encodeURIComponent(projectId)}/artifact?commit=${encodeURIComponent(commitId)}`;
-    }
-    return `${baseOrigin}/api/v1/cloud/projects/${encodeURIComponent(projectId)}/artifact?commit=${encodeURIComponent(commitId)}`;
+    // Both `public` and `private` allow anonymous download with an exact
+    // commitId via /pub/v1; the difference is enumeration (revisions list).
+    return `${baseOrigin}/api/v1/pub/v1/projects/${encodeURIComponent(projectId)}/artifact?commit=${encodeURIComponent(commitId)}`;
   };
 
   const handleCopyUrl = async (commitId: string) => {
@@ -239,10 +241,13 @@ function ProjectRevisionsComponent() {
 
         {visibility === 'private' && (
           <p className="text-xs text-muted-foreground">
-            This project is <strong>private</strong> — artifact URLs require an
-            authenticated session. Switch visibility to <code>unlisted</code> or{' '}
-            <code>public</code> from the project page to enable share links via{' '}
-            <code className="font-mono">/api/v1/pub/v1/...</code>.
+            This project is <strong>private</strong> — it is hidden from the
+            public gallery and from <code>/pub/v1</code> enumeration, but
+            anyone with the <em>exact</em> URL above (including the{' '}
+            <code>?commit=&lt;id&gt;</code> query) can download that snapshot
+            anonymously (share-by-link). Members keep full authenticated
+            access. Switch to <code>public</code> from the project page to
+            list it and allow current-pointer downloads without a commit.
           </p>
         )}
       </div>

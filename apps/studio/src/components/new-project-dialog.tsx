@@ -80,7 +80,7 @@ export function NewProjectDialog({
   const [displayName, setDisplayName] = useState('');
   const [driver, setDriver] = useState<string>('');
   const [templateId, setTemplateId] = useState<string>('blank');
-  const [visibility, setVisibility] = useState<'private' | 'unlisted' | 'public'>('private');
+  const [visibility, setVisibility] = useState<'private' | 'public'>('private');
 
   // Auto-select a sensible default once drivers load: prefer turso, then memory,
   // otherwise the first registered driver.
@@ -176,20 +176,19 @@ export function NewProjectDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {templates.length === 0 && !templatesLoading && (
-                    <SelectItem value="blank">
-                      <span>Blank — start from scratch</span>
-                    </SelectItem>
+                    <SelectItem value="blank">Blank</SelectItem>
                   )}
                   {templates.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
-                      <div className="flex flex-col">
-                        <span>{t.label}</span>
-                        <span className="text-[11px] text-muted-foreground">{t.description}</span>
-                      </div>
+                      {t.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {templates.find((t) => t.id === templateId)?.description ??
+                  (templateId === 'blank' ? 'Empty project — start from scratch.' : '')}
+              </p>
             </div>
 
             <div className="grid gap-1.5">
@@ -213,20 +212,14 @@ export function NewProjectDialog({
                 <SelectContent>
                   {drivers.map((d) => (
                     <SelectItem key={d.driverId} value={d.name}>
-                      <div className="flex flex-col">
-                        <span>{d.name}</span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {d.driverId}
-                        </span>
-                      </div>
+                      {d.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
-                Where this project's data will be stored. `memory` is ideal
-                for tests; `sqlite` persists to a local file; `turso`
-                persists to libSQL (local or remote).
+                {drivers.find((d) => d.name === driver)?.driverId ??
+                  'Where this project\u2019s data will be stored. `memory` is ideal for tests; `sqlite` persists to a local file; `turso` persists to libSQL (local or remote).'}
               </p>
             </div>
 
@@ -234,35 +227,20 @@ export function NewProjectDialog({
               <Label>Visibility</Label>
               <Select
                 value={visibility}
-                onValueChange={(v) => setVisibility(v as 'private' | 'unlisted' | 'public')}
+                onValueChange={(v) => setVisibility(v as 'private' | 'public')}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="private">
-                    <div className="flex flex-col">
-                      <span>Private</span>
-                      <span className="text-[11px] text-muted-foreground">Default. Auth required for every read.</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="unlisted">
-                    <div className="flex flex-col">
-                      <span>Unlisted</span>
-                      <span className="text-[11px] text-muted-foreground">Downloadable when commit id is known. Good for share-preview links.</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="public">
-                    <div className="flex flex-col">
-                      <span>Public</span>
-                      <span className="text-[11px] text-muted-foreground">Listed and freely downloadable via /pub/v1. For marketplace, OSS, live-doc demos.</span>
-                    </div>
-                  </SelectItem>
+                  <SelectItem value="private">Private (share-by-link)</SelectItem>
+                  <SelectItem value="public">Public (listed)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
-                Controls who can read this project's compiled artifact.
-                Audit metadata for secrets before going public.
+                {visibility === 'public'
+                  ? 'Listed and freely downloadable via /pub/v1. Suitable for marketplace, OSS demos, and live-doc embeds. Audit metadata for secrets before going public.'
+                  : 'Hidden from /pub/v1 enumeration. Members keep full authenticated access; anyone with the exact `?commit=<id>` URL can still download that snapshot anonymously (share-by-link).'}
               </p>
             </div>
           </div>
