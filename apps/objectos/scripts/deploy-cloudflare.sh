@@ -47,6 +47,7 @@ SKIP_DEPLOY=0
 DRY_RUN=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --) shift ;;
     --skip-build)  SKIP_BUILD=1; shift ;;
     --skip-push)   SKIP_PUSH=1; shift ;;
     --skip-deploy) SKIP_DEPLOY=1; shift ;;
