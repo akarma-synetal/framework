@@ -66,7 +66,11 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --prefer-offline --prod=false
 
 # Build apps/objectos + all its workspace transitive deps.
-RUN pnpm --filter '@objectstack/objectos...' build
+# Use turbo (not raw `pnpm --filter ... build`) so its content-addressed
+# cache at /repo/.turbo can short-circuit unchanged packages on rebuilds.
+RUN --mount=type=cache,id=turbo-objectos,target=/repo/.turbo,sharing=locked \
+    --mount=type=cache,id=node-cache-objectos,target=/repo/node_modules/.cache,sharing=locked \
+    pnpm exec turbo run build --filter='@objectstack/objectos...'
 
 # ──────────────────────────────────────────────────────────────────────────
 # Stage 2 — production prune (pnpm deploy)

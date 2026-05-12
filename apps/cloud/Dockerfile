@@ -53,7 +53,12 @@ COPY apps/account ./apps/account
 
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --prefer-offline --prod=false
-RUN pnpm --filter '@objectstack/cloud...' build
+# Use turbo (not raw `pnpm --filter ... build`) so its content-addressed
+# cache at /repo/.turbo can short-circuit unchanged packages on rebuilds.
+# Cache mounts persist the cache across `docker build` invocations.
+RUN --mount=type=cache,id=turbo-cloud,target=/repo/.turbo,sharing=locked \
+    --mount=type=cache,id=node-cache-cloud,target=/repo/node_modules/.cache,sharing=locked \
+    pnpm exec turbo run build --filter='@objectstack/cloud...'
 
 # ──────────────────────────────────────────────────────────────────────────
 # Stage 2 — production prune (pnpm deploy)
