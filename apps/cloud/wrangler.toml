@@ -45,7 +45,7 @@ compatibility_flags = ["nodejs_compat"]
 # rebuild + re-push to ship a new version, then run `wrangler deploy`.
 [[containers]]
 class_name = "CloudContainer"
-image = "registry.cloudflare.com/2846eb40a60f4738e292b90dcd8cce10/objectstack-cloud:a63afd62"
+image = "registry.cloudflare.com/2846eb40a60f4738e292b90dcd8cce10/objectstack-cloud:55c6fe06"
 max_instances = 3
 instance_type = "standard-1"
 
@@ -66,3 +66,10 @@ new_sqlite_classes = ["CloudContainer"]
 # ── Observability ───────────────────────────────────────────────────────
 [observability]
 enabled = true
+
+# ── Worker-only vars (NOT injected into the Container process) ──────────
+# Container env is set on the CloudContainer class in cloudflare/worker.ts
+# (envVars field). Anything the Node.js runtime reads via process.env —
+# AUTH_BASE_URL, OS_TRUSTED_ORIGINS, etc. — MUST live there, not here.
+# This [vars] block is intentionally empty.
+# [vars]

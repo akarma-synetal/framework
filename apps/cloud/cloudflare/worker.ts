@@ -40,6 +40,16 @@ export class CloudContainer extends Container {
         OS_KERNEL_CACHE_SIZE: '50',
         OS_KERNEL_TTL_MS: '1800000',
         OS_ENV_CACHE_TTL_MS: '300000',
+        // Public URL the better-auth instance issues redirects from. MUST
+        // match the origin the browser hits, otherwise sign-up / OAuth
+        // callbacks fail with "Invalid origin". Set on the Container
+        // process (NOT [vars] in wrangler.toml) because the Node runtime
+        // reads it via process.env at startup.
+        AUTH_BASE_URL: 'https://objectstack-cloud.objectstack.workers.dev',
+        // Comma-separated extra origins to add to better-auth's trusted
+        // list (custom domains, preview hosts, …). AUTH_BASE_URL is
+        // already trusted automatically.
+        OS_TRUSTED_ORIGINS: 'https://cloud.objectstack.ai',
     };
 }
 
