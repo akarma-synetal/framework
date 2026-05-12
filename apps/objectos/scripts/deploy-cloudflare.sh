@@ -113,6 +113,8 @@ if [[ $SKIP_BUILD -eq 0 ]]; then
     --platform "$CF_PLATFORM" \
     -f "$DOCKERFILE" \
     -t "$IMAGE" \
+    --provenance=false \
+    --sbom=false \
     --load \
     "$REPO_ROOT"
 else
