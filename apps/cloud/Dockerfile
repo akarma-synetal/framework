@@ -120,7 +120,12 @@ COPY --from=builder /repo/apps/cloud/dist /app/dist
 EXPOSE 4000
 VOLUME ["/data"]
 
-ENV OS_DATABASE_URL=file:/data/control.db
+# NB: do NOT bake `ENV OS_DATABASE_URL=…` here. service-cloud's
+# resolveControlDriver() already handles the full fallback chain
+# (OS_CONTROL_DATABASE_URL → OS_DATABASE_URL → TURSO_DATABASE_URL →
+# file:<data-dir>/control.db) and will throw a clear error on serverless
+# when none is configured. A baked image default would silently win over
+# an unset Worker secret and quietly write to ephemeral container disk.
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD wget -qO- "http://127.0.0.1:${PORT}/api/v1/health" >/dev/null 2>&1 || exit 1

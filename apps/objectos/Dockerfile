@@ -136,11 +136,12 @@ COPY --from=builder /repo/apps/objectos/dist /app/dist
 EXPOSE 3000
 VOLUME ["/data"]
 
-# The container talks to the control plane (local SQLite at /data or remote
-# libSQL/Turso) via env. The local file path is only viable on platforms
-# with a persistent volume mount (Fly volumes, Docker volumes) — on
-# Cloudflare Containers it MUST be overridden to a remote URL.
-ENV OS_DATABASE_URL=file:/data/control.db
+# NB: do NOT bake `ENV OS_DATABASE_URL=…` here. service-cloud's
+# resolveControlDriver() / single-app driver factory already handles the
+# full fallback chain (OS_DATABASE_URL → TURSO_DATABASE_URL →
+# file:<data-dir>/<app>.db) and will throw a clear error on serverless
+# when none is configured. A baked image default would silently win over
+# an unset Worker secret and quietly write to ephemeral container disk.
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD wget -qO- "http://127.0.0.1:${PORT}/api/v1/health" >/dev/null 2>&1 || exit 1
