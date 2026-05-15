@@ -248,12 +248,12 @@
               "lead_source": {
                 "label": "Lead Source",
                 "options": {
-                  "Web": "Web",
-                  "Referral": "Referral",
-                  "Event": "Event",
-                  "Partner": "Partner",
-                  "Advertisement": "Advertisement",
-                  "Cold Call": "Cold Call"
+                  "web": "Web",
+                  "referral": "Referral",
+                  "event": "Event",
+                  "partner": "Partner",
+                  "advertisement": "Advertisement",
+                  "cold_call": "Cold Call"
                 }
               },
               "owner": {
@@ -1558,12 +1558,12 @@
               "lead_source": {
                 "label": "线索来源",
                 "options": {
-                  "Web": "网站",
-                  "Referral": "推荐",
-                  "Event": "活动",
-                  "Partner": "合作伙伴",
-                  "Advertisement": "广告",
-                  "Cold Call": "陌生拜访"
+                  "web": "网站",
+                  "referral": "推荐",
+                  "event": "活动",
+                  "partner": "合作伙伴",
+                  "advertisement": "广告",
+                  "cold_call": "陌生拜访"
                 }
               },
               "owner": {
@@ -2904,12 +2904,12 @@
               "lead_source": {
                 "label": "リードソース",
                 "options": {
-                  "Web": "Web",
-                  "Referral": "紹介",
-                  "Event": "イベント",
-                  "Partner": "パートナー",
-                  "Advertisement": "広告",
-                  "Cold Call": "コールドコール"
+                  "web": "ウェブ",
+                  "referral": "紹介",
+                  "event": "イベント",
+                  "partner": "パートナー",
+                  "advertisement": "広告",
+                  "cold_call": "コールドコール"
                 }
               },
               "owner": {
@@ -4182,12 +4182,12 @@
               "lead_source": {
                 "label": "Origen del Prospecto",
                 "options": {
-                  "Web": "Web",
-                  "Referral": "Referencia",
-                  "Event": "Evento",
-                  "Partner": "Socio",
-                  "Advertisement": "Publicidad",
-                  "Cold Call": "Llamada en Frío"
+                  "web": "Web",
+                  "referral": "Referencia",
+                  "event": "Evento",
+                  "partner": "Socio",
+                  "advertisement": "Publicidad",
+                  "cold_call": "Llamada en Frío"
                 }
               },
               "owner": {

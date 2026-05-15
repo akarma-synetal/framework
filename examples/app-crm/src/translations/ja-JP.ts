@@ -121,8 +121,8 @@ export const jaJP: TranslationData = {
         lead_source: {
           label: 'リードソース',
           options: {
-            Web: 'Web', Referral: '紹介', Event: 'イベント',
-            Partner: 'パートナー', Advertisement: '広告', 'Cold Call': 'コールドコール',
+            web: 'ウェブ', referral: '紹介', event: 'イベント',
+            partner: 'パートナー', advertisement: '広告', cold_call: 'コールドコール',
           },
         },
         owner: { label: 'リード所有者' },

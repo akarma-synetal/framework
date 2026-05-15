@@ -122,8 +122,8 @@ export const en: TranslationData = {
         lead_source: {
           label: 'Lead Source',
           options: {
-            Web: 'Web', Referral: 'Referral', Event: 'Event',
-            Partner: 'Partner', Advertisement: 'Advertisement', 'Cold Call': 'Cold Call',
+            web: 'Web', referral: 'Referral', event: 'Event',
+            partner: 'Partner', advertisement: 'Advertisement', cold_call: 'Cold Call',
           },
         },
         owner: { label: 'Lead Owner' },

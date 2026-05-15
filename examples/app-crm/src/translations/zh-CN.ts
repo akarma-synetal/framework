@@ -140,8 +140,8 @@ export const zhCN: TranslationData = {
         lead_source: {
           label: '线索来源',
           options: {
-            Web: '网站', Referral: '推荐', Event: '活动',
-            Partner: '合作伙伴', Advertisement: '广告', 'Cold Call': '陌生拜访',
+            web: '网站', referral: '推荐', event: '活动',
+            partner: '合作伙伴', advertisement: '广告', cold_call: '陌生拜访',
           },
         },
         owner: { label: '线索负责人' },

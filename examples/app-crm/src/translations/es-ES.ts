@@ -121,8 +121,8 @@ export const esES: TranslationData = {
         lead_source: {
           label: 'Origen del Prospecto',
           options: {
-            Web: 'Web', Referral: 'Referencia', Event: 'Evento',
-            Partner: 'Socio', Advertisement: 'Publicidad', 'Cold Call': 'Llamada en Frío',
+            web: 'Web', referral: 'Referencia', event: 'Evento',
+            partner: 'Socio', advertisement: 'Publicidad', cold_call: 'Llamada en Frío',
           },
         },
         owner: { label: 'Propietario' },
