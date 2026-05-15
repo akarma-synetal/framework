@@ -18,7 +18,28 @@ export interface IPluginLifecycleEvents {
      * Payload: []
      */
     'kernel:ready': [];
-    
+
+    /**
+     * Emitted AFTER all `kernel:ready` handlers have completed.
+     *
+     * Use this hook for actions that must happen *strictly after* every
+     * other plugin has had a chance to register routes / services /
+     * middleware during `kernel:ready` — most notably HTTP server
+     * `listen()`.
+     *
+     * Why a separate phase: route registration in Hono (and similar
+     * routers) seals the matcher the first time a request is matched.
+     * If a server starts listening during `kernel:ready` while sibling
+     * plugins are still adding routes in their own `kernel:ready`
+     * hooks, an inbound request can build the matcher mid-init and
+     * subsequent `app.get(...)` calls throw "matcher is already built".
+     * On a fast-fronting platform (e.g. Cloudflare Containers) this
+     * race fires on every cold boot.
+     *
+     * Payload: []
+     */
+    'kernel:listening': [];
+
     /**
      * Emitted when kernel is shutting down
      * Payload: []

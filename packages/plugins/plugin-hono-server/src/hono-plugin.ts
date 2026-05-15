@@ -311,13 +311,30 @@ export class HonoServerPlugin implements Plugin {
             rawAppForNotFound.notFound((c: any) => c.json({ error: 'Not found' }, 404));
         }
 
-        // Start server on kernel:ready hook
-        ctx.hook('kernel:ready', async () => {
-            // Register standard endpoints before starting to listen
-            if (this.options.registerStandardEndpoints) {
+        // Register standard endpoints during kernel:ready so they're
+        // wired up alongside other plugins' route registrations.
+        if (this.options.registerStandardEndpoints) {
+            ctx.hook('kernel:ready', async () => {
                 this.registerDiscoveryAndCrudEndpoints(ctx);
-            }
+            });
+        }
 
+        // Open the listening socket on kernel:listening — this fires
+        // STRICTLY AFTER every kernel:ready handler completes, so all
+        // plugins have finished registering routes by the time the
+        // server starts accepting requests.
+        //
+        // Why this matters: Hono seals the route matcher the first
+        // time a request is matched. If we listen during kernel:ready
+        // and a request arrives before sibling plugins (auth, i18n,
+        // storage, …) finish registering their routes, those late
+        // `app.get(...)` calls throw "matcher is already built" and
+        // crash the process. Cloudflare Containers fronts traffic the
+        // millisecond port 4000 opens, so the race fires on every
+        // cold boot in production. See
+        // packages/spec/src/contracts/plugin-lifecycle-events.ts for
+        // the full rationale.
+        ctx.hook('kernel:listening', async () => {
             const port = this.options.port ?? 3000;
             ctx.logger.debug('Starting HTTP server', { port });
 

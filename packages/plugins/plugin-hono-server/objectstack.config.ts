@@ -234,6 +234,7 @@ const HonoServerPlugin: ObjectStackManifest = {
     // System Events
     events: [
       'kernel:ready',
+      'kernel:listening',
     ],
   },
 };

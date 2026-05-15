@@ -75,8 +75,11 @@ export class LiteKernel extends ObjectKernelBase {
             await this.runPluginStart(plugin);
         }
 
-        // Trigger ready hook
+        // Trigger ready hook (route/middleware registration phase)
         await this.triggerHook('kernel:ready');
+        // Trigger listening hook (HTTP servers open their socket here —
+        // strictly after every kernel:ready handler has completed).
+        await this.triggerHook('kernel:listening');
         this.logger.info('✅ Bootstrap complete', { 
             pluginCount: this.plugins.size 
         });

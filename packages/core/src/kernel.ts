@@ -349,6 +349,16 @@ export class ObjectKernel {
             this.logger.debug('Triggering kernel:ready hook');
             await this.context.trigger('kernel:ready');
 
+            // Phase 4: Trigger kernel:listening hook AFTER all kernel:ready
+            // handlers have completed. This is the cue for HTTP server
+            // plugins to actually open the listening socket — by now every
+            // other plugin has finished registering routes/middleware.
+            // See `kernel:listening` docs in
+            // packages/spec/src/contracts/plugin-lifecycle-events.ts
+            // for the race-condition rationale.
+            this.logger.debug('Triggering kernel:listening hook');
+            await this.context.trigger('kernel:listening');
+
             this.logger.info('✅ Bootstrap complete');
         } catch (error) {
             this.state = 'stopped';
