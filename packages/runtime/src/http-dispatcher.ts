@@ -294,11 +294,14 @@ export class HttpDispatcher {
      * so project-scoped meta routes can resolve their project).
      */
     private async resolveEnvironmentContext(context: HttpProtocolContext, path: string): Promise<void> {
-        // Skip environment resolution for control-plane routes.
-        // NOTE: /meta is intentionally not in this list anymore — a scoped
+        // Skip environment resolution for control-plane routes only.
+        // NOTE: /meta is intentionally not in this list — a scoped
         // /projects/:id/meta path still needs the project resolved so the
         // protocol can scope its answer.
-        const skipPaths = ['/auth', '/cloud', '/health', '/discovery'];
+        // NOTE: /auth was removed — per-project AuthPlugin needs the
+        // hostname-resolved projectId so the dispatcher kernel-swap routes
+        // to the project's auth manager (not the host's).
+        const skipPaths = ['/cloud', '/health', '/discovery'];
         if (skipPaths.some(p => path.startsWith(p))) {
             return;
         }

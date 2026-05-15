@@ -230,6 +230,16 @@ export function createDispatcherPlugin(config: DispatcherPluginConfig = {}): Plu
             });
 
             // ── Auth ────────────────────────────────────────────────────
+            // NOTE: /auth/* wildcard is mounted by AuthProxyPlugin (cloud)
+            // or AuthPlugin (single-tenant) directly on the raw Hono app —
+            // those handlers can return native Web `Response` objects which
+            // is what better-auth produces. The dispatcher cannot represent
+            // a streaming Response cleanly through `IHttpServer.send`, so
+            // we deliberately do NOT register a dispatcher wildcard here.
+            //
+            // Legacy explicit /auth/login retained for self-hosted clients
+            // that still POST there; superseded by the wildcard above for
+            // the better-auth surface (sign-up/email, sign-in/email, …).
             server.post(`${prefix}/auth/login`, async (req: any, res: any) => {
                 try {
                     const result = await dispatcher.handleAuth('login', 'POST', req.body, { request: req });

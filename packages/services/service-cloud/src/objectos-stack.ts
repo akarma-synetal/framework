@@ -26,6 +26,7 @@ import { KernelManager } from './kernel-manager.js';
 import { ArtifactApiClient } from './artifact-api-client.js';
 import { ArtifactEnvironmentRegistry } from './artifact-environment-registry.js';
 import { ArtifactKernelFactory } from './artifact-kernel-factory.js';
+import { AuthProxyPlugin } from './auth-proxy-plugin.js';
 
 export interface ObjectOSStackConfig {
     /** Control-plane base URL. Required. */
@@ -51,15 +52,24 @@ export interface ObjectOSStackResult {
 
 /**
  * Lazy-loaded host engine plugins. Mirrors the head of
- * `createControlPlanePlugins()` — ObjectQL + Driver + Metadata — but with
- * a transient in-memory driver instead of SQLite/Turso since the host
- * kernel never persists anything.
+ * `createControlPlanePlugins()` — ObjectQL + InMemory Driver + Metadata.
+ *
+ * The host kernel in objectos is a pure routing shell. Per-tenant auth +
+ * business data live in per-project kernels (each backed by the project's
+ * own Turso/Postgres DB), so there is nothing to persist on the host.
+ *
+ * AuthPlugin is intentionally NOT injected on the host (CLI's
+ * `serve.ts` auto-injection guard skips it when `OS_CLOUD_URL` is set).
+ * Identity is owned by `ArtifactKernelFactory` per project so that:
+ *   - users persist in the project's DB across container cold-starts
+ *   - cookies are scoped to the project's hostname (no `.<root>`-wide leak)
+ *   - tokens are signed with a per-project HKDF-derived secret
  */
 async function createHostEnginePlugins(): Promise<Plugin[]> {
     const { ObjectQLPlugin } = await import('@objectstack/objectql');
-    const { InMemoryDriver } = await import('@objectstack/driver-memory');
     const { DriverPlugin } = await import('@objectstack/runtime');
     const { MetadataPlugin } = await import('@objectstack/metadata');
+    const { InMemoryDriver } = await import('@objectstack/driver-memory');
 
     const driver = new InMemoryDriver();
     const driverName = 'memory';
@@ -195,7 +205,7 @@ export async function createObjectOSStack(config: ObjectOSStackConfig): Promise<
     const enginePlugins = await createHostEnginePlugins();
 
     return {
-        plugins: [...enginePlugins, new ObjectOSProjectPlugin(merged)],
+        plugins: [...enginePlugins, new ObjectOSProjectPlugin(merged), new AuthProxyPlugin()],
         api: {
             enableProjectScoping: true,
             projectResolution: 'auto',

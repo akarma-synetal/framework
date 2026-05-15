@@ -35,6 +35,17 @@ export interface AuthPluginOptions extends Partial<AuthConfig> {
    * @default '/api/v1/auth'
    */
   basePath?: string;
+
+  /**
+   * Override the datasource that owns the identity tables (sys_user,
+   * sys_session, …) when AuthPlugin's manifest is registered.
+   *
+   * Defaults to `'cloud'` (control-plane DB) so the historical
+   * single-tenant control-plane behaviour is preserved. Per-project
+   * kernels in objectos pass `'default'` so identity tables live in the
+   * project's own database — each project owns its own users.
+   */
+  manifestDatasource?: string;
 }
 
 /**
@@ -107,6 +118,9 @@ export class AuthPlugin implements Plugin {
 
     ctx.getService<{ register(m: any): void }>('manifest').register({
       ...authPluginManifestHeader,
+      ...(this.options.manifestDatasource
+        ? { defaultDatasource: this.options.manifestDatasource }
+        : {}),
       objects: authIdentityObjects,
       // The platform Setup App is a static metadata artifact (lives in
       // @objectstack/platform-objects/apps). plugin-auth is the natural

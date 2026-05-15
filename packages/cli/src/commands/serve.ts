@@ -591,7 +591,22 @@ export default class Serve extends Command {
             ?? process.env.OS_AUTH_SECRET
             ?? (isDev ? 'dev-only-insecure-secret-change-me-in-production' : undefined);
 
-          if (!secret) {
+          // Guard: in cloud-connected runtime mode (e.g. objectos worker)
+          // the host kernel is a pure routing shell. Auth is owned by each
+          // per-project kernel (`ArtifactKernelFactory` injects an
+          // `AuthPlugin` per project against the project's own DB so users
+          // persist and stay isolated per subdomain). Injecting a host-level
+          // AuthPlugin here would compete with the per-project one — its
+          // shared OS_AUTH_SECRET would erroneously validate cookies across
+          // unrelated projects. Refuse to inject in runtime mode.
+          const cloudUrl = process.env.OS_CLOUD_URL?.trim();
+          const isRuntimeMode = !!cloudUrl && cloudUrl.toLowerCase() !== 'local' && cloudUrl.toLowerCase() !== 'off';
+          if (isRuntimeMode) {
+            console.warn(chalk.yellow(
+              '  ⚠ AuthPlugin skipped on host kernel — runtime mode (OS_CLOUD_URL set).\n' +
+              '    Auth is owned per-project by ArtifactKernelFactory (see service-cloud).'
+            ));
+          } else if (!secret) {
             console.warn(chalk.yellow('  ⚠ AuthPlugin skipped — set AUTH_SECRET to enable authentication in production'));
           } else {
             const baseUrl = process.env.AUTH_BASE_URL
