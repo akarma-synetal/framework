@@ -276,6 +276,7 @@ export const SalesDashboard: Dashboard = {
         showRowTotals: true,
         showColumnTotals: true,
         format: '$,.0f',
+        drillDown: { enabled: true },
       },
     },
   ],

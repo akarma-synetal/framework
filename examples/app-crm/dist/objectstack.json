@@ -16099,7 +16099,10 @@
             "aggregation": "sum",
             "showRowTotals": true,
             "showColumnTotals": true,
-            "format": "$,.0f"
+            "format": "$,.0f",
+            "drillDown": {
+              "enabled": true
+            }
           }
         }
       ],
@@ -19984,7 +19987,8 @@
             "source": "daysFromNow(30)"
           },
           "type": "existing_business",
-          "forecast_category": "pipeline"
+          "forecast_category": "pipeline",
+          "lead_source": "web"
         },
         {
           "name": "Globex Manufacturing Suite",
@@ -19997,7 +20001,8 @@
             "source": "daysFromNow(60)"
           },
           "type": "new_business",
-          "forecast_category": "pipeline"
+          "forecast_category": "pipeline",
+          "lead_source": "referral"
         },
         {
           "name": "Wayne Enterprise License",
@@ -20010,7 +20015,8 @@
             "source": "daysFromNow(14)"
           },
           "type": "new_business",
-          "forecast_category": "commit"
+          "forecast_category": "commit",
+          "lead_source": "partner"
         },
         {
           "name": "Initech Cloud Migration",
@@ -20023,7 +20029,8 @@
             "source": "daysFromNow(45)"
           },
           "type": "existing_business",
-          "forecast_category": "best_case"
+          "forecast_category": "best_case",
+          "lead_source": "event"
         }
       ]
     },
