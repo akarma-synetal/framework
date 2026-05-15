@@ -90,6 +90,7 @@ function createTemplateSeeder(
     kernelManager: KernelManager,
     templates: Record<string, ProjectTemplate>,
     envRegistry: EnvironmentDriverRegistry,
+    publishCtx: { controlDriver: IDataDriver; getStorage: () => any | null; storageAdapter: string; keyPrefix: string },
 ): TemplateSeeder {
     const seedBundleForProject = async (projectId: string, bundle: any): Promise<void> => {
         const items = bundle ? extractMetadataItems(bundle) : [];
@@ -258,12 +259,48 @@ function createTemplateSeeder(
             await seedLoader.load({ datasets: dataSets, config });
         }
 
-        const driverWithFlush = (kernel as any).services?.driver ?? (kernel as any).getService?.('driver');
+        const driverWithFlush = await (kernel as any).getServiceAsync?.('driver').catch?.(() => null)
+            ?? (kernel as any).services?.driver
+            ?? null;
         const flushable = typeof driverWithFlush?.flush === 'function'
             ? driverWithFlush
             : null;
         if (flushable) {
             try { await flushable.flush(); } catch { /* best effort */ }
+        }
+
+        // Publish the seeded bundle as a sys_project_revision so the
+        // artifact API serves it to remote runtimes (objectos in cloud
+        // mode reads `GET /cloud/projects/:id/artifact`). Without this
+        // step, the seeded data only lives in this project's metadata
+        // DB on the cloud container's filesystem and is invisible to
+        // any other process.
+        try {
+            const storage = publishCtx.getStorage();
+            if (storage) {
+                const projectRow = await (publishCtx.controlDriver as any).findOne(
+                    'sys_project',
+                    { where: { id: projectId } },
+                );
+                if (projectRow) {
+                    const { publishProjectRevision } = await import('./cloud-artifact-helpers.js');
+                    await publishProjectRevision({
+                        driver: publishCtx.controlDriver,
+                        storage,
+                        storageAdapter: publishCtx.storageAdapter,
+                        keyPrefix: publishCtx.keyPrefix,
+                        project: { id: projectRow.id, organization_id: projectRow.organization_id },
+                        bundle,
+                        note: 'template-seed',
+                    });
+                }
+            }
+        } catch (err: any) {
+            // eslint-disable-next-line no-console
+            console.error(
+                `[MultiProjectPlugin] Failed to publish seeded artifact for project ${projectId}:`,
+                err?.stack ?? err?.message ?? err,
+            );
         }
     };
 
@@ -441,7 +478,26 @@ export class MultiProjectPlugin implements Plugin {
         });
         this.kernelManager = kernelManager;
 
-        const seeder = createTemplateSeeder(kernelManager, this.config.templates ?? {}, envRegistry);
+        const seeder = createTemplateSeeder(
+            kernelManager,
+            this.config.templates ?? {},
+            envRegistry,
+            {
+                controlDriver: this.config.controlDriver,
+                storageAdapter: (process.env.OS_STORAGE_ADAPTER ?? 'local').toLowerCase(),
+                keyPrefix: process.env.OS_STORAGE_KEY_PREFIX ?? 'artifacts',
+                getStorage: () => {
+                    // Resolve once-per-call so the storage plugin (registered
+                    // in parallel) is available even when MultiProjectPlugin
+                    // initialised first.
+                    try {
+                        const sync = (hostKernel as any).getService?.('file-storage');
+                        if (sync && typeof sync.upload === 'function') return sync;
+                    } catch { /* async-only — fall through */ }
+                    return null;
+                },
+            },
+        );
 
         ctx.registerService('env-registry', envRegistry);
         ctx.registerService('kernel-manager', kernelManager);

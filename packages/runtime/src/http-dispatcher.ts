@@ -1753,7 +1753,7 @@ export class HttpDispatcher {
                     try {
                         const orgRow = await findOne('sys_organization', { id: req.organization_id });
                         const orgSlug = orgRow?.slug || req.organization_id;
-                        const rootDomain = getEnv('ROOT_DOMAIN', 'objectstack.app');
+                        const rootDomain = getEnv('OS_ROOT_DOMAIN') ?? getEnv('ROOT_DOMAIN', 'objectstack.app');
                         computedHostname = `${orgSlug}-${shortId}.${rootDomain}`;
                     } catch {
                         // Fallback if sys_organization doesn't exist

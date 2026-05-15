@@ -100,7 +100,7 @@ export function hasConsoleDist(consolePath: string): boolean {
  *     a real 404 surfaces a rebuild/deploy mismatch instead of the
  *     dreaded "asset returns text/html" silent failure.
  */
-export function createConsoleStaticPlugin(distPath: string, options?: { isDev?: boolean }) {
+export function createConsoleStaticPlugin(distPath: string, options?: { isDev?: boolean; rootRedirect?: boolean }) {
   return {
     name: 'com.objectstack.console-static',
 
@@ -124,10 +124,13 @@ export function createConsoleStaticPlugin(distPath: string, options?: { isDev?: 
 
       const readIndexHtml = () => fs.readFileSync(indexPath, 'utf-8');
 
-      // In dev mode, the Console is the default UI surface — root `/`
-      // redirects here. Mirrors the convention Studio used to own; we now
-      // prefer the Console because it is the opinionated end-user surface.
-      if (options?.isDev) {
+      // The Console is the default end-user surface — root `/` redirects
+      // here whenever the Console is mounted (`rootRedirect !== false`).
+      // Mirrors the studio plugin's `rootRedirect` option. The CLI's
+      // serve.ts gates whether the Console mounts at all via `--no-console`
+      // / `OS_DISABLE_CONSOLE=1`; once mounted, claiming `/` is the
+      // intended behaviour in both dev and production deployments.
+      if (options?.rootRedirect !== false) {
         app.get('/', (c: any) => c.redirect(`${CONSOLE_PATH}/`));
       }
 

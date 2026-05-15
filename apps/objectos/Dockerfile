@@ -74,6 +74,8 @@ COPY package.json pnpm-workspace.yaml turbo.json tsconfig.json tsup.config.ts ./
 COPY packages ./packages
 COPY examples ./examples
 COPY apps/objectos ./apps/objectos
+COPY apps/console ./apps/console
+COPY apps/account ./apps/account
 
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --prefer-offline --prod=false

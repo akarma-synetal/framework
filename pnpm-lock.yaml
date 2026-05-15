@@ -465,9 +465,15 @@ importers:
       '@libsql/client':
         specifier: ^0.17.3
         version: 0.17.3
+      '@objectstack/account':
+        specifier: workspace:*
+        version: link:../account
       '@objectstack/cli':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@objectstack/console':
+        specifier: workspace:*
+        version: link:../console
       '@objectstack/driver-memory':
         specifier: workspace:*
         version: link:../../packages/plugins/driver-memory

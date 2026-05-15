@@ -210,6 +210,16 @@ export function createControlPlanePlugins(cfg: ControlPlanePresetConfig): any[] 
       if (isDev && !trustedOrigins.includes('http://localhost:*')) {
         trustedOrigins.push('http://localhost:*');
       }
+      // Per-project subdomains: when OS_ROOT_DOMAIN is set (multi-project
+      // hosting under `*.<root>`), every project hostname must be trusted
+      // by better-auth or sign-up/sign-in / cookie operations are blocked
+      // with "Invalid origin". The wildcard mirrors the OS_COOKIE_DOMAIN
+      // semantics — they are always set together.
+      const rootDomain = (process.env.OS_ROOT_DOMAIN ?? process.env.ROOT_DOMAIN)?.trim();
+      if (rootDomain) {
+        const wildcard = `https://*.${rootDomain}`;
+        if (!trustedOrigins.includes(wildcard)) trustedOrigins.push(wildcard);
+      }
 
       return new AuthPlugin({
         secret: cfg.authSecret,

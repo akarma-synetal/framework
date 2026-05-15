@@ -36,6 +36,7 @@ export interface Env {
     OS_BASE_URL?: string;
     OS_TRUSTED_ORIGINS?: string;
     OS_COOKIE_DOMAIN?: string;
+    OS_ROOT_DOMAIN?: string;
     GOOGLE_CLIENT_ID?: string;
     GOOGLE_CLIENT_SECRET?: string;
     GITHUB_CLIENT_ID?: string;
@@ -94,7 +95,7 @@ const FORWARDED_ENV_KEYS: readonly (keyof Env)[] = [
     // auth
     'AUTH_SECRET', 'OS_AUTH_SECRET',
     'AUTH_BASE_URL', 'OS_BASE_URL',
-    'OS_TRUSTED_ORIGINS', 'OS_COOKIE_DOMAIN',
+    'OS_TRUSTED_ORIGINS', 'OS_COOKIE_DOMAIN', 'OS_ROOT_DOMAIN',
     'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET',
     'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET',
     // cloud client
@@ -132,6 +133,49 @@ export class ObjectOSContainer extends Container<Env> {
     enableInternet = true;
     requiredPorts = [3000];
 
+    /**
+     * Cold start budget for the Node app to bind port 3000. The default
+     * in `@cloudflare/containers` is 20s which is not enough for a fresh
+     * boot that has to open a remote DB connection + run schema sync for
+     * every registered `sys_*` object. See apps/cloud/cloudflare/worker.ts
+     * for the full rationale — this is the same override.
+     */
+    private readonly PORT_READY_TIMEOUT_MS = 120_000;
+
+    override async startAndWaitForPorts(
+        portsOrArgs?: any,
+        cancellationOptions?: any,
+        startOptions?: any,
+    ): Promise<void> {
+        const TIMEOUT = this.PORT_READY_TIMEOUT_MS;
+        if (
+            portsOrArgs !== null &&
+            typeof portsOrArgs === 'object' &&
+            !Array.isArray(portsOrArgs) &&
+            ('ports' in portsOrArgs || 'cancellationOptions' in portsOrArgs || 'startOptions' in portsOrArgs)
+        ) {
+            const inner = { ...(portsOrArgs.cancellationOptions ?? {}) };
+            delete inner.abort;
+            const merged = {
+                ...portsOrArgs,
+                cancellationOptions: {
+                    portReadyTimeoutMS: TIMEOUT,
+                    instanceGetTimeoutMS: TIMEOUT,
+                    ...inner,
+                },
+            };
+            return super.startAndWaitForPorts(merged);
+        }
+        const inner = { ...(cancellationOptions ?? {}) };
+        delete inner.abort;
+        const merged = {
+            portReadyTimeoutMS: TIMEOUT,
+            instanceGetTimeoutMS: TIMEOUT,
+            ...inner,
+        };
+        return super.startAndWaitForPorts(portsOrArgs, merged, startOptions);
+    }
+
     envVars: Record<string, string> = {
         NODE_ENV: 'production',
         PORT: '3000',
@@ -139,6 +183,9 @@ export class ObjectOSContainer extends Container<Env> {
         OS_KERNEL_CACHE_SIZE: '50',
         OS_KERNEL_TTL_MS: '1800000',
         OS_ENV_CACHE_TTL_MS: '300000',
+        // Schema sync against a cold remote DB easily exceeds Workers'
+        // ~30s inbound budget; run migrations out of band before deploy.
+        OS_SKIP_SCHEMA_SYNC: '1',
     };
 
     constructor(state: DurableObjectState, env: Env) {

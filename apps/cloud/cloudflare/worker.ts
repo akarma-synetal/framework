@@ -42,6 +42,7 @@ export interface Env {
     OS_BASE_URL?: string;
     OS_TRUSTED_ORIGINS?: string;
     OS_COOKIE_DOMAIN?: string;
+    OS_ROOT_DOMAIN?: string;
     GOOGLE_CLIENT_ID?: string;
     GOOGLE_CLIENT_SECRET?: string;
     GITHUB_CLIENT_ID?: string;
@@ -126,6 +127,7 @@ const FORWARDED_ENV_KEYS: readonly (keyof Env)[] = [
     'OS_BASE_URL',
     'OS_TRUSTED_ORIGINS',
     'OS_COOKIE_DOMAIN',
+    'OS_ROOT_DOMAIN',
     'GOOGLE_CLIENT_ID',
     'GOOGLE_CLIENT_SECRET',
     'GITHUB_CLIENT_ID',
@@ -296,7 +298,7 @@ export class CloudContainer extends Container<Env> {
         // match the origin the browser hits, otherwise sign-up / OAuth
         // callbacks fail with "Invalid origin". Override per environment
         // via `wrangler secret put AUTH_BASE_URL` or [vars] in wrangler.toml.
-        AUTH_BASE_URL: 'https://objectstack-cloud.objectstack.workers.dev',
+        AUTH_BASE_URL: 'https://cloud.objectos.app',
         // Comma-separated extra origins to add to better-auth's trusted
         // list (custom domains, preview hosts, …). AUTH_BASE_URL is
         // already trusted automatically.

@@ -5,6 +5,9 @@
   "type": "module",
   "description": "ObjectStack Console - opinionated, fork-ready runtime console built on @object-ui/app-shell with the full plugin set wired up.",
   "license": "Apache-2.0",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
