@@ -28,10 +28,21 @@ export interface ControlPlanePresetConfig {
   authPlugins?: Record<string, unknown>;
 }
 
-/** Create a lazy-proxy plugin that defers its import to init(). */
-function lazyPlugin(name: string, factory: (ctx: any) => Promise<any>): any {
+/**
+ * Create a lazy-proxy plugin that defers its import to init().
+ *
+ * `startupTimeout` is set on the **wrapper** (not the inner plugin) so the
+ * kernel honours it during Phase 2 start. The kernel reads
+ * `plugin.startupTimeout` from the registered plugin object, but the inner
+ * implementation is not constructed until init() — by which time the
+ * registration is already locked in. Without forwarding the budget on the
+ * wrapper, heavy plugins like `ObjectQLPlugin` (which does N×CREATE TABLE
+ * round-trips against a remote DB) inherit the kernel's default 30s and
+ * time out on cold Neon/Turso boots.
+ */
+function lazyPlugin(name: string, factory: (ctx: any) => Promise<any>, opts?: { startupTimeout?: number }): any {
   let impl: any = null;
-  return {
+  const wrapper: any = {
     name,
     async init(ctx: any) {
       impl = await factory(ctx);
@@ -44,6 +55,10 @@ function lazyPlugin(name: string, factory: (ctx: any) => Promise<any>): any {
       if (impl?.stop) await impl.stop(ctx);
     },
   };
+  if (typeof opts?.startupTimeout === 'number' && opts.startupTimeout > 0) {
+    wrapper.startupTimeout = opts.startupTimeout;
+  }
+  return wrapper;
 }
 
 /**
@@ -67,11 +82,20 @@ export function createControlPlanePlugins(cfg: ControlPlanePresetConfig): any[] 
 
   return [
     // ── 1. ObjectQL ────────────────────────────────────────────────────────
+    // Migration mode (`OS_MIGRATE_AND_EXIT=1`) gets a 10-minute startup
+    // budget because schema sync from a developer laptop to a remote DB
+    // can be much slower than from a colocated container. Without this,
+    // operators in latency-disadvantaged regions (e.g. Asia → Neon US East
+    // at ~300ms RTT × 30 tables × 2 phases) hit the 120s kernel ceiling
+    // before all DDL completes. Production cold-boot still uses 120s.
     lazyPlugin('com.objectstack.engine.objectql', async () => {
       const { ObjectQLPlugin } = await import('@objectstack/objectql');
       const plugin = new ObjectQLPlugin();
       oqlRef.ql = (plugin as any).ql ?? plugin;
       return plugin;
+    }, {
+      startupTimeout:
+        process.env.OS_MIGRATE_AND_EXIT === '1' ? 600_000 : 120_000,
     }),
 
     // ── 2. Datasource mapping (no heavy deps) ─────────────────────────────

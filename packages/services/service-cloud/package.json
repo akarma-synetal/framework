@@ -40,6 +40,9 @@
     "zod": "^4.4.3",
     "@objectstack/service-storage": "workspace:*"
   },
+  "optionalDependencies": {
+    "pg": "^8.20.0"
+  },
   "devDependencies": {
     "@types/node": "^22.19.18",
     "tsup": "^8.5.1",
