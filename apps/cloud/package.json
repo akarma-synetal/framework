@@ -24,6 +24,7 @@
   "dependencies": {
     "@hono/node-server": "^2.0.2",
     "@libsql/client": "^0.17.3",
+    "@objectstack/account": "workspace:*",
     "@objectstack/cli": "workspace:*",
     "@objectstack/driver-memory": "workspace:*",
     "@objectstack/driver-sql": "workspace:*",
@@ -45,19 +46,18 @@
     "@objectstack/service-tenant": "workspace:*",
     "@objectstack/spec": "workspace:*",
     "@objectstack/studio": "workspace:*",
-    "@objectstack/account": "workspace:*",
     "hono": "^4.12.18",
     "pg": "^8.20.0"
   },
   "devDependencies": {
-    "@cloudflare/containers": "^0.3.3",
-    "@cloudflare/workers-types": "^4.20260510.1",
+    "@cloudflare/containers": "^0.3.4",
+    "@cloudflare/workers-types": "^4.20260515.1",
     "@types/pg": "^8.20.0",
     "esbuild": "^0.28.0",
     "ts-node": "^10.9.2",
     "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.0",
     "typescript": "^6.0.3",
-    "wrangler": "^4.90.0"
+    "wrangler": "^4.91.0"
   }
 }

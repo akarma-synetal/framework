@@ -39,7 +39,7 @@
     "topicSeparator": " "
   },
   "dependencies": {
-    "@ai-sdk/gateway": "^3.0.112",
+    "@ai-sdk/gateway": "^3.0.114",
     "@objectstack/client": "workspace:*",
     "@objectstack/core": "workspace:*",
     "@objectstack/driver-memory": "workspace:^",
@@ -66,25 +66,25 @@
     "@objectstack/service-realtime": "workspace:*",
     "@objectstack/service-storage": "workspace:*",
     "@objectstack/spec": "workspace:*",
-    "@oclif/core": "^4.11.1",
+    "@oclif/core": "^4.11.2",
     "bundle-require": "^5.1.0",
     "chalk": "^5.6.2",
     "dotenv-flow": "^4.1.0",
     "esbuild": "^0.28.0",
-    "tsx": "^4.21.0",
-    "yaml": "^2.8.4",
+    "tsx": "^4.22.0",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@objectstack/core": "workspace:^"
   },
   "devDependencies": {
-    "@oclif/plugin-help": "^6.2.46",
-    "@oclif/plugin-plugins": "^5.4.64",
-    "@types/node": "^25.6.2",
+    "@oclif/plugin-help": "^6.2.48",
+    "@oclif/plugin-plugins": "^5.4.67",
+    "@types/node": "^25.8.0",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.6"
   },
   "repository": {
     "type": "git",

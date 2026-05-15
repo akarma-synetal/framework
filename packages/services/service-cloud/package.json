@@ -35,19 +35,19 @@
     "@objectstack/plugin-security": "workspace:^",
     "@objectstack/runtime": "workspace:^",
     "@objectstack/service-package": "workspace:^",
+    "@objectstack/service-storage": "workspace:*",
     "@objectstack/service-tenant": "workspace:^",
     "@objectstack/spec": "workspace:^",
-    "zod": "^4.4.3",
-    "@objectstack/service-storage": "workspace:*"
+    "zod": "^4.4.3"
   },
   "optionalDependencies": {
     "pg": "^8.20.0"
   },
   "devDependencies": {
-    "@types/node": "^22.19.18",
+    "@types/node": "^22.19.19",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.6"
   },
   "publishConfig": {
     "access": "public"
