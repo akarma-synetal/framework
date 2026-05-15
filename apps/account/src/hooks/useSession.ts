@@ -57,6 +57,13 @@ export interface SessionState {
   setActiveOrganization: (organizationId: string) => Promise<void>;
   organizations: Organization[];
   organizationsLoading: boolean;
+  /**
+   * `true` once `organizations` has been fetched at least once for the
+   * current user. Useful for callers that need to distinguish "user has no
+   * orgs" from "we haven't asked the server yet" (e.g. the post-login
+   * redirect flow).
+   */
+  organizationsFetched: boolean;
   reloadOrganizations: () => Promise<void>;
 }
 
@@ -93,6 +100,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationsLoading, setOrganizationsLoading] = useState(false);
+  const [organizationsFetched, setOrganizationsFetched] = useState(false);
 
   const reloadOrganizations = useCallback(async () => {
     if (!client?.organizations) return;
@@ -104,6 +112,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setOrganizations([]);
     } finally {
       setOrganizationsLoading(false);
+      setOrganizationsFetched(true);
     }
   }, [client]);
 
@@ -134,6 +143,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       reloadOrganizations();
     } else {
       setOrganizations([]);
+      setOrganizationsFetched(false);
     }
   }, [user, reloadOrganizations]);
 
@@ -145,6 +155,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setSession(null);
       setOrganizations([]);
+      setOrganizationsFetched(false);
     }
   }, [client]);
 
@@ -168,6 +179,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setActiveOrganization,
       organizations,
       organizationsLoading,
+      organizationsFetched,
       reloadOrganizations,
     }),
     [
@@ -180,6 +192,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setActiveOrganization,
       organizations,
       organizationsLoading,
+      organizationsFetched,
       reloadOrganizations,
     ],
   );

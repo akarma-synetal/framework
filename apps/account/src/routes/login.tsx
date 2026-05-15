@@ -44,25 +44,69 @@ function LoginPage() {
   const navigate = useNavigate();
   const { redirect } = Route.useSearch();
   const client = useClient() as any;
-  const { session, user, refresh } = useSession();
+  const {
+    session,
+    user,
+    refresh,
+    organizations,
+    organizationsLoading,
+    organizationsFetched,
+    setActiveOrganization,
+  } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [autoSelectingOrg, setAutoSelectingOrg] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    if (isSafeRedirect(redirect)) {
-      window.location.assign(resolveRedirect(redirect));
+
+    // If the user has organizations but no active one, auto-select the first
+    // org before navigating away. Otherwise consumers like the Console's
+    // `RequireOrganization` guard would bounce the user from the redirect
+    // target (e.g. `/_console/home`) to `/_console/organizations`, making
+    // the post-login redirect look like a back-and-forth jump.
+    if (!session?.activeOrganizationId) {
+      // Wait for the org list to be fetched at least once before deciding.
+      if (!organizationsFetched || organizationsLoading || autoSelectingOrg) return;
+      if (organizations.length === 1) {
+        setAutoSelectingOrg(true);
+        setActiveOrganization(organizations[0].id)
+          .catch(() => undefined)
+          .finally(() => setAutoSelectingOrg(false));
+        return;
+      }
+      if (organizations.length === 0) {
+        // Brand-new account with no org yet — send to the org creation flow
+        // instead of the org picker (which would be empty).
+        navigate({ to: '/organizations/new' });
+        return;
+      }
+      // Multiple orgs and no active selection — let the user choose.
+      navigate({ to: '/organizations' });
       return;
     }
-    if (!session?.activeOrganizationId) {
-      navigate({ to: '/organizations' });
+
+    if (autoSelectingOrg) return;
+
+    if (isSafeRedirect(redirect)) {
+      window.location.assign(resolveRedirect(redirect));
       return;
     }
     // Default landing after sign-in: the platform home, not the Account
     // profile page. Users can reach `/account` from the top-bar menu.
     window.location.assign('/');
-  }, [user, session, navigate, redirect]);
+  }, [
+    user,
+    session,
+    navigate,
+    redirect,
+    organizations,
+    organizationsLoading,
+    organizationsFetched,
+    autoSelectingOrg,
+    setActiveOrganization,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

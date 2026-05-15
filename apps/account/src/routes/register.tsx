@@ -36,27 +36,67 @@ function RegisterPage() {
   const navigate = useNavigate();
   const { redirect } = Route.useSearch();
   const client = useClient() as any;
-  const { session, user, refresh } = useSession();
+  const {
+    session,
+    user,
+    refresh,
+    organizations,
+    organizationsLoading,
+    organizationsFetched,
+    setActiveOrganization,
+  } = useSession();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [autoSelectingOrg, setAutoSelectingOrg] = useState(false);
 
   useEffect(() => {
     if (!user) return;
+
+    // If the freshly-signed-up user already has organizations (the auth
+    // plugin auto-provisions a personal workspace, or they accepted an
+    // invitation), make sure one is active before navigating away. Without
+    // this the redirect target's `RequireOrganization` guard would bounce
+    // the user to `/_console/organizations`.
+    if (!session?.activeOrganizationId) {
+      // Wait until the org list has been fetched at least once before
+      // deciding — otherwise we'd race the post-signup org provisioning.
+      if (!organizationsFetched || organizationsLoading || autoSelectingOrg) return;
+      if (organizations.length === 1) {
+        setAutoSelectingOrg(true);
+        setActiveOrganization(organizations[0].id)
+          .catch(() => undefined)
+          .finally(() => setAutoSelectingOrg(false));
+        return;
+      }
+      if (organizations.length > 1) {
+        navigate({ to: '/organizations' });
+        return;
+      }
+      // No orgs at all — the user needs to create one.
+      navigate({ to: '/organizations/new' });
+      return;
+    }
+
+    if (autoSelectingOrg) return;
+
     if (isSafeRedirect(redirect)) {
       window.location.assign(resolveRedirect(redirect));
       return;
     }
-    // If the user already has an org (e.g. signed up via an invitation),
-    // hand off to the platform home. Otherwise, send them to the org
-    // creation page — they need an org before they can use the product.
-    if (session?.activeOrganizationId) {
-      window.location.assign('/');
-      return;
-    }
-    navigate({ to: '/organizations/new' });
-  }, [user, session, navigate, redirect]);
+    window.location.assign('/');
+  }, [
+    user,
+    session,
+    navigate,
+    redirect,
+    organizations,
+    organizationsLoading,
+    organizationsFetched,
+    autoSelectingOrg,
+    setActiveOrganization,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -90,7 +90,7 @@ function createTemplateSeeder(
     kernelManager: KernelManager,
     templates: Record<string, ProjectTemplate>,
     envRegistry: EnvironmentDriverRegistry,
-    publishCtx: { controlDriver: IDataDriver; getStorage: () => any | null; storageAdapter: string; keyPrefix: string },
+    publishCtx: { controlDriver: IDataDriver; getStorage: () => any | Promise<any> | null; storageAdapter: string; keyPrefix: string },
 ): TemplateSeeder {
     const seedBundleForProject = async (projectId: string, bundle: any): Promise<void> => {
         const items = bundle ? extractMetadataItems(bundle) : [];
@@ -275,14 +275,32 @@ function createTemplateSeeder(
         // step, the seeded data only lives in this project's metadata
         // DB on the cloud container's filesystem and is invisible to
         // any other process.
+        let publishStatus: { stage: string; ok: boolean; error?: string; detail?: any } = {
+            stage: 'start', ok: false,
+        };
         try {
-            const storage = publishCtx.getStorage();
-            if (storage) {
+            const storage = await Promise.resolve(publishCtx.getStorage());
+            publishStatus.stage = 'getStorage';
+            publishStatus.detail = {
+                hasStorage: !!storage,
+                storageType: storage ? (storage.constructor?.name ?? typeof storage) : 'null',
+                bundleHasObjects: Array.isArray(bundle?.objects) ? bundle.objects.length : 0,
+                bundleHasApps: Array.isArray(bundle?.apps) ? bundle.apps.length : 0,
+                bundleHasViews: Array.isArray(bundle?.views) ? bundle.views.length : 0,
+            };
+            if (!storage) {
+                publishStatus.error = 'no-file-storage-service';
+                console.warn(
+                    `[MultiProjectPlugin] No file-storage service registered; skipping artifact publish for project ${projectId}.`,
+                );
+            } else {
+                publishStatus.stage = 'findProject';
                 const projectRow = await (publishCtx.controlDriver as any).findOne(
                     'sys_project',
                     { where: { id: projectId } },
                 );
                 if (projectRow) {
+                    publishStatus.stage = 'publishProjectRevision';
                     const { publishProjectRevision } = await import('./cloud-artifact-helpers.js');
                     await publishProjectRevision({
                         driver: publishCtx.controlDriver,
@@ -293,15 +311,34 @@ function createTemplateSeeder(
                         bundle,
                         note: 'template-seed',
                     });
+                    publishStatus.ok = true;
+                    publishStatus.stage = 'done';
+                    console.log(`[MultiProjectPlugin] Published artifact bundle for project ${projectId}`);
+                } else {
+                    publishStatus.error = 'project-not-found';
                 }
             }
         } catch (err: any) {
-            // eslint-disable-next-line no-console
+            publishStatus.error = err?.message ?? String(err);
+            publishStatus.detail = { ...(publishStatus.detail ?? {}), stack: err?.stack };
             console.error(
                 `[MultiProjectPlugin] Failed to publish seeded artifact for project ${projectId}:`,
                 err?.stack ?? err?.message ?? err,
             );
         }
+        // Persist publish diagnostic into sys_project.metadata.publishStatus so
+        // operators can see why publish skipped without container logs.
+        try {
+            const cur = await (publishCtx.controlDriver as any).findOne('sys_project', { where: { id: projectId } });
+            const meta = cur && typeof cur.metadata === 'string'
+                ? JSON.parse(cur.metadata)
+                : (cur?.metadata ?? {});
+            await (publishCtx.controlDriver as any).update(
+                'sys_project',
+                { where: { id: projectId } },
+                { metadata: JSON.stringify({ ...meta, publishStatus, publishStatusAt: new Date().toISOString() }) },
+            );
+        } catch { /* best-effort diagnostic */ }
     };
 
     return {
@@ -486,14 +523,20 @@ export class MultiProjectPlugin implements Plugin {
                 controlDriver: this.config.controlDriver,
                 storageAdapter: (process.env.OS_STORAGE_ADAPTER ?? 'local').toLowerCase(),
                 keyPrefix: process.env.OS_STORAGE_KEY_PREFIX ?? 'artifacts',
-                getStorage: () => {
+                getStorage: async () => {
                     // Resolve once-per-call so the storage plugin (registered
                     // in parallel) is available even when MultiProjectPlugin
-                    // initialised first.
+                    // initialised first. Try sync getService first; fall back
+                    // to async getServiceAsync (StorageServicePlugin may register
+                    // via async lifecycle on cold start).
                     try {
                         const sync = (hostKernel as any).getService?.('file-storage');
                         if (sync && typeof sync.upload === 'function') return sync;
-                    } catch { /* async-only — fall through */ }
+                    } catch { /* fall through */ }
+                    try {
+                        const async = await (hostKernel as any).getServiceAsync?.('file-storage');
+                        if (async && typeof async.upload === 'function') return async;
+                    } catch { /* not registered yet */ }
                     return null;
                 },
             },
