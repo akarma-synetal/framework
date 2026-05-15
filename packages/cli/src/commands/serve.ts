@@ -100,6 +100,15 @@ export default class Serve extends Command {
   async run(): Promise<void> {
     const { args, flags } = await this.parse(Serve);
 
+    // When --dev is passed, set NODE_ENV early so any runtime modules
+    // imported below (and any deps that branch on NODE_ENV at import
+    // time) see development mode. We deliberately do NOT inherit
+    // NODE_ENV from the parent `os dev` spawn — see the note in
+    // commands/dev.ts for why.
+    if (flags.dev && !process.env.NODE_ENV) {
+      process.env.NODE_ENV = 'development';
+    }
+
     let port = parseInt(flags.port);
     try {
       const availablePort = await getAvailablePort(port);

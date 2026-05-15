@@ -34,6 +34,9 @@ export interface Env {
     OS_CONTROL_PG_POOL_MAX?: string;
     TURSO_DATABASE_URL?: string;
     TURSO_AUTH_TOKEN?: string;
+    // Used by ProjectProvisioning's Turso adapter to create per-project DBs.
+    TURSO_API_TOKEN?: string;
+    TURSO_ORG_NAME?: string;
 
     // — Auth (better-auth) —
     AUTH_SECRET?: string;
@@ -120,6 +123,8 @@ const FORWARDED_ENV_KEYS: readonly (keyof Env)[] = [
     'OS_CONTROL_PG_POOL_MAX',
     'TURSO_DATABASE_URL',
     'TURSO_AUTH_TOKEN',
+    'TURSO_API_TOKEN',
+    'TURSO_ORG_NAME',
     // auth
     'AUTH_SECRET',
     'OS_AUTH_SECRET',

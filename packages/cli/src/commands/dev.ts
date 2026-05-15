@@ -107,9 +107,17 @@ export default class Dev extends Command {
       printStep('Starting dev server (local mode)...');
 
       const projectId = flags['project-id'] ?? process.env.OS_PROJECT_ID ?? 'proj_local';
+      // NOTE: Do NOT set NODE_ENV='development' here. Oclif's tsx-based
+      // TypeScript source loader (activated when NODE_ENV is 'test' or
+      // 'development') currently mis-handles `.json` requires inside
+      // CommonJS deps (e.g. dotenv's `require('../package.json')` is
+      // transformed as JS, then JSON.parse fails) — which causes the
+      // child process to report `command serve not found`. The `--dev`
+      // flag below already opts the serve command into dev semantics,
+      // and serve.ts will set NODE_ENV='development' internally before
+      // any runtime modules are imported.
       const localEnv: NodeJS.ProcessEnv = {
         ...process.env,
-        NODE_ENV: 'development',
         OS_PROJECT_ID: projectId,
         OS_ARTIFACT_PATH: artifactPath,
         ...(flags.database ? { OS_DATABASE_URL: flags.database } : {}),
