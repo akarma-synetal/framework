@@ -24,17 +24,18 @@ fi
 : "${CF_IMAGE_TAG:=$(cd "$REPO_ROOT" && git rev-parse --short HEAD 2>/dev/null || echo latest)}"
 : "${CF_PLATFORM:=linux/amd64}"
 
-SKIP_BUILD=0; SKIP_PUSH=0; SKIP_DEPLOY=0; DRY_RUN=0
+SKIP_BUILD=0; SKIP_PUSH=0; SKIP_DEPLOY=0; SKIP_MIGRATE=0; DRY_RUN=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --) shift ;;
-    --skip-build)  SKIP_BUILD=1; shift ;;
-    --skip-push)   SKIP_PUSH=1; shift ;;
-    --skip-deploy) SKIP_DEPLOY=1; shift ;;
-    --dry-run)     DRY_RUN=1; shift ;;
-    --tag)         CF_IMAGE_TAG="$2"; shift 2 ;;
-    --tag=*)       CF_IMAGE_TAG="${1#--tag=}"; shift ;;
-    -h|--help)     grep -E '^#( |$)' "$0" | sed -E 's/^# ?//'; exit 0 ;;
+    --skip-build)   SKIP_BUILD=1; shift ;;
+    --skip-push)    SKIP_PUSH=1; shift ;;
+    --skip-deploy)  SKIP_DEPLOY=1; shift ;;
+    --skip-migrate) SKIP_MIGRATE=1; shift ;;
+    --dry-run)      DRY_RUN=1; shift ;;
+    --tag)          CF_IMAGE_TAG="$2"; shift 2 ;;
+    --tag=*)        CF_IMAGE_TAG="${1#--tag=}"; shift ;;
+    -h|--help)      grep -E '^#( |$)' "$0" | sed -E 's/^# ?//'; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -81,7 +82,7 @@ run() { if [[ $DRY_RUN -eq 1 ]]; then echo "[dry-run] $*"; else "$@"; fi; }
 
 if [[ $SKIP_BUILD -eq 0 ]]; then
   echo ""
-  echo "▶ [1/3] docker buildx build"
+  echo "▶ [1/4] docker buildx build"
   command -v docker >/dev/null || { echo "✗ docker not installed" >&2; exit 1; }
   run docker buildx build \
     --platform "$CF_PLATFORM" \
@@ -92,12 +93,52 @@ if [[ $SKIP_BUILD -eq 0 ]]; then
     --load \
     "$REPO_ROOT"
 else
-  echo "▶ [1/3] skipped (--skip-build)"
+  echo "▶ [1/4] skipped (--skip-build)"
+fi
+
+# ─────────────────────────────────────────────────────────────────────
+# Migration step (out-of-band schema sync against the production DB).
+#
+# Runs the kernel locally with OS_MIGRATE_AND_EXIT=1 so the
+# ObjectQLPlugin.start() schema sync runs ONCE against Neon/Turso
+# from the deploy machine (which has no 30s wallclock budget). The
+# container then ships with OS_SKIP_SCHEMA_SYNC=1 baked in (see
+# cloudflare/worker.ts) and skips DDL on every cold boot.
+#
+# Without this, the container is killed mid-DDL on every cold start
+# because Cloudflare Workers' inbound-request budget (~30s) is shorter
+# than a fresh remote-DB schema sync (~30–60s for ~30 sys_* tables).
+#
+# Requires the prebuilt config (apps/cloud/dist/objectstack.config.js)
+# — the build step above produces it inside the Docker image, so we
+# trigger a host-side build if needed.
+# ─────────────────────────────────────────────────────────────────────
+if [[ $SKIP_MIGRATE -eq 0 && $SKIP_PUSH -eq 0 ]]; then
+  echo ""
+  echo "▶ [2/4] schema migration (OS_SKIP_SCHEMA_SYNC=0, OS_MIGRATE_AND_EXIT=1)"
+  if [[ ! -f "$APP_DIR/dist/objectstack.config.js" ]]; then
+    echo "  · dist/ not found — building host-side first"
+    run pnpm --dir "$APP_DIR" build
+  fi
+  if [[ $DRY_RUN -eq 1 ]]; then
+    echo "[dry-run] pnpm --dir $APP_DIR migrate"
+  else
+    if ! pnpm --dir "$APP_DIR" migrate; then
+      echo "" >&2
+      echo "✗ schema migration failed." >&2
+      echo "  Check OS_DATABASE_URL in $APP_DIR/.env.cloudflare.secrets and" >&2
+      echo "  re-run \`pnpm --dir $APP_DIR migrate\` with DEBUG=* for details." >&2
+      echo "  Pass --skip-migrate if you've already migrated separately." >&2
+      exit 1
+    fi
+  fi
+else
+  echo "▶ [2/4] skipped ($([[ $SKIP_MIGRATE -eq 1 ]] && echo --skip-migrate || echo --skip-push))"
 fi
 
 if [[ $SKIP_PUSH -eq 0 ]]; then
   echo ""
-  echo "▶ [2/3] wrangler containers push"
+  echo "▶ [3/4] wrangler containers push"
   if [[ $DRY_RUN -eq 1 ]]; then
     echo "[dry-run] npx --yes wrangler containers push $IMAGE"
   else
@@ -116,12 +157,12 @@ if [[ $SKIP_PUSH -eq 0 ]]; then
     fi
   fi
 else
-  echo "▶ [2/3] skipped (--skip-push)"
+  echo "▶ [3/4] skipped (--skip-push)"
 fi
 
 if [[ $SKIP_DEPLOY -eq 0 ]]; then
   echo ""
-  echo "▶ [3/3] update wrangler.toml image → $IMAGE"
+  echo "▶ [4/4] update wrangler.toml image → $IMAGE"
   if [[ $DRY_RUN -eq 0 ]]; then
     if [[ "$OSTYPE" == "darwin"* ]]; then
       sed -i '' -E "s|^image = \".*\"|image = \"$IMAGE\"|" "$WRANGLER_TOML"
@@ -133,7 +174,7 @@ if [[ $SKIP_DEPLOY -eq 0 ]]; then
   echo "▶ wrangler deploy"
   run npx --yes wrangler deploy --config "$WRANGLER_TOML"
 else
-  echo "▶ [3/3] skipped (--skip-deploy)"
+  echo "▶ [4/4] skipped (--skip-deploy)"
 fi
 
 echo ""

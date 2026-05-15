@@ -976,6 +976,24 @@ export default class Serve extends Command {
       await new Promise(r => setTimeout(r, 100));
       restoreOutput();
 
+      // ── Migrate-and-exit short-circuit ─────────────────────────────
+      // Out-of-band migration mode: the caller (e.g.
+      // `apps/cloud/scripts/migrate.ts`) just wants the kernel
+      // bootstrap (ObjectQLPlugin → schema sync → metadata hydration)
+      // to run once against the configured database, then exit. The
+      // HTTP server has already bound `port` at this point but we
+      // never accept a request — shutdown immediately so the deploy
+      // pipeline can move on.
+      if (process.env.OS_MIGRATE_AND_EXIT === '1') {
+        console.log(chalk.green(`✓ Migration complete (${loadedPlugins.length} plugins started against ${redactDbUrl(resolvedDatabaseUrl) || 'configured DB'})`));
+        try {
+          await kernel.shutdown();
+        } catch (err: any) {
+          console.warn(chalk.yellow(`  ⚠ shutdown warning: ${err?.message ?? err}`));
+        }
+        process.exit(0);
+      }
+
       // ── Driver introspection ──────────────────────────────────────
       // When the driver was registered by an app preset / per-project
       // factory (ProjectKernelFactory) instead of serve.ts's own

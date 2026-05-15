@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "objectstack test",
     "test:production-flow": "tsx test/production-flow.test.ts",
+    "migrate": "tsx scripts/migrate.ts",
     "cf:build": "bash scripts/deploy-cloudflare.sh --skip-push --skip-deploy",
     "cf:push": "bash scripts/deploy-cloudflare.sh --skip-build --skip-deploy",
     "cf:deploy": "bash scripts/deploy-cloudflare.sh",

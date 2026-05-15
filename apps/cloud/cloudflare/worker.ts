@@ -62,6 +62,7 @@ export interface Env {
     OS_DATA_DIR?: string;
     OS_PROVISION_SYNC?: string;
     OS_EAGER_SCHEMAS?: string;
+    OS_SKIP_SCHEMA_SYNC?: string;
 
     // — Storage (S3/R2) —
     OS_STORAGE_ADAPTER?: string;
@@ -143,6 +144,7 @@ const FORWARDED_ENV_KEYS: readonly (keyof Env)[] = [
     'OS_DATA_DIR',
     'OS_PROVISION_SYNC',
     'OS_EAGER_SCHEMAS',
+    'OS_SKIP_SCHEMA_SYNC',
     // storage
     'OS_STORAGE_ADAPTER',
     'OS_STORAGE_LOCAL_DIR',
@@ -279,6 +281,17 @@ export class CloudContainer extends Container<Env> {
         OS_KERNEL_CACHE_SIZE: '50',
         OS_KERNEL_TTL_MS: '1800000',
         OS_ENV_CACHE_TTL_MS: '300000',
+        // Cold-start optimization: schema sync (one round-trip per
+        // sys_* table on a remote Postgres) routinely runs ~30–60s
+        // against a cold Neon DB, which exceeds Cloudflare Workers'
+        // inbound-request budget (~30s). The container can never
+        // finish booting on a fresh request because the platform
+        // tears down the in-flight DO invocation when the inbound
+        // request expires. Move DDL out-of-band: run
+        // `pnpm --filter @objectstack/cloud migrate` against the
+        // production DB before deploying the image, then let the
+        // container assume the schema is already there.
+        OS_SKIP_SCHEMA_SYNC: '1',
         // Public URL the better-auth instance issues redirects from. MUST
         // match the origin the browser hits, otherwise sign-up / OAuth
         // callbacks fail with "Invalid origin". Override per environment

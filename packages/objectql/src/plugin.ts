@@ -52,6 +52,23 @@ export interface ObjectQLPluginOptions {
    * default 30s easily, even though everything is healthy.
    */
   startupTimeout?: number;
+  /**
+   * Skip both `syncRegisteredSchemas()` calls inside `start()` and
+   * assume DDL is managed out-of-band (e.g. an `apps/cloud/scripts/migrate.ts`
+   * run before deploy that connects directly to the database and creates
+   * all `sys_*` + custom tables once).
+   *
+   * Use this on cold-start-sensitive runtimes (Cloudflare Containers,
+   * Lambda) where the platform's inbound-request budget is shorter than
+   * a fresh remote-DB schema sync. The plugin still hydrates the
+   * SchemaRegistry from `sys_metadata` (Phase 2), so custom user
+   * objects come up — they just aren't re-DDL'd on every cold boot.
+   *
+   * Falls back to `process.env.OS_SKIP_SCHEMA_SYNC === '1'` when the
+   * option is unset, so containers can flip it via their env without a
+   * code change.
+   */
+  skipSchemaSync?: boolean;
 }
 
 export class ObjectQLPlugin implements Plugin {
@@ -68,6 +85,7 @@ export class ObjectQLPlugin implements Plugin {
   private ql: ObjectQL | undefined;
   private hostContext?: Record<string, any>;
   private projectId?: string;
+  private skipSchemaSync = false;
 
   constructor(qlOrOptions?: ObjectQL | ObjectQLPluginOptions, hostContext?: Record<string, any>) {
     // Back-compat: legacy callers passed `(ObjectQL, hostContext)` positionally.
@@ -86,6 +104,10 @@ export class ObjectQLPlugin implements Plugin {
     if (typeof opts.startupTimeout === 'number' && opts.startupTimeout > 0) {
       this.startupTimeout = opts.startupTimeout;
     }
+    this.skipSchemaSync =
+      typeof opts.skipSchemaSync === 'boolean'
+        ? opts.skipSchemaSync
+        : process.env.OS_SKIP_SCHEMA_SYNC === '1';
   }
 
   init = async (ctx: PluginContext) => {
@@ -182,7 +204,18 @@ export class ObjectQLPlugin implements Plugin {
     await this.ql?.init();
 
     // Phase 1: Sync built-in schemas so sys_metadata table exists before reading it.
-    await this.syncRegisteredSchemas(ctx);
+    //
+    // Cold-start-sensitive runtimes (Cloudflare Containers, Lambda) can
+    // opt out via `skipSchemaSync` / `OS_SKIP_SCHEMA_SYNC=1`. In that
+    // mode an out-of-band migration must have already created every
+    // table; we only assume the DDL is in place and skip straight to
+    // hydration. This avoids one round-trip per table × N objects on
+    // every cold boot.
+    if (this.skipSchemaSync) {
+      ctx.logger.info('Skipping schema sync (OS_SKIP_SCHEMA_SYNC=1) — assuming DDL is managed out-of-band');
+    } else {
+      await this.syncRegisteredSchemas(ctx);
+    }
 
     // Phase 2: Hydrate SchemaRegistry from sys_metadata (loads custom/template objects).
     // Project kernels (projectId set) never persist sys_metadata locally —
@@ -197,7 +230,9 @@ export class ObjectQLPlugin implements Plugin {
 
     // Phase 3: Sync any new schemas that were just hydrated from the DB
     // (e.g. CRM objects seeded via template — they must have tables before use).
-    await this.syncRegisteredSchemas(ctx);
+    if (!this.skipSchemaSync) {
+      await this.syncRegisteredSchemas(ctx);
+    }
 
     // Bridge all SchemaRegistry objects to metadata service.
     //
