@@ -227,6 +227,18 @@ export class CloudContainer extends Container<Env> {
         // Two call shapes: (ports, cancellationOptions, startOptions)
         // and ({ ports, cancellationOptions, startOptions }). Inject our
         // default timeout and strip the inbound abort signal.
+        //
+        // Why both `portReadyTimeoutMS` and `instanceGetTimeoutMS`:
+        //   - `instanceGetTimeoutMS` (default 8s) bounds the inner
+        //     `startContainerIfNotRunning` loop that asks the CF
+        //     control plane to provision an instance. On a cold first
+        //     deploy that 8s is occasionally too tight.
+        //   - `portReadyTimeoutMS` (default 20s) bounds the subsequent
+        //     `waitForPort` loop after the instance is up. We need
+        //     both because the second budget is computed as
+        //     `portReadyTimeout - triesUsed` and any time spent
+        //     getting the instance is deducted.
+        const TIMEOUT = this.PORT_READY_TIMEOUT_MS;
         if (
             portsOrArgs !== null &&
             typeof portsOrArgs === 'object' &&
@@ -238,7 +250,8 @@ export class CloudContainer extends Container<Env> {
             const merged = {
                 ...portsOrArgs,
                 cancellationOptions: {
-                    portReadyTimeoutMS: this.PORT_READY_TIMEOUT_MS,
+                    portReadyTimeoutMS: TIMEOUT,
+                    instanceGetTimeoutMS: TIMEOUT,
                     ...inner,
                 },
             };
@@ -247,7 +260,8 @@ export class CloudContainer extends Container<Env> {
         const inner = { ...(cancellationOptions ?? {}) };
         delete inner.abort;
         const merged = {
-            portReadyTimeoutMS: this.PORT_READY_TIMEOUT_MS,
+            portReadyTimeoutMS: TIMEOUT,
+            instanceGetTimeoutMS: TIMEOUT,
             ...inner,
         };
         return super.startAndWaitForPorts(portsOrArgs, merged, startOptions);
