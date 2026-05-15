@@ -50,18 +50,47 @@ if [[ ! -f "$SECRETS_FILE" ]]; then
   exit 1
 fi
 
-set -a; source "$SECRETS_FILE"; set +a
+# Parse KEY=VALUE lines manually instead of `set -a; source`.
+# Why: `source` runs the file as bash, so values containing shell
+# metachars (& ; $ < > |) silently break — e.g. a Postgres URL with
+# `?sslmode=require&channel_binding=require` would have everything
+# after the `&` treated as a background command and the variable would
+# be set to the truncated prefix (or empty). Manual parsing reads the
+# raw bytes and supports optional surrounding single/double quotes.
+#
+# Note: macOS ships bash 3.2 which lacks associative arrays, so we
+# extract one key at a time on demand rather than building a map.
+read_secret() {
+  local target="$1"
+  local line key value
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    line="${line#export }"
+    [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || continue
+    key="${BASH_REMATCH[1]}"
+    [[ "$key" != "$target" ]] && continue
+    value="${BASH_REMATCH[2]}"
+    if   [[ "$value" =~ ^\"(.*)\"$ ]]; then value="${BASH_REMATCH[1]}"
+    elif [[ "$value" =~ ^\'(.*)\'$ ]]; then value="${BASH_REMATCH[1]}"
+    fi
+    value="${value%$'\r'}"
+    printf '%s' "$value"
+    return 0
+  done < "$SECRETS_FILE"
+  return 0
+}
 
 echo "→ pushing secrets to Worker defined in $WRANGLER_TOML"
 PUSHED=0; SKIPPED=0
 for key in "${KEYS[@]}"; do
-  value="${!key:-}"
+  value="$(read_secret "$key")"
   if [[ -z "$value" ]]; then
     echo "  · $key (skipped — not set)"
     SKIPPED=$((SKIPPED+1))
     continue
   fi
-  echo "  ✓ $key"
+  echo "  ✓ $key (${#value} chars)"
   printf '%s' "$value" | npx --yes wrangler secret put "$key" \
     --config "$WRANGLER_TOML" >/dev/null
   PUSHED=$((PUSHED+1))
