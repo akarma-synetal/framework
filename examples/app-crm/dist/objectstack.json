@@ -14878,8 +14878,6 @@
           },
           "options": {
             "icon": "DollarSign",
-            "format": "$0,0",
-            "prefix": "$",
             "trend": {
               "value": 12.5,
               "direction": "up",
@@ -14976,8 +14974,6 @@
           },
           "options": {
             "icon": "bar-chart",
-            "format": "$0,0",
-            "prefix": "$",
             "trend": {
               "value": 1.2,
               "direction": "up",
@@ -15172,8 +15168,7 @@
               },
               {
                 "header": "Amount",
-                "accessorKey": "amount",
-                "format": "$0,0"
+                "accessorKey": "amount"
               },
               {
                 "header": "Stage",
@@ -15279,8 +15274,6 @@
           },
           "options": {
             "icon": "DollarSign",
-            "format": "$0,0",
-            "prefix": "$",
             "trend": {
               "value": 12.5,
               "direction": "up",
@@ -15576,8 +15569,7 @@
               },
               {
                 "header": "Annual Revenue",
-                "accessorKey": "annual_revenue",
-                "format": "$0,0"
+                "accessorKey": "annual_revenue"
               },
               {
                 "header": "Type",

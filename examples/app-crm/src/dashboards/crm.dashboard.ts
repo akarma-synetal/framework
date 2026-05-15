@@ -68,7 +68,6 @@ export const CrmOverviewDashboard: Dashboard = {
       layout: { x: 0, y: 0, w: 3, h: 2 },
       options: {
         icon: 'DollarSign',
-        format: '$0,0',
         trend: { value: 12.5, direction: 'up', label: 'vs last month' },
       },
     },
@@ -127,7 +126,6 @@ export const CrmOverviewDashboard: Dashboard = {
       layout: { x: 9, y: 0, w: 3, h: 2 },
       options: {
         icon: 'bar-chart',
-        format: '$0,0',
         trend: { value: 1.2, direction: 'up', label: 'vs last month' },
       },
     },
@@ -230,7 +228,7 @@ export const CrmOverviewDashboard: Dashboard = {
         columns: [
           { header: 'Opportunity', accessorKey: 'name' },
           { header: 'Account',     accessorKey: 'account' },
-          { header: 'Amount',      accessorKey: 'amount', format: '$0,0' },
+          { header: 'Amount',      accessorKey: 'amount' },
           { header: 'Stage',       accessorKey: 'stage' },
           { header: 'Probability', accessorKey: 'probability', format: '0%' },
           { header: 'Close Date',  accessorKey: 'close_date', format: 'MMM D, YYYY' },

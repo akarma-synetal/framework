@@ -78,7 +78,6 @@ export const ExecutiveDashboard: Dashboard = {
       layout: { x: 0, y: 0, w: 3, h: 2 },
       options: {
         icon: 'DollarSign',
-        format: '$0,0',
         trend: { value: 12.5, direction: 'up', label: 'vs last quarter' },
       },
     },
@@ -241,7 +240,7 @@ export const ExecutiveDashboard: Dashboard = {
         columns: [
           { header: 'Account',         accessorKey: 'name' },
           { header: 'Industry',        accessorKey: 'industry' },
-          { header: 'Annual Revenue',  accessorKey: 'annual_revenue', format: '$0,0' },
+          { header: 'Annual Revenue',  accessorKey: 'annual_revenue' },
           { header: 'Type',            accessorKey: 'type' },
           { header: 'Owner',           accessorKey: 'owner' },
         ],
