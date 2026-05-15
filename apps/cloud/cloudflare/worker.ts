@@ -209,8 +209,15 @@ export class CloudContainer extends Container<Env> {
     /**
      * Override the auto-start path so the container has the full cold
      * start budget to open port 4000. Without this, `containerFetch`
-     * passes only `{ abort }` and inherits the 20s default, killing
-     * the container mid-schema-sync on first boot.
+     * passes only `{ abort: request.signal }` and inherits the 20s
+     * default, killing the container mid-schema-sync on first boot.
+     *
+     * We also explicitly drop the inbound request's abort signal: the
+     * Cloudflare Worker request signal fires on subrequest abort
+     * (~30–45s), which would cancel the wait even if our timeout is
+     * 120s. Detaching the wait from the request lets the container
+     * finish booting for the *next* request even if this one's caller
+     * already hung up.
      */
     override async startAndWaitForPorts(
         portsOrArgs?: any,
@@ -219,25 +226,29 @@ export class CloudContainer extends Container<Env> {
     ): Promise<void> {
         // Two call shapes: (ports, cancellationOptions, startOptions)
         // and ({ ports, cancellationOptions, startOptions }). Inject our
-        // default timeout into whichever is in use.
+        // default timeout and strip the inbound abort signal.
         if (
             portsOrArgs !== null &&
             typeof portsOrArgs === 'object' &&
             !Array.isArray(portsOrArgs) &&
             ('ports' in portsOrArgs || 'cancellationOptions' in portsOrArgs || 'startOptions' in portsOrArgs)
         ) {
+            const inner = { ...(portsOrArgs.cancellationOptions ?? {}) };
+            delete inner.abort;
             const merged = {
                 ...portsOrArgs,
                 cancellationOptions: {
                     portReadyTimeoutMS: this.PORT_READY_TIMEOUT_MS,
-                    ...(portsOrArgs.cancellationOptions ?? {}),
+                    ...inner,
                 },
             };
             return super.startAndWaitForPorts(merged);
         }
+        const inner = { ...(cancellationOptions ?? {}) };
+        delete inner.abort;
         const merged = {
             portReadyTimeoutMS: this.PORT_READY_TIMEOUT_MS,
-            ...(cancellationOptions ?? {}),
+            ...inner,
         };
         return super.startAndWaitForPorts(portsOrArgs, merged, startOptions);
     }
