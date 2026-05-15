@@ -285,7 +285,10 @@ export const zhCN: TranslationData = {
         },
         type: { label: '类型' },
         owner: { label: '负责人' },
-        origin: { label: '工单来源' },
+        origin: {
+          label: '工单来源',
+          options: { email: '邮件', phone: '电话', web: '网站', chat: '在线客服', social_media: '社交媒体' },
+        },
         created_date: { label: '创建日期' },
         closed_date: { label: '关闭日期' },
         first_response_date: { label: '首次响应日期' },
@@ -500,7 +503,13 @@ export const zhCN: TranslationData = {
         description: { label: '描述' },
         next_step: { label: '下一步' },
         created_date: { label: '创建日期' },
-        lead_source: { label: '线索来源' },
+        lead_source: {
+          label: '线索来源',
+          options: {
+            web: '网站', referral: '推荐', event: '活动',
+            partner: '合作伙伴', advertisement: '广告', cold_call: '陌生拜访',
+          },
+        },
         competitors: { label: '竞争对手' },
         campaign: { label: '营销活动' },
         days_in_stage: { label: '当前阶段天数' },
@@ -641,6 +650,7 @@ export const zhCN: TranslationData = {
         opportunities_by_owner: { title: '负责人商机分布', description: '各销售负责的进行中商机' },
         lead_source_breakdown: { title: '线索来源分布', description: '按来源统计的线索数量' },
         top_opportunities: { title: '重点商机', description: '当前金额最高的进行中商机' },
+        pipeline_stage_by_source: { title: '阶段 × 线索来源', description: '按阶段和来源交叉统计进行中商机金额' },
       },
     },
     service_dashboard: {

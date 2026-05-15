@@ -415,7 +415,15 @@
                 "label": "Created Date"
               },
               "lead_source": {
-                "label": "Lead Source"
+                "label": "Lead Source",
+                "options": {
+                  "web": "Web",
+                  "referral": "Referral",
+                  "event": "Event",
+                  "partner": "Partner",
+                  "advertisement": "Advertisement",
+                  "cold_call": "Cold Call"
+                }
               },
               "competitors": {
                 "label": "Competitors"
@@ -490,7 +498,14 @@
                 "label": "Case Type"
               },
               "origin": {
-                "label": "Case Origin"
+                "label": "Case Origin",
+                "options": {
+                  "email": "Email",
+                  "phone": "Phone",
+                  "web": "Web",
+                  "chat": "Chat",
+                  "social_media": "Social Media"
+                }
               },
               "owner": {
                 "label": "Case Owner"
@@ -1208,6 +1223,10 @@
               "top_opportunities": {
                 "title": "Top Open Opportunities",
                 "description": "Highest-value deals still in flight"
+              },
+              "pipeline_stage_by_source": {
+                "title": "Pipeline by Stage × Lead Source",
+                "description": "Cross-tab of open opportunity amount by stage and source"
               }
             }
           },
@@ -1852,7 +1871,14 @@
                 "label": "负责人"
               },
               "origin": {
-                "label": "工单来源"
+                "label": "工单来源",
+                "options": {
+                  "email": "邮件",
+                  "phone": "电话",
+                  "web": "网站",
+                  "chat": "在线客服",
+                  "social_media": "社交媒体"
+                }
               },
               "created_date": {
                 "label": "创建日期"
@@ -2302,7 +2328,15 @@
                 "label": "创建日期"
               },
               "lead_source": {
-                "label": "线索来源"
+                "label": "线索来源",
+                "options": {
+                  "web": "网站",
+                  "referral": "推荐",
+                  "event": "活动",
+                  "partner": "合作伙伴",
+                  "advertisement": "广告",
+                  "cold_call": "陌生拜访"
+                }
               },
               "competitors": {
                 "label": "竞争对手"
@@ -2567,6 +2601,10 @@
               "top_opportunities": {
                 "title": "重点商机",
                 "description": "当前金额最高的进行中商机"
+              },
+              "pipeline_stage_by_source": {
+                "title": "阶段 × 线索来源",
+                "description": "按阶段和来源交叉统计进行中商机金额"
               }
             }
           },
@@ -3033,7 +3071,15 @@
                 "label": "作成日"
               },
               "lead_source": {
-                "label": "リードソース"
+                "label": "リードソース",
+                "options": {
+                  "web": "ウェブ",
+                  "referral": "紹介",
+                  "event": "イベント",
+                  "partner": "パートナー",
+                  "advertisement": "広告",
+                  "cold_call": "コールドコール"
+                }
               },
               "competitors": {
                 "label": "競合他社"
@@ -3108,7 +3154,14 @@
                 "label": "ケース種別"
               },
               "origin": {
-                "label": "ケース発生元"
+                "label": "ケース発生元",
+                "options": {
+                  "email": "メール",
+                  "phone": "電話",
+                  "web": "ウェブ",
+                  "chat": "チャット",
+                  "social_media": "ソーシャルメディア"
+                }
               },
               "owner": {
                 "label": "ケース担当者"
@@ -3826,6 +3879,10 @@
               "top_opportunities": {
                 "title": "主要オープン商談",
                 "description": "最も金額の大きい進行中商談"
+              },
+              "pipeline_stage_by_source": {
+                "title": "ステージ × リードソース",
+                "description": "ステージとソース別の進行中商談金額のクロス集計"
               }
             }
           },
@@ -4292,7 +4349,15 @@
                 "label": "Fecha de Creación"
               },
               "lead_source": {
-                "label": "Origen del Prospecto"
+                "label": "Origen del Prospecto",
+                "options": {
+                  "web": "Web",
+                  "referral": "Referido",
+                  "event": "Evento",
+                  "partner": "Socio",
+                  "advertisement": "Publicidad",
+                  "cold_call": "Llamada en Frío"
+                }
               },
               "competitors": {
                 "label": "Competidores"
@@ -4367,7 +4432,14 @@
                 "label": "Tipo de Caso"
               },
               "origin": {
-                "label": "Origen del Caso"
+                "label": "Origen del Caso",
+                "options": {
+                  "email": "Email",
+                  "phone": "Teléfono",
+                  "web": "Web",
+                  "chat": "Chat",
+                  "social_media": "Redes Sociales"
+                }
               },
               "owner": {
                 "label": "Propietario del Caso"
@@ -5085,6 +5157,10 @@
               "top_opportunities": {
                 "title": "Oportunidades abiertas principales",
                 "description": "Negocios de mayor valor aún en curso"
+              },
+              "pipeline_stage_by_source": {
+                "title": "Pipeline por Etapa × Origen",
+                "description": "Tabla cruzada del importe de oportunidades abiertas por etapa y origen"
               }
             }
           },

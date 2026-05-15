@@ -206,7 +206,13 @@ export const en: TranslationData = {
         description: { label: 'Description' },
         next_step: { label: 'Next Step' },
         created_date: { label: 'Created Date' },
-        lead_source: { label: 'Lead Source' },
+        lead_source: {
+          label: 'Lead Source',
+          options: {
+            web: 'Web', referral: 'Referral', event: 'Event',
+            partner: 'Partner', advertisement: 'Advertisement', cold_call: 'Cold Call',
+          },
+        },
         competitors: { label: 'Competitors' },
         campaign: { label: 'Campaign' },
         days_in_stage: { label: 'Days in Current Stage' },
@@ -244,7 +250,10 @@ export const en: TranslationData = {
         status: { label: 'Status' },
         priority: { label: 'Priority' },
         type: { label: 'Case Type' },
-        origin: { label: 'Case Origin' },
+        origin: {
+          label: 'Case Origin',
+          options: { email: 'Email', phone: 'Phone', web: 'Web', chat: 'Chat', social_media: 'Social Media' },
+        },
         owner: { label: 'Case Owner' },
         created_date: { label: 'Created Date' },
         closed_date: { label: 'Closed Date' },
@@ -569,6 +578,7 @@ export const en: TranslationData = {
         opportunities_by_owner: { title: 'Opportunities by Owner', description: 'Open pipeline value per sales rep' },
         lead_source_breakdown: { title: 'Lead Source', description: 'Where our pipeline is coming from' },
         top_opportunities: { title: 'Top Open Opportunities', description: 'Highest-value deals still in flight' },
+        pipeline_stage_by_source: { title: 'Pipeline by Stage × Lead Source', description: 'Cross-tab of open opportunity amount by stage and source' },
       },
     },
     service_dashboard: {

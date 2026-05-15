@@ -205,7 +205,13 @@ export const esES: TranslationData = {
         description: { label: 'Descripción' },
         next_step: { label: 'Próximo Paso' },
         created_date: { label: 'Fecha de Creación' },
-        lead_source: { label: 'Origen del Prospecto' },
+        lead_source: {
+          label: 'Origen del Prospecto',
+          options: {
+            web: 'Web', referral: 'Referido', event: 'Evento',
+            partner: 'Socio', advertisement: 'Publicidad', cold_call: 'Llamada en Frío',
+          },
+        },
         competitors: { label: 'Competidores' },
         campaign: { label: 'Campaña' },
         days_in_stage: { label: 'Días en Etapa Actual' },
@@ -243,7 +249,10 @@ export const esES: TranslationData = {
         status: { label: 'Estado' },
         priority: { label: 'Prioridad' },
         type: { label: 'Tipo de Caso' },
-        origin: { label: 'Origen del Caso' },
+        origin: {
+          label: 'Origen del Caso',
+          options: { email: 'Email', phone: 'Teléfono', web: 'Web', chat: 'Chat', social_media: 'Redes Sociales' },
+        },
         owner: { label: 'Propietario del Caso' },
         created_date: { label: 'Fecha de Creación' },
         closed_date: { label: 'Fecha de Cierre' },
@@ -568,6 +577,7 @@ export const esES: TranslationData = {
         opportunities_by_owner: { title: 'Oportunidades por responsable', description: 'Valor del pipeline abierto por representante' },
         lead_source_breakdown: { title: 'Origen del prospecto', description: 'De dónde proviene nuestro pipeline' },
         top_opportunities: { title: 'Oportunidades abiertas principales', description: 'Negocios de mayor valor aún en curso' },
+        pipeline_stage_by_source: { title: 'Pipeline por Etapa × Origen', description: 'Tabla cruzada del importe de oportunidades abiertas por etapa y origen' },
       },
     },
     service_dashboard: {

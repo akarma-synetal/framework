@@ -205,7 +205,13 @@ export const jaJP: TranslationData = {
         description: { label: '説明' },
         next_step: { label: '次のステップ' },
         created_date: { label: '作成日' },
-        lead_source: { label: 'リードソース' },
+        lead_source: {
+          label: 'リードソース',
+          options: {
+            web: 'ウェブ', referral: '紹介', event: 'イベント',
+            partner: 'パートナー', advertisement: '広告', cold_call: 'コールドコール',
+          },
+        },
         competitors: { label: '競合他社' },
         campaign: { label: 'キャンペーン' },
         days_in_stage: { label: '現ステージ滞在日数' },
@@ -243,7 +249,10 @@ export const jaJP: TranslationData = {
         status: { label: 'ステータス' },
         priority: { label: '優先度' },
         type: { label: 'ケース種別' },
-        origin: { label: 'ケース発生元' },
+        origin: {
+          label: 'ケース発生元',
+          options: { email: 'メール', phone: '電話', web: 'ウェブ', chat: 'チャット', social_media: 'ソーシャルメディア' },
+        },
         owner: { label: 'ケース担当者' },
         created_date: { label: '作成日' },
         closed_date: { label: 'クローズ日' },
@@ -568,6 +577,7 @@ export const jaJP: TranslationData = {
         opportunities_by_owner: { title: '担当者別商談', description: '営業担当ごとのオープンパイプライン金額' },
         lead_source_breakdown: { title: 'リードソース', description: 'パイプラインの流入元' },
         top_opportunities: { title: '主要オープン商談', description: '最も金額の大きい進行中商談' },
+        pipeline_stage_by_source: { title: 'ステージ × リードソース', description: 'ステージとソース別の進行中商談金額のクロス集計' },
       },
     },
     service_dashboard: {
