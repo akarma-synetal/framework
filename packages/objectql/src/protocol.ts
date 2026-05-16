@@ -13,6 +13,51 @@ import type { MetadataCacheRequest, MetadataCacheResponse, ServiceInfo, ApiRoute
 import type { IFeedService } from '@objectstack/spec/contracts';
 import { parseFilterAST, isFilterAST } from '@objectstack/spec/data';
 import { PLURAL_TO_SINGULAR, SINGULAR_TO_PLURAL } from '@objectstack/spec/shared';
+import { ListViewSchema, FormViewSchema, DashboardSchema } from '@objectstack/spec/ui';
+import { z } from 'zod';
+
+/**
+ * Zod schemas used to validate overlay items before they are persisted into
+ * `sys_metadata` by {@link ObjectStackProtocolImplementation.saveMetaItem}.
+ *
+ * Some types (notably `view`) are *not* a single schema but a discriminated
+ * family — a grid/kanban/calendar list view vs. a simple/tabbed/wizard form
+ * view. We dispatch to the right schema based on the `type` discriminant
+ * rather than using `z.union([...])`, which would collapse all branch errors
+ * into an opaque "Invalid input" union error.
+ *
+ * Validation policy:
+ *   - `safeParse` is used so we can craft a 422 with structured `issues`.
+ *   - We do NOT replace the persisted document with `parsed.data`; the
+ *     original payload is stored verbatim so Studio-only auxiliary fields
+ *     (e.g. `isPinned`, `isDefault`, `sortOrder`) survive the round-trip.
+ *   - Schemas are referenced lazily through the Spec's `lazySchema` Proxy,
+ *     so importing this module does not trigger eager Zod construction.
+ *   - Types without a registered schema (e.g. `app`, `package`) fall through
+ *     unvalidated for backwards compatibility — they were never enforced
+ *     historically and existing control-plane writes rely on the lenient
+ *     behaviour.
+ */
+const FORM_VIEW_TYPES = new Set(['simple', 'tabbed', 'wizard', 'split', 'drawer', 'modal']);
+
+function resolveOverlaySchema(type: string, item: unknown): z.ZodTypeAny | null {
+    const singular = PLURAL_TO_SINGULAR[type] ?? type;
+    switch (singular) {
+        case 'view': {
+            // Form views and list views share the `view` overlay type. Pick
+            // the right Zod schema by inspecting the discriminant. Defaults
+            // to ListViewSchema (matches the ListViewSchema `type.default('grid')`).
+            const t = (item && typeof item === 'object' && 'type' in item)
+                ? String((item as any).type)
+                : undefined;
+            return t && FORM_VIEW_TYPES.has(t) ? FormViewSchema : ListViewSchema;
+        }
+        case 'dashboard':
+            return DashboardSchema;
+        default:
+            return null;
+    }
+}
 
 /**
  * Simple hash function for ETag generation (browser-compatible)
@@ -1095,6 +1140,39 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             (err as any).code = 'customization_not_allowed';
             (err as any).status = 400;
             throw err;
+        }
+
+        // Spec-conformance check: if a Zod schema is registered for this
+        // overlay type (see OVERLAY_VALIDATION_SCHEMAS), validate the payload
+        // before persisting. We surface invalid payloads as `422
+        // invalid_metadata` with structured Zod issues so the Studio form can
+        // highlight the offending field. The original `item` is kept verbatim
+        // — `parsed.data` would strip Studio-only auxiliary fields (e.g.
+        // isPinned, isDefault, sortOrder) that intentionally ride along with
+        // the overlay document. ADR-0005 §"Validation".
+        {
+            const schema = resolveOverlaySchema(request.type, request.item);
+            if (schema) {
+                const parsed = schema.safeParse(request.item);
+                if (!parsed.success) {
+                    const issues = parsed.error.issues.map((i: z.ZodIssue) => ({
+                        path: i.path.join('.'),
+                        message: i.message,
+                        code: i.code,
+                    }));
+                    const summary = issues.slice(0, 3)
+                        .map((i: { path: string; message: string }) => `${i.path || '<root>'}: ${i.message}`)
+                        .join('; ');
+                    const err = new Error(
+                        `[invalid_metadata] ${request.type}/${request.name} failed spec validation: ${summary}`
+                        + (issues.length > 3 ? ` (+${issues.length - 3} more)` : '')
+                    );
+                    (err as any).code = 'invalid_metadata';
+                    (err as any).status = 422;
+                    (err as any).issues = issues;
+                    throw err;
+                }
+            }
         }
 
         // 1. Update the in-memory registry (runtime cache) ONLY for the

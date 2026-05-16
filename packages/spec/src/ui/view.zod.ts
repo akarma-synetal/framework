@@ -280,6 +280,20 @@ export const KanbanConfigSchema = lazySchema(() => z.object({
 }));
 
 /**
+ * List Chart View Configuration (Airtable-style)
+ * Configures aggregate chart visualizations (bar/line/pie/area/scatter)
+ * when used as a `type: 'chart'` ListView. Distinct from the full-featured
+ * `ChartConfigSchema` in `chart.zod.ts` (which is for embedded reports).
+ */
+export const ListChartConfigSchema = lazySchema(() => z.object({
+  chartType: z.enum(['bar', 'line', 'pie', 'area', 'scatter']).default('bar').describe('Chart visualisation type'),
+  xAxisField: z.string().describe('Field used as the X axis / category dimension'),
+  yAxisFields: z.array(z.string()).min(1).describe('Field(s) used as the Y axis / measures'),
+  aggregation: z.enum(['sum', 'avg', 'count', 'min', 'max']).optional().describe('Aggregation function applied to Y axis fields'),
+  groupByField: z.string().optional().describe('Optional field used to split / stack the chart'),
+}).describe('List chart view configuration'));
+
+/**
  * Calendar Settings
  */
 export const CalendarConfigSchema = lazySchema(() => z.object({
@@ -368,7 +382,8 @@ export const ListViewSchema = lazySchema(() => z.object({
     'calendar',   // Monthly/Weekly/Daily
     'timeline',   // Chronological Stream (Feed)
     'gantt',      // Project Timeline
-    'map'         // Geospatial
+    'map',        // Geospatial
+    'chart'       // Aggregate visualisation
   ]).default('grid'),
   
   /** Data Source Configuration */
@@ -412,6 +427,7 @@ export const ListViewSchema = lazySchema(() => z.object({
   gantt: GanttConfigSchema.optional(),
   gallery: GalleryConfigSchema.optional(),
   timeline: TimelineConfigSchema.optional(),
+  chart: ListChartConfigSchema.optional(),
 
   /** View Metadata (Airtable-style view management) */
   description: I18nLabelSchema.optional().describe('View description for documentation/tooltips'),
@@ -637,6 +653,7 @@ export type RowHeight = z.infer<typeof RowHeightSchema>;
 export type GroupingConfig = z.infer<typeof GroupingConfigSchema>;
 export type GalleryConfig = z.infer<typeof GalleryConfigSchema>;
 export type TimelineConfig = z.infer<typeof TimelineConfigSchema>;
+export type ListChartConfig = z.infer<typeof ListChartConfigSchema>;
 export type ViewSharing = z.infer<typeof ViewSharingSchema>;
 export type RowColorConfig = z.infer<typeof RowColorConfigSchema>;
 export type VisualizationType = z.infer<typeof VisualizationTypeSchema>;

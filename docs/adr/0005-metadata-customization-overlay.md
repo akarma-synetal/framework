@@ -223,3 +223,51 @@ After the change, `/api/v1/data/sys_view` (and the four siblings) returns **404
 object_not_found**. All metadata customisation flows through the overlay
 endpoints (`PUT/GET/DELETE /api/v1/meta/{type}/:name`) backed by
 `sys_metadata` JSON rows only.
+
+---
+
+## Addendum — 2026-05-16 (c): spec validation on overlay save
+
+`PUT /api/v1/meta/:type/:name` now validates the payload against the
+canonical Zod schema before persisting to `sys_metadata`. Prior to this
+change, any JSON shape was accepted and stored verbatim, surfacing as
+runtime errors only at read time when the merged effective metadata was
+fed into the UI engine.
+
+Implementation (`packages/objectql/src/protocol.ts`):
+
+- `resolveOverlaySchema(type, item)` dispatches by metadata type:
+  - `view` → `ListViewSchema` or `FormViewSchema` (picked by the `type`
+    discriminant: form types `simple / tabbed / wizard / split / drawer / modal`
+    → `FormViewSchema`; everything else → `ListViewSchema`).
+    A naive `z.union` was rejected because its branch errors collapse to an
+    opaque "Invalid input" message — explicit dispatch produces real field
+    paths.
+  - `dashboard` → `DashboardSchema`.
+  - Other types → `null` (validation skipped, preserves legacy control-plane
+    writes for `app`/`package`/etc. that pre-date strict schemas).
+- `saveMetaItem` runs `safeParse`. On failure, throws an error with
+  `code='invalid_metadata'`, `status=422`, and a structured `issues` array
+  carrying `path/message/code` for each Zod issue. REST layer
+  (`packages/rest/src/rest-server.ts:973-979`) already propagates `status`
+  and `code` to the response.
+- The persisted document is the **original** `request.item`, NOT
+  `parsed.data`. Studio attaches auxiliary fields (`isPinned`,
+  `isDefault`, `sortOrder`, `objectName`, …) that aren't in the canonical
+  schema; storing `parsed.data` would silently strip them on every save.
+  This trades strict-stripping against forward compatibility for Studio
+  extensions — the canonical fields are still type-checked.
+
+Sample 422 response:
+
+```json
+{
+  "error": "[invalid_metadata] view/test_bad_view failed spec validation: columns: Invalid input",
+  "code": "invalid_metadata"
+}
+```
+
+Tests added in `packages/objectql/src/protocol-meta.test.ts`
+(`describe('spec validation', …)`): valid view/dashboard accepted, invalid
+shapes return 422 with `issues`, unknown extras preserved, unregistered
+types fall through, plural type strings normalize correctly.

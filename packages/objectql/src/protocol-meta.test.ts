@@ -155,6 +155,131 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
                 version: 1,
             }), expect.anything());
         });
+
+        // ─── Spec validation (ADR-0005 §"Validation") ───────────────────
+        describe('spec validation', () => {
+            const validView = {
+                name: 'all_leads',
+                label: 'All Leads',
+                type: 'grid',
+                data: { provider: 'object', object: 'lead' },
+                columns: ['first_name', 'last_name'],
+            };
+            const validDashboard = {
+                name: 'sales_dashboard',
+                label: 'Sales',
+                widgets: [{
+                    id: 'pipeline',
+                    title: 'Pipeline',
+                    type: 'metric',
+                    object: 'opportunity',
+                    valueField: 'amount',
+                    aggregate: 'sum',
+                    layout: { x: 0, y: 0, w: 3, h: 2 },
+                }],
+            };
+
+            it('accepts a spec-conformant view payload', async () => {
+                await expect(
+                    protocol.saveMetaItem({ type: 'view', name: 'all_leads', item: validView })
+                ).resolves.toMatchObject({ success: true });
+                expect(mockEngine.insert).toHaveBeenCalled();
+            });
+
+            it('accepts a spec-conformant dashboard payload', async () => {
+                await expect(
+                    protocol.saveMetaItem({
+                        type: 'dashboard',
+                        name: 'sales_dashboard',
+                        item: validDashboard,
+                    })
+                ).resolves.toMatchObject({ success: true });
+                expect(mockEngine.insert).toHaveBeenCalled();
+            });
+
+            it('preserves Studio-only auxiliary fields verbatim (not stripped)', async () => {
+                // isPinned / isDefault / sortOrder are not in ListViewSchema;
+                // we must NOT replace the persisted document with parsed.data,
+                // or these fields would be silently dropped on every save.
+                const itemWithExtras = {
+                    ...validView,
+                    isPinned: true,
+                    isDefault: false,
+                    sortOrder: 5,
+                    objectName: 'lead',
+                };
+
+                await protocol.saveMetaItem({
+                    type: 'view',
+                    name: 'all_leads',
+                    item: itemWithExtras,
+                });
+
+                const insertCall = mockEngine.insert.mock.calls[0];
+                const persisted = JSON.parse(insertCall[1].metadata);
+                expect(persisted.isPinned).toBe(true);
+                expect(persisted.isDefault).toBe(false);
+                expect(persisted.sortOrder).toBe(5);
+                expect(persisted.objectName).toBe('lead');
+            });
+
+            it('rejects a view missing the required `columns` field with 422', async () => {
+                const invalid = { name: 'bad_view', type: 'grid' }; // no columns
+                let caught: any;
+                try {
+                    await protocol.saveMetaItem({
+                        type: 'view',
+                        name: 'bad_view',
+                        item: invalid,
+                    });
+                } catch (e) { caught = e; }
+
+                expect(caught).toBeDefined();
+                expect(caught.code).toBe('invalid_metadata');
+                expect(caught.status).toBe(422);
+                expect(caught.message).toMatch(/invalid_metadata/);
+                expect(Array.isArray(caught.issues)).toBe(true);
+                expect(mockEngine.insert).not.toHaveBeenCalled();
+            });
+
+            it('rejects a dashboard with wrong-typed widgets with 422', async () => {
+                const invalid = {
+                    name: 'bad_dashboard',
+                    label: 'Bad',
+                    widgets: 'not-an-array', // must be an array of widgets
+                };
+                let caught: any;
+                try {
+                    await protocol.saveMetaItem({
+                        type: 'dashboard',
+                        name: 'bad_dashboard',
+                        item: invalid,
+                    });
+                } catch (e) { caught = e; }
+
+                expect(caught?.code).toBe('invalid_metadata');
+                expect(caught?.status).toBe(422);
+                expect(mockEngine.insert).not.toHaveBeenCalled();
+            });
+
+            it('skips validation for types without a registered schema (e.g. app)', async () => {
+                // `app` is intentionally not in OVERLAY_VALIDATION_SCHEMAS;
+                // legacy save paths must continue to work unvalidated.
+                await expect(
+                    protocol.saveMetaItem({
+                        type: 'app',
+                        name: 'test_app',
+                        item: { name: 'test_app', label: 'X' }, // would fail AppSchema, but should not be checked
+                    })
+                ).resolves.toMatchObject({ success: true });
+            });
+
+            it('accepts plural type strings (e.g. `views`, `dashboards`)', async () => {
+                await expect(
+                    protocol.saveMetaItem({ type: 'views', name: 'all_leads', item: validView })
+                ).resolves.toMatchObject({ success: true });
+            });
+        });
     });
 
     // ═══════════════════════════════════════════════════════════════
