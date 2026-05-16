@@ -46,7 +46,7 @@
     "@objectstack/service-tenant": "workspace:*",
     "@objectstack/spec": "workspace:*",
     "@objectstack/studio": "workspace:*",
-    "hono": "^4.12.18",
+    "hono": "^4.12.19",
     "pg": "^8.20.0"
   },
   "devDependencies": {

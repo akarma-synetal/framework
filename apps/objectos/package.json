@@ -52,7 +52,7 @@
     "@objectstack/service-package": "workspace:*",
     "@objectstack/service-tenant": "workspace:*",
     "@objectstack/spec": "workspace:*",
-    "hono": "^4.12.18"
+    "hono": "^4.12.19"
   },
   "devDependencies": {
     "@cloudflare/containers": "^0.3.4",
