@@ -442,7 +442,17 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     for (const item of runtimeItems) {
                         const entry = item as any;
                         if (entry && typeof entry === 'object' && 'name' in entry) {
-                            itemMap.set(entry.name, entry);
+                            // Do not overwrite entries already present in the
+                            // map: those came from sys_metadata (customization
+                            // overlays) or the SchemaRegistry and must win
+                            // over the MetadataService's artifact baseline.
+                            // Without this guard, saved per-org dashboard /
+                            // view overlays disappear from list endpoints on
+                            // refresh (detail endpoint kept showing the
+                            // overlay because it uses a different code path).
+                            if (!itemMap.has(entry.name)) {
+                                itemMap.set(entry.name, entry);
+                            }
                         }
                     }
                     items = Array.from(itemMap.values());

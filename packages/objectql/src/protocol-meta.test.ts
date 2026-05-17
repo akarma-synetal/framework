@@ -494,6 +494,44 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
             expect(result.items).toHaveLength(0);
             expect(result.type).toBe('app');
         });
+
+        it('should preserve sys_metadata overlay over MetadataService.list() baseline', async () => {
+            // Regression: previously the MetadataService merge loop called
+            // `itemMap.set(entry.name, entry)` unconditionally, blowing away
+            // the customization overlay that had just been merged from
+            // sys_metadata. Result: edits saved by the user disappeared from
+            // every list endpoint on the next refresh (the detail endpoint
+            // kept working because it uses a different code path). See
+            // commit history around getMetaItems / MetadataService merge.
+            const overlayDashboard = { name: 'sales_dashboard', label: 'Customized', columns: 9 };
+            const baselineDashboard = { name: 'sales_dashboard', label: 'Original', columns: 12 };
+
+            mockEngine.find.mockResolvedValue([
+                {
+                    type: 'dashboard',
+                    name: 'sales_dashboard',
+                    state: 'active',
+                    metadata: JSON.stringify(overlayDashboard),
+                }
+            ]);
+
+            const metadataService = {
+                list: vi.fn().mockResolvedValue([baselineDashboard]),
+            };
+            const services = new Map<string, any>();
+            services.set('metadata', metadataService);
+            const scopedProtocol = new ObjectStackProtocolImplementation(
+                mockEngine,
+                () => services,
+            );
+
+            const result = await scopedProtocol.getMetaItems({ type: 'dashboard' });
+
+            expect(result.items).toHaveLength(1);
+            // Overlay wins; the artifact baseline must NOT overwrite it.
+            expect(result.items[0]).toEqual(overlayDashboard);
+            expect(metadataService.list).toHaveBeenCalledWith('dashboard');
+        });
     });
 
     // ═══════════════════════════════════════════════════════════════
