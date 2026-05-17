@@ -480,11 +480,12 @@ describe('applySystemFields', () => {
         expect(out.fields.first_name).toBeDefined();
     });
 
-    it('skips injection when multiTenant is false', () => {
+    it('skips organization_id injection when multiTenant is false (but still injects audit fields)', () => {
         const out = applySystemFields(baseLead, { multiTenant: false });
         expect(out.fields.organization_id).toBeUndefined();
-        // returns the original schema unchanged
-        expect(out).toBe(baseLead);
+        // audit fields are tenant-independent — still injected
+        expect(out.fields.created_at).toBeDefined();
+        expect(out.fields.updated_at).toBeDefined();
     });
 
     it('does NOT overwrite an author-declared organization_id', () => {
@@ -493,9 +494,9 @@ describe('applySystemFields', () => {
             fields: { organization_id: { type: 'text', label: 'Org Code' } },
         };
         const out = applySystemFields(declared, { multiTenant: true });
-        // unchanged: returns original (no addition needed)
-        expect(out).toBe(declared);
+        // organization_id preserved; audit fields still injected
         expect(out.fields.organization_id.label).toBe('Org Code');
+        expect(out.fields.created_at).toBeDefined();
     });
 
     it('respects systemFields: false opt-out', () => {
@@ -503,12 +504,25 @@ describe('applySystemFields', () => {
         const out = applySystemFields(opted, { multiTenant: true });
         expect(out).toBe(opted);
         expect(out.fields.organization_id).toBeUndefined();
+        expect(out.fields.created_at).toBeUndefined();
     });
 
-    it('respects systemFields.tenant: false opt-out', () => {
+    it('respects systemFields.tenant: false opt-out (audit fields still injected)', () => {
         const opted: any = { ...baseLead, systemFields: { tenant: false } };
         const out = applySystemFields(opted, { multiTenant: true });
         expect(out.fields.organization_id).toBeUndefined();
+        expect(out.fields.created_at).toBeDefined();
+        expect(out.fields.updated_by).toBeDefined();
+    });
+
+    it('respects systemFields.audit: false opt-out (tenant field still injected)', () => {
+        const opted: any = { ...baseLead, systemFields: { audit: false } };
+        const out = applySystemFields(opted, { multiTenant: true });
+        expect(out.fields.organization_id).toBeDefined();
+        expect(out.fields.created_at).toBeUndefined();
+        expect(out.fields.created_by).toBeUndefined();
+        expect(out.fields.updated_at).toBeUndefined();
+        expect(out.fields.updated_by).toBeUndefined();
     });
 
     it('skips externally-managed objects (managedBy set)', () => {
@@ -516,6 +530,40 @@ describe('applySystemFields', () => {
         const out = applySystemFields(sysUser, { multiTenant: true });
         expect(out).toBe(sysUser);
         expect(out.fields.organization_id).toBeUndefined();
+        expect(out.fields.created_at).toBeUndefined();
+    });
+
+    it('injects all four audit fields with the expected shape', () => {
+        const out = applySystemFields(baseLead, { multiTenant: false });
+        expect(out.fields.created_at).toMatchObject({
+            type: 'datetime', system: true, readonly: true,
+        });
+        expect(out.fields.created_by).toMatchObject({
+            type: 'lookup', reference: 'sys_user', system: true, readonly: true,
+        });
+        expect(out.fields.updated_at).toMatchObject({
+            type: 'datetime', system: true, readonly: true,
+        });
+        expect(out.fields.updated_by).toMatchObject({
+            type: 'lookup', reference: 'sys_user', system: true, readonly: true,
+        });
+    });
+
+    it('does NOT overwrite author-declared audit fields', () => {
+        const declared: any = {
+            name: 'lead',
+            fields: {
+                created_at: { type: 'text', label: 'Custom Created' },
+                updated_by: { type: 'text', label: 'Custom Updater' },
+            },
+        };
+        const out = applySystemFields(declared, { multiTenant: false });
+        expect(out.fields.created_at.type).toBe('text');
+        expect(out.fields.created_at.label).toBe('Custom Created');
+        expect(out.fields.updated_by.type).toBe('text');
+        // The missing ones are still injected as system fields
+        expect(out.fields.created_by).toMatchObject({ system: true });
+        expect(out.fields.updated_at).toMatchObject({ system: true });
     });
 
     it('SchemaRegistry({ multiTenant: true }) auto-injects on registerObject', () => {
@@ -524,5 +572,7 @@ describe('applySystemFields', () => {
         const stored = (reg as any).objectContributors.get('lead')[0].definition;
         expect(stored.fields.organization_id).toBeDefined();
         expect(stored.fields.organization_id.reference).toBe('sys_organization');
+        expect(stored.fields.created_at).toMatchObject({ system: true, readonly: true });
+        expect(stored.fields.updated_by).toMatchObject({ system: true, readonly: true });
     });
 });

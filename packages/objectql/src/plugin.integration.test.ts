@@ -1029,14 +1029,20 @@ describe('ObjectQLPlugin - Metadata Service Integration', () => {
       await kernel.bootstrap();
 
       const objectql = kernel.getService('objectql') as any;
+      // Opt out of auto-injected system fields so the schema authentically
+      // does NOT declare created_by/updated_by/tenant_id — exercising the
+      // original regression guard. (Without `systemFields:false` the
+      // registry auto-injects audit fields and the hook correctly stamps
+      // them; that's covered by the sibling test below.)
       const lite: ObjectSchema = {
         name: 'lite_lead',
         label: 'Lite Lead',
         datasource: 'capture-driver',
+        systemFields: false,
         fields: {
           first_name: { name: 'first_name', label: 'First Name', type: 'text' },
         },
-      };
+      } as any;
       objectql.registry.registerObject(lite, 'test', 'test');
 
       await objectql.insert(

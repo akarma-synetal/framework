@@ -476,6 +476,7 @@ export const FieldSchema = lazySchema(() => z.object({
   /** Security & Visibility */
   hidden: z.boolean().default(false).describe('Hidden from default UI'),
   readonly: z.boolean().default(false).describe('Read-only in UI'),
+  system: z.boolean().optional().describe('Auto-injected system/audit field (e.g. created_at, updated_by, organization_id). Tools that surface system fields separately from author-declared business fields should branch on this flag.'),
   sortable: z.boolean().optional().default(true).describe('Whether field is sortable in list views'),
   inlineHelpText: z.string().optional().describe('Help text displayed below the field in forms'),
   trackFeedHistory: z.boolean().optional().describe('Track field changes in Chatter/activity feed (Salesforce pattern)'),

@@ -608,7 +608,10 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
         });
 
         it('should load records of different types', async () => {
-            const objDef = { name: 'task', label: 'Task', fields: {} };
+            // systemFields:false avoids the auto-injected audit field set so
+            // the registry stores the exact object we passed in for a tight
+            // equality assertion.
+            const objDef = { name: 'task', label: 'Task', fields: {}, systemFields: false };
             mockEngine.find.mockResolvedValue([
                 { type: 'app', name: 'test_app', state: 'active', metadata: JSON.stringify(sampleApp) },
                 { type: 'object', name: 'task', state: 'active', metadata: JSON.stringify(objDef) },

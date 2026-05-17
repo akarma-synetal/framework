@@ -150,6 +150,13 @@ export interface SchemaRegistryOptions {
  *   - `organization_id` — multi-tenant deployments. Required-false (the
  *     SecurityPlugin populates it on insert; nullable rows are still
  *     filtered out by the `tenant_isolation` RLS USING clause).
+ *   - `created_at` / `created_by` / `updated_at` / `updated_by` — audit
+ *     fields. Marked `system: true, readonly: true` so detail views can
+ *     surface them in a dedicated "System Information" section while
+ *     edit forms / drawers filter them out. The driver populates the
+ *     timestamps; the `*_by` lookups are filled by the runtime when an
+ *     authenticated session is present (NULL otherwise — e.g. seeded
+ *     rows).
  */
 export function applySystemFields(
   schema: ServiceObject,
@@ -166,10 +173,11 @@ export function applySystemFields(
 
   const sf =
     typeof (schema as any).systemFields === 'object' && (schema as any).systemFields !== null
-      ? ((schema as any).systemFields as { tenant?: boolean })
+      ? ((schema as any).systemFields as { tenant?: boolean; audit?: boolean })
       : undefined;
 
   const wantTenant = opts.multiTenant && sf?.tenant !== false;
+  const wantAudit = sf?.audit !== false;
 
   const additions: Record<string, any> = {};
 
@@ -182,8 +190,54 @@ export function applySystemFields(
       indexed: true,
       hidden: true,
       readonly: true,
+      system: true,
       description: 'Tenant scope (auto-populated by SecurityPlugin on insert).',
     };
+  }
+
+  if (wantAudit) {
+    if (!schema.fields?.created_at) {
+      additions.created_at = {
+        type: 'datetime',
+        label: 'Created At',
+        required: false,
+        readonly: true,
+        system: true,
+        description: 'Timestamp when the record was created (auto-populated by the driver).',
+      };
+    }
+    if (!schema.fields?.created_by) {
+      additions.created_by = {
+        type: 'lookup',
+        reference: 'sys_user',
+        label: 'Created By',
+        required: false,
+        readonly: true,
+        system: true,
+        description: 'User who created the record (populated when an authenticated session is present).',
+      };
+    }
+    if (!schema.fields?.updated_at) {
+      additions.updated_at = {
+        type: 'datetime',
+        label: 'Last Modified At',
+        required: false,
+        readonly: true,
+        system: true,
+        description: 'Timestamp of the most recent modification (auto-populated by the driver).',
+      };
+    }
+    if (!schema.fields?.updated_by) {
+      additions.updated_by = {
+        type: 'lookup',
+        reference: 'sys_user',
+        label: 'Last Modified By',
+        required: false,
+        readonly: true,
+        system: true,
+        description: 'User who last modified the record (populated when an authenticated session is present).',
+      };
+    }
   }
 
   if (Object.keys(additions).length === 0) return schema;
