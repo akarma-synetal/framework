@@ -25,7 +25,8 @@ export const ApprovalActionType = z.enum([
   'email_alert',
   'webhook',
   'script',
-  'connector_action' // Added for Zapier-style integrations
+  'connector_action', // Added for Zapier-style integrations
+  'inbox_notify',     // M11.C15.B — write a sys_notification row
 ]);
 
 /**
@@ -90,6 +91,19 @@ export const ApprovalProcessSchema = lazySchema(() => z.object({
   
   /** Record Locking */
   lockRecord: z.boolean().default(true).describe('Lock record from editing during approval'),
+
+  /**
+   * M11.C15.B — name of a field on the business object where the
+   * engine mirrors the request status (e.g. `'approval_status'`).
+   * Values written: 'pending' | 'approved' | 'rejected' | 'recalled'
+   * | 'not_submitted'. The field should be declared as readonly on
+   * the object so users can filter / display it but not edit it.
+   * If omitted, no status mirror is written and the engine only
+   * exposes status via `sys_approval_request`.
+   */
+  approvalStatusField: z.string().optional().describe(
+    'Field name on the business object to mirror the request status.',
+  ),
   
   /** Steps */
   steps: z.array(ApprovalStepSchema).min(1).describe('Sequence of approval steps'),

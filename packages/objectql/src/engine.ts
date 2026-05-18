@@ -570,7 +570,10 @@ export class ObjectQL implements IDataEngine {
       tenantId: execCtx.tenantId,
       roles: execCtx.roles,
       accessToken: execCtx.accessToken,
-    };
+      // Propagate system-elevated flag so hooks can distinguish engine
+      // self-writes (e.g. approval status mirror) from genuine user writes.
+      ...((execCtx as any).isSystem ? { isSystem: true } : {}),
+    } as HookContext['session'];
   }
 
   /**

@@ -13,6 +13,7 @@ import type {
   SubmitApprovalInput,
   SharingExecutionContext,
 } from '@objectstack/spec/contracts';
+import { executeActions, type ApprovalTrigger, type FetchLike } from './action-executor.js';
 
 /**
  * Narrow engine surface — keeps the service testable without booting
@@ -110,18 +111,86 @@ function resolveApprovers(step: any, record?: any): string[] {
 export interface ApprovalServiceOptions {
   engine: ApprovalEngine;
   clock?: ApprovalClock;
-  logger?: { info?: (msg: any, ...rest: any[]) => void; warn?: (msg: any, ...rest: any[]) => void; error?: (msg: any, ...rest: any[]) => void };
+  logger?: { info?: (msg: any, ...rest: any[]) => void; warn?: (msg: any, ...rest: any[]) => void; error?: (msg: any, ...rest: any[]) => void; debug?: (msg: any, ...rest: any[]) => void };
+  /** Optional fetch impl for `webhook` actions; defaults to global. */
+  fetch?: FetchLike;
+  /** Webhook timeout in ms; default 5000. */
+  webhookTimeoutMs?: number;
+  /**
+   * Called after the process registry changes (defineProcess / deleteProcess).
+   * The plugin uses this to re-bind lifecycle hooks for auto-trigger / lock.
+   */
+  onRegistryChange?: () => void | Promise<void>;
 }
 
 export class ApprovalService implements IApprovalService {
   private readonly engine: ApprovalEngine;
   private readonly clock: ApprovalClock;
+  private readonly logger?: ApprovalServiceOptions['logger'];
+  private readonly fetchImpl?: FetchLike;
+  private readonly webhookTimeoutMs?: number;
+  private readonly onRegistryChange?: () => void | Promise<void>;
 
   constructor(opts: ApprovalServiceOptions) {
     this.engine = opts.engine;
     this.clock = opts.clock ?? { now: () => new Date() };
-    // logger reserved for future SLA dispatcher
-    void opts.logger;
+    this.logger = opts.logger;
+    this.fetchImpl = opts.fetch;
+    this.webhookTimeoutMs = opts.webhookTimeoutMs;
+    this.onRegistryChange = opts.onRegistryChange;
+  }
+
+  /** Allow the plugin to attach a hook re-binding callback after construction. */
+  setRegistryChangeHandler(handler: () => void | Promise<void>): void {
+    (this as any).onRegistryChange = handler;
+  }
+
+  private async notifyRegistryChanged(): Promise<void> {
+    const cb = this.onRegistryChange ?? ((this as any).onRegistryChange as (() => void | Promise<void>) | undefined);
+    if (!cb) return;
+    try { await cb(); }
+    catch (err: any) { this.logger?.warn?.('[approvals] onRegistryChange handler failed', { error: err?.message }); }
+  }
+
+  /** Mirror request status onto `process.approvalStatusField` if configured. */
+  private async syncStatusField(process: ApprovalProcessRow, request: ApprovalRequestRow): Promise<void> {
+    const field = (process.definition as any)?.approvalStatusField;
+    if (!field) return;
+    try {
+      await this.engine.update(
+        process.object_name,
+        { id: request.record_id, [field]: request.status },
+        { context: SYSTEM_CTX },
+      );
+    } catch (err: any) {
+      this.logger?.warn?.(`[approvals] syncStatusField failed: ${err?.message ?? err}`);
+    }
+  }
+
+  /** Convenience wrapper that funnels every action invocation through the executor. */
+  private async runActions(
+    actions: any[] | undefined | null,
+    trigger: ApprovalTrigger,
+    process: ApprovalProcessRow,
+    request: ApprovalRequestRow,
+    step: any | undefined,
+    actorId: string | null | undefined,
+    comment: string | null | undefined,
+  ): Promise<void> {
+    if (!actions || actions.length === 0) return;
+    await executeActions(actions, {
+      trigger,
+      process: { ...process, object: process.object_name },
+      request,
+      step,
+      actorId: actorId ?? null,
+      comment: comment ?? null,
+    }, {
+      engine: this.engine,
+      logger: this.logger,
+      fetch: this.fetchImpl,
+      webhookTimeoutMs: this.webhookTimeoutMs,
+    });
   }
 
   // ── Process definitions ──────────────────────────────────────
@@ -156,13 +225,17 @@ export class ApprovalService implements IApprovalService {
     if (Array.isArray(existing) && existing[0]) {
       const id = existing[0].id;
       await this.engine.update('sys_approval_process', { id, ...payload }, { context: SYSTEM_CTX });
-      return rowFromProcess({ ...existing[0], ...payload, id });
+      const row = rowFromProcess({ ...existing[0], ...payload, id });
+      await this.notifyRegistryChanged();
+      return row;
     }
 
     const id = input.id ?? uid('apv');
     const row = { id, ...payload, created_at: now };
     await this.engine.insert('sys_approval_process', row, { context: SYSTEM_CTX });
-    return rowFromProcess(row);
+    const out = rowFromProcess(row);
+    await this.notifyRegistryChanged();
+    return out;
   }
 
   async listProcesses(
@@ -196,6 +269,7 @@ export class ApprovalService implements IApprovalService {
     const proc = await this.getProcess(idOrName, context);
     if (!proc) return;
     await this.engine.delete('sys_approval_process', { where: { id: proc.id }, context: SYSTEM_CTX });
+    await this.notifyRegistryChanged();
   }
 
   // ── Requests ─────────────────────────────────────────────────
@@ -266,7 +340,22 @@ export class ApprovalService implements IApprovalService {
       created_at: now,
     }, { context: SYSTEM_CTX });
 
-    return rowFromRequest(row);
+    const requestRow = rowFromRequest(row);
+
+    // Phase B: status mirror + onSubmit actions.
+    await this.syncStatusField(process, requestRow);
+    const definition: any = process.definition ?? {};
+    await this.runActions(
+      definition.onSubmit,
+      'submit',
+      process,
+      requestRow,
+      step0,
+      input.submitterId ?? context.userId ?? null,
+      input.comment ?? null,
+    );
+
+    return requestRow;
   }
 
   async listRequests(
@@ -369,6 +458,10 @@ export class ApprovalService implements IApprovalService {
         updated_at: now,
       }, { context: SYSTEM_CTX });
       const fresh = await this.getRequest(req.id, context);
+      // Phase B: step.onApprove + process.onFinalApprove + status mirror.
+      await this.runActions((step as any)?.onApprove, 'step_approve', process, fresh!, step, input.actorId, input.comment);
+      await this.syncStatusField(process, fresh!);
+      await this.runActions((process.definition as any)?.onFinalApprove, 'final_approve', process, fresh!, step, input.actorId, input.comment);
       return { request: fresh!, finalized: true };
     }
 
@@ -382,6 +475,8 @@ export class ApprovalService implements IApprovalService {
       updated_at: now,
     }, { context: SYSTEM_CTX });
     const fresh = await this.getRequest(req.id, context);
+    // Phase B: step.onApprove fires when transitioning out of this step.
+    await this.runActions((step as any)?.onApprove, 'step_approve', process, fresh!, step, input.actorId, input.comment);
     return { request: fresh!, finalized: false };
   }
 
@@ -423,6 +518,8 @@ export class ApprovalService implements IApprovalService {
         updated_at: now,
       }, { context: SYSTEM_CTX });
       const fresh = await this.getRequest(req.id, context);
+      // Phase B: step-level onReject fires on non-final rejection too.
+      await this.runActions((step as any)?.onReject, 'step_reject', process, fresh!, step, input.actorId, input.comment);
       return { request: fresh!, finalized: false };
     }
 
@@ -434,6 +531,10 @@ export class ApprovalService implements IApprovalService {
       updated_at: now,
     }, { context: SYSTEM_CTX });
     const fresh = await this.getRequest(req.id, context);
+    // Phase B: step.onReject + process.onFinalReject + status mirror.
+    await this.runActions((step as any)?.onReject, 'step_reject', process, fresh!, step, input.actorId, input.comment);
+    await this.syncStatusField(process, fresh!);
+    await this.runActions((process.definition as any)?.onFinalReject, 'final_reject', process, fresh!, step, input.actorId, input.comment);
     return { request: fresh!, finalized: true };
   }
 
@@ -466,6 +567,12 @@ export class ApprovalService implements IApprovalService {
       updated_at: now,
     }, { context: SYSTEM_CTX });
     const fresh = await this.getRequest(req.id, context);
+    // Phase B: process.onRecall + status mirror.
+    const process = await this.getProcess(req.process_name, context);
+    if (process) {
+      await this.syncStatusField(process, fresh!);
+      await this.runActions((process.definition as any)?.onRecall, 'recall', process, fresh!, undefined, input.actorId, input.comment);
+    }
     return { request: fresh!, finalized: true };
   }
 

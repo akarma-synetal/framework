@@ -7,15 +7,24 @@ import {
   SysApprovalAction,
 } from '@objectstack/platform-objects/audit';
 import { ApprovalService, type ApprovalEngine } from './approval-service.js';
+import { bindProcessHooks, unbindAllHooks } from './lifecycle-hooks.js';
 
 export interface ApprovalsPluginOptions {
   /** Disable runtime registration (schemas still register). */
   disableService?: boolean;
+  /**
+   * Disable Phase B auto-trigger / lock hooks. Schema definition stays
+   * intact; only the engine-level wiring is suppressed. Useful when a
+   * caller wants the manual API only (e.g. tests).
+   */
+  disableAutoHooks?: boolean;
 }
 
 /**
  * ApprovalsServicePlugin — registers sys_approval_{process,request,action},
- * the `approvals` service, and (later) the SLA escalation dispatcher.
+ * the `approvals` service, and Phase B lifecycle hooks (auto-trigger,
+ * record lock, status mirror). SLA escalation dispatcher is a later
+ * milestone.
  */
 export class ApprovalsServicePlugin implements Plugin {
   name = 'com.objectstack.service.approvals';
@@ -25,6 +34,8 @@ export class ApprovalsServicePlugin implements Plugin {
 
   private readonly options: ApprovalsPluginOptions;
   private service?: ApprovalService;
+  private engine?: any;
+  private logger?: any;
 
   constructor(options: ApprovalsPluginOptions = {}) {
     this.options = options;
@@ -46,10 +57,6 @@ export class ApprovalsServicePlugin implements Plugin {
 
   async start(ctx: PluginContext): Promise<void> {
     if (this.options.disableService) return;
-    // Register the service directly (not on kernel:ready) so it's available
-    // when other plugins' `kernel:ready` hooks fire — e.g. AppPlugin's
-    // declarative approval-process seeder. `objectql` is in our
-    // `dependencies` array, so it's guaranteed to be started first.
     let engine: any = null;
     try { engine = ctx.getService<any>('objectql'); }
     catch { try { engine = ctx.getService<any>('data'); } catch { /* ignore */ } }
@@ -57,15 +64,51 @@ export class ApprovalsServicePlugin implements Plugin {
       ctx.logger.warn('ApprovalsServicePlugin: no ObjectQL engine — service NOT registered');
       return;
     }
+    this.engine = engine;
+    this.logger = ctx.logger;
+
     this.service = new ApprovalService({
       engine: engine as ApprovalEngine,
       logger: ctx.logger,
     });
+
+    if (!this.options.disableAutoHooks) {
+      // Re-bind hooks on every registry mutation.
+      this.service.setRegistryChangeHandler(() => this.rebindHooks());
+      // Initial bind happens once the kernel is ready so the AppPlugin's
+      // declarative process seeder has already populated sys_approval_process.
+      const hookOn = (ctx as any).hook ?? (ctx as any).on;
+      if (typeof hookOn === 'function') {
+        try {
+          hookOn.call(ctx, 'kernel:ready', async () => { await this.rebindHooks(); });
+        } catch {
+          // Fall through to immediate bind (no kernel:ready event).
+          await this.rebindHooks();
+        }
+      } else {
+        await this.rebindHooks();
+      }
+    }
+
     ctx.registerService('approvals', this.service);
     ctx.logger.info('ApprovalsServicePlugin: service registered');
   }
 
+  private async rebindHooks(): Promise<void> {
+    if (!this.engine || !this.service) return;
+    try {
+      unbindAllHooks(this.engine);
+      const processes = await this.service.listProcesses({ activeOnly: true }, { isSystem: true, roles: [], permissions: [] } as any);
+      bindProcessHooks(this.engine, this.service, processes, this.logger);
+    } catch (err: any) {
+      this.logger?.warn?.('[approvals] rebindHooks failed', { error: err?.message });
+    }
+  }
+
   async stop(_ctx: PluginContext): Promise<void> {
-    // nothing yet (no dispatcher)
+    if (this.engine) {
+      try { unbindAllHooks(this.engine); } catch { /* ignore */ }
+    }
   }
 }
+

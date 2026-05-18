@@ -9,6 +9,16 @@ import { ApprovalProcess } from '@objectstack/spec/automation';
  * opportunity amount exceeds 100,000. Sales manager reviews first, then
  * a sales director signs off. Either rejection rolls back to the previous
  * step so the submitter can re-justify.
+ *
+ * Phase B autopilot:
+ *   - `entryCriteria` causes the engine to auto-submit on insert/update
+ *     when amount crosses the threshold.
+ *   - `lockRecord: true` blocks edits while a request is pending.
+ *   - `approvalStatusField: 'approval_status'` mirrors the request status
+ *     onto the opportunity row.
+ *   - `onSubmit` notifies the pending approvers via the system inbox.
+ *   - `onFinalApprove` advances the opportunity to closed_won.
+ *   - `onFinalReject` notifies the submitter.
  */
 export const OpportunityDiscountApproval = ApprovalProcess.create({
   name: 'opportunity_discount_approval',
@@ -20,6 +30,63 @@ export const OpportunityDiscountApproval = ApprovalProcess.create({
 
   entryCriteria: 'record.amount > 100000',
   lockRecord: true,
+  approvalStatusField: 'approval_status',
+
+  onSubmit: [
+    {
+      type: 'inbox_notify',
+      name: 'notify_approvers',
+      config: {
+        to: 'pending_approvers',
+        title: 'Discount approval needed',
+        body: 'Opportunity {record_id} (amount over 100k) is awaiting your review.',
+        link: '/system/approvals',
+      },
+    },
+  ],
+
+  onFinalApprove: [
+    {
+      type: 'field_update',
+      name: 'mark_won',
+      config: { field: 'stage', value: 'closed_won' },
+    },
+    {
+      type: 'inbox_notify',
+      name: 'notify_submitter_approved',
+      config: {
+        to: 'submitter',
+        title: 'Discount approved',
+        body: 'Your discount request on opportunity {record_id} was approved.',
+        link: '/system/approvals',
+      },
+    },
+  ],
+
+  onFinalReject: [
+    {
+      type: 'inbox_notify',
+      name: 'notify_submitter_rejected',
+      config: {
+        to: 'submitter',
+        title: 'Discount rejected',
+        body: 'Your discount request on opportunity {record_id} was rejected: {comment}',
+        link: '/system/approvals',
+      },
+    },
+  ],
+
+  onRecall: [
+    {
+      type: 'inbox_notify',
+      name: 'notify_recall',
+      config: {
+        to: 'pending_approvers',
+        title: 'Discount request recalled',
+        body: 'Submitter recalled the discount request on opportunity {record_id}.',
+      },
+    },
+  ],
 
   steps: [
     {
@@ -44,3 +111,4 @@ export const OpportunityDiscountApproval = ApprovalProcess.create({
     },
   ],
 });
+

@@ -205,6 +205,7 @@ export const HookContextSchema = lazySchema(() => z.object({
     tenantId: z.string().optional(),
     roles: z.array(z.string()).optional(),
     accessToken: z.string().optional(),
+    isSystem: z.boolean().optional().describe('True when the call was made with an elevated system context (engine self-writes)'),
   }).optional().describe('Current session context'),
   
   /**
