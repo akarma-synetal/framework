@@ -1316,6 +1316,12 @@ export class ObjectQL implements IDataEngine {
           ql: this
       };
       await this.triggerHooks('beforeFind', hookContext);
+      if (opCtx.context?.transaction) {
+        hookContext.input.options = {
+          ...(hookContext.input.options as any),
+          transaction: opCtx.context.transaction,
+        };
+      }
 
       try {
           let result = await driver.find(object, hookContext.input.ast as QueryAST, hookContext.input.options as any);
@@ -1378,7 +1384,10 @@ export class ObjectQL implements IDataEngine {
     };
 
     await this.executeWithMiddleware(opCtx, async () => {
-      let result = await driver.findOne(objectName, opCtx.ast as QueryAST);
+      const findOneOpts = opCtx.context?.transaction
+        ? ({ transaction: opCtx.context.transaction } as any)
+        : undefined;
+      let result = await driver.findOne(objectName, opCtx.ast as QueryAST, findOneOpts);
 
       // Post-process: evaluate formula virtual fields against the raw row
       if (result != null) applyFormulaPlan(_findOneFormula.plan, [result]);
@@ -1419,6 +1428,16 @@ export class ObjectQL implements IDataEngine {
           ql: this
       };
       await this.triggerHooks('beforeInsert', hookContext);
+      // Thread the open transaction (if any) into the driver-facing
+      // options so that knex's `.transacting(trx)` is honoured. Without
+      // this, calls inside a `engine.transaction(...)` block would deadlock
+      // on SQLite's single-connection pool.
+      if (opCtx.context?.transaction) {
+        hookContext.input.options = {
+          ...(hookContext.input.options as any),
+          transaction: opCtx.context.transaction,
+        };
+      }
 
       try {
         let result;
@@ -1527,6 +1546,12 @@ export class ObjectQL implements IDataEngine {
           ql: this
        };
        await this.triggerHooks('beforeUpdate', hookContext);
+       if (opCtx.context?.transaction) {
+         hookContext.input.options = {
+           ...(hookContext.input.options as any),
+           transaction: opCtx.context.transaction,
+         };
+       }
 
        try {
            let result;
@@ -1606,6 +1631,12 @@ export class ObjectQL implements IDataEngine {
           ql: this
       };
       await this.triggerHooks('beforeDelete', hookContext);
+      if (opCtx.context?.transaction) {
+        hookContext.input.options = {
+          ...(hookContext.input.options as any),
+          transaction: opCtx.context.transaction,
+        };
+      }
 
       try {
           let result;
@@ -1753,6 +1784,53 @@ export class ObjectQL implements IDataEngine {
       }
 
       return driver.execute(rawCommand, params, options);
+  }
+
+  /**
+   * Execute a callback inside a database transaction.
+   *
+   * The callback receives a context object that should be passed to all
+   * downstream `engine.insert/update/delete/find/findOne` calls (as
+   * `{ context: trxCtx }`). The transaction handle threads through
+   * `OperationContext.context.transaction` and the SQL driver's per-builder
+   * `.transacting(trx)` call.
+   *
+   * - If the default driver does not support `beginTransaction`, the callback
+   *   runs directly with the supplied base context (no rollback). This keeps
+   *   the API safe to call on drivers without ACID support (e.g. the
+   *   in-memory driver in tests).
+   * - On callback success the transaction is committed; on any thrown error
+   *   it is rolled back and the original error is re-thrown.
+   *
+   * Use case: multi-step operations that must be atomic (e.g. CRM
+   * `convertLead`, which creates an account + contact + opportunity + flips
+   * the lead in a single unit of work).
+   */
+  async transaction<T>(
+    callback: (trxCtx: any) => Promise<T>,
+    baseContext?: any,
+  ): Promise<T> {
+    const driver = this.defaultDriver ? this.drivers.get(this.defaultDriver) : undefined;
+    const drv = driver as any;
+    if (!drv?.beginTransaction) {
+      return callback(baseContext);
+    }
+    const trx = await drv.beginTransaction();
+    const trxCtx = { ...(baseContext ?? {}), transaction: trx };
+    try {
+      const result = await callback(trxCtx);
+      if (drv.commit) await drv.commit(trx);
+      else if (drv.commitTransaction) await drv.commitTransaction(trx);
+      return result;
+    } catch (err) {
+      try {
+        if (drv.rollback) await drv.rollback(trx);
+        else if (drv.rollbackTransaction) await drv.rollbackTransaction(trx);
+      } catch {
+        // swallow rollback failures so the original error surfaces
+      }
+      throw err;
+    }
   }
 
   // ============================================

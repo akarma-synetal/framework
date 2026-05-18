@@ -1091,27 +1091,21 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             throw err;
         }
 
-        const createdAccountIds: string[] = [];
-        const createdContactIds: string[] = [];
-        const createdOpportunityIds: string[] = [];
+        // Wrap the whole conversion in a single DB transaction so that a
+        // partial failure (e.g. opportunity insert fails after we've
+        // already created the account/contact) rolls back atomically
+        // instead of leaving orphan rows. Falls back to direct execution
+        // on drivers without transaction support — in that case the
+        // operations are still ordered so callers see the same partial
+        // state we'd get from any non-atomic sequence.
+        const runConversion = async (trxCtx: any) => {
+            const opCtx = trxCtx ?? ctx;
+            const trxCtxOpt = opCtx !== undefined ? { context: opCtx } : undefined;
 
-        const rollback = async () => {
-            for (const id of createdOpportunityIds) {
-                try { await this.engine.delete('opportunity', { where: { id } } as any); } catch { /* ignore */ }
-            }
-            for (const id of createdContactIds) {
-                try { await this.engine.delete('contact', { where: { id } } as any); } catch { /* ignore */ }
-            }
-            for (const id of createdAccountIds) {
-                try { await this.engine.delete('account', { where: { id } } as any); } catch { /* ignore */ }
-            }
-        };
-
-        try {
             // 1) Account
             let account: any;
             if (request.accountId) {
-                account = await this.engine.findOne('account', { where: { id: request.accountId }, ...(ctxOpt as any) } as any);
+                account = await this.engine.findOne('account', { where: { id: request.accountId }, ...(trxCtxOpt as any) } as any);
                 if (!account) {
                     const err: any = new Error(`Account '${request.accountId}' not found`);
                     err.status = 404;
@@ -1129,14 +1123,13 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 if (lead.phone)           accountPayload.phone = lead.phone;
                 if (lead.address)         accountPayload.billing_address = lead.address;
                 if (lead.owner)           accountPayload.owner = lead.owner;
-                account = await this.engine.insert('account', accountPayload, ctxOpt as any);
-                if (account?.id) createdAccountIds.push(account.id);
+                account = await this.engine.insert('account', accountPayload, trxCtxOpt as any);
             }
 
             // 2) Contact
             let contact: any;
             if (request.contactId) {
-                contact = await this.engine.findOne('contact', { where: { id: request.contactId }, ...(ctxOpt as any) } as any);
+                contact = await this.engine.findOne('contact', { where: { id: request.contactId }, ...(trxCtxOpt as any) } as any);
                 if (!contact) {
                     const err: any = new Error(`Contact '${request.contactId}' not found`);
                     err.status = 404;
@@ -1156,8 +1149,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 if (lead.address)    contactPayload.mailing_address = lead.address;
                 if (lead.owner)      contactPayload.owner = lead.owner;
                 if (account?.id)     contactPayload.account = account.id;
-                contact = await this.engine.insert('contact', contactPayload, ctxOpt as any);
-                if (contact?.id) createdContactIds.push(contact.id);
+                contact = await this.engine.insert('contact', contactPayload, trxCtxOpt as any);
             }
 
             // 3) Opportunity (optional)
@@ -1180,8 +1172,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 if (contact?.id)  oppPayload.primary_contact = contact.id;
                 if (lead.owner)   oppPayload.owner = lead.owner;
                 if (lead.lead_source) oppPayload.lead_source = lead.lead_source;
-                opportunity = await this.engine.insert('opportunity', oppPayload, ctxOpt as any);
-                if (opportunity?.id) createdOpportunityIds.push(opportunity.id);
+                opportunity = await this.engine.insert('opportunity', oppPayload, trxCtxOpt as any);
             }
 
             // 4) Mark lead converted
@@ -1195,7 +1186,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             };
             const updatedLead = await this.engine.update('lead', leadUpdate, {
                 where: { id: leadId },
-                ...(ctxOpt as any),
+                ...(trxCtxOpt as any),
             } as any);
 
             return {
@@ -1204,10 +1195,9 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 contact,
                 opportunity,
             };
-        } catch (err) {
-            await rollback();
-            throw err;
-        }
+        };
+
+        return (this.engine as any).transaction(runConversion, ctx);
     }
 
     // ==========================================
