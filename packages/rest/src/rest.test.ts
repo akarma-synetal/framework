@@ -566,6 +566,120 @@ describe('RestServer', () => {
       });
     });
   });
+
+  // -----------------------------------------------------------------------
+  // GET /data/:object/export — streaming CSV / JSON export (M10.21 / C.21)
+  // -----------------------------------------------------------------------
+  describe('export handler', () => {
+    function getExportRoute(rest: any) {
+      const routes = rest.getRoutes();
+      return routes.find(
+        (r: any) => r.method === 'GET' && r.path === '/api/v1/data/:object/export',
+      );
+    }
+
+    function makeRes() {
+      const chunks: string[] = [];
+      const headers: Record<string, string> = {};
+      let status = 200;
+      const res: any = {
+        write: (s: string) => { chunks.push(s); },
+        end: vi.fn(),
+        header: (n: string, v: string) => { headers[n] = v; return res; },
+        status: (code: number) => { status = code; return res; },
+        json: vi.fn(),
+      };
+      return { res, chunks, headers, getStatus: () => status };
+    }
+
+    it('streams CSV with header row and quotes risky cells', async () => {
+      const rest = new RestServer(server as any, protocol as any);
+      rest.registerRoutes();
+      const route = getExportRoute(rest);
+      expect(route).toBeDefined();
+
+      protocol.findData.mockResolvedValueOnce({
+        data: [
+          { id: '1', name: 'Acme, Inc.', note: 'line1\nline2' },
+          { id: '2', name: 'Beta "Co"', note: null },
+        ],
+      });
+      // Second call returns empty -> ends the stream
+      protocol.findData.mockResolvedValueOnce({ data: [] });
+
+      const { res, chunks, headers } = makeRes();
+      const req = {
+        params: { object: 'account' },
+        query: { format: 'csv', fields: 'id,name,note', limit: '500' },
+      };
+
+      await route!.handler(req as any, res);
+
+      expect(headers['Content-Type']).toBe('text/csv; charset=utf-8');
+      expect(headers['Content-Disposition']).toMatch(/attachment; filename="account-\d{4}-\d{2}-\d{2}\.csv"/);
+      const text = chunks.join('');
+      expect(text.startsWith('id,name,note\r\n')).toBe(true);
+      expect(text).toContain('1,"Acme, Inc.","line1\nline2"');
+      expect(text).toContain('2,"Beta ""Co""",');
+      expect(res.end).toHaveBeenCalled();
+    });
+
+    it('streams JSON array when format=json', async () => {
+      const rest = new RestServer(server as any, protocol as any);
+      rest.registerRoutes();
+      const route = getExportRoute(rest);
+
+      protocol.findData.mockResolvedValueOnce({
+        data: [{ id: 'a' }, { id: 'b' }],
+      });
+      protocol.findData.mockResolvedValueOnce({ data: [] });
+
+      const { res, chunks, headers } = makeRes();
+      await route!.handler({
+        params: { object: 'lead' },
+        query: { format: 'json' },
+      } as any, res);
+
+      expect(headers['Content-Type']).toBe('application/json; charset=utf-8');
+      const text = chunks.join('');
+      expect(text).toBe('[{"id":"a"},{"id":"b"}]');
+    });
+
+    it('rejects invalid JSON in filter query', async () => {
+      const rest = new RestServer(server as any, protocol as any);
+      rest.registerRoutes();
+      const route = getExportRoute(rest);
+
+      const { res } = makeRes();
+      await route!.handler({
+        params: { object: 'account' },
+        query: { filter: '{not json' },
+      } as any, res);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'INVALID_REQUEST' }));
+    });
+
+    it('honours the hard 50k row cap', async () => {
+      const rest = new RestServer(server as any, protocol as any);
+      rest.registerRoutes();
+      const route = getExportRoute(rest);
+
+      // Always return full chunks so the loop is bounded only by `limit`.
+      protocol.findData.mockImplementation(async ({ query }: any) => {
+        const take = query?.$top ?? 0;
+        return { data: Array.from({ length: take }, (_v, i) => ({ id: String((query?.$skip ?? 0) + i) })) };
+      });
+
+      const { res, chunks } = makeRes();
+      await route!.handler({
+        params: { object: 'big' },
+        query: { format: 'csv', limit: '999999', fields: 'id' },
+      } as any, res);
+
+      const lines = chunks.join('').split('\r\n').filter(Boolean);
+      // 1 header + 50 000 rows.
+      expect(lines.length).toBe(50_001);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -236,6 +236,39 @@ function parseCsvToRows(csv: string, mapping: Record<string, string> = {}): Arra
 }
 
 /**
+ * Escape a single value into an RFC-4180 CSV cell. Values containing
+ * commas, quotes, CR, or LF are wrapped in double-quotes with embedded
+ * quotes doubled. `null` / `undefined` become an empty cell. Objects and
+ * arrays are serialised as compact JSON so nested data round-trips
+ * without flattening surprises.
+ */
+function formatCsvCell(value: any): string {
+    if (value === null || value === undefined) return '';
+    let s: string;
+    if (typeof value === 'string') s = value;
+    else if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') s = String(value);
+    else if (value instanceof Date) s = value.toISOString();
+    else { try { s = JSON.stringify(value); } catch { s = String(value); } }
+    if (/[",\r\n]/.test(s)) {
+        return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+}
+
+/**
+ * Serialise a list of rows to RFC-4180 CSV text. Caller supplies the
+ * ordered list of field names; unknown fields produce empty cells.
+ */
+function rowsToCsv(fields: string[], rows: Array<Record<string, any>>, includeHeader: boolean): string {
+    const lines: string[] = [];
+    if (includeHeader) lines.push(fields.map(formatCsvCell).join(','));
+    for (const row of rows) {
+        lines.push(fields.map(f => formatCsvCell(row?.[f])).join(','));
+    }
+    return lines.join('\r\n') + (lines.length > 0 ? '\r\n' : '');
+}
+
+/**
  * Structural subset of `KernelManager` that RestServer needs in order to
  * resolve a per-project protocol at request time. Typed locally to avoid
  * an @objectstack/runtime → @objectstack/rest → @objectstack/runtime
@@ -1626,6 +1659,156 @@ export class RestServer {
             metadata: {
                 summary: 'Bulk-import rows into an object (CSV or JSON, with optional dry-run)',
                 tags: ['data', 'import'],
+            },
+        });
+
+        // GET /data/:object/export  — streaming export (M10.21 / C.21)
+        //
+        // Query params:
+        //   format=csv|json     (default: csv. json emits a JSON array.)
+        //   fields=a,b,c        (default: derive from object schema; falls back to keys of the first row)
+        //   filter=<json>       ($filter as URL-encoded JSON, same shape as list endpoint)
+        //   orderby=field:desc  (optional ordering, mirrors $orderby semantics)
+        //   limit=<n>           (default 10000, hard cap 50000)
+        //   page=<n>            (driver chunk size, default 500, max 5000)
+        //
+        // Streams the response so 50k-row exports do not buffer in memory.
+        // Filename suggests `${object}-${YYYY-MM-DD}.${ext}` for browsers.
+        this.routeManager.register({
+            method: 'GET',
+            path: `${dataPath}/:object/export`,
+            handler: async (req: any, res: any) => {
+                try {
+                    const projectId = isScoped ? req.params?.projectId : undefined;
+                    const p = await this.resolveProtocol(projectId, req);
+                    const context = await this.resolveExecCtx(projectId, req);
+                    if (this.enforceAuth(req, res, context)) return;
+                    const objectName = String(req.params.object || '');
+                    if (!objectName) {
+                        res.status(400).json({ code: 'INVALID_REQUEST', error: 'object is required' });
+                        return;
+                    }
+                    const q = req.query ?? {};
+                    const format = (String(q.format ?? 'csv')).toLowerCase() === 'json' ? 'json' : 'csv';
+                    const HARD_CAP = 50_000;
+                    const MAX_CHUNK = 5_000;
+                    const requestedLimit = q.limit != null ? Math.max(1, Number(q.limit) || 0) : 10_000;
+                    const limit = Math.min(requestedLimit, HARD_CAP);
+                    const chunkSize = Math.min(MAX_CHUNK, Math.max(50, q.page != null ? Number(q.page) || 500 : 500));
+
+                    let filter: any = undefined;
+                    if (typeof q.filter === 'string' && q.filter.length > 0) {
+                        try { filter = JSON.parse(q.filter); }
+                        catch {
+                            res.status(400).json({ code: 'INVALID_REQUEST', error: 'filter must be JSON' });
+                            return;
+                        }
+                    } else if (q.filter && typeof q.filter === 'object') {
+                        filter = q.filter;
+                    }
+
+                    let orderby: any = undefined;
+                    if (typeof q.orderby === 'string' && q.orderby.length > 0) {
+                        // Accept "field:dir,field2:dir" shorthand or a JSON object.
+                        if (q.orderby.startsWith('{') || q.orderby.startsWith('[')) {
+                            try { orderby = JSON.parse(q.orderby); } catch { /* leave undefined */ }
+                        } else {
+                            const obj: Record<string, 'asc' | 'desc'> = {};
+                            for (const part of q.orderby.split(',')) {
+                                const [field, dir] = part.split(':').map((s: string) => s.trim());
+                                if (field) obj[field] = dir?.toLowerCase() === 'desc' ? 'desc' : 'asc';
+                            }
+                            if (Object.keys(obj).length > 0) orderby = obj;
+                        }
+                    }
+
+                    // Resolve fields: explicit param > schema fields > derived from first row.
+                    let fields: string[] | undefined;
+                    if (typeof q.fields === 'string' && q.fields.length > 0) {
+                        fields = q.fields.split(',').map((s: string) => s.trim()).filter(Boolean);
+                    } else if (Array.isArray(q.fields)) {
+                        fields = q.fields.filter((s: any) => typeof s === 'string' && s.length > 0);
+                    }
+                    if (!fields || fields.length === 0) {
+                        try {
+                            const schema = await (p as any).getObjectSchema?.(objectName, projectId);
+                            const schemaFields = schema?.fields;
+                            if (Array.isArray(schemaFields)) {
+                                fields = schemaFields.map((f: any) => f.name).filter((n: any) => typeof n === 'string');
+                            }
+                        } catch { /* fall back to first-row derivation */ }
+                    }
+
+                    // Prepare streaming response. Set headers BEFORE first write.
+                    const stamp = new Date().toISOString().slice(0, 10);
+                    const safeObj = objectName.replace(/[^A-Za-z0-9_.-]/g, '_');
+                    if (format === 'csv') {
+                        res.header('Content-Type', 'text/csv; charset=utf-8');
+                        res.header('Content-Disposition', `attachment; filename="${safeObj}-${stamp}.csv"`);
+                    } else {
+                        res.header('Content-Type', 'application/json; charset=utf-8');
+                        res.header('Content-Disposition', `attachment; filename="${safeObj}-${stamp}.json"`);
+                    }
+                    res.header('X-Export-Format', format);
+                    res.header('X-Export-Limit', String(limit));
+                    res.header('Cache-Control', 'no-store');
+
+                    let exported = 0;
+                    let firstChunk = true;
+                    let skip = 0;
+                    if (format === 'json') res.write('[');
+
+                    while (exported < limit) {
+                        const take = Math.min(chunkSize, limit - exported);
+                        const findArgs: any = {
+                            object: objectName,
+                            query: {
+                                ...(filter ? { $filter: filter } : {}),
+                                ...(orderby ? { $orderby: orderby } : {}),
+                                $top: take,
+                                $skip: skip,
+                            },
+                            ...(projectId ? { projectId } : {}),
+                            ...(context ? { context } : {}),
+                        };
+                        const result: any = await (p as any).findData(findArgs);
+                        const rows: any[] = Array.isArray(result?.data) ? result.data
+                            : Array.isArray(result?.rows) ? result.rows
+                                : Array.isArray(result) ? result : [];
+
+                        if (rows.length === 0) break;
+
+                        if (format === 'csv') {
+                            // Derive fields from the first row if schema lookup failed.
+                            if ((!fields || fields.length === 0) && firstChunk) {
+                                fields = Object.keys(rows[0] ?? {});
+                            }
+                            const text = rowsToCsv(fields ?? [], rows, firstChunk);
+                            res.write(text);
+                        } else {
+                            for (let i = 0; i < rows.length; i++) {
+                                const prefix = (firstChunk && i === 0) ? '' : ',';
+                                res.write(prefix + JSON.stringify(rows[i]));
+                            }
+                        }
+                        firstChunk = false;
+                        exported += rows.length;
+                        skip += rows.length;
+                        if (rows.length < take) break;
+                    }
+                    if (format === 'json') res.write(']');
+                    res.end();
+                } catch (error: any) {
+                    logError('[REST] Unhandled error:', error);
+                    // Best-effort error envelope; if headers already sent the
+                    // client receives a truncated stream which signals failure.
+                    try { sendError(res, error, String(req.params?.object || '')); }
+                    catch { try { res.end(); } catch { /* swallow */ } }
+                }
+            },
+            metadata: {
+                summary: 'Streaming export of object rows (CSV or JSON)',
+                tags: ['data', 'export'],
             },
         });
     }
