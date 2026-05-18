@@ -549,15 +549,15 @@ D9 / D10 / D11                   (resolved through M9 sub-tasks above)
 
 ### M10 P1 — Critical (80%+ of customers need these)
 
-- [ ] M10.6 — `POST /api/v1/data/lead/:id/convert` → atomic Lead → Account + Contact + Opportunity.
-- [ ] M10.7 — `service-email` + `sys_email` (IMAP/SMTP, OAuth Gmail/Outlook), thread linking to records.
-- [ ] M10.8 — `sys_notification` via existing `service-feed` + WebSocket via `service-realtime`; header bell badge.
-- [ ] M10.9 — `POST /api/v1/data/:obj/import` CSV/XLSX parser with dry-run + field mapping.
-- [ ] M10.10 — Comments / @mentions UI on detail pages (table `sys_comment` already exists).
-- [ ] M10.11 — Activity-timeline component (consumes M10.1 data).
-- [ ] M10.12 — `full_name` CEL formula bug (leading space when `salutation` is null).
-- [ ] M10.13 — Date / datetime column formatters in grid plugin (currently displays raw ISO).
-- [ ] M10.14 — Stop SQL error leakage in REST error responses.
+- [x] M10.6 — `POST /api/v1/data/lead/:id/convert` → Lead → Account + Contact + Opportunity (compensating rollback; true tx is M11 follow-up).
+- [ ] M10.7 — `service-email` + `sys_email` (IMAP/SMTP, OAuth Gmail/Outlook), thread linking to records. **Deferred to M11** — requires external infra outside the first-wave pilot scope.
+- [x] M10.8 — `sys_notification` inbox + assignment / @mention writers + header bell (polling). WebSocket push deferred to M11.
+- [x] M10.9 — `POST /api/v1/data/:obj/import` CSV/JSON parser with dry-run + field mapping.
+- [x] M10.10 — Comments / @mentions UI on detail pages (sys_comment snake_case fix + reactions writeback).
+- [x] M10.11 — Activity-timeline component (consumes M10.1 data via sys_activity → FeedItem mapping).
+- [x] M10.12 — `full_name` CEL formula bug (leading space when `salutation` is null).
+- [x] M10.13 — Date / datetime column formatters in grid plugin.
+- [x] M10.14 — Stop SQL error leakage in REST error responses (centralized sendError → mapDataError).
 
 ### M10 P2 — Important (50%+ of customers need these)
 
