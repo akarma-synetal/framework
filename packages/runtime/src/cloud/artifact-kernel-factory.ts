@@ -17,7 +17,11 @@
  *                              as the `'cloud'` datasource so AuthPlugin's
  *                              identity manifest resolves locally.
  *   • ObjectQLPlugin
- *   • MetadataPlugin (no system-object registration)
+ *   • MetadataPlugin (registers `sys_metadata` + `sys_metadata_history` on
+ *                     the project DB — required by ADR-0005: customization
+ *                     overlays such as user-created views/dashboards are
+ *                     persisted by ObjectStackProtocolImplementation on the
+ *                     per-project engine, so the table must exist there).
  *   • AuthPlugin    — per-project, derives an HKDF secret from
  *                     `OS_AUTH_SECRET` + projectId. Each project owns its
  *                     own `sys_user/sys_session/...` tables in its own
@@ -128,7 +132,15 @@ export class ArtifactKernelFactory implements ProjectKernelFactory {
             watch: false,
             projectId: projectId,
             organizationId: project.organization_id,
-            registerSystemObjects: false,
+            // ADR-0005: customization overlays (user-created views, dashboards,
+            // edited objects, ...) are persisted by
+            // ObjectStackProtocolImplementation.saveMetaItem on whichever
+            // engine the protocol is attached to. For per-project kernels that
+            // means the project's own DB, so the sys_metadata + history tables
+            // MUST be provisioned here. The previous `false` setting caused
+            // "no such table: sys_metadata" errors on any PUT /api/v1/meta/*
+            // call (e.g. Studio "Create View") against a project deployment.
+            registerSystemObjects: true,
         }));
 
         // Per-project AuthPlugin — only when an OS_AUTH_SECRET base is
