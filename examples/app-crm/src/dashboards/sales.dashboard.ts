@@ -186,13 +186,13 @@ export const SalesDashboard: Dashboard = {
 
     // ─── Row 3: Performance Breakdown ─────────────────────────────────
     {
-      id: 'opportunities_by_owner',
-      title: 'Opportunities by Owner',
-      description: 'Open pipeline value per sales rep',
+      id: 'pipeline_by_forecast_category',
+      title: 'Pipeline by Forecast Category',
+      description: 'Open pipeline grouped by sales forecast category',
       type: 'horizontal-bar',
       object: 'opportunity',
       filter: { stage: { $nin: ['closed_won', 'closed_lost'] } },
-      categoryField: 'owner',
+      categoryField: 'forecast_category',
       valueField: 'amount',
       aggregate: 'sum',
       colorVariant: 'blue',
@@ -203,7 +203,7 @@ export const SalesDashboard: Dashboard = {
         showDataLabels: true,
         colors: ['#4F46E5'],
         xAxis: { field: 'amount', title: 'Pipeline value', format: '0,0', showGridLines: true, logarithmic: false },
-        yAxis: [{ field: 'owner', title: 'Owner', showGridLines: false, logarithmic: false }],
+        yAxis: [{ field: 'forecast_category', title: 'Forecast', showGridLines: false, logarithmic: false }],
       },
     },
     {

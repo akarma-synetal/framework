@@ -13190,7 +13190,7 @@
         },
         "renewals_due": {
           "name": "renewals_due",
-          "label": "🔄 Renewals Due (90d)",
+          "label": "🔄 Upcoming Renewals",
           "type": "grid",
           "data": {
             "provider": "object",
@@ -13212,13 +13212,7 @@
             },
             {
               "field": "next_renewal_date",
-              "operator": "less_than_or_equal",
-              "value": "{TODAY() + 90d}"
-            },
-            {
-              "field": "next_renewal_date",
-              "operator": "greater_than_or_equal",
-              "value": "{TODAY()}"
+              "operator": "is_not_null"
             }
           ],
           "sort": [
@@ -13880,14 +13874,12 @@
               "value": false
             },
             {
-              "field": "is_sla_violated",
-              "operator": "equals",
-              "value": false
-            },
-            {
-              "field": "sla_due_date",
-              "operator": "less_than_or_equal",
-              "value": "{NOW() + 4h}"
+              "field": "priority",
+              "operator": "in",
+              "value": [
+                "high",
+                "critical"
+              ]
             }
           ],
           "sort": [
@@ -14768,11 +14760,6 @@
                 "new",
                 "contacted"
               ]
-            },
-            {
-              "field": "next_followup_date",
-              "operator": "less_than_or_equal",
-              "value": "{TODAY()}"
             }
           ],
           "sort": [
@@ -15615,11 +15602,6 @@
           ],
           "filter": [
             {
-              "field": "days_in_stage",
-              "operator": "greater_than",
-              "value": 30
-            },
-            {
               "field": "stage",
               "operator": "not_in",
               "value": [
@@ -15632,6 +15614,10 @@
             {
               "field": "days_in_stage",
               "order": "desc"
+            },
+            {
+              "field": "close_date",
+              "order": "asc"
             }
           ]
         },
@@ -16470,7 +16456,7 @@
         },
         "todays_tasks": {
           "name": "todays_tasks",
-          "label": "📅 Today's Tasks",
+          "label": "📅 My Priority Tasks",
           "type": "grid",
           "data": {
             "provider": "object",
@@ -16486,22 +16472,27 @@
           ],
           "filter": [
             {
-              "field": "owner",
-              "operator": "equals",
-              "value": "{current_user_id}"
+              "field": "status",
+              "operator": "in",
+              "value": [
+                "not_started",
+                "in_progress"
+              ]
             },
             {
-              "field": "due_date",
-              "operator": "equals",
-              "value": "{TODAY()}"
-            },
-            {
-              "field": "is_completed",
-              "operator": "equals",
-              "value": false
+              "field": "priority",
+              "operator": "in",
+              "value": [
+                "high",
+                "urgent"
+              ]
             }
           ],
           "sort": [
+            {
+              "field": "due_date",
+              "order": "asc"
+            },
             {
               "field": "priority",
               "order": "desc"
@@ -16510,7 +16501,7 @@
         },
         "overdue_tasks": {
           "name": "overdue_tasks",
-          "label": "⏰ Overdue Tasks",
+          "label": "⏰ Open Tasks Past Due",
           "type": "grid",
           "data": {
             "provider": "object",
@@ -16524,11 +16515,6 @@
             "owner"
           ],
           "filter": [
-            {
-              "field": "due_date",
-              "operator": "less_than",
-              "value": "{TODAY()}"
-            },
             {
               "field": "is_completed",
               "operator": "equals",
@@ -17632,9 +17618,9 @@
           }
         },
         {
-          "id": "opportunities_by_owner",
-          "title": "Opportunities by Owner",
-          "description": "Open pipeline value per sales rep",
+          "id": "pipeline_by_forecast_category",
+          "title": "Pipeline by Forecast Category",
+          "description": "Open pipeline grouped by sales forecast category",
           "type": "horizontal-bar",
           "chartConfig": {
             "type": "horizontal-bar",
@@ -17647,8 +17633,8 @@
             },
             "yAxis": [
               {
-                "field": "owner",
-                "title": "Owner",
+                "field": "forecast_category",
+                "title": "Forecast",
                 "showGridLines": false,
                 "logarithmic": false
               }
@@ -17669,7 +17655,7 @@
               ]
             }
           },
-          "categoryField": "owner",
+          "categoryField": "forecast_category",
           "valueField": "amount",
           "aggregate": "sum",
           "layout": {
@@ -21408,11 +21394,11 @@
           "type": "number",
           "sql": "annual_revenue"
         },
-        "created_date": {
-          "name": "created_date",
+        "created_at": {
+          "name": "created_at",
           "label": "Created Date",
           "type": "time",
-          "sql": "created_date",
+          "sql": "created_at",
           "granularities": [
             "day",
             "week",
@@ -21534,7 +21520,18 @@
           "annual_revenue": 5000000,
           "number_of_employees": 250,
           "phone": "+1-415-555-0100",
-          "website": "https://acme.example.com"
+          "website": "https://acme.example.com",
+          "tier": "enterprise",
+          "segment": "growth",
+          "health_score": "healthy",
+          "next_renewal_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(45)"
+          },
+          "last_activity_date": {
+            "dialect": "cel",
+            "source": "daysAgo(3)"
+          }
         },
         {
           "name": "Globex Industries",
@@ -21543,7 +21540,13 @@
           "annual_revenue": 12000000,
           "number_of_employees": 800,
           "phone": "+1-312-555-0200",
-          "website": "https://globex.example.com"
+          "website": "https://globex.example.com",
+          "tier": "enterprise",
+          "segment": "net_new",
+          "last_activity_date": {
+            "dialect": "cel",
+            "source": "daysAgo(8)"
+          }
         },
         {
           "name": "Initech Solutions",
@@ -21552,7 +21555,18 @@
           "annual_revenue": 3500000,
           "number_of_employees": 150,
           "phone": "+1-212-555-0300",
-          "website": "https://initech.example.com"
+          "website": "https://initech.example.com",
+          "tier": "mid_market",
+          "segment": "at_risk",
+          "health_score": "at_risk",
+          "next_renewal_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(75)"
+          },
+          "last_activity_date": {
+            "dialect": "cel",
+            "source": "daysAgo(21)"
+          }
         },
         {
           "name": "Stark Medical",
@@ -21561,7 +21575,13 @@
           "annual_revenue": 8000000,
           "number_of_employees": 400,
           "phone": "+1-617-555-0400",
-          "website": "https://starkmed.example.com"
+          "website": "https://starkmed.example.com",
+          "tier": "mid_market",
+          "segment": "stable",
+          "last_activity_date": {
+            "dialect": "cel",
+            "source": "daysAgo(5)"
+          }
         },
         {
           "name": "Wayne Enterprises",
@@ -21570,7 +21590,18 @@
           "annual_revenue": 25000000,
           "number_of_employees": 2000,
           "phone": "+1-650-555-0500",
-          "website": "https://wayne.example.com"
+          "website": "https://wayne.example.com",
+          "tier": "strategic",
+          "segment": "growth",
+          "health_score": "healthy",
+          "next_renewal_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(28)"
+          },
+          "last_activity_date": {
+            "dialect": "cel",
+            "source": "daysAgo(1)"
+          }
         }
       ]
     },
@@ -21654,7 +21685,12 @@
           "phone": "+1-503-555-0600",
           "status": "new",
           "lead_source": "web",
-          "industry": "retail"
+          "industry": "retail",
+          "rating": 3,
+          "next_followup_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(2)"
+          }
         },
         {
           "first_name": "David",
@@ -21664,7 +21700,16 @@
           "phone": "+1-408-555-0700",
           "status": "contacted",
           "lead_source": "referral",
-          "industry": "education"
+          "industry": "education",
+          "rating": 4,
+          "next_followup_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(1)"
+          },
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(3)"
+          }
         },
         {
           "first_name": "Lisa",
@@ -21674,7 +21719,16 @@
           "phone": "+1-206-555-0800",
           "status": "qualified",
           "lead_source": "event",
-          "industry": "technology"
+          "industry": "technology",
+          "rating": 4.5,
+          "next_followup_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(0)"
+          },
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(1)"
+          }
         }
       ]
     },
@@ -21700,7 +21754,8 @@
           },
           "type": "existing_upgrade",
           "forecast_category": "pipeline",
-          "lead_source": "web"
+          "lead_source": "web",
+          "days_in_stage": 12
         },
         {
           "name": "Globex Manufacturing Suite",
@@ -21714,7 +21769,8 @@
           },
           "type": "new_business",
           "forecast_category": "pipeline",
-          "lead_source": "referral"
+          "lead_source": "referral",
+          "days_in_stage": 45
         },
         {
           "name": "Wayne Enterprise License",
@@ -21728,7 +21784,8 @@
           },
           "type": "new_business",
           "forecast_category": "commit",
-          "lead_source": "partner"
+          "lead_source": "partner",
+          "days_in_stage": 7
         },
         {
           "name": "Initech Cloud Migration",
@@ -21742,7 +21799,106 @@
           },
           "type": "existing_upgrade",
           "forecast_category": "best_case",
+          "lead_source": "event",
+          "days_in_stage": 38
+        },
+        {
+          "name": "Acme Annual Renewal 2025",
+          "account": "Acme Corporation",
+          "amount": 220000,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(15)"
+          },
+          "type": "renewal",
+          "forecast_category": "closed",
+          "lead_source": "partner"
+        },
+        {
+          "name": "Stark Medical Pilot",
+          "account": "Stark Medical",
+          "amount": 145000,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(50)"
+          },
+          "type": "new_business",
+          "forecast_category": "closed",
           "lead_source": "event"
+        },
+        {
+          "name": "Wayne Q1 Expansion",
+          "account": "Wayne Enterprises",
+          "amount": 380000,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(95)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "closed",
+          "lead_source": "web"
+        },
+        {
+          "name": "Globex Training Package",
+          "account": "Globex Industries",
+          "amount": 65000,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(140)"
+          },
+          "type": "new_business",
+          "forecast_category": "closed",
+          "lead_source": "referral"
+        },
+        {
+          "name": "Initech Phase 1",
+          "account": "Initech Solutions",
+          "amount": 90000,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(200)"
+          },
+          "type": "new_business",
+          "forecast_category": "closed",
+          "lead_source": "web"
+        },
+        {
+          "name": "Acme Add-on (Lost)",
+          "account": "Acme Corporation",
+          "amount": 75000,
+          "stage": "closed_lost",
+          "probability": 0,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(25)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "omitted",
+          "lead_source": "cold_call"
+        },
+        {
+          "name": "Stark Expansion (Lost)",
+          "account": "Stark Medical",
+          "amount": 120000,
+          "stage": "closed_lost",
+          "probability": 0,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(60)"
+          },
+          "type": "new_business",
+          "forecast_category": "omitted",
+          "lead_source": "advertising"
         }
       ]
     },
@@ -21861,9 +22017,14 @@
           "is_closed": false,
           "is_sla_violated": false,
           "is_escalated": false,
+          "case_number": "CASE-00001",
           "created_date": {
             "dialect": "cel",
             "source": "daysAgo(2)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(1)"
           }
         },
         {
@@ -21879,9 +22040,14 @@
           "is_sla_violated": true,
           "is_escalated": true,
           "escalation_reason": "Customer threatening churn",
+          "case_number": "CASE-00002",
           "created_date": {
             "dialect": "cel",
             "source": "daysAgo(5)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysAgo(2)"
           }
         },
         {
@@ -21897,9 +22063,14 @@
           "is_sla_violated": false,
           "is_escalated": false,
           "resolution_time_hours": 4.5,
+          "case_number": "CASE-00003",
           "created_date": {
             "dialect": "cel",
             "source": "daysAgo(3)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(2)"
           }
         },
         {
@@ -21915,11 +22086,16 @@
           "is_sla_violated": false,
           "is_escalated": false,
           "resolution_time_hours": 2,
+          "case_number": "CASE-00004",
           "created_date": {
             "dialect": "cel",
             "source": "daysAgo(7)"
           },
           "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(6)"
+          },
+          "sla_due_date": {
             "dialect": "cel",
             "source": "daysAgo(6)"
           }
@@ -21936,9 +22112,14 @@
           "is_closed": false,
           "is_sla_violated": false,
           "is_escalated": false,
+          "case_number": "CASE-00005",
           "created_date": {
             "dialect": "cel",
             "source": "daysAgo(1)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(2)"
           }
         },
         {
@@ -21953,9 +22134,14 @@
           "is_closed": false,
           "is_sla_violated": false,
           "is_escalated": false,
+          "case_number": "CASE-00006",
           "created_date": {
             "dialect": "cel",
             "source": "daysAgo(4)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(3)"
           }
         },
         {
@@ -21971,9 +22157,14 @@
           "is_sla_violated": true,
           "is_escalated": true,
           "escalation_reason": "Affects 30% of mobile users",
+          "case_number": "CASE-00007",
           "created_date": {
             "dialect": "cel",
             "source": "daysAgo(3)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysAgo(1)"
           }
         },
         {
@@ -21989,11 +22180,16 @@
           "is_sla_violated": false,
           "is_escalated": false,
           "resolution_time_hours": 8,
+          "case_number": "CASE-00008",
           "created_date": {
             "dialect": "cel",
             "source": "daysAgo(10)"
           },
           "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(8)"
+          },
+          "sla_due_date": {
             "dialect": "cel",
             "source": "daysAgo(8)"
           }
