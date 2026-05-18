@@ -836,6 +836,191 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
     }
 
     // ==========================================
+    // Global Search (M10.5)
+    // ==========================================
+    /**
+     * Cross-object substring search across all registered objects that opt in
+     * via `enable.searchable !== false` and `enable.apiEnabled !== false`.
+     * Searches text-like fields (text/textarea/email/url/phone/markdown/html/string)
+     * whose `searchable: true` flag is set, falling back to the object's
+     * `displayNameField` (or `name`) when no fields are explicitly searchable.
+     *
+     * The query is split into whitespace-separated terms; each term must match
+     * (case-insensitive LIKE) at least one searchable field. RBAC/RLS is
+     * enforced by forwarding the caller's `context` to `engine.find` so users
+     * only see records they are entitled to read.
+     */
+    async searchAll(request: {
+        q: string;
+        objects?: string[];
+        limit?: number;
+        perObject?: number;
+        context?: any;
+    }): Promise<{
+        query: string;
+        hits: Array<{
+            object: string;
+            id: string;
+            title: string;
+            snippet?: string;
+            record: any;
+        }>;
+        totalObjects: number;
+        totalHits: number;
+        truncated: boolean;
+    }> {
+        const q = (request.q ?? '').trim();
+        if (!q) {
+            return { query: '', hits: [], totalObjects: 0, totalHits: 0, truncated: false };
+        }
+
+        const overallLimit = Math.max(1, Math.min(100, Number(request.limit ?? 20)));
+        const perObject = Math.max(1, Math.min(25, Number(request.perObject ?? 5)));
+        const objectsFilter = request.objects && request.objects.length
+            ? new Set(request.objects)
+            : null;
+
+        // Tokenise: each token must match (LIKE %term%) at least one searchable field
+        const terms = q.split(/\s+/).filter(Boolean).slice(0, 8);
+
+        const allObjects = (this.engine as any).registry?.getAllObjects?.() ?? [];
+        const hits: Array<{ object: string; id: string; title: string; snippet?: string; record: any }> = [];
+        let objectsScanned = 0;
+
+        for (const obj of allObjects) {
+            if (hits.length >= overallLimit) break;
+            if (!obj?.name) continue;
+            if (objectsFilter && !objectsFilter.has(obj.name)) continue;
+
+            // Skip platform/system tables and opt-outs
+            const enable = obj.enable ?? {};
+            if (enable.searchable === false) continue;
+            if (enable.apiEnabled === false) continue;
+            // Skip noisy system tables by name prefix
+            if (obj.name.startsWith('sys_audit_log')
+                || obj.name.startsWith('sys_activity')
+                || obj.name.startsWith('sys_session')
+                || obj.name.startsWith('sys_presence')
+                || obj.name.startsWith('sys_metadata')
+                || obj.name.startsWith('sys_account')) {
+                continue;
+            }
+
+            const fieldsRaw = obj.fields;
+            const fields: Array<{ name: string; type: string; searchable?: boolean }> =
+                Array.isArray(fieldsRaw)
+                    ? fieldsRaw
+                    : (fieldsRaw && typeof fieldsRaw === 'object'
+                        ? Object.entries(fieldsRaw).map(([name, f]: [string, any]) => ({ name, ...(f || {}) }))
+                        : []);
+            const TEXT_TYPES = new Set(['text', 'textarea', 'string', 'email', 'url', 'phone', 'markdown', 'html']);
+            const fieldByName = new Map(fields.map(f => [f.name, f]));
+            const hasField = (n: string) => fieldByName.has(n);
+            // Resolve title for a record using titleFormat → displayNameField →
+            // common conventional fields → id. titleFormat supports simple
+            // `{field}` placeholders (the `template` dialect); unresolved
+            // placeholders fall through to the next strategy.
+            const titleFormatSource = (obj.titleFormat && (obj.titleFormat.source || obj.titleFormat))
+                || undefined;
+            const renderTitle = (row: any): string => {
+                if (typeof titleFormatSource === 'string') {
+                    let allResolved = true;
+                    const rendered = titleFormatSource.replace(/\{\{?\s*([a-zA-Z0-9_.]+)\s*\}?\}/g, (_m, key) => {
+                        const v = row[key];
+                        if (v == null || v === '') { allResolved = false; return ''; }
+                        return String(v);
+                    }).trim();
+                    if (rendered && allResolved) return rendered;
+                    if (rendered) return rendered.replace(/\s+-\s+$/, '').replace(/^\s+-\s+/, '').trim() || row.id;
+                }
+                const candidates = [
+                    obj.displayNameField,
+                    'name', 'full_name', 'title', 'subject', 'label', 'company',
+                ].filter((c): c is string => typeof c === 'string' && hasField(c));
+                for (const c of candidates) {
+                    const v = row[c];
+                    if (v != null && String(v).trim()) return String(v);
+                }
+                const fn = row.first_name, ln = row.last_name;
+                if (fn || ln) return `${fn ?? ''} ${ln ?? ''}`.trim();
+                return String(row.id);
+            };
+
+            const titleFieldName = obj.displayNameField
+                || (hasField('name') ? 'name' : undefined)
+                || (hasField('title') ? 'title' : undefined)
+                || fields.find(f => TEXT_TYPES.has(f.type))?.name;
+
+            let searchableFields = fields
+                .filter(f => f && TEXT_TYPES.has(f.type) && f.searchable === true)
+                .map(f => f.name as string);
+
+            // Fallback: if no field is explicitly searchable, scan the title field
+            if (searchableFields.length === 0 && titleFieldName) {
+                searchableFields = [titleFieldName];
+            }
+            if (searchableFields.length === 0) continue;
+
+            objectsScanned++;
+
+            // Build AND-of-OR filter: every term must hit at least one field.
+            // ObjectQL exposes case-insensitive substring matching via `$contains`.
+            const andClauses = terms.map(term => ({
+                $or: searchableFields.map(f => ({ [f]: { $contains: term } })),
+            }));
+            const where = andClauses.length === 1 ? andClauses[0] : { $and: andClauses };
+
+            try {
+                const opts: any = {
+                    where,
+                    limit: perObject,
+                    orderBy: [{ field: 'updated_at', direction: 'desc' }],
+                };
+                if (request.context !== undefined) opts.context = request.context;
+
+                const rows = await this.engine.find(obj.name, opts);
+                for (const row of rows || []) {
+                    if (hits.length >= overallLimit) break;
+                    const title = renderTitle(row);
+                    // Build snippet from first searchable field that contains a term
+                    let snippet: string | undefined;
+                    for (const f of searchableFields) {
+                        const v = row[f];
+                        if (typeof v === 'string' && v) {
+                            const lc = v.toLowerCase();
+                            const idx = terms.map(t => lc.indexOf(t.toLowerCase())).find(i => i >= 0);
+                            if (idx != null && idx >= 0) {
+                                const start = Math.max(0, idx - 30);
+                                const end = Math.min(v.length, idx + 90);
+                                snippet = (start > 0 ? '…' : '') + v.slice(start, end) + (end < v.length ? '…' : '');
+                                break;
+                            }
+                        }
+                    }
+                    hits.push({
+                        object: obj.name,
+                        id: row.id,
+                        title,
+                        snippet,
+                        record: row,
+                    });
+                }
+            } catch {
+                // RBAC denial or driver hiccup — skip silently per object
+                continue;
+            }
+        }
+
+        return {
+            query: q,
+            hits,
+            totalObjects: objectsScanned,
+            totalHits: hits.length,
+            truncated: hits.length >= overallLimit,
+        };
+    }
+
+    // ==========================================
     // Metadata Caching
     // ==========================================
 

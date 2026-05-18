@@ -172,6 +172,7 @@ type NormalizedRestServerConfig = {
         enableUi: boolean;
         enableBatch: boolean;
         enableDiscovery: boolean;
+        enableSearch?: boolean;
         enableProjectScoping: boolean;
         projectResolution: 'required' | 'optional' | 'auto';
         requireAuth: boolean;
@@ -708,6 +709,7 @@ export class RestServer {
                 enableUi: api.enableUi ?? true,
                 enableBatch: api.enableBatch ?? true,
                 enableDiscovery: api.enableDiscovery ?? true,
+                enableSearch: (api as any).enableSearch ?? true,
                 enableProjectScoping: api.enableProjectScoping ?? false,
                 projectResolution: api.projectResolution ?? 'auto',
                 requireAuth: (api as any).requireAuth ?? false,
@@ -798,6 +800,9 @@ export class RestServer {
             }
             if (this.config.api.enableCrud) {
                 this.registerCrudEndpoints(bp);
+            }
+            if (this.config.api.enableSearch ?? true) {
+                this.registerSearchEndpoints(bp);
             }
             if (this.config.api.enableBatch) {
                 this.registerBatchEndpoints(bp);
@@ -1393,6 +1398,54 @@ export class RestServer {
         }
     }
     
+    /**
+     * Register global cross-object search endpoint (M10.5).
+     * GET {basePath}/search?q=acme&objects=lead,account&limit=20&perObject=5
+     */
+    private registerSearchEndpoints(basePath: string): void {
+        const isScoped = basePath.includes('/projects/:projectId');
+        this.routeManager.register({
+            method: 'GET',
+            path: `${basePath}/search`,
+            handler: async (req: any, res: any) => {
+                try {
+                    const projectId = isScoped ? req.params?.projectId : undefined;
+                    const p = await this.resolveProtocol(projectId, req);
+                    const context = await this.resolveExecCtx(projectId, req);
+                    if (this.enforceAuth(req, res, context)) return;
+                    const searchAll = (p as any).searchAll;
+                    if (typeof searchAll !== 'function') {
+                        res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'Search not supported by this protocol' });
+                        return;
+                    }
+                    const q = String(req.query?.q ?? req.query?.query ?? '');
+                    const objectsParam = req.query?.objects;
+                    const objects = typeof objectsParam === 'string'
+                        ? objectsParam.split(',').map((s: string) => s.trim()).filter(Boolean)
+                        : Array.isArray(objectsParam) ? objectsParam : undefined;
+                    const result = await searchAll.call(p, {
+                        q,
+                        objects,
+                        limit: req.query?.limit ? Number(req.query.limit) : undefined,
+                        perObject: req.query?.perObject ? Number(req.query.perObject) : undefined,
+                        ...(context ? { context } : {}),
+                    });
+                    res.json(result);
+                } catch (error: any) {
+                    const mapped = mapDataError(error);
+                    if (!isExpectedDataStatus(mapped.status) && mapped.body?.code !== 'VALIDATION_FAILED') {
+                        logError('[REST] Unhandled error:', error);
+                    }
+                    res.status(mapped.status).json(mapped.body);
+                }
+            },
+            metadata: {
+                summary: 'Global cross-object search',
+                tags: ['search'],
+            },
+        });
+    }
+
     /**
      * Register batch operation endpoints
      */
