@@ -192,6 +192,10 @@ export function installAuditWriters(engine: any, packageId = 'com.objectstack.au
 
     const activityRow: Record<string, any> = {
       type: activityTypeFor(action),
+      // Explicit ISO timestamp — `defaultValue: 'NOW()'` on the column
+      // isn't resolved by every driver and would otherwise leak the
+      // literal string "NOW()" into the row.
+      timestamp: new Date().toISOString(),
       summary,
       actor_id: userId ?? null,
       object_name: ctx.object,
