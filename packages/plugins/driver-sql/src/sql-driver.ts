@@ -1002,6 +1002,25 @@ export class SqlDriver implements IDataDriver {
     if (col) {
       if (field.unique) col.unique();
       if (field.required) col.notNullable();
+      // `defaultValue: 'NOW()'` is a framework convention for "use the
+      // database clock at insert time". Translate it to the driver-native
+      // CURRENT_TIMESTAMP equivalent so the column gets a real default
+      // instead of leaving the literal string 'NOW()' for whatever
+      // upstream code happens to write.
+      if (
+        (type === 'datetime' || type === 'date' || type === 'time') &&
+        typeof field.defaultValue === 'string' &&
+        /^now\(\)$/i.test(field.defaultValue.trim())
+      ) {
+        col.defaultTo(this.knex.fn.now());
+      } else if (field.defaultValue !== undefined && field.defaultValue !== null) {
+        const dv = field.defaultValue;
+        if (typeof dv === 'string' && /^now\(\)$/i.test(dv.trim())) {
+          col.defaultTo(this.knex.fn.now());
+        } else if (typeof dv !== 'object') {
+          col.defaultTo(dv as any);
+        }
+      }
     }
   }
 
@@ -1096,12 +1115,30 @@ export class SqlDriver implements IDataDriver {
   // ── SQLite serialisation ────────────────────────────────────────────────────
 
   protected formatInput(object: string, data: any): any {
-    if (!this.isSqlite) return data;
+    let copy: any = data;
+    let copied = false;
+
+    // Insert/update-time safety net: any caller that passes the literal
+    // string 'NOW()' (often because a field defaultValue leaked unresolved)
+    // gets it replaced with a real ISO timestamp here, before it hits the
+    // wire. Applies to every driver, not just SQLite.
+    if (data && typeof data === 'object') {
+      const now = new Date().toISOString();
+      for (const key of Object.keys(data)) {
+        const v = (data as any)[key];
+        if (typeof v === 'string' && /^now\(\)$/i.test(v.trim())) {
+          if (!copied) { copy = { ...data }; copied = true; }
+          copy[key] = now;
+        }
+      }
+    }
+
+    if (!this.isSqlite) return copy;
 
     const fields = this.jsonFields[object];
-    if (!fields || fields.length === 0) return data;
+    if (!fields || fields.length === 0) return copy;
 
-    const copy = { ...data };
+    if (!copied) { copy = { ...copy }; copied = true; }
     for (const field of fields) {
       if (copy[field] !== undefined && typeof copy[field] === 'object' && copy[field] !== null) {
         copy[field] = JSON.stringify(copy[field]);
