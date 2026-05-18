@@ -23,6 +23,21 @@ const logError = (...args: unknown[]) => (globalThis as any).console?.error(...a
  * returns a misleading 404.
  */
 function mapDataError(error: any, object?: string): { status: number; body: Record<string, unknown> } {
+    // Validation failures → 400 with per-field envelope. Handled FIRST
+    // because the validator throws a typed error before any SQL ever
+    // runs, and we want callers to differentiate "your payload was
+    // invalid" (fixable client-side) from generic 400s.
+    if (error?.code === 'VALIDATION_FAILED' || error?.name === 'ValidationError') {
+        return {
+            status: 400,
+            body: {
+                error: error?.message ?? 'Validation failed',
+                code: 'VALIDATION_FAILED',
+                fields: Array.isArray(error?.fields) ? error.fields : [],
+                ...(object ? { object } : {}),
+            },
+        };
+    }
     // Short-circuit: explicit security denial → 403. Match by `code` /
     // `name` to avoid pulling a runtime dependency on plugin-security.
     if (
@@ -84,6 +99,37 @@ function mapDataError(error: any, object?: string): { status: number; body: Reco
             },
         };
     }
+    // Default: do NOT leak raw SQL or driver internals. If the message
+    // looks like a SQL/driver dump, replace it with a generic envelope
+    // and rely on server logs for the full diagnostic.
+    const looksLikeSqlLeak =
+        lower.includes('sqlite_') ||
+        lower.includes('sqlstate') ||
+        lower.startsWith('insert into ') ||
+        lower.startsWith('update ') ||
+        lower.startsWith('select ') ||
+        lower.startsWith('delete from ') ||
+        lower.includes('constraint failed') ||
+        lower.includes('unique constraint') ||
+        lower.includes('foreign key');
+    if (looksLikeSqlLeak) {
+        // Surface unique-constraint violations as a structured 409 so
+        // the UI can map them to "this value already exists".
+        if (lower.includes('unique constraint') || lower.includes('unique violation')) {
+            return {
+                status: 409,
+                body: {
+                    error: 'A record with this value already exists',
+                    code: 'UNIQUE_VIOLATION',
+                    ...(object ? { object } : {}),
+                },
+            };
+        }
+        return {
+            status: 500,
+            body: { error: 'Internal data error', code: 'DATABASE_ERROR' },
+        };
+    }
     return { status: 400, body: { error: raw || 'Bad request' } };
 }
 
@@ -97,7 +143,7 @@ function mapDataError(error: any, object?: string): { status: number; body: Reco
  *    sys_project.metadata.provisioningError if needed.
  */
 function isExpectedDataStatus(status: number): boolean {
-    return status === 403 || status === 404 || status === 502 || status === 503;
+    return status === 403 || status === 404 || status === 409 || status === 502 || status === 503;
 }
 
 /**
@@ -1241,7 +1287,7 @@ export class RestServer {
                         res.json(result);
                     } catch (error: any) {
                         const mapped = mapDataError(error, req.params?.object);
-                        if (!isExpectedDataStatus(mapped.status)) logError("[REST] Unhandled error:", error);
+                        if (!isExpectedDataStatus(mapped.status) && mapped.body?.code !== "VALIDATION_FAILED") logError("[REST] Unhandled error:", error);
                         res.status(mapped.status === 400 ? 404 : mapped.status).json(mapped.body);
                     }
                 },
@@ -1272,7 +1318,7 @@ export class RestServer {
                         res.status(201).json(result);
                     } catch (error: any) {
                         const mapped = mapDataError(error, req.params?.object);
-                        if (!isExpectedDataStatus(mapped.status)) logError("[REST] Unhandled error:", error);
+                        if (!isExpectedDataStatus(mapped.status) && mapped.body?.code !== "VALIDATION_FAILED") logError("[REST] Unhandled error:", error);
                         res.status(mapped.status).json(mapped.body);
                     }
                 },
@@ -1304,7 +1350,7 @@ export class RestServer {
                         res.json(result);
                     } catch (error: any) {
                         const mapped = mapDataError(error, req.params?.object);
-                        if (!isExpectedDataStatus(mapped.status)) logError("[REST] Unhandled error:", error);
+                        if (!isExpectedDataStatus(mapped.status) && mapped.body?.code !== "VALIDATION_FAILED") logError("[REST] Unhandled error:", error);
                         res.status(mapped.status).json(mapped.body);
                     }
                 },
@@ -1335,7 +1381,7 @@ export class RestServer {
                         res.json(result);
                     } catch (error: any) {
                         const mapped = mapDataError(error, req.params?.object);
-                        if (!isExpectedDataStatus(mapped.status)) logError("[REST] Unhandled error:", error);
+                        if (!isExpectedDataStatus(mapped.status) && mapped.body?.code !== "VALIDATION_FAILED") logError("[REST] Unhandled error:", error);
                         res.status(mapped.status).json(mapped.body);
                     }
                 },

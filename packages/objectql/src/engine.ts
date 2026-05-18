@@ -18,6 +18,7 @@ import { SchemaRegistry, computeFQN } from './registry.js';
 import { ExpressionEngine } from '@objectstack/formula';
 import type { Expression } from '@objectstack/spec';
 import { bindHooksToEngine } from './hook-binder.js';
+import { validateRecord } from './validation/record-validator.js';
 
 interface FormulaPlanEntry { name: string; expression: Expression; }
 
@@ -1422,11 +1423,13 @@ export class ObjectQL implements IDataEngine {
       try {
         let result;
         const nowSnap = new Date();
+        const schemaForValidation = this._registry.getObject(object);
         if (Array.isArray(hookContext.input.data)) {
           // Bulk Create — apply defaults per row
           const rows = (hookContext.input.data as any[]).map((row) =>
             this.applyFieldDefaults(object, row as Record<string, unknown>, opCtx.context, nowSnap),
           );
+          for (const r of rows) validateRecord(schemaForValidation, r, 'insert');
           if (driver.bulkCreate) {
                result = await driver.bulkCreate(object, rows, hookContext.input.options as any);
           } else {
@@ -1440,6 +1443,7 @@ export class ObjectQL implements IDataEngine {
             opCtx.context,
             nowSnap,
           );
+          validateRecord(schemaForValidation, row, 'insert');
           result = await driver.create(object, row, hookContext.input.options as any);
         }
 
@@ -1527,8 +1531,10 @@ export class ObjectQL implements IDataEngine {
        try {
            let result;
            if (hookContext.input.id) {
+               validateRecord(this._registry.getObject(object), hookContext.input.data as Record<string, unknown>, 'update');
                result = await driver.update(object, hookContext.input.id as string, hookContext.input.data as Record<string, unknown>, hookContext.input.options as any);
            } else if (options?.multi && driver.updateMany) {
+               validateRecord(this._registry.getObject(object), hookContext.input.data as Record<string, unknown>, 'update');
                const ast: QueryAST = { object, where: options.where };
                result = await driver.updateMany(object, ast, hookContext.input.data as Record<string, unknown>, hookContext.input.options as any);
            } else {

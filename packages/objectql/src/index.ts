@@ -24,6 +24,10 @@ export { bindHooksToEngine } from './hook-binder.js';
 export type { BindHooksOptions, BindHooksResult } from './hook-binder.js';
 export { wrapDeclarativeHook } from './hook-wrappers.js';
 export type { WrapDeclarativeOptions } from './hook-wrappers.js';
+
+// Export Validation
+export { ValidationError, validateRecord } from './validation/record-validator.js';
+export type { FieldValidationError } from './validation/record-validator.js';
 export {
     InMemoryHookMetricsRecorder,
     noopHookMetricsRecorder,
