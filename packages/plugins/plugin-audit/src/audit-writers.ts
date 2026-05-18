@@ -120,9 +120,25 @@ export function installAuditWriters(engine: any, packageId = 'com.objectstack.au
     if (SKIP_OBJECTS.has(ctx.object)) return;
     const id = (ctx.input as any)?.id;
     if (!id) return; // bulk update/delete — too costly to snapshot every row here
-    const api: any = (ctx as any).api;
-    if (!api?.sudo) return;
     try {
+      // Use the engine directly (not api.sudo) so we can thread the
+      // active transaction through. On drivers with single-connection
+      // pools (e.g. SQLite via knex) a sudo() findOne that does NOT
+      // carry the open transaction will deadlock for the full
+      // acquireConnectionTimeout (~60s) because the outer transaction
+      // holds the only connection.
+      const trx = (ctx as any).transaction;
+      const ql = (ctx as any).ql ?? (ctx as any).api?.engine;
+      if (ql?.findOne) {
+        const prev = await ql.findOne(ctx.object, {
+          where: { id },
+          context: { isSystem: true, ...(trx ? { transaction: trx } : {}) },
+        });
+        if (prev) (ctx as any).__previous = prev;
+        return;
+      }
+      const api: any = (ctx as any).api;
+      if (!api?.sudo) return;
       const prev = await api.sudo().object(ctx.object).findOne({ where: { id } });
       if (prev) (ctx as any).__previous = prev;
     } catch {

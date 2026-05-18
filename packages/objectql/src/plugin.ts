@@ -400,7 +400,13 @@ export class ObjectQLPlugin implements Plugin {
           if (hookCtx.input?.id && !hookCtx.previous) {
             try {
               const existing = await this.ql!.findOne(hookCtx.object, {
-                where: { id: hookCtx.input.id }
+                where: { id: hookCtx.input.id },
+                context: {
+                  roles: [],
+                  permissions: [],
+                  isSystem: true,
+                  ...(hookCtx.transaction ? { transaction: hookCtx.transaction } : {}),
+                } as any,
               });
               if (existing) hookCtx.previous = existing;
             } catch (_e) {
@@ -419,7 +425,13 @@ export class ObjectQLPlugin implements Plugin {
           if (hookCtx.input?.id && !hookCtx.previous) {
             try {
               const existing = await this.ql!.findOne(hookCtx.object, {
-                where: { id: hookCtx.input.id }
+                where: { id: hookCtx.input.id },
+                context: {
+                  roles: [],
+                  permissions: [],
+                  isSystem: true,
+                  ...(hookCtx.transaction ? { transaction: hookCtx.transaction } : {}),
+                } as any,
               });
               if (existing) hookCtx.previous = existing;
             } catch (_e) {
