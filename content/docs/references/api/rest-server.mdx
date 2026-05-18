@@ -191,6 +191,7 @@ const result = BatchEndpointsConfig.parse(data);
 | **enableDiscovery** | `boolean` | ✅ | Enable API discovery endpoint |
 | **enableProjectScoping** | `boolean` | ✅ | Enable project-scoped routing for data/meta/AI APIs |
 | **projectResolution** | `Enum<'required' \| 'optional' \| 'auto'>` | ✅ | Project ID resolution strategy |
+| **requireAuth** | `boolean` | ✅ | Reject anonymous requests on /data/* with HTTP 401 |
 | **documentation** | `Object` | optional | OpenAPI/Swagger documentation config |
 | **responseFormat** | `Object` | optional | Response format options |
 
