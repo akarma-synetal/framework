@@ -101,5 +101,17 @@ export const CrmApp = App.create({
         { id: 'nav_report_sla',               type: 'report', reportName: 'sla_performance',              label: 'SLA Performance',             icon: 'timer' },
       ],
     },
+    {
+      id: 'group_approvals',
+      type: 'group',
+      label: 'Approvals',
+      icon: 'check-circle',
+      expanded: true,
+      children: [
+        { id: 'nav_approval_requests', type: 'object', objectName: 'sys_approval_request', label: 'Approval Requests', icon: 'inbox',    requiresObject: 'sys_approval_request' },
+        { id: 'nav_approval_actions',  type: 'object', objectName: 'sys_approval_action',  label: 'Action History',    icon: 'history',  requiresObject: 'sys_approval_action' },
+        { id: 'nav_approval_processes',type: 'object', objectName: 'sys_approval_process', label: 'Processes',         icon: 'workflow', requiresObject: 'sys_approval_process' },
+      ],
+    },
   ],
 });

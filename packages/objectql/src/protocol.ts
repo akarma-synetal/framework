@@ -752,6 +752,32 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             }
         }
         
+        // Route to engine.aggregate() when the query has GROUP BY / aggregations.
+        // engine.find() does not do in-memory aggregation fallback, so without
+        // this branch a spec-shape aggregate request would silently return
+        // ungrouped raw rows on drivers (e.g. SqlDriver) that don't natively
+        // honor groupBy/aggregations in find().
+        const hasGroupBy = Array.isArray(options.groupBy) && options.groupBy.length > 0;
+        const hasAggregations = Array.isArray(options.aggregations) && options.aggregations.length > 0;
+        if (hasGroupBy || hasAggregations) {
+            const records = await this.engine.aggregate(request.object, {
+                where: options.where,
+                groupBy: options.groupBy,
+                aggregations: options.aggregations,
+                context: options.context,
+            } as any);
+            // Apply limit client-side (EngineAggregateOptions doesn't carry limit)
+            const limited = typeof options.limit === 'number' && options.limit > 0
+                ? records.slice(0, options.limit)
+                : records;
+            return {
+                object: request.object,
+                records: limited,
+                total: limited.length,
+                hasMore: false,
+            };
+        }
+
         const records = await this.engine.find(request.object, options);
         // Spec: FindDataResponseSchema — only `records` is returned.
         // OData `value` adaptation (if needed) is handled in the HTTP dispatch layer.

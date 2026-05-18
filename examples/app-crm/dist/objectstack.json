@@ -12952,6 +12952,39 @@
               "reportName": "sla_performance"
             }
           ]
+        },
+        {
+          "id": "group_approvals",
+          "label": "Approvals",
+          "icon": "check-circle",
+          "type": "group",
+          "expanded": true,
+          "children": [
+            {
+              "id": "nav_approval_requests",
+              "label": "Approval Requests",
+              "icon": "inbox",
+              "requiresObject": "sys_approval_request",
+              "type": "object",
+              "objectName": "sys_approval_request"
+            },
+            {
+              "id": "nav_approval_actions",
+              "label": "Action History",
+              "icon": "history",
+              "requiresObject": "sys_approval_action",
+              "type": "object",
+              "objectName": "sys_approval_action"
+            },
+            {
+              "id": "nav_approval_processes",
+              "label": "Processes",
+              "icon": "workflow",
+              "requiresObject": "sys_approval_process",
+              "type": "object",
+              "objectName": "sys_approval_process"
+            }
+          ]
         }
       ],
       "defaultAgent": "sales_copilot"
@@ -18551,12 +18584,7 @@
           "sortOrder": "asc",
           "dateGranularity": "month"
         }
-      ],
-      "filter": {
-        "last_contacted_date": {
-          "$ne": null
-        }
-      }
+      ]
     },
     {
       "name": "leads_by_source",

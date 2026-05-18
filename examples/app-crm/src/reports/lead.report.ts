@@ -41,5 +41,4 @@ export const LeadInflowByMonthSourceReport: ReportInput = {
   groupingsAcross: [
     { field: 'last_contacted_date', dateGranularity: 'month', sortOrder: 'asc' },
   ],
-  filter: { last_contacted_date: { $ne: null } },
 };

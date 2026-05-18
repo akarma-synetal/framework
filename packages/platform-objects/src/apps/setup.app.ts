@@ -84,6 +84,17 @@ export const SETUP_APP: App = {
       ],
     },
     {
+      id: 'group_approvals',
+      type: 'group',
+      label: 'Approvals',
+      icon: 'check-circle',
+      children: [
+        { id: 'nav_approval_processes', type: 'object', label: 'Processes', objectName: 'sys_approval_process', icon: 'workflow', requiresObject: 'sys_approval_process' },
+        { id: 'nav_approval_requests', type: 'object', label: 'Requests', objectName: 'sys_approval_request', icon: 'inbox', requiresObject: 'sys_approval_request' },
+        { id: 'nav_approval_actions', type: 'object', label: 'Action History', objectName: 'sys_approval_action', icon: 'history', requiresObject: 'sys_approval_action' },
+      ],
+    },
+    {
       id: 'group_system',
       type: 'group',
       label: 'System',
@@ -92,6 +103,7 @@ export const SETUP_APP: App = {
         { id: 'nav_sessions', type: 'object', label: 'Sessions', objectName: 'sys_session', icon: 'monitor' },
         { id: 'nav_audit_logs', type: 'object', label: 'Audit Logs', objectName: 'sys_audit_log', icon: 'scroll-text' },
         { id: 'nav_activity', type: 'object', label: 'Activity', objectName: 'sys_activity', icon: 'activity' },
+        { id: 'nav_notifications', type: 'object', label: 'Notifications', objectName: 'sys_notification', icon: 'bell', requiresObject: 'sys_notification' },
         { id: 'nav_comments', type: 'object', label: 'Comments', objectName: 'sys_comment', icon: 'message-square' },
       ],
     },

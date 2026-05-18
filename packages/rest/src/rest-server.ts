@@ -1468,6 +1468,40 @@ export class RestServer {
             });
         }
 
+        // POST /data/:object/query — Spec-shape advanced query (QueryAST in body).
+        // Supports server-side aggregation via { groupBy, aggregations, where, ... }
+        // per spec/data/query.zod.ts. Mirrors what `client.data.query()` posts.
+        // Returns FindDataResponse = { object, records, total? }.
+        if (operations.list) {
+            this.routeManager.register({
+                method: 'POST',
+                path: `${dataPath}/:object/query`,
+                handler: async (req: any, res: any) => {
+                    try {
+                        const projectId = isScoped ? req.params?.projectId : undefined;
+                        const p = await this.resolveProtocol(projectId, req);
+                        const context = await this.resolveExecCtx(projectId, req);
+                        if (this.enforceAuth(req, res, context)) return;
+                        const result = await p.findData({
+                            object: req.params.object,
+                            query: req.body || {},
+                            ...(projectId ? { projectId } : {}),
+                            ...(context ? { context } : {}),
+                        } as any);
+                        res.json(result);
+                    } catch (error: any) {
+                        const mapped = mapDataError(error, req.params?.object);
+                        if (!isExpectedDataStatus(mapped.status)) logError("[REST] Unhandled error:", error);
+                        res.status(mapped.status).json(mapped.body);
+                    }
+                },
+                metadata: {
+                    summary: 'Advanced query (QueryAST in body)',
+                    tags: ['data', 'crud'],
+                },
+            });
+        }
+
         // PATCH /data/:object/:id - Update record
         if (operations.update) {
             this.routeManager.register({

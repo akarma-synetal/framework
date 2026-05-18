@@ -550,9 +550,15 @@ function validateCrossReferences(config: ObjectStackDefinition): string[] {
           if (!item || typeof item !== 'object') continue;
           const nav = item as Record<string, unknown>;
           if (nav.type === 'object' && typeof nav.objectName === 'string' && !objectNames.has(nav.objectName)) {
-            errors.push(
-              `App '${appName}' navigation references object '${nav.objectName}' which is not defined in objects.`,
-            );
+            // `requiresObject` opts the nav item into "may be provided by
+            // another stack / platform plugin" semantics — the frontend
+            // hides the entry when the object isn't in the SchemaRegistry,
+            // and stack-level cross-ref validation must skip it.
+            if (!nav.requiresObject) {
+              errors.push(
+                `App '${appName}' navigation references object '${nav.objectName}' which is not defined in objects.`,
+              );
+            }
           }
           if (nav.type === 'dashboard' && typeof nav.dashboardName === 'string' && dashboardNames.size > 0 && !dashboardNames.has(nav.dashboardName)) {
             errors.push(
