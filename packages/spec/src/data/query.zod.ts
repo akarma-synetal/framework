@@ -59,6 +59,41 @@ export const AggregationFunction = z.enum([
 ]);
 
 /**
+ * Date Granularity Enum
+ * Used to bucket date/timestamp fields into uniform periods during GROUP BY.
+ *
+ * Backends MAY emit `DATE_TRUNC` (PostgreSQL), `DATE_FORMAT` (MySQL),
+ * `$dateTrunc` (MongoDB), or any other equivalent. When a driver does not
+ * support server-side truncation the engine falls back to an in-memory bucket
+ * using ISO-8601 conventions (weeks start Monday).
+ */
+export const DateGranularity = z.enum(['day', 'week', 'month', 'quarter', 'year']);
+
+/**
+ * GroupBy Node
+ *
+ * A grouping target — either a bare field name (string) for plain grouping,
+ * or a structured object that adds `dateGranularity` for time-bucketed
+ * grouping. The string form remains the canonical short-hand:
+ *
+ * ```ts
+ * groupBy: ['region', { field: 'closed_at', dateGranularity: 'quarter' }]
+ * ```
+ *
+ * This is backward-compatible: every existing `groupBy: ['region']` payload
+ * continues to validate.
+ */
+export const GroupByNodeSchema = lazySchema(() => z.union([
+  z.string(),
+  z.object({
+    field: z.string().describe('Field to group by'),
+    dateGranularity: DateGranularity.optional().describe('Bucket date values into uniform periods (day/week/month/quarter/year)'),
+    /** Optional alias for the projected group value (defaults to `field`). */
+    alias: z.string().optional().describe('Alias for the projected group value'),
+  }),
+]));
+
+/**
  * Aggregation Node
  * Represents an aggregated field with function.
  * 
@@ -505,7 +540,7 @@ const BaseQuerySchema = z.object({
   aggregations: z.array(AggregationNodeSchema).optional().describe('Aggregation functions'),
   
   /** Group By Clause */
-  groupBy: z.array(z.string()).optional().describe('GROUP BY fields'),
+  groupBy: z.array(GroupByNodeSchema).optional().describe('GROUP BY targets (strings or `{field, dateGranularity?}` objects for date bucketing)'),
   
   /** Having Clause */
   having: FilterConditionSchema.optional().describe('HAVING clause for aggregation filtering'),
@@ -559,6 +594,8 @@ export const QuerySchema: z.ZodType<QueryAST> = lazySchema(() => BaseQuerySchema
 
 export type SortNode = z.infer<typeof SortNodeSchema>;
 export type AggregationNode = z.infer<typeof AggregationNodeSchema>;
+export type GroupByNode = z.infer<typeof GroupByNodeSchema>;
+export type DateGranularityValue = z.infer<typeof DateGranularity>;
 export type JoinNode = z.infer<typeof JoinNodeSchema>;
 export type WindowFunctionNode = z.infer<typeof WindowFunctionNodeSchema>;
 export type WindowSpec = z.infer<typeof WindowSpecSchema>;

@@ -19,6 +19,10 @@ export { ObjectStackProtocolImplementation } from './protocol.js';
 export { ObjectQL, ObjectRepository, ScopedContext } from './engine.js';
 export type { ObjectQLHostContext, HookHandler, HookEntry, OperationContext, EngineMiddleware } from './engine.js';
 
+// Export in-memory aggregation fallback (used by engine.aggregate when the
+// driver lacks native groupBy/aggregations support; also useful for tests).
+export { applyInMemoryAggregation, bucketDateValue } from './in-memory-aggregation.js';
+
 // Export Hook Binder & Wrappers (declarative-metadata → engine glue)
 export { bindHooksToEngine } from './hook-binder.js';
 export type { BindHooksOptions, BindHooksResult } from './hook-binder.js';

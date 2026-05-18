@@ -77,5 +77,29 @@ export const CrmApp = App.create({
         { id: 'nav_analytics_service_db', type: 'dashboard', dashboardName: 'service_dashboard', label: 'Service Analytics', icon: 'chart-pie' },
       ],
     },
+    {
+      id: 'group_reports',
+      type: 'group',
+      label: 'Reports',
+      icon: 'chart-bar',
+      expanded: true,
+      children: [
+        // Matrix reports — exercise the new spec `groupingsAcross` +
+        // `dateGranularity` end-to-end. Naming matches the report definitions
+        // so users can correlate the sidebar item to source code.
+        { id: 'nav_report_pipeline_coverage', type: 'report', reportName: 'pipeline_coverage_by_quarter', label: 'Pipeline Coverage (Quarter)', icon: 'columns-3' },
+        { id: 'nav_report_lead_inflow',       type: 'report', reportName: 'lead_inflow_by_month_source',  label: 'Lead Inflow (Month)',         icon: 'trending-up' },
+        { id: 'nav_report_cases_daily',       type: 'report', reportName: 'cases_opened_by_day_priority', label: 'Cases Opened (Day)',          icon: 'calendar-days' },
+        { id: 'nav_report_account_matrix',    type: 'report', reportName: 'accounts_by_industry_type',    label: 'Accounts by Industry × Type', icon: 'grid-3x3' },
+        // Multi-level summary
+        { id: 'nav_report_funnel_owner',      type: 'report', reportName: 'opportunity_funnel_owner_stage', label: 'Funnel by Owner → Stage',   icon: 'filter' },
+        // Single-axis summaries
+        { id: 'nav_report_opps_by_stage',     type: 'report', reportName: 'opportunities_by_stage',       label: 'Opportunities by Stage',      icon: 'bar-chart-3' },
+        { id: 'nav_report_won_by_owner',      type: 'report', reportName: 'won_opportunities_by_owner',   label: 'Won by Owner',                icon: 'trophy' },
+        { id: 'nav_report_leads_by_source',   type: 'report', reportName: 'leads_by_source',              label: 'Leads by Source',             icon: 'user-plus' },
+        { id: 'nav_report_cases_by_status',   type: 'report', reportName: 'cases_by_status_priority',     label: 'Cases by Status × Priority',  icon: 'life-buoy' },
+        { id: 'nav_report_sla',               type: 'report', reportName: 'sla_performance',              label: 'SLA Performance',             icon: 'timer' },
+      ],
+    },
   ],
 });

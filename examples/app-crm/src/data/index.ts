@@ -19,6 +19,15 @@ import { Campaign } from '../objects/campaign.object';
 import { Contract } from '../objects/contract.object';
 import { Quote } from '../objects/quote.object';
 
+/**
+ * Build a CEL `daysAgo(N)` expression from a runtime number. Mirrors the
+ * existing tagged-template usage (`cel\`daysAgo(N)\``) so we can produce
+ * timestamps inside `.map()` generators without manufacturing fake template
+ * string arrays.
+ */
+const celDaysAgo = (n: number) => cel`daysAgo(${n})`;
+const celDaysFromNow = (n: number) => cel`daysFromNow(${n})`;
+
 // ─── Accounts ─────────────────────────────────────────────────────────
 const accounts = defineDataset(Account, {
   mode: 'upsert',
@@ -194,6 +203,40 @@ const leads = defineDataset(Lead, {
       next_followup_date: cel`daysFromNow(0)`,
       last_contacted_date: cel`daysAgo(1)`,
     },
+    // ─── Generated demo leads — spread across 6 months for monthly-bucket reports
+    // (`LeadInflowByMonthSourceReport`). Each `last_contacted_date` lives in a
+    // distinct month / source pair so the matrix has multiple cells populated.
+    ...[
+      { fn: 'Noah',    ln: 'Patel',    co: 'Vertex Analytics',     src: 'web',         ind: 'technology',   age: 7   },
+      { fn: 'Maya',    ln: 'Singh',    co: 'BluePeak Logistics',   src: 'referral',    ind: 'logistics',    age: 14  },
+      { fn: 'Owen',    ln: 'Becker',   co: 'Northwind Energy',     src: 'event',       ind: 'energy',       age: 21  },
+      { fn: 'Sara',    ln: 'Lopez',    co: 'Helios Solar',         src: 'partner',     ind: 'energy',       age: 28  },
+      { fn: 'Leo',     ln: 'Vance',    co: 'CleanCart',            src: 'web',         ind: 'retail',       age: 38  },
+      { fn: 'Iris',    ln: 'Okafor',   co: 'PulseHealth',          src: 'cold_call',   ind: 'healthcare',   age: 45  },
+      { fn: 'Ravi',    ln: 'Mehta',    co: 'Foundry Robotics',     src: 'event',       ind: 'manufacturing',age: 52  },
+      { fn: 'Tess',    ln: 'Brown',    co: 'Lattice Education',    src: 'referral',    ind: 'education',    age: 67  },
+      { fn: 'Marco',   ln: 'Ricci',    co: 'Aurora Travel',        src: 'advertising', ind: 'travel',       age: 74  },
+      { fn: 'Pia',     ln: 'Anand',    co: 'Citrine Finance',      src: 'partner',     ind: 'financial_services', age: 81 },
+      { fn: 'Jonas',   ln: 'Holt',     co: 'Polar Cargo',          src: 'web',         ind: 'logistics',    age: 95  },
+      { fn: 'Anya',    ln: 'Volkov',   co: 'RedOak Realty',        src: 'cold_call',   ind: 'real_estate',  age: 102 },
+      { fn: 'Theo',    ln: 'Park',     co: 'Skyline Media',        src: 'advertising', ind: 'media',        age: 116 },
+      { fn: 'Wren',    ln: 'Garcia',   co: 'Maple Bakery Group',   src: 'event',       ind: 'consumer_goods', age: 123 },
+      { fn: 'Hugo',    ln: 'Dubois',   co: 'Nimbus Aerospace',     src: 'referral',    ind: 'manufacturing',age: 138 },
+      { fn: 'Lena',    ln: 'Fischer',  co: 'Granite Insurance',    src: 'partner',     ind: 'financial_services', age: 145 },
+      { fn: 'Kai',     ln: 'Watanabe', co: 'Coral Reef Hotels',    src: 'web',         ind: 'travel',       age: 162 },
+      { fn: 'Mira',    ln: 'Costa',    co: 'Atlas Construction',   src: 'cold_call',   ind: 'construction', age: 175 },
+    ].map((l, i) => ({
+      first_name: l.fn,
+      last_name: l.ln,
+      company: l.co,
+      email: `${l.fn.toLowerCase()}.${l.ln.toLowerCase()}@${l.co.toLowerCase().replace(/\s+/g, '')}.example.com`,
+      phone: `+1-555-01${String(i).padStart(2, '0')}-${String(1000 + i * 7)}`,
+      status: (['new', 'contacted', 'qualified', 'unqualified'] as const)[i % 4],
+      lead_source: l.src,
+      industry: l.ind,
+      rating: 1 + ((i * 7) % 5),
+      last_contacted_date: celDaysAgo(l.age),
+    })),
   ]
 });
 
@@ -329,6 +372,45 @@ const opportunities = defineDataset(Opportunity, {
       forecast_category: 'omitted',
       lead_source: 'advertising',
     },
+    // ─── Generated demo opportunities — ~50 deals across ~6 months close_date
+    // spread over every stage / forecast / source combination so the
+    // `PipelineCoverageByQuarterReport`, `OpportunityFunnelByOwnerStageReport`,
+    // and the dashboard funnel/area widgets all have rich data to chew on.
+    ...((): readonly Record<string, unknown>[] => {
+      const stages = ['qualification', 'needs_analysis', 'proposal', 'negotiation', 'closed_won', 'closed_lost'] as const;
+      const forecastByStage: Record<typeof stages[number], string> = {
+        qualification: 'pipeline',
+        needs_analysis: 'best_case',
+        proposal: 'best_case',
+        negotiation: 'commit',
+        closed_won: 'closed',
+        closed_lost: 'omitted',
+      };
+      const sources = ['web', 'referral', 'partner', 'event', 'cold_call', 'advertising'] as const;
+      const types = ['new_business', 'existing_upgrade', 'renewal'] as const;
+      const accountsList = ['Acme Corporation', 'Globex Industries', 'Wayne Enterprises', 'Initech Solutions', 'Stark Medical'] as const;
+      const out: Record<string, unknown>[] = [];
+      for (let i = 0; i < 50; i++) {
+        const stage = stages[i % stages.length];
+        // Spread close_date across +/- 180 days for ~6 months of buckets.
+        const dayOffset = -180 + Math.floor((i * 367) % 360);
+        out.push({
+          name: `Demo Deal ${String(i + 1).padStart(2, '0')}`,
+          account: accountsList[i % accountsList.length],
+          amount: 20000 + ((i * 17_393) % 480_000),
+          stage,
+          probability: stage === 'closed_won' ? 100 : stage === 'closed_lost' ? 0 : 10 + (i * 13) % 80,
+          close_date: dayOffset >= 0 ? celDaysFromNow(dayOffset) : celDaysAgo(-dayOffset),
+          type: types[i % types.length],
+          forecast_category: forecastByStage[stage],
+          lead_source: sources[i % sources.length],
+          ...(stage !== 'closed_won' && stage !== 'closed_lost'
+            ? { days_in_stage: 3 + (i * 11) % 60 }
+            : {}),
+        });
+      }
+      return out;
+    })(),
   ]
 });
 
@@ -545,6 +627,41 @@ const cases = defineDataset(Case, {
       closed_date: cel`daysAgo(8)`,
       sla_due_date: cel`daysAgo(8)`,
     },
+    // ─── Generated demo cases — 30 cases over the last 30 days, mixed across
+    // priorities. Powers `CasesOpenedByDayPriorityReport` (daily bucketing
+    // matrix) and the service dashboard's daily-volume area chart.
+    ...((): readonly Record<string, unknown>[] => {
+      const priorities = ['low', 'medium', 'high', 'critical'] as const;
+      const types = ['question', 'bug', 'problem', 'feature_request'] as const;
+      const origins = ['email', 'phone', 'web', 'chat'] as const;
+      const statuses = ['new', 'in_progress', 'resolved', 'closed', 'escalated'] as const;
+      const accountsList = ['Acme Corporation', 'Globex Industries', 'Wayne Enterprises', 'Initech Solutions', 'Stark Medical'] as const;
+      const out: Record<string, unknown>[] = [];
+      for (let i = 0; i < 30; i++) {
+        const priority = priorities[i % priorities.length];
+        const status = statuses[i % statuses.length];
+        const closed = status === 'resolved' || status === 'closed';
+        const ageDays = 1 + (i % 30);
+        out.push({
+          subject: `Demo case ${String(i + 9).padStart(5, '0')} — ${priority} ${types[i % types.length]}`,
+          description: `Auto-generated demo case for ${priority} priority on day -${ageDays}.`,
+          account: accountsList[i % accountsList.length],
+          status,
+          priority,
+          type: types[i % types.length],
+          origin: origins[i % origins.length],
+          is_closed: closed,
+          is_sla_violated: priority === 'critical' && i % 3 === 0,
+          is_escalated: status === 'escalated',
+          ...(closed ? { resolution_time_hours: 1 + (i * 7) % 48 } : {}),
+          case_number: `CASE-${String(i + 9).padStart(5, '0')}`,
+          created_date: celDaysAgo(ageDays),
+          ...(closed ? { closed_date: celDaysAgo(Math.max(0, ageDays - 1)) } : {}),
+          sla_due_date: celDaysFromNow(priority === 'critical' ? 1 : priority === 'high' ? 2 : 4),
+        });
+      }
+      return out;
+    })(),
   ],
 });
 

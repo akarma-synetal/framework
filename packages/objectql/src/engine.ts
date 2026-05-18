@@ -19,6 +19,7 @@ import { ExpressionEngine } from '@objectstack/formula';
 import type { Expression } from '@objectstack/spec';
 import { bindHooksToEngine } from './hook-binder.js';
 import { validateRecord } from './validation/record-validator.js';
+import { applyInMemoryAggregation } from './in-memory-aggregation.js';
 
 interface FormulaPlanEntry { name: string; expression: Expression; }
 
@@ -1726,7 +1727,7 @@ export class ObjectQL implements IDataEngine {
         const ast: QueryAST = {
             object,
             where: query.where,
-            groupBy: query.groupBy,
+            groupBy: query.groupBy as any,
             aggregations: query.aggregations,
         };
 
@@ -1738,7 +1739,13 @@ export class ObjectQL implements IDataEngine {
         if (typeof drv.aggregate === 'function') {
             return drv.aggregate(object, ast);
         }
-        return driver.find(object, ast);
+        // In-memory fallback path: ask the driver for raw rows, then bucket +
+        // aggregate here. This guarantees `groupBy` (incl. structured items
+        // carrying `dateGranularity`) and `aggregations` always work even on
+        // drivers that have no native aggregation support (driver-rest,
+        // driver-memory, partial SQL drivers).
+        const raw = await driver.find(object, ast);
+        return applyInMemoryAggregation(raw, ast);
       });
 
       return opCtx.result as any[];

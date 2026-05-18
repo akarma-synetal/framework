@@ -12873,6 +12873,85 @@
               "dashboardName": "service_dashboard"
             }
           ]
+        },
+        {
+          "id": "group_reports",
+          "label": "Reports",
+          "icon": "chart-bar",
+          "type": "group",
+          "expanded": true,
+          "children": [
+            {
+              "id": "nav_report_pipeline_coverage",
+              "label": "Pipeline Coverage (Quarter)",
+              "icon": "columns-3",
+              "type": "report",
+              "reportName": "pipeline_coverage_by_quarter"
+            },
+            {
+              "id": "nav_report_lead_inflow",
+              "label": "Lead Inflow (Month)",
+              "icon": "trending-up",
+              "type": "report",
+              "reportName": "lead_inflow_by_month_source"
+            },
+            {
+              "id": "nav_report_cases_daily",
+              "label": "Cases Opened (Day)",
+              "icon": "calendar-days",
+              "type": "report",
+              "reportName": "cases_opened_by_day_priority"
+            },
+            {
+              "id": "nav_report_account_matrix",
+              "label": "Accounts by Industry × Type",
+              "icon": "grid-3x3",
+              "type": "report",
+              "reportName": "accounts_by_industry_type"
+            },
+            {
+              "id": "nav_report_funnel_owner",
+              "label": "Funnel by Owner → Stage",
+              "icon": "filter",
+              "type": "report",
+              "reportName": "opportunity_funnel_owner_stage"
+            },
+            {
+              "id": "nav_report_opps_by_stage",
+              "label": "Opportunities by Stage",
+              "icon": "bar-chart-3",
+              "type": "report",
+              "reportName": "opportunities_by_stage"
+            },
+            {
+              "id": "nav_report_won_by_owner",
+              "label": "Won by Owner",
+              "icon": "trophy",
+              "type": "report",
+              "reportName": "won_opportunities_by_owner"
+            },
+            {
+              "id": "nav_report_leads_by_source",
+              "label": "Leads by Source",
+              "icon": "user-plus",
+              "type": "report",
+              "reportName": "leads_by_source"
+            },
+            {
+              "id": "nav_report_cases_by_status",
+              "label": "Cases by Status × Priority",
+              "icon": "life-buoy",
+              "type": "report",
+              "reportName": "cases_by_status_priority"
+            },
+            {
+              "id": "nav_report_sla",
+              "label": "SLA Performance",
+              "icon": "timer",
+              "type": "report",
+              "reportName": "sla_performance"
+            }
+          ]
         }
       ],
       "defaultAgent": "sales_copilot"
@@ -18386,6 +18465,33 @@
       }
     },
     {
+      "name": "cases_opened_by_day_priority",
+      "label": "Cases Opened by Priority × Day",
+      "description": "Daily case inflow split by priority",
+      "objectName": "case",
+      "type": "matrix",
+      "columns": [
+        {
+          "field": "case_number",
+          "label": "Cases",
+          "aggregate": "count"
+        }
+      ],
+      "groupingsDown": [
+        {
+          "field": "priority",
+          "sortOrder": "desc"
+        }
+      ],
+      "groupingsAcross": [
+        {
+          "field": "created_date",
+          "sortOrder": "asc",
+          "dateGranularity": "day"
+        }
+      ]
+    },
+    {
       "name": "contacts_by_account",
       "label": "Contacts by Account",
       "description": "List of contacts grouped by account",
@@ -18419,6 +18525,38 @@
           "sortOrder": "asc"
         }
       ]
+    },
+    {
+      "name": "lead_inflow_by_month_source",
+      "label": "Lead Engagement by Month × Source",
+      "description": "Contacted-lead volume per month, broken down by acquisition channel",
+      "objectName": "lead",
+      "type": "matrix",
+      "columns": [
+        {
+          "field": "id",
+          "label": "Leads Touched",
+          "aggregate": "count"
+        }
+      ],
+      "groupingsDown": [
+        {
+          "field": "lead_source",
+          "sortOrder": "asc"
+        }
+      ],
+      "groupingsAcross": [
+        {
+          "field": "last_contacted_date",
+          "sortOrder": "asc",
+          "dateGranularity": "month"
+        }
+      ],
+      "filter": {
+        "last_contacted_date": {
+          "$ne": null
+        }
+      }
     },
     {
       "name": "leads_by_source",
@@ -18513,6 +18651,93 @@
         "yAxis": "amount",
         "showLegend": true,
         "showDataLabels": false
+      }
+    },
+    {
+      "name": "opportunity_funnel_owner_stage",
+      "label": "Opportunity Funnel by Owner → Stage",
+      "description": "Per-rep stage-by-stage pipeline funnel",
+      "objectName": "opportunity",
+      "type": "summary",
+      "columns": [
+        {
+          "field": "amount",
+          "label": "Total Amount",
+          "aggregate": "sum"
+        },
+        {
+          "field": "name",
+          "label": "Deals",
+          "aggregate": "count"
+        },
+        {
+          "field": "probability",
+          "label": "Avg Probability",
+          "aggregate": "avg"
+        }
+      ],
+      "groupingsDown": [
+        {
+          "field": "owner",
+          "sortOrder": "asc"
+        },
+        {
+          "field": "stage",
+          "sortOrder": "asc"
+        }
+      ],
+      "filter": {
+        "stage": {
+          "$ne": "closed_lost"
+        }
+      },
+      "chart": {
+        "type": "funnel",
+        "title": "Pipeline Funnel",
+        "xAxis": "stage",
+        "yAxis": "amount",
+        "showLegend": false,
+        "showDataLabels": false
+      }
+    },
+    {
+      "name": "pipeline_coverage_by_quarter",
+      "label": "Pipeline Coverage by Forecast × Quarter",
+      "description": "Open pipeline amount by forecast category, bucketed by close quarter",
+      "objectName": "opportunity",
+      "type": "matrix",
+      "columns": [
+        {
+          "field": "amount",
+          "label": "Pipeline",
+          "aggregate": "sum"
+        },
+        {
+          "field": "name",
+          "label": "Deals",
+          "aggregate": "count"
+        }
+      ],
+      "groupingsDown": [
+        {
+          "field": "forecast_category",
+          "sortOrder": "asc"
+        }
+      ],
+      "groupingsAcross": [
+        {
+          "field": "close_date",
+          "sortOrder": "asc",
+          "dateGranularity": "quarter"
+        }
+      ],
+      "filter": {
+        "stage": {
+          "$nin": [
+            "closed_won",
+            "closed_lost"
+          ]
+        }
       }
     },
     {
@@ -18976,6 +19201,7 @@
         "source": "record.amount > 100000"
       },
       "lockRecord": true,
+      "approvalStatusField": "approval_status",
       "steps": [
         {
           "name": "manager_review",
@@ -19002,6 +19228,61 @@
           ],
           "behavior": "first_response",
           "rejectionBehavior": "back_to_previous"
+        }
+      ],
+      "onSubmit": [
+        {
+          "type": "inbox_notify",
+          "name": "notify_approvers",
+          "config": {
+            "to": "pending_approvers",
+            "title": "Discount approval needed",
+            "body": "Opportunity {record_id} (amount over 100k) is awaiting your review.",
+            "link": "/system/approvals"
+          }
+        }
+      ],
+      "onFinalApprove": [
+        {
+          "type": "field_update",
+          "name": "mark_won",
+          "config": {
+            "field": "stage",
+            "value": "closed_won"
+          }
+        },
+        {
+          "type": "inbox_notify",
+          "name": "notify_submitter_approved",
+          "config": {
+            "to": "submitter",
+            "title": "Discount approved",
+            "body": "Your discount request on opportunity {record_id} was approved.",
+            "link": "/system/approvals"
+          }
+        }
+      ],
+      "onFinalReject": [
+        {
+          "type": "inbox_notify",
+          "name": "notify_submitter_rejected",
+          "config": {
+            "to": "submitter",
+            "title": "Discount rejected",
+            "body": "Your discount request on opportunity {record_id} was rejected: {comment}",
+            "link": "/system/approvals"
+          }
+        }
+      ],
+      "onRecall": [
+        {
+          "type": "inbox_notify",
+          "name": "notify_recall",
+          "config": {
+            "to": "pending_approvers",
+            "title": "Discount request recalled",
+            "body": "Submitter recalled the discount request on opportunity {record_id}."
+          }
         }
       ]
     }
@@ -21771,6 +22052,276 @@
             "dialect": "cel",
             "source": "daysAgo(1)"
           }
+        },
+        {
+          "first_name": "Noah",
+          "last_name": "Patel",
+          "company": "Vertex Analytics",
+          "email": "noah.patel@vertexanalytics.example.com",
+          "phone": "+1-555-0100-1000",
+          "status": "new",
+          "lead_source": "web",
+          "industry": "technology",
+          "rating": 1,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(7)"
+          }
+        },
+        {
+          "first_name": "Maya",
+          "last_name": "Singh",
+          "company": "BluePeak Logistics",
+          "email": "maya.singh@bluepeaklogistics.example.com",
+          "phone": "+1-555-0101-1007",
+          "status": "contacted",
+          "lead_source": "referral",
+          "industry": "logistics",
+          "rating": 3,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(14)"
+          }
+        },
+        {
+          "first_name": "Owen",
+          "last_name": "Becker",
+          "company": "Northwind Energy",
+          "email": "owen.becker@northwindenergy.example.com",
+          "phone": "+1-555-0102-1014",
+          "status": "qualified",
+          "lead_source": "event",
+          "industry": "energy",
+          "rating": 5,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(21)"
+          }
+        },
+        {
+          "first_name": "Sara",
+          "last_name": "Lopez",
+          "company": "Helios Solar",
+          "email": "sara.lopez@heliossolar.example.com",
+          "phone": "+1-555-0103-1021",
+          "status": "unqualified",
+          "lead_source": "partner",
+          "industry": "energy",
+          "rating": 2,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(28)"
+          }
+        },
+        {
+          "first_name": "Leo",
+          "last_name": "Vance",
+          "company": "CleanCart",
+          "email": "leo.vance@cleancart.example.com",
+          "phone": "+1-555-0104-1028",
+          "status": "new",
+          "lead_source": "web",
+          "industry": "retail",
+          "rating": 4,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(38)"
+          }
+        },
+        {
+          "first_name": "Iris",
+          "last_name": "Okafor",
+          "company": "PulseHealth",
+          "email": "iris.okafor@pulsehealth.example.com",
+          "phone": "+1-555-0105-1035",
+          "status": "contacted",
+          "lead_source": "cold_call",
+          "industry": "healthcare",
+          "rating": 1,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(45)"
+          }
+        },
+        {
+          "first_name": "Ravi",
+          "last_name": "Mehta",
+          "company": "Foundry Robotics",
+          "email": "ravi.mehta@foundryrobotics.example.com",
+          "phone": "+1-555-0106-1042",
+          "status": "qualified",
+          "lead_source": "event",
+          "industry": "manufacturing",
+          "rating": 3,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(52)"
+          }
+        },
+        {
+          "first_name": "Tess",
+          "last_name": "Brown",
+          "company": "Lattice Education",
+          "email": "tess.brown@latticeeducation.example.com",
+          "phone": "+1-555-0107-1049",
+          "status": "unqualified",
+          "lead_source": "referral",
+          "industry": "education",
+          "rating": 5,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(67)"
+          }
+        },
+        {
+          "first_name": "Marco",
+          "last_name": "Ricci",
+          "company": "Aurora Travel",
+          "email": "marco.ricci@auroratravel.example.com",
+          "phone": "+1-555-0108-1056",
+          "status": "new",
+          "lead_source": "advertising",
+          "industry": "travel",
+          "rating": 2,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(74)"
+          }
+        },
+        {
+          "first_name": "Pia",
+          "last_name": "Anand",
+          "company": "Citrine Finance",
+          "email": "pia.anand@citrinefinance.example.com",
+          "phone": "+1-555-0109-1063",
+          "status": "contacted",
+          "lead_source": "partner",
+          "industry": "financial_services",
+          "rating": 4,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(81)"
+          }
+        },
+        {
+          "first_name": "Jonas",
+          "last_name": "Holt",
+          "company": "Polar Cargo",
+          "email": "jonas.holt@polarcargo.example.com",
+          "phone": "+1-555-0110-1070",
+          "status": "qualified",
+          "lead_source": "web",
+          "industry": "logistics",
+          "rating": 1,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(95)"
+          }
+        },
+        {
+          "first_name": "Anya",
+          "last_name": "Volkov",
+          "company": "RedOak Realty",
+          "email": "anya.volkov@redoakrealty.example.com",
+          "phone": "+1-555-0111-1077",
+          "status": "unqualified",
+          "lead_source": "cold_call",
+          "industry": "real_estate",
+          "rating": 3,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(102)"
+          }
+        },
+        {
+          "first_name": "Theo",
+          "last_name": "Park",
+          "company": "Skyline Media",
+          "email": "theo.park@skylinemedia.example.com",
+          "phone": "+1-555-0112-1084",
+          "status": "new",
+          "lead_source": "advertising",
+          "industry": "media",
+          "rating": 5,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(116)"
+          }
+        },
+        {
+          "first_name": "Wren",
+          "last_name": "Garcia",
+          "company": "Maple Bakery Group",
+          "email": "wren.garcia@maplebakerygroup.example.com",
+          "phone": "+1-555-0113-1091",
+          "status": "contacted",
+          "lead_source": "event",
+          "industry": "consumer_goods",
+          "rating": 2,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(123)"
+          }
+        },
+        {
+          "first_name": "Hugo",
+          "last_name": "Dubois",
+          "company": "Nimbus Aerospace",
+          "email": "hugo.dubois@nimbusaerospace.example.com",
+          "phone": "+1-555-0114-1098",
+          "status": "qualified",
+          "lead_source": "referral",
+          "industry": "manufacturing",
+          "rating": 4,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(138)"
+          }
+        },
+        {
+          "first_name": "Lena",
+          "last_name": "Fischer",
+          "company": "Granite Insurance",
+          "email": "lena.fischer@graniteinsurance.example.com",
+          "phone": "+1-555-0115-1105",
+          "status": "unqualified",
+          "lead_source": "partner",
+          "industry": "financial_services",
+          "rating": 1,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(145)"
+          }
+        },
+        {
+          "first_name": "Kai",
+          "last_name": "Watanabe",
+          "company": "Coral Reef Hotels",
+          "email": "kai.watanabe@coralreefhotels.example.com",
+          "phone": "+1-555-0116-1112",
+          "status": "new",
+          "lead_source": "web",
+          "industry": "travel",
+          "rating": 3,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(162)"
+          }
+        },
+        {
+          "first_name": "Mira",
+          "last_name": "Costa",
+          "company": "Atlas Construction",
+          "email": "mira.costa@atlasconstruction.example.com",
+          "phone": "+1-555-0117-1119",
+          "status": "contacted",
+          "lead_source": "cold_call",
+          "industry": "construction",
+          "rating": 5,
+          "last_contacted_date": {
+            "dialect": "cel",
+            "source": "daysAgo(175)"
+          }
         }
       ]
     },
@@ -21941,6 +22492,740 @@
           "type": "new_business",
           "forecast_category": "omitted",
           "lead_source": "advertising"
+        },
+        {
+          "name": "Demo Deal 01",
+          "account": "Acme Corporation",
+          "amount": 20000,
+          "stage": "qualification",
+          "probability": 10,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(180)"
+          },
+          "type": "new_business",
+          "forecast_category": "pipeline",
+          "lead_source": "web",
+          "days_in_stage": 3
+        },
+        {
+          "name": "Demo Deal 02",
+          "account": "Globex Industries",
+          "amount": 37393,
+          "stage": "needs_analysis",
+          "probability": 23,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(173)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "best_case",
+          "lead_source": "referral",
+          "days_in_stage": 14
+        },
+        {
+          "name": "Demo Deal 03",
+          "account": "Wayne Enterprises",
+          "amount": 54786,
+          "stage": "proposal",
+          "probability": 36,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(166)"
+          },
+          "type": "renewal",
+          "forecast_category": "best_case",
+          "lead_source": "partner",
+          "days_in_stage": 25
+        },
+        {
+          "name": "Demo Deal 04",
+          "account": "Initech Solutions",
+          "amount": 72179,
+          "stage": "negotiation",
+          "probability": 49,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(159)"
+          },
+          "type": "new_business",
+          "forecast_category": "commit",
+          "lead_source": "event",
+          "days_in_stage": 36
+        },
+        {
+          "name": "Demo Deal 05",
+          "account": "Stark Medical",
+          "amount": 89572,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(152)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "closed",
+          "lead_source": "cold_call"
+        },
+        {
+          "name": "Demo Deal 06",
+          "account": "Acme Corporation",
+          "amount": 106965,
+          "stage": "closed_lost",
+          "probability": 0,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(145)"
+          },
+          "type": "renewal",
+          "forecast_category": "omitted",
+          "lead_source": "advertising"
+        },
+        {
+          "name": "Demo Deal 07",
+          "account": "Globex Industries",
+          "amount": 124358,
+          "stage": "qualification",
+          "probability": 88,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(138)"
+          },
+          "type": "new_business",
+          "forecast_category": "pipeline",
+          "lead_source": "web",
+          "days_in_stage": 9
+        },
+        {
+          "name": "Demo Deal 08",
+          "account": "Wayne Enterprises",
+          "amount": 141751,
+          "stage": "needs_analysis",
+          "probability": 21,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(131)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "best_case",
+          "lead_source": "referral",
+          "days_in_stage": 20
+        },
+        {
+          "name": "Demo Deal 09",
+          "account": "Initech Solutions",
+          "amount": 159144,
+          "stage": "proposal",
+          "probability": 34,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(124)"
+          },
+          "type": "renewal",
+          "forecast_category": "best_case",
+          "lead_source": "partner",
+          "days_in_stage": 31
+        },
+        {
+          "name": "Demo Deal 10",
+          "account": "Stark Medical",
+          "amount": 176537,
+          "stage": "negotiation",
+          "probability": 47,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(117)"
+          },
+          "type": "new_business",
+          "forecast_category": "commit",
+          "lead_source": "event",
+          "days_in_stage": 42
+        },
+        {
+          "name": "Demo Deal 11",
+          "account": "Acme Corporation",
+          "amount": 193930,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(110)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "closed",
+          "lead_source": "cold_call"
+        },
+        {
+          "name": "Demo Deal 12",
+          "account": "Globex Industries",
+          "amount": 211323,
+          "stage": "closed_lost",
+          "probability": 0,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(103)"
+          },
+          "type": "renewal",
+          "forecast_category": "omitted",
+          "lead_source": "advertising"
+        },
+        {
+          "name": "Demo Deal 13",
+          "account": "Wayne Enterprises",
+          "amount": 228716,
+          "stage": "qualification",
+          "probability": 86,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(96)"
+          },
+          "type": "new_business",
+          "forecast_category": "pipeline",
+          "lead_source": "web",
+          "days_in_stage": 15
+        },
+        {
+          "name": "Demo Deal 14",
+          "account": "Initech Solutions",
+          "amount": 246109,
+          "stage": "needs_analysis",
+          "probability": 19,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(89)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "best_case",
+          "lead_source": "referral",
+          "days_in_stage": 26
+        },
+        {
+          "name": "Demo Deal 15",
+          "account": "Stark Medical",
+          "amount": 263502,
+          "stage": "proposal",
+          "probability": 32,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(82)"
+          },
+          "type": "renewal",
+          "forecast_category": "best_case",
+          "lead_source": "partner",
+          "days_in_stage": 37
+        },
+        {
+          "name": "Demo Deal 16",
+          "account": "Acme Corporation",
+          "amount": 280895,
+          "stage": "negotiation",
+          "probability": 45,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(75)"
+          },
+          "type": "new_business",
+          "forecast_category": "commit",
+          "lead_source": "event",
+          "days_in_stage": 48
+        },
+        {
+          "name": "Demo Deal 17",
+          "account": "Globex Industries",
+          "amount": 298288,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(68)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "closed",
+          "lead_source": "cold_call"
+        },
+        {
+          "name": "Demo Deal 18",
+          "account": "Wayne Enterprises",
+          "amount": 315681,
+          "stage": "closed_lost",
+          "probability": 0,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(61)"
+          },
+          "type": "renewal",
+          "forecast_category": "omitted",
+          "lead_source": "advertising"
+        },
+        {
+          "name": "Demo Deal 19",
+          "account": "Initech Solutions",
+          "amount": 333074,
+          "stage": "qualification",
+          "probability": 84,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(54)"
+          },
+          "type": "new_business",
+          "forecast_category": "pipeline",
+          "lead_source": "web",
+          "days_in_stage": 21
+        },
+        {
+          "name": "Demo Deal 20",
+          "account": "Stark Medical",
+          "amount": 350467,
+          "stage": "needs_analysis",
+          "probability": 17,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(47)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "best_case",
+          "lead_source": "referral",
+          "days_in_stage": 32
+        },
+        {
+          "name": "Demo Deal 21",
+          "account": "Acme Corporation",
+          "amount": 367860,
+          "stage": "proposal",
+          "probability": 30,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(40)"
+          },
+          "type": "renewal",
+          "forecast_category": "best_case",
+          "lead_source": "partner",
+          "days_in_stage": 43
+        },
+        {
+          "name": "Demo Deal 22",
+          "account": "Globex Industries",
+          "amount": 385253,
+          "stage": "negotiation",
+          "probability": 43,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(33)"
+          },
+          "type": "new_business",
+          "forecast_category": "commit",
+          "lead_source": "event",
+          "days_in_stage": 54
+        },
+        {
+          "name": "Demo Deal 23",
+          "account": "Wayne Enterprises",
+          "amount": 402646,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(26)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "closed",
+          "lead_source": "cold_call"
+        },
+        {
+          "name": "Demo Deal 24",
+          "account": "Initech Solutions",
+          "amount": 420039,
+          "stage": "closed_lost",
+          "probability": 0,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(19)"
+          },
+          "type": "renewal",
+          "forecast_category": "omitted",
+          "lead_source": "advertising"
+        },
+        {
+          "name": "Demo Deal 25",
+          "account": "Stark Medical",
+          "amount": 437432,
+          "stage": "qualification",
+          "probability": 82,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(12)"
+          },
+          "type": "new_business",
+          "forecast_category": "pipeline",
+          "lead_source": "web",
+          "days_in_stage": 27
+        },
+        {
+          "name": "Demo Deal 26",
+          "account": "Acme Corporation",
+          "amount": 454825,
+          "stage": "needs_analysis",
+          "probability": 15,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysAgo(5)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "best_case",
+          "lead_source": "referral",
+          "days_in_stage": 38
+        },
+        {
+          "name": "Demo Deal 27",
+          "account": "Globex Industries",
+          "amount": 472218,
+          "stage": "proposal",
+          "probability": 28,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(2)"
+          },
+          "type": "renewal",
+          "forecast_category": "best_case",
+          "lead_source": "partner",
+          "days_in_stage": 49
+        },
+        {
+          "name": "Demo Deal 28",
+          "account": "Wayne Enterprises",
+          "amount": 489611,
+          "stage": "negotiation",
+          "probability": 41,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(9)"
+          },
+          "type": "new_business",
+          "forecast_category": "commit",
+          "lead_source": "event",
+          "days_in_stage": 60
+        },
+        {
+          "name": "Demo Deal 29",
+          "account": "Initech Solutions",
+          "amount": 27004,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(16)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "closed",
+          "lead_source": "cold_call"
+        },
+        {
+          "name": "Demo Deal 30",
+          "account": "Stark Medical",
+          "amount": 44397,
+          "stage": "closed_lost",
+          "probability": 0,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(23)"
+          },
+          "type": "renewal",
+          "forecast_category": "omitted",
+          "lead_source": "advertising"
+        },
+        {
+          "name": "Demo Deal 31",
+          "account": "Acme Corporation",
+          "amount": 61790,
+          "stage": "qualification",
+          "probability": 80,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(30)"
+          },
+          "type": "new_business",
+          "forecast_category": "pipeline",
+          "lead_source": "web",
+          "days_in_stage": 33
+        },
+        {
+          "name": "Demo Deal 32",
+          "account": "Globex Industries",
+          "amount": 79183,
+          "stage": "needs_analysis",
+          "probability": 13,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(37)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "best_case",
+          "lead_source": "referral",
+          "days_in_stage": 44
+        },
+        {
+          "name": "Demo Deal 33",
+          "account": "Wayne Enterprises",
+          "amount": 96576,
+          "stage": "proposal",
+          "probability": 26,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(44)"
+          },
+          "type": "renewal",
+          "forecast_category": "best_case",
+          "lead_source": "partner",
+          "days_in_stage": 55
+        },
+        {
+          "name": "Demo Deal 34",
+          "account": "Initech Solutions",
+          "amount": 113969,
+          "stage": "negotiation",
+          "probability": 39,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(51)"
+          },
+          "type": "new_business",
+          "forecast_category": "commit",
+          "lead_source": "event",
+          "days_in_stage": 6
+        },
+        {
+          "name": "Demo Deal 35",
+          "account": "Stark Medical",
+          "amount": 131362,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(58)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "closed",
+          "lead_source": "cold_call"
+        },
+        {
+          "name": "Demo Deal 36",
+          "account": "Acme Corporation",
+          "amount": 148755,
+          "stage": "closed_lost",
+          "probability": 0,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(65)"
+          },
+          "type": "renewal",
+          "forecast_category": "omitted",
+          "lead_source": "advertising"
+        },
+        {
+          "name": "Demo Deal 37",
+          "account": "Globex Industries",
+          "amount": 166148,
+          "stage": "qualification",
+          "probability": 78,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(72)"
+          },
+          "type": "new_business",
+          "forecast_category": "pipeline",
+          "lead_source": "web",
+          "days_in_stage": 39
+        },
+        {
+          "name": "Demo Deal 38",
+          "account": "Wayne Enterprises",
+          "amount": 183541,
+          "stage": "needs_analysis",
+          "probability": 11,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(79)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "best_case",
+          "lead_source": "referral",
+          "days_in_stage": 50
+        },
+        {
+          "name": "Demo Deal 39",
+          "account": "Initech Solutions",
+          "amount": 200934,
+          "stage": "proposal",
+          "probability": 24,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(86)"
+          },
+          "type": "renewal",
+          "forecast_category": "best_case",
+          "lead_source": "partner",
+          "days_in_stage": 61
+        },
+        {
+          "name": "Demo Deal 40",
+          "account": "Stark Medical",
+          "amount": 218327,
+          "stage": "negotiation",
+          "probability": 37,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(93)"
+          },
+          "type": "new_business",
+          "forecast_category": "commit",
+          "lead_source": "event",
+          "days_in_stage": 12
+        },
+        {
+          "name": "Demo Deal 41",
+          "account": "Acme Corporation",
+          "amount": 235720,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(100)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "closed",
+          "lead_source": "cold_call"
+        },
+        {
+          "name": "Demo Deal 42",
+          "account": "Globex Industries",
+          "amount": 253113,
+          "stage": "closed_lost",
+          "probability": 0,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(107)"
+          },
+          "type": "renewal",
+          "forecast_category": "omitted",
+          "lead_source": "advertising"
+        },
+        {
+          "name": "Demo Deal 43",
+          "account": "Wayne Enterprises",
+          "amount": 270506,
+          "stage": "qualification",
+          "probability": 76,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(114)"
+          },
+          "type": "new_business",
+          "forecast_category": "pipeline",
+          "lead_source": "web",
+          "days_in_stage": 45
+        },
+        {
+          "name": "Demo Deal 44",
+          "account": "Initech Solutions",
+          "amount": 287899,
+          "stage": "needs_analysis",
+          "probability": 89,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(121)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "best_case",
+          "lead_source": "referral",
+          "days_in_stage": 56
+        },
+        {
+          "name": "Demo Deal 45",
+          "account": "Stark Medical",
+          "amount": 305292,
+          "stage": "proposal",
+          "probability": 22,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(128)"
+          },
+          "type": "renewal",
+          "forecast_category": "best_case",
+          "lead_source": "partner",
+          "days_in_stage": 7
+        },
+        {
+          "name": "Demo Deal 46",
+          "account": "Acme Corporation",
+          "amount": 322685,
+          "stage": "negotiation",
+          "probability": 35,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(135)"
+          },
+          "type": "new_business",
+          "forecast_category": "commit",
+          "lead_source": "event",
+          "days_in_stage": 18
+        },
+        {
+          "name": "Demo Deal 47",
+          "account": "Globex Industries",
+          "amount": 340078,
+          "stage": "closed_won",
+          "probability": 100,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(142)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "closed",
+          "lead_source": "cold_call"
+        },
+        {
+          "name": "Demo Deal 48",
+          "account": "Wayne Enterprises",
+          "amount": 357471,
+          "stage": "closed_lost",
+          "probability": 0,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(149)"
+          },
+          "type": "renewal",
+          "forecast_category": "omitted",
+          "lead_source": "advertising"
+        },
+        {
+          "name": "Demo Deal 49",
+          "account": "Initech Solutions",
+          "amount": 374864,
+          "stage": "qualification",
+          "probability": 74,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(156)"
+          },
+          "type": "new_business",
+          "forecast_category": "pipeline",
+          "lead_source": "web",
+          "days_in_stage": 51
+        },
+        {
+          "name": "Demo Deal 50",
+          "account": "Stark Medical",
+          "amount": 392257,
+          "stage": "needs_analysis",
+          "probability": 87,
+          "close_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(163)"
+          },
+          "type": "existing_upgrade",
+          "forecast_category": "best_case",
+          "lead_source": "referral",
+          "days_in_stage": 62
         }
       ]
     },
@@ -22234,6 +23519,696 @@
           "sla_due_date": {
             "dialect": "cel",
             "source": "daysAgo(8)"
+          }
+        },
+        {
+          "subject": "Demo case 00009 — low question",
+          "description": "Auto-generated demo case for low priority on day -1.",
+          "account": "Acme Corporation",
+          "status": "new",
+          "priority": "low",
+          "type": "question",
+          "origin": "email",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "case_number": "CASE-00009",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(1)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00010 — medium bug",
+          "description": "Auto-generated demo case for medium priority on day -2.",
+          "account": "Globex Industries",
+          "status": "in_progress",
+          "priority": "medium",
+          "type": "bug",
+          "origin": "phone",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "case_number": "CASE-00010",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(2)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00011 — high problem",
+          "description": "Auto-generated demo case for high priority on day -3.",
+          "account": "Wayne Enterprises",
+          "status": "resolved",
+          "priority": "high",
+          "type": "problem",
+          "origin": "web",
+          "is_closed": true,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "resolution_time_hours": 15,
+          "case_number": "CASE-00011",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(3)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(2)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(2)"
+          }
+        },
+        {
+          "subject": "Demo case 00012 — critical feature_request",
+          "description": "Auto-generated demo case for critical priority on day -4.",
+          "account": "Initech Solutions",
+          "status": "closed",
+          "priority": "critical",
+          "type": "feature_request",
+          "origin": "chat",
+          "is_closed": true,
+          "is_sla_violated": true,
+          "is_escalated": false,
+          "resolution_time_hours": 22,
+          "case_number": "CASE-00012",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(4)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(3)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(1)"
+          }
+        },
+        {
+          "subject": "Demo case 00013 — low question",
+          "description": "Auto-generated demo case for low priority on day -5.",
+          "account": "Stark Medical",
+          "status": "escalated",
+          "priority": "low",
+          "type": "question",
+          "origin": "email",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": true,
+          "case_number": "CASE-00013",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(5)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00014 — medium bug",
+          "description": "Auto-generated demo case for medium priority on day -6.",
+          "account": "Acme Corporation",
+          "status": "new",
+          "priority": "medium",
+          "type": "bug",
+          "origin": "phone",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "case_number": "CASE-00014",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(6)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00015 — high problem",
+          "description": "Auto-generated demo case for high priority on day -7.",
+          "account": "Globex Industries",
+          "status": "in_progress",
+          "priority": "high",
+          "type": "problem",
+          "origin": "web",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "case_number": "CASE-00015",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(7)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(2)"
+          }
+        },
+        {
+          "subject": "Demo case 00016 — critical feature_request",
+          "description": "Auto-generated demo case for critical priority on day -8.",
+          "account": "Wayne Enterprises",
+          "status": "resolved",
+          "priority": "critical",
+          "type": "feature_request",
+          "origin": "chat",
+          "is_closed": true,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "resolution_time_hours": 2,
+          "case_number": "CASE-00016",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(8)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(7)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(1)"
+          }
+        },
+        {
+          "subject": "Demo case 00017 — low question",
+          "description": "Auto-generated demo case for low priority on day -9.",
+          "account": "Initech Solutions",
+          "status": "closed",
+          "priority": "low",
+          "type": "question",
+          "origin": "email",
+          "is_closed": true,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "resolution_time_hours": 9,
+          "case_number": "CASE-00017",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(9)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(8)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00018 — medium bug",
+          "description": "Auto-generated demo case for medium priority on day -10.",
+          "account": "Stark Medical",
+          "status": "escalated",
+          "priority": "medium",
+          "type": "bug",
+          "origin": "phone",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": true,
+          "case_number": "CASE-00018",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(10)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00019 — high problem",
+          "description": "Auto-generated demo case for high priority on day -11.",
+          "account": "Acme Corporation",
+          "status": "new",
+          "priority": "high",
+          "type": "problem",
+          "origin": "web",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "case_number": "CASE-00019",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(11)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(2)"
+          }
+        },
+        {
+          "subject": "Demo case 00020 — critical feature_request",
+          "description": "Auto-generated demo case for critical priority on day -12.",
+          "account": "Globex Industries",
+          "status": "in_progress",
+          "priority": "critical",
+          "type": "feature_request",
+          "origin": "chat",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "case_number": "CASE-00020",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(12)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(1)"
+          }
+        },
+        {
+          "subject": "Demo case 00021 — low question",
+          "description": "Auto-generated demo case for low priority on day -13.",
+          "account": "Wayne Enterprises",
+          "status": "resolved",
+          "priority": "low",
+          "type": "question",
+          "origin": "email",
+          "is_closed": true,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "resolution_time_hours": 37,
+          "case_number": "CASE-00021",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(13)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(12)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00022 — medium bug",
+          "description": "Auto-generated demo case for medium priority on day -14.",
+          "account": "Initech Solutions",
+          "status": "closed",
+          "priority": "medium",
+          "type": "bug",
+          "origin": "phone",
+          "is_closed": true,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "resolution_time_hours": 44,
+          "case_number": "CASE-00022",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(14)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(13)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00023 — high problem",
+          "description": "Auto-generated demo case for high priority on day -15.",
+          "account": "Stark Medical",
+          "status": "escalated",
+          "priority": "high",
+          "type": "problem",
+          "origin": "web",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": true,
+          "case_number": "CASE-00023",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(15)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(2)"
+          }
+        },
+        {
+          "subject": "Demo case 00024 — critical feature_request",
+          "description": "Auto-generated demo case for critical priority on day -16.",
+          "account": "Acme Corporation",
+          "status": "new",
+          "priority": "critical",
+          "type": "feature_request",
+          "origin": "chat",
+          "is_closed": false,
+          "is_sla_violated": true,
+          "is_escalated": false,
+          "case_number": "CASE-00024",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(16)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(1)"
+          }
+        },
+        {
+          "subject": "Demo case 00025 — low question",
+          "description": "Auto-generated demo case for low priority on day -17.",
+          "account": "Globex Industries",
+          "status": "in_progress",
+          "priority": "low",
+          "type": "question",
+          "origin": "email",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "case_number": "CASE-00025",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(17)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00026 — medium bug",
+          "description": "Auto-generated demo case for medium priority on day -18.",
+          "account": "Wayne Enterprises",
+          "status": "resolved",
+          "priority": "medium",
+          "type": "bug",
+          "origin": "phone",
+          "is_closed": true,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "resolution_time_hours": 24,
+          "case_number": "CASE-00026",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(18)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(17)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00027 — high problem",
+          "description": "Auto-generated demo case for high priority on day -19.",
+          "account": "Initech Solutions",
+          "status": "closed",
+          "priority": "high",
+          "type": "problem",
+          "origin": "web",
+          "is_closed": true,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "resolution_time_hours": 31,
+          "case_number": "CASE-00027",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(19)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(18)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(2)"
+          }
+        },
+        {
+          "subject": "Demo case 00028 — critical feature_request",
+          "description": "Auto-generated demo case for critical priority on day -20.",
+          "account": "Stark Medical",
+          "status": "escalated",
+          "priority": "critical",
+          "type": "feature_request",
+          "origin": "chat",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": true,
+          "case_number": "CASE-00028",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(20)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(1)"
+          }
+        },
+        {
+          "subject": "Demo case 00029 — low question",
+          "description": "Auto-generated demo case for low priority on day -21.",
+          "account": "Acme Corporation",
+          "status": "new",
+          "priority": "low",
+          "type": "question",
+          "origin": "email",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "case_number": "CASE-00029",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(21)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00030 — medium bug",
+          "description": "Auto-generated demo case for medium priority on day -22.",
+          "account": "Globex Industries",
+          "status": "in_progress",
+          "priority": "medium",
+          "type": "bug",
+          "origin": "phone",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "case_number": "CASE-00030",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(22)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00031 — high problem",
+          "description": "Auto-generated demo case for high priority on day -23.",
+          "account": "Wayne Enterprises",
+          "status": "resolved",
+          "priority": "high",
+          "type": "problem",
+          "origin": "web",
+          "is_closed": true,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "resolution_time_hours": 11,
+          "case_number": "CASE-00031",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(23)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(22)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(2)"
+          }
+        },
+        {
+          "subject": "Demo case 00032 — critical feature_request",
+          "description": "Auto-generated demo case for critical priority on day -24.",
+          "account": "Initech Solutions",
+          "status": "closed",
+          "priority": "critical",
+          "type": "feature_request",
+          "origin": "chat",
+          "is_closed": true,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "resolution_time_hours": 18,
+          "case_number": "CASE-00032",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(24)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(23)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(1)"
+          }
+        },
+        {
+          "subject": "Demo case 00033 — low question",
+          "description": "Auto-generated demo case for low priority on day -25.",
+          "account": "Stark Medical",
+          "status": "escalated",
+          "priority": "low",
+          "type": "question",
+          "origin": "email",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": true,
+          "case_number": "CASE-00033",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(25)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00034 — medium bug",
+          "description": "Auto-generated demo case for medium priority on day -26.",
+          "account": "Acme Corporation",
+          "status": "new",
+          "priority": "medium",
+          "type": "bug",
+          "origin": "phone",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "case_number": "CASE-00034",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(26)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00035 — high problem",
+          "description": "Auto-generated demo case for high priority on day -27.",
+          "account": "Globex Industries",
+          "status": "in_progress",
+          "priority": "high",
+          "type": "problem",
+          "origin": "web",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "case_number": "CASE-00035",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(27)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(2)"
+          }
+        },
+        {
+          "subject": "Demo case 00036 — critical feature_request",
+          "description": "Auto-generated demo case for critical priority on day -28.",
+          "account": "Wayne Enterprises",
+          "status": "resolved",
+          "priority": "critical",
+          "type": "feature_request",
+          "origin": "chat",
+          "is_closed": true,
+          "is_sla_violated": true,
+          "is_escalated": false,
+          "resolution_time_hours": 46,
+          "case_number": "CASE-00036",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(28)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(27)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(1)"
+          }
+        },
+        {
+          "subject": "Demo case 00037 — low question",
+          "description": "Auto-generated demo case for low priority on day -29.",
+          "account": "Initech Solutions",
+          "status": "closed",
+          "priority": "low",
+          "type": "question",
+          "origin": "email",
+          "is_closed": true,
+          "is_sla_violated": false,
+          "is_escalated": false,
+          "resolution_time_hours": 5,
+          "case_number": "CASE-00037",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(29)"
+          },
+          "closed_date": {
+            "dialect": "cel",
+            "source": "daysAgo(28)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
+          }
+        },
+        {
+          "subject": "Demo case 00038 — medium bug",
+          "description": "Auto-generated demo case for medium priority on day -30.",
+          "account": "Stark Medical",
+          "status": "escalated",
+          "priority": "medium",
+          "type": "bug",
+          "origin": "phone",
+          "is_closed": false,
+          "is_sla_violated": false,
+          "is_escalated": true,
+          "case_number": "CASE-00038",
+          "created_date": {
+            "dialect": "cel",
+            "source": "daysAgo(30)"
+          },
+          "sla_due_date": {
+            "dialect": "cel",
+            "source": "daysFromNow(4)"
           }
         }
       ]
