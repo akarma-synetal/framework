@@ -34,6 +34,7 @@ import { AppPlugin } from '../app-plugin.js';
 import type { ProjectKernelFactory } from './kernel-manager.js';
 import type { EnvironmentDriverRegistry } from './environment-registry.js';
 import type { ArtifactApiClient } from './artifact-api-client.js';
+import { loadCapabilities } from './capability-loader.js';
 
 type IDataDriver = Contracts.IDataDriver;
 
@@ -215,6 +216,33 @@ export class ArtifactKernelFactory implements ProjectKernelFactory {
             this.logger.warn?.('[ArtifactKernelFactory] I18nServicePlugin not registered', {
                 projectId,
                 error: err?.message,
+            });
+        }
+
+        // Tier-driven capability loading: install service plugins listed
+        // in the artifact's `requires` array (e.g. ['ai','automation',
+        // 'analytics']). Must be registered BEFORE AppPlugin so that
+        // AppPlugin's start phase can hand off flows/agents/cubes to
+        // services that are already initialised.
+        const requiresRaw =
+            (Array.isArray(bundle?.requires) ? bundle.requires : null) ??
+            (Array.isArray(sys?.requires) ? sys.requires : null) ??
+            [];
+        const requires: string[] = (requiresRaw as unknown[])
+            .filter((x): x is string => typeof x === 'string' && x.length > 0);
+
+        if (requires.length > 0) {
+            const installed = await loadCapabilities({
+                kernel,
+                requires,
+                bundle: { ...(bundle ?? {}), ...(sys ?? {}) } as Record<string, unknown>,
+                logger: this.logger,
+                projectId,
+            });
+            this.logger.info?.('[ArtifactKernelFactory] capabilities loaded', {
+                projectId,
+                requires,
+                installed,
             });
         }
 
