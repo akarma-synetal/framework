@@ -116,6 +116,13 @@ export function createRestApiPlugin(config: RestApiPluginConfig = {}): Plugin {
                 } catch { return undefined; }
             };
 
+            // Sharing service resolver — used by /data/:object/:id/shares.
+            const sharingServiceProvider = async (_projectId?: string): Promise<any | undefined> => {
+                try {
+                    return ctx.getService<any>('sharing');
+                } catch { return undefined; }
+            };
+
             if (!server) {
                 ctx.logger.warn(`RestApiPlugin: HTTP Server service '${serverService}' not found. REST routes skipped.`);
                 return;
@@ -129,7 +136,7 @@ export function createRestApiPlugin(config: RestApiPluginConfig = {}): Plugin {
             ctx.logger.info('Hydrating REST API from Protocol...');
             
             try {
-                const restServer = new RestServer(server, protocol, config.api as any, kernelManager, envRegistry, defaultProjectIdProvider, authServiceProvider, objectQLProvider, emailServiceProvider);
+                const restServer = new RestServer(server, protocol, config.api as any, kernelManager, envRegistry, defaultProjectIdProvider, authServiceProvider, objectQLProvider, emailServiceProvider, sharingServiceProvider);
                 restServer.registerRoutes();
 
                 ctx.logger.info('REST API successfully registered');

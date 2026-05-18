@@ -36,6 +36,7 @@ export * from './workflow-service.js';
 export * from './feed-service.js';
 export * from './export-service.js';
 export * from './email-service.js';
+export * from './sharing-service.js';
 export * from './package-service.js';
 
 // Provisioning & Deployment

@@ -742,6 +742,102 @@ describe('RestServer', () => {
       }));
     });
   });
+
+  // -----------------------------------------------------------------------
+  // /data/:object/:id/shares — ISharingService bridge (M11.C17)
+  // -----------------------------------------------------------------------
+  describe('sharing endpoints', () => {
+    function getShareRoutes(rest: any) {
+      const routes = rest.getRoutes();
+      return {
+        list: routes.find((r: any) => r.method === 'GET' && r.path === '/api/v1/data/:object/:id/shares'),
+        grant: routes.find((r: any) => r.method === 'POST' && r.path === '/api/v1/data/:object/:id/shares'),
+        revoke: routes.find((r: any) => r.method === 'DELETE' && r.path === '/api/v1/data/:object/:id/shares/:shareId'),
+      };
+    }
+
+    it('returns 501 when no sharing service provider is wired', async () => {
+      const rest = new RestServer(server as any, protocol as any);
+      rest.registerRoutes();
+      const { list, grant, revoke } = getShareRoutes(rest);
+      expect(list && grant && revoke).toBeDefined();
+      for (const route of [list, grant, revoke]) {
+        const res = { json: vi.fn(), status: vi.fn().mockReturnThis(), end: vi.fn() };
+        await route!.handler({ params: { object: 'a', id: '1', shareId: 's1' }, body: {} } as any, res as any);
+        expect(res.status).toHaveBeenCalledWith(501);
+      }
+    });
+
+    it('GET returns the rows produced by listShares()', async () => {
+      const listShares = vi.fn(async () => [{ id: 'shr_1', recipient_id: 'bob' }]);
+      const provider = async () => ({ listShares, grant: vi.fn(), revoke: vi.fn() });
+      const rest = new RestServer(
+        server as any, protocol as any, {},
+        undefined, undefined, undefined, undefined, undefined,
+        undefined, provider as any,
+      );
+      rest.registerRoutes();
+      const { list } = getShareRoutes(rest);
+      const res = { json: vi.fn(), status: vi.fn().mockReturnThis() };
+      await list!.handler({ params: { object: 'account', id: 'a1' } } as any, res as any);
+      expect(listShares).toHaveBeenCalledWith('account', 'a1', expect.anything());
+      expect(res.json).toHaveBeenCalledWith({ data: [{ id: 'shr_1', recipient_id: 'bob' }] });
+    });
+
+    it('POST creates a grant and returns 201', async () => {
+      const grant = vi.fn(async (input: any) => ({ id: 'shr_2', ...input }));
+      const provider = async () => ({ listShares: vi.fn(), grant, revoke: vi.fn() });
+      const rest = new RestServer(
+        server as any, protocol as any, {},
+        undefined, undefined, undefined, undefined, undefined,
+        undefined, provider as any,
+      );
+      rest.registerRoutes();
+      const { grant: route } = getShareRoutes(rest);
+      const res = { json: vi.fn(), status: vi.fn().mockReturnThis() };
+      await route!.handler({
+        params: { object: 'account', id: 'a1' },
+        body: { recipientId: 'bob', accessLevel: 'edit' },
+      } as any, res as any);
+      expect(grant).toHaveBeenCalledWith(
+        expect.objectContaining({ object: 'account', recordId: 'a1', recipientId: 'bob', accessLevel: 'edit' }),
+        expect.anything(),
+      );
+      expect(res.status).toHaveBeenCalledWith(201);
+    });
+
+    it('POST surfaces VALIDATION_FAILED as 400', async () => {
+      const grant = vi.fn(async () => { throw new Error('VALIDATION_FAILED: recipientId is required'); });
+      const provider = async () => ({ listShares: vi.fn(), grant, revoke: vi.fn() });
+      const rest = new RestServer(
+        server as any, protocol as any, {},
+        undefined, undefined, undefined, undefined, undefined,
+        undefined, provider as any,
+      );
+      rest.registerRoutes();
+      const { grant: route } = getShareRoutes(rest);
+      const res = { json: vi.fn(), status: vi.fn().mockReturnThis() };
+      await route!.handler({ params: { object: 'account', id: 'a1' }, body: {} } as any, res as any);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'VALIDATION_FAILED' }));
+    });
+
+    it('DELETE revokes and returns 204', async () => {
+      const revoke = vi.fn(async () => undefined);
+      const provider = async () => ({ listShares: vi.fn(), grant: vi.fn(), revoke });
+      const rest = new RestServer(
+        server as any, protocol as any, {},
+        undefined, undefined, undefined, undefined, undefined,
+        undefined, provider as any,
+      );
+      rest.registerRoutes();
+      const { revoke: route } = getShareRoutes(rest);
+      const res = { json: vi.fn(), status: vi.fn().mockReturnThis(), end: vi.fn() };
+      await route!.handler({ params: { object: 'account', id: 'a1', shareId: 'shr_X' } } as any, res as any);
+      expect(revoke).toHaveBeenCalledWith('shr_X', expect.anything());
+      expect(res.status).toHaveBeenCalledWith(204);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

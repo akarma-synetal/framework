@@ -398,6 +398,7 @@ export class RestServer {
     private authServiceProvider?: (projectId?: string) => Promise<any | undefined>;
     private objectQLProvider?: (projectId?: string) => Promise<any | undefined>;
     private emailServiceProvider?: (projectId?: string) => Promise<any | undefined>;
+    private sharingServiceProvider?: (projectId?: string) => Promise<any | undefined>;
 
     constructor(
         server: IHttpServer,
@@ -409,6 +410,7 @@ export class RestServer {
         authServiceProvider?: (projectId?: string) => Promise<any | undefined>,
         objectQLProvider?: (projectId?: string) => Promise<any | undefined>,
         emailServiceProvider?: (projectId?: string) => Promise<any | undefined>,
+        sharingServiceProvider?: (projectId?: string) => Promise<any | undefined>,
     ) {
         this.protocol = protocol;
         this.config = this.normalizeConfig(config);
@@ -419,6 +421,7 @@ export class RestServer {
         this.authServiceProvider = authServiceProvider;
         this.objectQLProvider = objectQLProvider;
         this.emailServiceProvider = emailServiceProvider;
+        this.sharingServiceProvider = sharingServiceProvider;
     }
 
     /**
@@ -930,6 +933,7 @@ export class RestServer {
                 this.registerSearchEndpoints(bp);
             }
             this.registerEmailEndpoints(bp);
+            this.registerSharingEndpoints(bp);
             this.registerDataActionEndpoints(bp);
             if (this.config.api.enableBatch) {
                 this.registerBatchEndpoints(bp);
@@ -1956,6 +1960,124 @@ export class RestServer {
                 summary: 'Send a transactional email via the configured EmailService',
                 tags: ['email'],
             },
+        });
+    }
+
+    /**
+     * Register record-level sharing endpoints (M11.C17).
+     *
+     * Surfaces `ISharingService` over HTTP so the UI can list, create
+     * and revoke per-record grants without going through ObjectQL. The
+     * three routes mirror the share-management drawer in Salesforce /
+     * ServiceNow:
+     *
+     *   GET    {basePath}/data/:object/:id/shares
+     *   POST   {basePath}/data/:object/:id/shares
+     *   DELETE {basePath}/data/:object/:id/shares/:shareId
+     *
+     * All three resolve via `sharingServiceProvider`; routes return 501
+     * when no sharing service is configured so a deployment without the
+     * `@objectstack/plugin-sharing` plugin fails cleanly.
+     */
+    private registerSharingEndpoints(basePath: string): void {
+        const { crud } = this.config;
+        const dataPath = `${basePath}${crud.dataPrefix}`;
+        const isScoped = basePath.includes('/projects/:projectId');
+
+        const resolveService = async (projectId?: string) => {
+            if (!this.sharingServiceProvider) return undefined;
+            try { return await this.sharingServiceProvider(projectId); }
+            catch { return undefined; }
+        };
+        const respond501 = (res: any) => res.status(501).json({
+            code: 'NOT_IMPLEMENTED',
+            message: 'Sharing service is not configured on this deployment',
+        });
+
+        // GET — list shares on a record.
+        this.routeManager.register({
+            method: 'GET',
+            path: `${dataPath}/:object/:id/shares`,
+            handler: async (req: any, res: any) => {
+                try {
+                    const projectId = isScoped ? req.params?.projectId : undefined;
+                    const context = await this.resolveExecCtx(projectId, req);
+                    if (this.enforceAuth(req, res, context)) return;
+                    const svc = await resolveService(projectId);
+                    if (!svc) return respond501(res);
+                    const rows = await svc.listShares(req.params.object, req.params.id, context ?? {});
+                    res.json({ data: rows });
+                } catch (error: any) {
+                    logError('[REST] List shares error:', error);
+                    res.status(500).json({ code: 'SHARES_LIST_FAILED', error: String(error?.message ?? error).slice(0, 500) });
+                }
+            },
+            metadata: { summary: 'List per-record sharing grants', tags: ['sharing'] },
+        });
+
+        // POST — grant access.
+        this.routeManager.register({
+            method: 'POST',
+            path: `${dataPath}/:object/:id/shares`,
+            handler: async (req: any, res: any) => {
+                try {
+                    const projectId = isScoped ? req.params?.projectId : undefined;
+                    const context = await this.resolveExecCtx(projectId, req);
+                    if (this.enforceAuth(req, res, context)) return;
+                    const svc = await resolveService(projectId);
+                    if (!svc) return respond501(res);
+                    const body = req.body ?? {};
+                    const input = {
+                        object: req.params.object,
+                        recordId: req.params.id,
+                        recipientType: body.recipientType ?? body.recipient_type,
+                        recipientId: body.recipientId ?? body.recipient_id,
+                        accessLevel: body.accessLevel ?? body.access_level,
+                        source: body.source,
+                        sourceId: body.sourceId ?? body.source_id,
+                        reason: body.reason,
+                    };
+                    try {
+                        const row = await svc.grant(input, context ?? {});
+                        res.status(201).json(row);
+                    } catch (err: any) {
+                        const msg = String(err?.message ?? err ?? '');
+                        if (msg.startsWith('VALIDATION_FAILED')) {
+                            res.status(400).json({
+                                code: 'VALIDATION_FAILED',
+                                error: msg.replace(/^VALIDATION_FAILED:\s*/, ''),
+                            });
+                            return;
+                        }
+                        throw err;
+                    }
+                } catch (error: any) {
+                    logError('[REST] Grant share error:', error);
+                    res.status(500).json({ code: 'SHARE_GRANT_FAILED', error: String(error?.message ?? error).slice(0, 500) });
+                }
+            },
+            metadata: { summary: 'Grant a per-record share to a principal', tags: ['sharing'] },
+        });
+
+        // DELETE — revoke a share by id.
+        this.routeManager.register({
+            method: 'DELETE',
+            path: `${dataPath}/:object/:id/shares/:shareId`,
+            handler: async (req: any, res: any) => {
+                try {
+                    const projectId = isScoped ? req.params?.projectId : undefined;
+                    const context = await this.resolveExecCtx(projectId, req);
+                    if (this.enforceAuth(req, res, context)) return;
+                    const svc = await resolveService(projectId);
+                    if (!svc) return respond501(res);
+                    await svc.revoke(req.params.shareId, context ?? {});
+                    res.status(204).end();
+                } catch (error: any) {
+                    logError('[REST] Revoke share error:', error);
+                    res.status(500).json({ code: 'SHARE_REVOKE_FAILED', error: String(error?.message ?? error).slice(0, 500) });
+                }
+            },
+            metadata: { summary: 'Revoke a per-record share by id', tags: ['sharing'] },
         });
     }
 
