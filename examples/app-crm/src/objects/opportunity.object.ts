@@ -297,7 +297,7 @@ export const Opportunity = ObjectSchema.create({
           name: 'set_probability',
           type: 'field_update',
           field: 'probability',
-          value: `CASE(stage,
+          value: `CASE(record.stage,
             "prospecting", 10,
             "qualification", 25,
             "needs_analysis", 40,
@@ -305,14 +305,14 @@ export const Opportunity = ObjectSchema.create({
             "negotiation", 80,
             "closed_won", 100,
             "closed_lost", 0,
-            probability
+            record.probability
           )`,
         },
         {
           name: 'set_forecast_category',
           type: 'field_update',
           field: 'forecast_category',
-          value: `CASE(stage,
+          value: `CASE(record.stage,
             "prospecting", "pipeline",
             "qualification", "pipeline",
             "needs_analysis", "best_case",
@@ -320,7 +320,7 @@ export const Opportunity = ObjectSchema.create({
             "negotiation", "commit",
             "closed_won", "closed",
             "closed_lost", "omitted",
-            forecast_category
+            record.forecast_category
           )`,
         }
       ],
@@ -336,7 +336,7 @@ export const Opportunity = ObjectSchema.create({
           name: 'update_expected_revenue',
           type: 'field_update',
           field: 'expected_revenue',
-          value: 'amount * (probability / 100)',
+          value: 'record.amount * (record.probability / 100)',
         }
       ],
     },

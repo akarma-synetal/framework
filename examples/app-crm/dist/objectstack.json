@@ -5258,7 +5258,7 @@
         "account_number": {
           "label": "Account Number",
           "type": "autonumber",
-          "format": "ACC-{0000}",
+          "format": "ACC-{000000}",
           "required": false,
           "searchable": false,
           "multiple": false,
@@ -5578,6 +5578,151 @@
           "group": "system",
           "hidden": false,
           "readonly": true,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "tier": {
+          "label": "Customer Tier",
+          "type": "select",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "options": [
+            {
+              "label": "Strategic",
+              "value": "strategic",
+              "color": "#7C3AED"
+            },
+            {
+              "label": "Enterprise",
+              "value": "enterprise",
+              "color": "#4169E1"
+            },
+            {
+              "label": "Mid-Market",
+              "value": "mid_market",
+              "color": "#00AA00"
+            },
+            {
+              "label": "SMB",
+              "value": "smb",
+              "color": "#FFA500",
+              "default": true
+            }
+          ],
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "ownership",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "segment": {
+          "label": "Segment",
+          "type": "select",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "options": [
+            {
+              "label": "Net New",
+              "value": "net_new"
+            },
+            {
+              "label": "Growth",
+              "value": "growth"
+            },
+            {
+              "label": "At Risk",
+              "value": "at_risk"
+            },
+            {
+              "label": "Stable",
+              "value": "stable"
+            }
+          ],
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "ownership",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "health_score": {
+          "label": "Health Score",
+          "type": "select",
+          "description": "CSM-maintained health indicator",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "options": [
+            {
+              "label": "Healthy",
+              "value": "healthy",
+              "color": "#00AA00"
+            },
+            {
+              "label": "Watching",
+              "value": "watching",
+              "color": "#FFA500"
+            },
+            {
+              "label": "At Risk",
+              "value": "at_risk",
+              "color": "#FF4500"
+            },
+            {
+              "label": "Churning",
+              "value": "churning",
+              "color": "#FF0000"
+            }
+          ],
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "ownership",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "renewal_owner": {
+          "label": "Renewal Owner (CSM)",
+          "type": "lookup",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "reference": "user",
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "ownership",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "next_renewal_date": {
+          "label": "Next Renewal Date",
+          "type": "date",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "ownership",
+          "hidden": false,
+          "readonly": false,
           "sortable": true,
           "index": false,
           "externalId": false
@@ -6313,6 +6458,246 @@
       }
     },
     {
+      "name": "campaign_member",
+      "label": "Campaign Member",
+      "pluralLabel": "Campaign Members",
+      "description": "Membership and response tracking for marketing campaigns",
+      "icon": "user-plus",
+      "active": true,
+      "isSystem": false,
+      "abstract": false,
+      "datasource": "default",
+      "fields": {
+        "campaign": {
+          "label": "Campaign",
+          "type": "lookup",
+          "required": true,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "reference": "campaign",
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "basic",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "lead": {
+          "label": "Lead",
+          "type": "lookup",
+          "description": "Set when the member was a Lead at enrollment time",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "reference": "lead",
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "basic",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "contact": {
+          "label": "Contact",
+          "type": "lookup",
+          "description": "Set when the member is an existing Contact",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "reference": "contact",
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "basic",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "status": {
+          "label": "Status",
+          "type": "select",
+          "required": true,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "options": [
+            {
+              "label": "Sent",
+              "value": "sent",
+              "color": "#A0A0A0",
+              "default": true
+            },
+            {
+              "label": "Opened",
+              "value": "opened",
+              "color": "#4169E1"
+            },
+            {
+              "label": "Clicked",
+              "value": "clicked",
+              "color": "#00AA00"
+            },
+            {
+              "label": "Responded",
+              "value": "responded",
+              "color": "#00AA00"
+            },
+            {
+              "label": "Converted",
+              "value": "converted",
+              "color": "#7C3AED"
+            },
+            {
+              "label": "Bounced",
+              "value": "bounced",
+              "color": "#FF4500"
+            },
+            {
+              "label": "Unsubscribed",
+              "value": "unsubscribed",
+              "color": "#FF0000"
+            }
+          ],
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "response",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "added_date": {
+          "label": "Added Date",
+          "type": "datetime",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "response",
+          "hidden": false,
+          "readonly": true,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "first_opened_date": {
+          "label": "First Opened",
+          "type": "datetime",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "response",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "first_clicked_date": {
+          "label": "First Clicked",
+          "type": "datetime",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "response",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "response_date": {
+          "label": "Response Date",
+          "type": "datetime",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "response",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "has_responded": {
+          "label": "Has Responded",
+          "type": "boolean",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "defaultValue": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "response",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        }
+      },
+      "fieldGroups": [
+        {
+          "key": "basic",
+          "label": "Basic Information",
+          "icon": "info",
+          "defaultExpanded": true
+        },
+        {
+          "key": "response",
+          "label": "Response Tracking",
+          "icon": "activity",
+          "defaultExpanded": true
+        }
+      ],
+      "validations": [
+        {
+          "name": "lead_or_contact_required",
+          "active": true,
+          "events": [
+            "insert",
+            "update"
+          ],
+          "priority": 100,
+          "severity": "error",
+          "message": "A campaign member must reference either a Lead or a Contact",
+          "type": "script",
+          "condition": {
+            "dialect": "cel",
+            "source": "isBlank(record.lead) && isBlank(record.contact)"
+          }
+        }
+      ],
+      "compactLayout": [
+        "campaign",
+        "lead",
+        "contact",
+        "status",
+        "response_date"
+      ]
+    },
+    {
       "name": "case",
       "label": "Case",
       "pluralLabel": "Cases",
@@ -6690,6 +7075,21 @@
           "index": false,
           "externalId": false
         },
+        "escalated_date": {
+          "label": "Escalated Date",
+          "type": "datetime",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": true,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
         "escalation_reason": {
           "label": "Escalation Reason",
           "type": "textarea",
@@ -6855,6 +7255,44 @@
           "unique": false
         }
       ],
+      "fieldGroups": [
+        {
+          "key": "basic",
+          "label": "Case Information",
+          "icon": "info",
+          "defaultExpanded": true
+        },
+        {
+          "key": "origin",
+          "label": "Origin & Routing",
+          "icon": "route",
+          "defaultExpanded": true
+        },
+        {
+          "key": "sla",
+          "label": "SLA & Priority",
+          "icon": "clock",
+          "defaultExpanded": true
+        },
+        {
+          "key": "resolution",
+          "label": "Resolution",
+          "icon": "check-circle",
+          "defaultExpanded": true
+        },
+        {
+          "key": "escalation",
+          "label": "Escalation",
+          "icon": "alert-triangle",
+          "defaultExpanded": false
+        },
+        {
+          "key": "system",
+          "label": "System",
+          "icon": "database",
+          "defaultExpanded": false
+        }
+      ],
       "validations": [
         {
           "name": "resolution_required_for_closed",
@@ -6988,7 +7426,7 @@
           "refreshAfter": true,
           "visible": {
             "dialect": "cel",
-            "source": "is_closed == false"
+            "source": "record.is_closed == false"
           }
         },
         {
@@ -7023,7 +7461,7 @@
           "refreshAfter": true,
           "visible": {
             "dialect": "cel",
-            "source": "is_escalated == false && is_closed == false"
+            "source": "record.is_escalated == false && record.is_closed == false"
           }
         }
       ]
@@ -7588,22 +8026,6 @@
       ],
       "validations": [
         {
-          "name": "email_required_for_opt_in",
-          "active": true,
-          "events": [
-            "insert",
-            "update"
-          ],
-          "priority": 100,
-          "severity": "error",
-          "message": "Email is required when Email Opt Out is not checked",
-          "type": "script",
-          "condition": {
-            "dialect": "cel",
-            "source": "record.email_opt_out == false && isBlank(record.email)"
-          }
-        },
-        {
           "name": "email_unique_per_account",
           "active": true,
           "events": [
@@ -7666,7 +8088,7 @@
           "refreshAfter": true,
           "visible": {
             "dialect": "cel",
-            "source": "is_primary == false"
+            "source": "record.is_primary == false"
           }
         },
         {
@@ -7705,7 +8127,7 @@
           "refreshAfter": false,
           "visible": {
             "dialect": "cel",
-            "source": "email_opt_out == false"
+            "source": "record.email_opt_out == false"
           }
         }
       ]
@@ -8185,6 +8607,44 @@
           "unique": false
         }
       ],
+      "fieldGroups": [
+        {
+          "key": "basic",
+          "label": "Contract Information",
+          "icon": "info",
+          "defaultExpanded": true
+        },
+        {
+          "key": "parties",
+          "label": "Parties",
+          "icon": "users",
+          "defaultExpanded": true
+        },
+        {
+          "key": "terms",
+          "label": "Terms & Dates",
+          "icon": "calendar",
+          "defaultExpanded": true
+        },
+        {
+          "key": "value",
+          "label": "Contract Value",
+          "icon": "dollar-sign",
+          "defaultExpanded": true
+        },
+        {
+          "key": "status",
+          "label": "Status & Approval",
+          "icon": "check-circle",
+          "defaultExpanded": true
+        },
+        {
+          "key": "renewal",
+          "label": "Renewal",
+          "icon": "refresh-ccw",
+          "defaultExpanded": false
+        }
+      ],
       "validations": [
         {
           "name": "end_after_start",
@@ -8210,12 +8670,12 @@
             "update"
           ],
           "priority": 100,
-          "severity": "error",
-          "message": "Contract Term must match date range",
+          "severity": "warning",
+          "message": "Contract Term should match the date range (months between start and end)",
           "type": "script",
           "condition": {
             "dialect": "cel",
-            "source": "((record.end_date - record.start_date) / 30) != record.contract_term_months"
+            "source": "monthsBetween(record.start_date, record.end_date) != record.contract_term_months"
           }
         }
       ],
@@ -8393,6 +8853,10 @@
               "value": "technology"
             },
             {
+              "label": "Software / SaaS",
+              "value": "software"
+            },
+            {
               "label": "Finance",
               "value": "finance"
             },
@@ -8411,6 +8875,38 @@
             {
               "label": "Education",
               "value": "education"
+            },
+            {
+              "label": "Real Estate",
+              "value": "real_estate"
+            },
+            {
+              "label": "Media & Entertainment",
+              "value": "media"
+            },
+            {
+              "label": "Logistics",
+              "value": "logistics"
+            },
+            {
+              "label": "Hospitality",
+              "value": "hospitality"
+            },
+            {
+              "label": "Energy & Utilities",
+              "value": "energy"
+            },
+            {
+              "label": "Government",
+              "value": "government"
+            },
+            {
+              "label": "Non-profit",
+              "value": "nonprofit"
+            },
+            {
+              "label": "Other",
+              "value": "other"
             }
           ],
           "deleteBehavior": "set_null",
@@ -8568,8 +9064,12 @@
               "value": "referral"
             },
             {
-              "label": "Event",
+              "label": "Event / Trade Show",
               "value": "event"
+            },
+            {
+              "label": "Webinar",
+              "value": "webinar"
             },
             {
               "label": "Partner",
@@ -8580,8 +9080,28 @@
               "value": "advertisement"
             },
             {
+              "label": "Paid Search",
+              "value": "paid_search"
+            },
+            {
+              "label": "Social Media",
+              "value": "social"
+            },
+            {
+              "label": "Content / Blog",
+              "value": "content"
+            },
+            {
               "label": "Cold Call",
               "value": "cold_call"
+            },
+            {
+              "label": "Email Campaign",
+              "value": "email_campaign"
+            },
+            {
+              "label": "Other",
+              "value": "other"
             }
           ],
           "deleteBehavior": "set_null",
@@ -8805,6 +9325,85 @@
           "deleteBehavior": "set_null",
           "auditTrail": false,
           "group": "preferences",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "next_followup_date": {
+          "label": "Next Follow-up Date",
+          "type": "date",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "qualification",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "last_contacted_date": {
+          "label": "Last Contacted",
+          "type": "datetime",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "qualification",
+          "hidden": false,
+          "readonly": true,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "disqualification_reason": {
+          "label": "Disqualification Reason",
+          "type": "select",
+          "description": "Required when status is Unqualified",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "options": [
+            {
+              "label": "Not a Fit",
+              "value": "not_a_fit"
+            },
+            {
+              "label": "No Budget",
+              "value": "no_budget"
+            },
+            {
+              "label": "Wrong Persona",
+              "value": "wrong_persona"
+            },
+            {
+              "label": "Unreachable",
+              "value": "unreachable"
+            },
+            {
+              "label": "Duplicate",
+              "value": "duplicate"
+            },
+            {
+              "label": "Competitor",
+              "value": "competitor"
+            },
+            {
+              "label": "Other",
+              "value": "other"
+            }
+          ],
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "qualification",
           "hidden": false,
           "readonly": false,
           "sortable": true,
@@ -9043,7 +9642,7 @@
           "refreshAfter": true,
           "visible": {
             "dialect": "cel",
-            "source": "status == \"qualified\" && is_converted == false"
+            "source": "record.status == \"qualified\" && record.is_converted == false"
           }
         },
         {
@@ -9524,6 +10123,164 @@
           "sortable": true,
           "index": false,
           "externalId": false
+        },
+        "approval_status": {
+          "label": "Approval Status",
+          "type": "select",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "options": [
+            {
+              "label": "Not Required",
+              "value": "not_required",
+              "default": true
+            },
+            {
+              "label": "Pending",
+              "value": "pending",
+              "color": "#FFA500"
+            },
+            {
+              "label": "Approved",
+              "value": "approved",
+              "color": "#00AA00"
+            },
+            {
+              "label": "Rejected",
+              "value": "rejected",
+              "color": "#FF0000"
+            }
+          ],
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "sales_process",
+          "hidden": false,
+          "readonly": true,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "approved_date": {
+          "label": "Approved Date",
+          "type": "datetime",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "sales_process",
+          "hidden": false,
+          "readonly": true,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "win_reason": {
+          "label": "Win Reason",
+          "type": "select",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "options": [
+            {
+              "label": "Better Product",
+              "value": "better_product"
+            },
+            {
+              "label": "Better Price",
+              "value": "better_price"
+            },
+            {
+              "label": "Existing Relationship",
+              "value": "relationship"
+            },
+            {
+              "label": "Better Support",
+              "value": "better_support"
+            },
+            {
+              "label": "Best Fit / Features",
+              "value": "best_fit"
+            },
+            {
+              "label": "Other",
+              "value": "other"
+            }
+          ],
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "classification",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "loss_reason": {
+          "label": "Loss Reason",
+          "type": "select",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "options": [
+            {
+              "label": "Price Too High",
+              "value": "price"
+            },
+            {
+              "label": "Lost to Competitor",
+              "value": "competitor"
+            },
+            {
+              "label": "No Budget",
+              "value": "no_budget"
+            },
+            {
+              "label": "No Decision",
+              "value": "no_decision"
+            },
+            {
+              "label": "Bad Timing",
+              "value": "timing"
+            },
+            {
+              "label": "Missing Features",
+              "value": "features"
+            },
+            {
+              "label": "Other",
+              "value": "other"
+            }
+          ],
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "classification",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "loss_details": {
+          "label": "Loss/Win Details",
+          "type": "textarea",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "group": "classification",
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
         }
       },
       "indexes": [
@@ -9857,6 +10614,195 @@
       ]
     },
     {
+      "name": "opportunity_line_item",
+      "label": "Opportunity Line Item",
+      "pluralLabel": "Opportunity Line Items",
+      "description": "A single product line on an Opportunity",
+      "icon": "package",
+      "active": true,
+      "isSystem": false,
+      "abstract": false,
+      "datasource": "default",
+      "fields": {
+        "opportunity": {
+          "label": "Opportunity",
+          "type": "lookup",
+          "required": true,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "reference": "opportunity",
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "product": {
+          "label": "Product",
+          "type": "lookup",
+          "required": true,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "reference": "product",
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "description": {
+          "label": "Description",
+          "type": "text",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "maxLength": 500,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "quantity": {
+          "label": "Quantity",
+          "type": "number",
+          "required": true,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "defaultValue": 1,
+          "scale": 2,
+          "min": 0,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "list_price": {
+          "label": "List Price",
+          "type": "currency",
+          "description": "Auto-populated from product.list_price",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": true,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "unit_price": {
+          "label": "Sales Price",
+          "type": "currency",
+          "description": "Negotiated unit price (may differ from list price)",
+          "required": true,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "discount": {
+          "label": "Discount %",
+          "type": "percent",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "defaultValue": 0,
+          "scale": 2,
+          "min": 0,
+          "max": 100,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "total_price": {
+          "label": "Total",
+          "type": "formula",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "expression": {
+            "dialect": "cel",
+            "source": "record.quantity * record.unit_price * (1 - record.discount / 100)"
+          },
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "line_number": {
+          "label": "Line #",
+          "type": "number",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "scale": 0,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": true,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        }
+      },
+      "validations": [
+        {
+          "name": "unit_price_positive",
+          "active": true,
+          "events": [
+            "insert",
+            "update"
+          ],
+          "priority": 100,
+          "severity": "error",
+          "message": "Sales price cannot be negative",
+          "type": "script",
+          "condition": {
+            "dialect": "cel",
+            "source": "record.unit_price < 0"
+          }
+        }
+      ],
+      "compactLayout": [
+        "product",
+        "quantity",
+        "unit_price",
+        "total_price"
+      ]
+    },
+    {
       "name": "product",
       "label": "Product",
       "pluralLabel": "Products",
@@ -10145,6 +11091,105 @@
           "sortable": true,
           "index": false,
           "externalId": false
+        },
+        "tax_rate": {
+          "label": "Default Tax Rate %",
+          "type": "percent",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "defaultValue": 0,
+          "scale": 2,
+          "min": 0,
+          "max": 100,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "billing_type": {
+          "label": "Billing Type",
+          "type": "select",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "options": [
+            {
+              "label": "One-Time",
+              "value": "one_time",
+              "default": true
+            },
+            {
+              "label": "Monthly",
+              "value": "monthly"
+            },
+            {
+              "label": "Quarterly",
+              "value": "quarterly"
+            },
+            {
+              "label": "Annual",
+              "value": "annual"
+            },
+            {
+              "label": "Usage",
+              "value": "usage"
+            }
+          ],
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "unit_of_measure": {
+          "label": "Unit of Measure",
+          "type": "select",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "options": [
+            {
+              "label": "Each",
+              "value": "each",
+              "default": true
+            },
+            {
+              "label": "License",
+              "value": "license"
+            },
+            {
+              "label": "Seat",
+              "value": "seat"
+            },
+            {
+              "label": "Hour",
+              "value": "hour"
+            },
+            {
+              "label": "Day",
+              "value": "day"
+            },
+            {
+              "label": "Month",
+              "value": "month"
+            }
+          ],
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
         }
       },
       "indexes": [
@@ -10175,6 +11220,26 @@
           ],
           "type": "btree",
           "unique": false
+        }
+      ],
+      "fieldGroups": [
+        {
+          "key": "basic",
+          "label": "Product Information",
+          "icon": "info",
+          "defaultExpanded": true
+        },
+        {
+          "key": "pricing",
+          "label": "Pricing & Billing",
+          "icon": "dollar-sign",
+          "defaultExpanded": true
+        },
+        {
+          "key": "metadata",
+          "label": "Resources",
+          "icon": "link",
+          "defaultExpanded": false
         }
       ],
       "validations": [
@@ -10688,6 +11753,38 @@
           "unique": false
         }
       ],
+      "fieldGroups": [
+        {
+          "key": "basic",
+          "label": "Quote Information",
+          "icon": "info",
+          "defaultExpanded": true
+        },
+        {
+          "key": "pricing",
+          "label": "Pricing",
+          "icon": "dollar-sign",
+          "defaultExpanded": true
+        },
+        {
+          "key": "terms",
+          "label": "Terms & Validity",
+          "icon": "calendar",
+          "defaultExpanded": true
+        },
+        {
+          "key": "address",
+          "label": "Addresses",
+          "icon": "map-pin",
+          "defaultExpanded": false
+        },
+        {
+          "key": "system",
+          "label": "System",
+          "icon": "database",
+          "defaultExpanded": false
+        }
+      ],
       "validations": [
         {
           "name": "expiration_after_quote",
@@ -10753,6 +11850,231 @@
         "mru": true,
         "clone": true
       }
+    },
+    {
+      "name": "quote_line_item",
+      "label": "Quote Line Item",
+      "pluralLabel": "Quote Line Items",
+      "description": "A single product line on a Quote",
+      "icon": "package",
+      "active": true,
+      "isSystem": false,
+      "abstract": false,
+      "datasource": "default",
+      "fields": {
+        "quote": {
+          "label": "Quote",
+          "type": "lookup",
+          "required": true,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "reference": "quote",
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "product": {
+          "label": "Product",
+          "type": "lookup",
+          "required": true,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "reference": "product",
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "description": {
+          "label": "Description",
+          "type": "text",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "maxLength": 500,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "quantity": {
+          "label": "Quantity",
+          "type": "number",
+          "required": true,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "defaultValue": 1,
+          "scale": 2,
+          "min": 0,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "list_price": {
+          "label": "List Price",
+          "type": "currency",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": true,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "unit_price": {
+          "label": "Sales Price",
+          "type": "currency",
+          "required": true,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "discount": {
+          "label": "Discount %",
+          "type": "percent",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "defaultValue": 0,
+          "scale": 2,
+          "min": 0,
+          "max": 100,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "subtotal": {
+          "label": "Subtotal",
+          "type": "formula",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "expression": {
+            "dialect": "cel",
+            "source": "record.quantity * record.unit_price * (1 - record.discount / 100)"
+          },
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "tax_rate": {
+          "label": "Tax Rate %",
+          "type": "percent",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "defaultValue": 0,
+          "scale": 2,
+          "min": 0,
+          "max": 100,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "total_price": {
+          "label": "Total",
+          "type": "formula",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "expression": {
+            "dialect": "cel",
+            "source": "record.subtotal * (1 + record.tax_rate / 100)"
+          },
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "line_number": {
+          "label": "Line #",
+          "type": "number",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "scale": 0,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": true,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        }
+      },
+      "validations": [
+        {
+          "name": "unit_price_positive",
+          "active": true,
+          "events": [
+            "insert",
+            "update"
+          ],
+          "priority": 100,
+          "severity": "error",
+          "message": "Sales price cannot be negative",
+          "type": "script",
+          "condition": {
+            "dialect": "cel",
+            "source": "record.unit_price < 0"
+          }
+        }
+      ],
+      "compactLayout": [
+        "product",
+        "quantity",
+        "unit_price",
+        "total_price"
+      ]
     },
     {
       "name": "task",
@@ -11865,6 +13187,84 @@
               "order": "desc"
             }
           ]
+        },
+        "renewals_due": {
+          "name": "renewals_due",
+          "label": "🔄 Renewals Due (90d)",
+          "type": "grid",
+          "data": {
+            "provider": "object",
+            "object": "account"
+          },
+          "columns": [
+            "name",
+            "tier",
+            "health_score",
+            "next_renewal_date",
+            "renewal_owner",
+            "annual_revenue"
+          ],
+          "filter": [
+            {
+              "field": "type",
+              "operator": "equals",
+              "value": "customer"
+            },
+            {
+              "field": "next_renewal_date",
+              "operator": "less_than_or_equal",
+              "value": "{TODAY() + 90d}"
+            },
+            {
+              "field": "next_renewal_date",
+              "operator": "greater_than_or_equal",
+              "value": "{TODAY()}"
+            }
+          ],
+          "sort": [
+            {
+              "field": "next_renewal_date",
+              "order": "asc"
+            }
+          ]
+        },
+        "at_risk_accounts": {
+          "name": "at_risk_accounts",
+          "label": "⚠️ At-Risk Accounts",
+          "type": "grid",
+          "data": {
+            "provider": "object",
+            "object": "account"
+          },
+          "columns": [
+            "name",
+            "tier",
+            "health_score",
+            "segment",
+            "renewal_owner",
+            "last_activity_date"
+          ],
+          "filter": [
+            {
+              "field": "type",
+              "operator": "equals",
+              "value": "customer"
+            },
+            {
+              "field": "health_score",
+              "operator": "in",
+              "value": [
+                "at_risk",
+                "churning"
+              ]
+            }
+          ],
+          "sort": [
+            {
+              "field": "health_score",
+              "order": "desc"
+            }
+          ]
         }
       }
     },
@@ -12454,6 +13854,46 @@
             {
               "field": "priority",
               "order": "desc"
+            }
+          ]
+        },
+        "sla_at_risk": {
+          "name": "sla_at_risk",
+          "label": "⏰ SLA at Risk",
+          "type": "grid",
+          "data": {
+            "provider": "object",
+            "object": "case"
+          },
+          "columns": [
+            "case_number",
+            "subject",
+            "account",
+            "priority",
+            "sla_due_date",
+            "owner"
+          ],
+          "filter": [
+            {
+              "field": "is_closed",
+              "operator": "equals",
+              "value": false
+            },
+            {
+              "field": "is_sla_violated",
+              "operator": "equals",
+              "value": false
+            },
+            {
+              "field": "sla_due_date",
+              "operator": "less_than_or_equal",
+              "value": "{NOW() + 4h}"
+            }
+          ],
+          "sort": [
+            {
+              "field": "sla_due_date",
+              "order": "asc"
             }
           ]
         }
@@ -13296,6 +14736,51 @@
               "5": "#00AA00"
             }
           }
+        },
+        "hot_leads": {
+          "name": "hot_leads",
+          "label": "🔥 Hot Leads",
+          "type": "grid",
+          "data": {
+            "provider": "object",
+            "object": "lead"
+          },
+          "columns": [
+            "first_name",
+            "last_name",
+            "company",
+            "phone",
+            "email",
+            "rating",
+            "next_followup_date",
+            "owner"
+          ],
+          "filter": [
+            {
+              "field": "rating",
+              "operator": "greater_than_or_equal",
+              "value": 4
+            },
+            {
+              "field": "status",
+              "operator": "in",
+              "value": [
+                "new",
+                "contacted"
+              ]
+            },
+            {
+              "field": "next_followup_date",
+              "operator": "less_than_or_equal",
+              "value": "{TODAY()}"
+            }
+          ],
+          "sort": [
+            {
+              "field": "next_followup_date",
+              "order": "asc"
+            }
+          ]
         }
       },
       "formViews": {
@@ -14110,6 +15595,87 @@
               "order": "asc"
             }
           ]
+        },
+        "stale_opportunities": {
+          "name": "stale_opportunities",
+          "label": "⚠️ Stale Opportunities",
+          "type": "grid",
+          "data": {
+            "provider": "object",
+            "object": "opportunity"
+          },
+          "columns": [
+            "name",
+            "account",
+            "stage",
+            "amount",
+            "days_in_stage",
+            "close_date",
+            "owner"
+          ],
+          "filter": [
+            {
+              "field": "days_in_stage",
+              "operator": "greater_than",
+              "value": 30
+            },
+            {
+              "field": "stage",
+              "operator": "not_in",
+              "value": [
+                "closed_won",
+                "closed_lost"
+              ]
+            }
+          ],
+          "sort": [
+            {
+              "field": "days_in_stage",
+              "order": "desc"
+            }
+          ]
+        },
+        "closing_this_quarter": {
+          "name": "closing_this_quarter",
+          "label": "Closing This Quarter",
+          "type": "grid",
+          "data": {
+            "provider": "object",
+            "object": "opportunity"
+          },
+          "columns": [
+            "name",
+            "account",
+            "amount",
+            "forecast_category",
+            "probability",
+            "close_date",
+            "owner"
+          ],
+          "filter": [
+            {
+              "field": "forecast_category",
+              "operator": "in",
+              "value": [
+                "commit",
+                "best_case"
+              ]
+            },
+            {
+              "field": "stage",
+              "operator": "not_in",
+              "value": [
+                "closed_won",
+                "closed_lost"
+              ]
+            }
+          ],
+          "sort": [
+            {
+              "field": "close_date",
+              "order": "asc"
+            }
+          ]
         }
       }
     },
@@ -14888,6 +16454,80 @@
               "field": "owner",
               "operator": "equals",
               "value": "{current_user_id}"
+            },
+            {
+              "field": "is_completed",
+              "operator": "equals",
+              "value": false
+            }
+          ],
+          "sort": [
+            {
+              "field": "due_date",
+              "order": "asc"
+            }
+          ]
+        },
+        "todays_tasks": {
+          "name": "todays_tasks",
+          "label": "📅 Today's Tasks",
+          "type": "grid",
+          "data": {
+            "provider": "object",
+            "object": "task"
+          },
+          "columns": [
+            "subject",
+            "priority",
+            "status",
+            "due_date",
+            "related_to_type",
+            "owner"
+          ],
+          "filter": [
+            {
+              "field": "owner",
+              "operator": "equals",
+              "value": "{current_user_id}"
+            },
+            {
+              "field": "due_date",
+              "operator": "equals",
+              "value": "{TODAY()}"
+            },
+            {
+              "field": "is_completed",
+              "operator": "equals",
+              "value": false
+            }
+          ],
+          "sort": [
+            {
+              "field": "priority",
+              "order": "desc"
+            }
+          ]
+        },
+        "overdue_tasks": {
+          "name": "overdue_tasks",
+          "label": "⏰ Overdue Tasks",
+          "type": "grid",
+          "data": {
+            "provider": "object",
+            "object": "task"
+          },
+          "columns": [
+            "subject",
+            "priority",
+            "status",
+            "due_date",
+            "owner"
+          ],
+          "filter": [
+            {
+              "field": "due_date",
+              "operator": "less_than",
+              "value": "{TODAY()}"
             },
             {
               "field": "is_completed",
@@ -16154,7 +17794,8 @@
               ]
             }
           },
-          "aggregate": "count",
+          "valueField": "amount",
+          "aggregate": "sum",
           "layout": {
             "x": 0,
             "y": 14,
@@ -17065,7 +18706,7 @@
       "refreshAfter": true,
       "visible": {
         "dialect": "cel",
-        "source": "is_closed == false"
+        "source": "record.is_closed == false"
       }
     },
     {
@@ -17084,7 +18725,7 @@
       "refreshAfter": true,
       "visible": {
         "dialect": "cel",
-        "source": "status == \"qualified\" && is_converted == false"
+        "source": "record.status == \"qualified\" && record.is_converted == false"
       }
     },
     {
@@ -17148,7 +18789,7 @@
       "refreshAfter": true,
       "visible": {
         "dialect": "cel",
-        "source": "is_escalated == false && is_closed == false"
+        "source": "record.is_escalated == false && record.is_closed == false"
       }
     },
     {
@@ -17235,7 +18876,7 @@
       "refreshAfter": true,
       "visible": {
         "dialect": "cel",
-        "source": "is_primary == false"
+        "source": "record.is_primary == false"
       }
     },
     {
@@ -17333,7 +18974,7 @@
       "refreshAfter": false,
       "visible": {
         "dialect": "cel",
-        "source": "email_opt_out == false"
+        "source": "record.email_opt_out == false"
       }
     }
   ],
@@ -17538,7 +19179,8 @@
             "fields": {
               "owner": "{caseRecord.owner.manager}",
               "is_escalated": true,
-              "escalated_date": "{NOW()}"
+              "escalated_date": "{NOW()}",
+              "status": "escalated"
             }
           }
         },
@@ -17550,7 +19192,8 @@
             "objectName": "task",
             "fields": {
               "subject": "Follow up on escalated case: {caseRecord.case_number}",
-              "related_to": "{caseId}",
+              "related_to_type": "case",
+              "related_to_case": "{caseId}",
               "owner": "{caseRecord.owner}",
               "priority": "high",
               "status": "not_started",
@@ -19948,7 +21591,7 @@
           "email": "john.smith@acme.example.com",
           "phone": "+1-415-555-0101",
           "title": "VP of Engineering",
-          "department": "Engineering",
+          "department": "engineering",
           "account": "Acme Corporation"
         },
         {
@@ -19958,7 +21601,7 @@
           "email": "sarah.j@globex.example.com",
           "phone": "+1-312-555-0201",
           "title": "Chief Procurement Officer",
-          "department": "Executive",
+          "department": "executive",
           "account": "Globex Industries"
         },
         {
@@ -19968,7 +21611,7 @@
           "email": "mchen@initech.example.com",
           "phone": "+1-212-555-0301",
           "title": "Director of Operations",
-          "department": "Operations",
+          "department": "operations",
           "account": "Initech Solutions"
         },
         {
@@ -19978,7 +21621,7 @@
           "email": "emily.d@starkmed.example.com",
           "phone": "+1-617-555-0401",
           "title": "Head of Partnerships",
-          "department": "Sales",
+          "department": "sales",
           "account": "Stark Medical"
         },
         {
@@ -19988,7 +21631,7 @@
           "email": "rwilson@wayne.example.com",
           "phone": "+1-650-555-0501",
           "title": "CTO",
-          "department": "Engineering",
+          "department": "engineering",
           "account": "Wayne Enterprises"
         }
       ]
@@ -20055,7 +21698,7 @@
             "dialect": "cel",
             "source": "daysFromNow(30)"
           },
-          "type": "existing_business",
+          "type": "existing_upgrade",
           "forecast_category": "pipeline",
           "lead_source": "web"
         },
@@ -20097,7 +21740,7 @@
             "dialect": "cel",
             "source": "daysFromNow(45)"
           },
-          "type": "existing_business",
+          "type": "existing_upgrade",
           "forecast_category": "best_case",
           "lead_source": "event"
         }
