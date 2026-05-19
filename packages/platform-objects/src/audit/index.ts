@@ -11,6 +11,7 @@ export { SysComment } from './sys-comment.object.js';
 export { SysAttachment } from './sys-attachment.object.js';
 export { SysNotification } from './sys-notification.object.js';
 export { SysEmail } from './sys-email.object.js';
+export { SysEmailTemplate } from './sys-email-template.object.js';
 export { SysSavedReport } from './sys-saved-report.object.js';
 export { SysReportSchedule } from './sys-report-schedule.object.js';
 export { SysApprovalProcess } from './sys-approval-process.object.js';

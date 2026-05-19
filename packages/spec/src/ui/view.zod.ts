@@ -449,6 +449,7 @@ export const ListViewSchema = lazySchema(() => z.object({
   /** Row & Bulk Actions */
   rowActions: z.array(z.string()).optional().describe('Actions available for individual row items'),
   bulkActions: z.array(z.string()).optional().describe('Actions available when multiple rows are selected'),
+  bulkActionDefs: z.array(z.record(z.string(), z.any())).optional().describe('Rich bulk action definitions (schema-driven, executed via BulkActionDialog)'),
 
   /** Performance */
   virtualScroll: z.boolean().optional().describe('Enable virtual scrolling for large datasets'),

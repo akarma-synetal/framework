@@ -5,11 +5,13 @@ import type {
   IEmailTransport,
   SendEmailInput,
   SendEmailResult,
+  SendTemplateInput,
   NormalizedEmailMessage,
   EmailAddress,
   EmailDeliveryStatus,
   TransportSendResult,
 } from '@objectstack/spec/contracts';
+import { renderTemplate, requireVars, htmlToText } from './template-engine.js';
 
 /**
  * Internal persistence shim — typed loosely so the service can run
@@ -131,15 +133,45 @@ function newId(): string {
   return `${hex(8)}-${hex(4)}-4${hex(3)}-a${hex(3)}-${hex(12)}`;
 }
 
+/**
+ * Loader for sys_email_template rows. Injected by EmailServicePlugin
+ * on `kernel:ready`. Returns the best-matching row for `(name, locale)`
+ * or `null` when none exists / inactive.
+ */
+export interface TemplateLoader {
+  load(name: string, locale: string | undefined): Promise<EmailTemplateRow | null>;
+}
+
+/**
+ * Row shape returned by the loader — mirrors sys_email_template
+ * columns relevant to rendering.
+ */
+export interface EmailTemplateRow {
+  name: string;
+  locale: string;
+  subject: string;
+  body_html: string;
+  body_text?: string | null;
+  from_name?: string | null;
+  from_address?: string | null;
+  reply_to?: string | null;
+  active?: boolean;
+  variables_json?: string | null;
+}
+
 export interface EmailServiceOptions {
   transport: IEmailTransport;
   defaultFrom?: EmailAddress;
   /** Persist each attempt to sys_email. Omit to disable persistence. */
   persistence?: EmailPersistence;
+  /** Resolve named templates for sendTemplate(). Omit to disable templates. */
+  templateLoader?: TemplateLoader;
   /** Retry attempts on transport throw. Default 0 (no retry). */
   retries?: number;
   /** Logger for diagnostic output. */
   logger?: { info: (msg: string, meta?: any) => void; warn: (msg: string, meta?: any) => void; error?: (msg: string, meta?: any) => void };
+  /** Default render context merged into every sendTemplate call (e.g. `{ appName }`). */
+  defaultTemplateContext?: Record<string, unknown>;
 }
 
 /**
@@ -154,8 +186,18 @@ export interface EmailServiceOptions {
  *      id when persistence is disabled).
  */
 export class EmailService implements IEmailService {
-  constructor(private readonly options: EmailServiceOptions) {
+  constructor(public options: EmailServiceOptions) {
     if (!options.transport) throw new Error('EmailService: transport is required');
+  }
+
+  /** Wire (or replace) the template loader after construction. */
+  setTemplateLoader(loader: TemplateLoader): void {
+    this.options.templateLoader = loader;
+  }
+
+  /** Wire (or replace) persistence after construction. */
+  setPersistence(persistence: EmailPersistence | undefined): void {
+    this.options.persistence = persistence;
   }
 
   async send(input: SendEmailInput): Promise<SendEmailResult> {
@@ -234,5 +276,76 @@ export class EmailService implements IEmailService {
     } catch (err: any) {
       this.options.logger?.warn('EmailService: sys_email update failed (non-fatal)', { id, error: err?.message });
     }
+  }
+
+  /**
+   * Render a named template from sys_email_template and deliver via
+   * send(). Looks up `(name, locale)` then falls back to `(name, 'en-US')`.
+   */
+  async sendTemplate(input: SendTemplateInput): Promise<SendEmailResult> {
+    if (!input?.template) {
+      throw new Error('VALIDATION_FAILED: template name is required');
+    }
+    const loader = this.options.templateLoader;
+    if (!loader) {
+      throw new Error('TEMPLATE_NOT_FOUND: no templateLoader configured on EmailService');
+    }
+    const preferred = input.locale && String(input.locale).trim();
+    let row = await loader.load(input.template, preferred || undefined);
+    if (!row && preferred && preferred !== 'en-US') {
+      row = await loader.load(input.template, 'en-US');
+    }
+    if (!row) {
+      throw new Error(`TEMPLATE_NOT_FOUND: ${input.template} (locale=${preferred || 'en-US'})`);
+    }
+    if (row.active === false) {
+      throw new Error(`TEMPLATE_INACTIVE: ${input.template}`);
+    }
+
+    // Validate required variables (declared in variables_json).
+    const data: Record<string, any> = {
+      ...(this.options.defaultTemplateContext || {}),
+      ...(input.data || {}),
+    };
+    if (row.variables_json) {
+      try {
+        const decl: Array<{ name: string; required?: boolean }> = JSON.parse(String(row.variables_json));
+        const required = decl.filter((v) => v?.required).map((v) => v.name);
+        if (required.length) requireVars(data, required);
+      } catch (err: any) {
+        if (String(err?.message).startsWith('MISSING_VARIABLES')) throw err;
+        this.options.logger?.warn('EmailService: variables_json parse failed (ignored)', { template: input.template });
+      }
+    }
+
+    const subject = renderTemplate(row.subject, data);
+    const html = renderTemplate(row.body_html, data);
+    const text = row.body_text
+      ? renderTemplate(row.body_text, data)
+      : htmlToText(html);
+
+    const from: EmailAddress | undefined = input.from
+      ?? (row.from_address
+        ? { address: row.from_address, ...(row.from_name ? { name: row.from_name } : {}) }
+        : undefined);
+
+    const sendInput: SendEmailInput = {
+      to: input.to,
+      subject,
+      html,
+      text,
+      ...(from ? { from } : {}),
+      ...(input.cc ? { cc: input.cc } : {}),
+      ...(input.bcc ? { bcc: input.bcc } : {}),
+      ...(input.replyTo ?? row.reply_to
+        ? { replyTo: input.replyTo ?? (row.reply_to as string) }
+        : {}),
+      ...(input.attachments ? { attachments: input.attachments } : {}),
+      ...(input.headers ? { headers: input.headers } : {}),
+      ...(input.relatedObject ? { relatedObject: input.relatedObject } : {}),
+      ...(input.relatedId ? { relatedId: input.relatedId } : {}),
+      ...(input.sentBy ? { sentBy: input.sentBy } : {}),
+    };
+    return this.send(sendInput);
   }
 }

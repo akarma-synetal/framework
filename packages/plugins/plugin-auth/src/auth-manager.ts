@@ -11,6 +11,7 @@ import type {
   OidcProvidersConfig,
 } from '@objectstack/spec/system';
 import type { IDataEngine } from '@objectstack/core';
+import type { IEmailService } from '@objectstack/spec/contracts';
 import { createObjectQLAdapterFactory } from './objectql-adapter.js';
 import {
   AUTH_USER_CONFIG,
@@ -74,6 +75,25 @@ export interface AuthManagerOptions extends Partial<AuthConfig> {
    * @example ['sales_rep', 'sales_manager', 'service_agent']
    */
   additionalOrgRoles?: string[];
+
+  /**
+   * Optional outbound email service used by better-auth callbacks
+   * (`sendResetPassword`, `sendVerificationEmail`, `sendInvitationEmail`,
+   * `sendMagicLink`). When omitted, those callbacks degrade to logging
+   * the action URL — keeping flows usable in pilots / local dev — but
+   * production deployments SHOULD wire one via `setEmailService()`.
+   *
+   * Resolved lazily through {@link AuthManager.getEmailService}; safe
+   * to set after construction. AuthPlugin wires this from the kernel
+   * service registry on `kernel:ready`.
+   */
+  emailService?: IEmailService;
+
+  /**
+   * Display name used by built-in auth email templates (`{{appName}}`
+   * placeholder). Defaults to `'ObjectStack'` when omitted.
+   */
+  appName?: string;
 }
 
 /**
@@ -186,19 +206,75 @@ export class AuthManager {
           ? { autoSignIn: this.config.emailAndPassword.autoSignIn } : {}),
         ...(this.config.emailAndPassword?.revokeSessionsOnPasswordReset != null
           ? { revokeSessionsOnPasswordReset: this.config.emailAndPassword.revokeSessionsOnPasswordReset } : {}),
+        sendResetPassword: async ({ user, url, token }: { user: { id: string; email: string; name?: string }; url: string; token: string }) => {
+          const email = this.getEmailService();
+          if (!email) {
+            console.warn(
+              `[AuthManager] Password-reset requested for ${user.email} but no email service is wired. URL: ${url}`,
+            );
+            return;
+          }
+          const ttlSec = this.config.emailAndPassword?.resetPasswordTokenExpiresIn ?? 60 * 60;
+          try {
+            await email.sendTemplate({
+              template: 'auth.password_reset',
+              to: { address: user.email, ...(user.name ? { name: user.name } : {}) },
+              data: {
+                user: { name: user.name || user.email, email: user.email, id: user.id },
+                resetUrl: url,
+                token,
+                expiresInMinutes: Math.round(ttlSec / 60),
+                appName: this.getAppName(),
+              },
+              relatedObject: 'sys_user',
+              relatedId: user.id,
+            });
+          } catch (err: any) {
+            console.error(`[AuthManager] sendResetPassword failed: ${err?.message ?? err}`);
+            throw err;
+          }
+        },
       },
 
       // Email verification
-      ...(this.config.emailVerification ? {
+      ...(this.config.emailVerification || this.config.emailService ? {
         emailVerification: {
-          ...(this.config.emailVerification.sendOnSignUp != null
+          ...(this.config.emailVerification?.sendOnSignUp != null
             ? { sendOnSignUp: this.config.emailVerification.sendOnSignUp } : {}),
-          ...(this.config.emailVerification.sendOnSignIn != null
+          ...(this.config.emailVerification?.sendOnSignIn != null
             ? { sendOnSignIn: this.config.emailVerification.sendOnSignIn } : {}),
-          ...(this.config.emailVerification.autoSignInAfterVerification != null
+          ...(this.config.emailVerification?.autoSignInAfterVerification != null
             ? { autoSignInAfterVerification: this.config.emailVerification.autoSignInAfterVerification } : {}),
-          ...(this.config.emailVerification.expiresIn != null
+          ...(this.config.emailVerification?.expiresIn != null
             ? { expiresIn: this.config.emailVerification.expiresIn } : {}),
+          sendVerificationEmail: async ({ user, url, token }: { user: { id: string; email: string; name?: string }; url: string; token: string }) => {
+            const email = this.getEmailService();
+            if (!email) {
+              console.warn(
+                `[AuthManager] Verification email requested for ${user.email} but no email service is wired. URL: ${url}`,
+              );
+              return;
+            }
+            const ttlSec = this.config.emailVerification?.expiresIn ?? 60 * 60;
+            try {
+              await email.sendTemplate({
+                template: 'auth.verify_email',
+                to: { address: user.email, ...(user.name ? { name: user.name } : {}) },
+                data: {
+                  user: { name: user.name || user.email, email: user.email, id: user.id },
+                  verificationUrl: url,
+                  token,
+                  expiresInMinutes: Math.round(ttlSec / 60),
+                  appName: this.getAppName(),
+                },
+                relatedObject: 'sys_user',
+                relatedId: user.id,
+              });
+            } catch (err: any) {
+              console.error(`[AuthManager] sendVerificationEmail failed: ${err?.message ?? err}`);
+              throw err;
+            }
+          },
         },
       } : {}),
 
@@ -348,15 +424,40 @@ export class AuthManager {
         // No mailer is wired in framework yet — log the accept URL so
         // operators / UI can fall back to copy-paste flows. Replace this
         // with a real mail integration when available.
-        sendInvitationEmail: async ({ email, invitation, organization: org, inviter }) => {
+        sendInvitationEmail: async ({ email: recipientEmail, invitation, organization: org, inviter }) => {
           const baseUrl = (this.config.baseUrl ?? '').replace(/\/$/, '');
           const acceptUrl = `${baseUrl}/accept-invitation/${invitation.id}`;
-          console.warn(
-            `[AuthManager] Invitation email not configured. ` +
-            `To: ${email} (org: ${org?.name ?? invitation.organizationId}, ` +
-            `role: ${invitation.role}, inviter: ${inviter?.user?.email ?? 'unknown'}) ` +
-            `URL: ${acceptUrl}`,
-          );
+          const emailService = this.getEmailService();
+          if (!emailService) {
+            console.warn(
+              `[AuthManager] Invitation email not configured. ` +
+              `To: ${recipientEmail} (org: ${org?.name ?? invitation.organizationId}, ` +
+              `role: ${invitation.role}, inviter: ${inviter?.user?.email ?? 'unknown'}) ` +
+              `URL: ${acceptUrl}`,
+            );
+            return;
+          }
+          try {
+            await emailService.sendTemplate({
+              template: 'auth.invitation',
+              to: recipientEmail,
+              data: {
+                inviter: {
+                  name: inviter?.user?.name ?? inviter?.user?.email ?? 'A teammate',
+                  email: inviter?.user?.email ?? '',
+                },
+                organization: { name: org?.name ?? invitation.organizationId },
+                role: invitation.role || '',
+                acceptUrl,
+                appName: this.getAppName(),
+              },
+              relatedObject: 'sys_invitation',
+              relatedId: invitation.id,
+            });
+          } catch (err: any) {
+            console.error(`[AuthManager] sendInvitationEmail failed: ${err?.message ?? err}`);
+            throw err;
+          }
         },
       }));
     }
@@ -383,14 +484,30 @@ export class AuthManager {
     if (enabled.magicLink) {
       const { magicLink } = await import('better-auth/plugins/magic-link');
       // magic-link reuses the `verification` table — no extra schema mapping needed.
-      // The sendMagicLink callback must be provided by the application at a higher level.
-      // Here we provide a no-op default that logs a warning; real applications should
-      // override this via AuthManagerOptions or a config extension point.
       plugins.push(magicLink({
-        sendMagicLink: async ({ email, url }) => {
-          console.warn(
-            `[AuthManager] Magic-link requested for ${email} but no sendMagicLink handler configured. URL: ${url}`,
-          );
+        sendMagicLink: async ({ email: recipientEmail, url, token }) => {
+          const emailService = this.getEmailService();
+          if (!emailService) {
+            console.warn(
+              `[AuthManager] Magic-link requested for ${recipientEmail} but no email service is wired. URL: ${url}`,
+            );
+            return;
+          }
+          try {
+            await emailService.sendTemplate({
+              template: 'auth.magic_link',
+              to: recipientEmail,
+              data: {
+                magicLinkUrl: url,
+                token,
+                expiresInMinutes: 10,
+                appName: this.getAppName(),
+              },
+            });
+          } catch (err: any) {
+            console.error(`[AuthManager] sendMagicLink failed: ${err?.message ?? err}`);
+            throw err;
+          }
         },
       }));
     }
@@ -615,6 +732,29 @@ export class AuthManager {
       return;
     }
     this.config = { ...this.config, baseUrl: url };
+  }
+
+  /**
+   * Inject (or replace) the outbound email service used by better-auth
+   * callbacks. Safe to call after construction but BEFORE the first
+   * request hits the auth handler — callbacks read this via
+   * {@link getEmailService} when invoked.
+   *
+   * AuthPlugin calls this on `kernel:ready` once `ctx.getService('email')`
+   * resolves. For tests / serverless, callers may invoke directly.
+   */
+  setEmailService(email: IEmailService | undefined): void {
+    this.config.emailService = email;
+  }
+
+  /** @internal Used by callback closures. */
+  private getEmailService(): IEmailService | undefined {
+    return this.config.emailService;
+  }
+
+  /** @internal `{{appName}}` placeholder value for built-in templates. */
+  private getAppName(): string {
+    return this.config.appName ?? 'ObjectStack';
   }
 
   /**

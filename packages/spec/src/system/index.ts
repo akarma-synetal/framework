@@ -28,6 +28,8 @@ export * from './migration.zod';
 
 // Security & Compliance
 export * from './auth-config.zod';
+export * from './email-config.zod';
+export * from './email-template.zod';
 export * from './compliance.zod';
 export * from './encryption.zod';
 export * from './masking.zod';

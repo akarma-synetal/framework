@@ -294,6 +294,13 @@ export default class Serve extends Command {
       const requires: string[] = Array.isArray((config as any).requires)
         ? (config as any).requires.filter((c: unknown) => typeof c === 'string')
         : [];
+      // Auth callbacks (password-reset, email-verification, magic-link,
+      // invitation) depend on the email service. Auto-pull `email` when
+      // `auth` is required so transactional mail works out of the box
+      // (LogTransport fallback when no provider is configured).
+      if (requires.includes('auth') && !requires.includes('email')) {
+        requires.push('email');
+      }
       // Capability → tier: any capability that is gated by a tier
       // here automatically opens that tier when listed in `requires`.
       // Capabilities NOT in this map (e.g. `automation`, `analytics`,
@@ -995,6 +1002,54 @@ export default class Serve extends Command {
           if (spec.configKey === 'analyticsCubes') {
             const cubes = (config as any).analyticsCubes ?? (config as any).cubes ?? [];
             arg = { cubes };
+          } else if (cap === 'email') {
+            // Compose EmailServicePlugin options from config.email + OS_EMAIL_* env.
+            // Env precedence: env beats config so operators can override per-environment.
+            const cfgEmail = (config as any).email ?? {};
+            const envProvider = process.env.OS_EMAIL_PROVIDER;
+            const provider = (envProvider || cfgEmail.provider || 'log').toLowerCase();
+            const apiKey = process.env.OS_EMAIL_API_KEY || cfgEmail.apiKey;
+            const envFrom = process.env.OS_EMAIL_FROM;
+            // OS_EMAIL_FROM supports either "addr@x" or "Name <addr@x>".
+            let defaultFrom = cfgEmail.defaultFrom;
+            if (envFrom) {
+              const m = envFrom.match(/^\s*(?:"?([^"<]*?)"?\s*<\s*([^>]+)\s*>|(\S+))\s*$/);
+              if (m) {
+                const name = (m[1] ?? '').trim();
+                const address = (m[2] ?? m[3] ?? '').trim();
+                if (address) defaultFrom = name ? { name, address } : { address };
+              }
+            }
+            const retries = process.env.OS_EMAIL_RETRIES
+              ? Number(process.env.OS_EMAIL_RETRIES)
+              : cfgEmail.retries;
+            const defaultTemplateContext = {
+              appName: process.env.OS_APP_NAME || cfgEmail.appName || (config as any).appName || 'ObjectStack',
+              ...(cfgEmail.defaultTemplateContext || {}),
+            };
+            // Provide a sensible fallback `from` so templates can render
+            // even before operators configure SMTP/SaaS. The log transport
+            // simply prints to stdout; the address never leaves the box.
+            if (!defaultFrom) {
+              const slug = String(defaultTemplateContext.appName || 'objectstack')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '') || 'objectstack';
+              defaultFrom = { name: defaultTemplateContext.appName, address: `no-reply@${slug}.local` };
+            }
+            arg = {
+              provider,
+              ...(apiKey ? { apiKey } : {}),
+              defaultFrom,
+              ...(retries != null && !Number.isNaN(retries) ? { retries } : {}),
+              defaultTemplateContext,
+            };
+            if (provider !== 'log' && !apiKey) {
+              console.warn(chalk.yellow(
+                `  ⚠ Capability "email": provider='${provider}' but no apiKey found (set OS_EMAIL_API_KEY or config.email.apiKey). Falling back to LogTransport.`,
+              ));
+              arg.provider = 'log';
+            }
           }
           await kernel.use(arg !== undefined ? new Ctor(arg) : new Ctor());
           trackPlugin(spec.export);

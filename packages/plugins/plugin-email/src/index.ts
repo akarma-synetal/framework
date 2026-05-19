@@ -12,3 +12,21 @@
 export { EmailServicePlugin } from './email-plugin.js';
 export type { EmailServicePluginOptions } from './email-plugin.js';
 export { LogTransport, normalizeMessage, formatAddress } from './email-service.js';
+export type { EmailServiceOptions, TemplateLoader, EmailTemplateRow, EmailPersistence } from './email-service.js';
+export { renderTemplate, requireVars, htmlToText } from './template-engine.js';
+export {
+  ResendTransport,
+  PostmarkTransport,
+  makeTransport,
+  type ResendTransportOptions,
+  type PostmarkTransportOptions,
+  type MakeTransportOptions,
+} from './transports/index.js';
+export {
+  AUTH_PASSWORD_RESET_TEMPLATE,
+  AUTH_VERIFY_EMAIL_TEMPLATE,
+  AUTH_MAGIC_LINK_TEMPLATE,
+  AUTH_INVITATION_TEMPLATE,
+  AUTH_TWO_FACTOR_OTP_TEMPLATE,
+  BUILTIN_AUTH_TEMPLATES,
+} from './templates/auth-templates.js';

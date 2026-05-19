@@ -125,6 +125,45 @@ export interface SendEmailResult {
 }
 
 /**
+ * Input for IEmailService.sendTemplate(). Resolves a named template
+ * row from `sys_email_template`, renders it against `data`, and
+ * forwards through the same transport pipeline as `send()`.
+ */
+export interface SendTemplateInput {
+  /**
+   * Template identifier (matches `sys_email_template.name`), e.g.
+   * `'auth.password_reset'`. The service picks the best-matching
+   * locale row (falls back to `en-US`).
+   */
+  template: string;
+  /** Envelope recipients. */
+  to: EmailAddress | EmailAddress[];
+  /** Render context — placeholders in subject/body are resolved against this object. */
+  data?: Record<string, unknown>;
+  /** Preferred BCP-47 locale (e.g. user's locale). Falls back to `'en-US'`. */
+  locale?: string;
+  /** Tenant id for org-overlay resolution (when supported). */
+  org?: string;
+  /** Envelope sender override (otherwise template.fromOverride → service default). */
+  from?: EmailAddress;
+  /** Carbon-copy recipients. */
+  cc?: EmailAddress | EmailAddress[];
+  /** Blind-carbon-copy recipients. */
+  bcc?: EmailAddress | EmailAddress[];
+  /** Reply-To header override (otherwise template.replyTo). */
+  replyTo?: EmailAddress;
+  /** Inline / attached files. */
+  attachments?: EmailAttachment[];
+  /** Extra headers to merge onto the outgoing message. */
+  headers?: Record<string, string>;
+  /** Optional related record for activity-stream linkage. */
+  relatedObject?: string;
+  relatedId?: string;
+  /** User id for `sent_by` audit linkage. */
+  sentBy?: string;
+}
+
+/**
  * Email service contract.
  */
 export interface IEmailService {
@@ -135,4 +174,15 @@ export interface IEmailService {
    * outcome takes precedence.
    */
   send(input: SendEmailInput): Promise<SendEmailResult>;
+
+  /**
+   * Resolve a named template from `sys_email_template`, render its
+   * subject/body against `input.data`, then deliver via `send()`.
+   *
+   * Errors:
+   * - `TEMPLATE_NOT_FOUND` — no row matches `(name, locale|en-US)`.
+   * - `TEMPLATE_INACTIVE`  — row exists but `active=false`.
+   * - `MISSING_VARIABLES`  — declared `required` variables absent from `data`.
+   */
+  sendTemplate(input: SendTemplateInput): Promise<SendEmailResult>;
 }

@@ -95,6 +95,7 @@ export const MetadataTypeSchema = lazySchema(() => z.enum([
   'router',      // API routes
   'function',    // Serverless functions
   'service',     // Service definitions
+  'email_template', // Outbound email templates (EmailTemplateSchema)
 
   // Security Protocol
   'permission',  // Permission sets (PermissionSetSchema)
@@ -530,6 +531,7 @@ export const DEFAULT_METADATA_TYPE_REGISTRY: MetadataTypeRegistryEntry[] = [
   { type: 'router', label: 'Router', filePatterns: ['**/*.router.ts'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, loadOrder: 40, domain: 'system' },
   { type: 'function', label: 'Function', filePatterns: ['**/*.function.ts'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, loadOrder: 40, domain: 'system' },
   { type: 'service', label: 'Service', filePatterns: ['**/*.service.ts'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, loadOrder: 40, domain: 'system' },
+  { type: 'email_template', label: 'Email Template', filePatterns: ['**/*.email-template.ts', '**/*.email-template.yml', '**/*.email-template.json'], supportsOverlay: true, allowOrgOverride: true, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 85, domain: 'system' },
 
   // Security Protocol
   { type: 'permission', label: 'Permission Set', filePatterns: ['**/*.permission.ts', '**/*.permission.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: true, loadOrder: 15, domain: 'security' },

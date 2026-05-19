@@ -32,6 +32,54 @@ export const AccountViews = defineView({
     selection: { type: 'multiple' },
     pagination: { pageSize: 50, pageSizeOptions: [25, 50, 100] },
     exportOptions: ['csv', 'xlsx'],
+    bulkActionDefs: [
+      {
+        name: 'update_tier',
+        label: 'Update Tier',
+        icon: 'tag',
+        operation: 'update',
+        params: [
+          {
+            name: 'tier',
+            label: 'Customer Tier',
+            type: 'select',
+            required: true,
+            options: [
+              { label: 'Strategic',  value: 'strategic'  },
+              { label: 'Enterprise', value: 'enterprise' },
+              { label: 'Mid-Market', value: 'mid_market' },
+              { label: 'SMB',        value: 'smb'        },
+            ],
+          },
+        ],
+        confirmText: 'Update tier on {{count}} account(s) to {{tier}}?',
+      },
+      {
+        name: 'transfer_owner',
+        label: 'Transfer Owner',
+        icon: 'user-check',
+        operation: 'update',
+        params: [
+          {
+            name: 'owner',
+            label: 'New Owner',
+            type: 'lookup',
+            object: 'user',
+            required: true,
+          },
+        ],
+        confirmText: 'Transfer ownership of {{count}} account(s)?',
+      },
+      {
+        name: 'delete',
+        label: 'Delete',
+        icon: 'trash-2',
+        variant: 'danger',
+        operation: 'delete',
+        confirmText: 'Permanently delete {{count}} account(s)? This cannot be undone.',
+        confirmLabel: 'Delete',
+      },
+    ],
     appearance: {
       showDescription: true,
       allowedVisualizations: ['grid', 'gallery', 'map'],

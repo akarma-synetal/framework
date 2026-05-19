@@ -6,44 +6,54 @@ import type {
   IEmailTransport,
   EmailAddress,
 } from '@objectstack/spec/contracts';
-import { SysEmail } from '@objectstack/platform-objects/audit';
-import { EmailService, LogTransport, type EmailPersistence } from './email-service.js';
+import { SysEmail, SysEmailTemplate } from '@objectstack/platform-objects/audit';
+import { EmailService, LogTransport, type EmailPersistence, type TemplateLoader, type EmailTemplateRow } from './email-service.js';
+import { makeTransport } from './transports/index.js';
+import { BUILTIN_AUTH_TEMPLATES } from './templates/auth-templates.js';
+import type { EmailTemplateDefinition as EmailTemplate } from '@objectstack/spec/system';
+
+const SYSTEM_CTX = { isSystem: true, roles: [], permissions: [] } as const;
 
 /**
  * Plugin configuration.
  */
 export interface EmailServicePluginOptions {
   /**
-   * Pluggable delivery transport. When omitted, a `LogTransport` is
-   * installed which never sends mail — suitable for development. For
-   * production, wire a concrete transport (nodemailer, Resend SDK, …).
+   * Pluggable delivery transport. When omitted the plugin builds one
+   * from `provider`/`apiKey`; if both omitted, falls back to
+   * `LogTransport` (no real send).
    */
   transport?: IEmailTransport;
+  /** Provider tag — `'log' | 'resend' | 'postmark'`. Default `'log'`. */
+  provider?: 'log' | 'resend' | 'postmark';
+  /** API key for resend/postmark. */
+  apiKey?: string;
+  /** Provider-specific extra options (e.g. Postmark messageStream). */
+  providerOptions?: Record<string, unknown>;
   /** Default `From` address applied when `input.from` is omitted. */
   defaultFrom?: EmailAddress;
   /** Persist each attempt to sys_email. Default true when ObjectQL engine present. */
   persist?: boolean;
   /** Retry attempts on transport throw. Default 0. */
   retries?: number;
+  /** Default template render context (merged into every sendTemplate call). */
+  defaultTemplateContext?: Record<string, unknown>;
+  /** Seed built-in auth templates into sys_email_template on startup. Default true. */
+  seedTemplates?: boolean;
+  /** Additional templates seeded alongside the built-ins. */
+  templates?: EmailTemplate[];
 }
 
 /**
  * EmailServicePlugin — registers the `email` service.
  *
- * @example
- * ```ts
- * import { EmailServicePlugin } from '@objectstack/plugin-email';
- * import nodemailer from 'nodemailer';
- *
- * const smtp = nodemailer.createTransport({ host: 'smtp.example.com', port: 587 });
- * const transport = { async send(msg) { const r = await smtp.sendMail(msg); return { messageId: r.messageId }; } };
- *
- * kernel.use(new EmailServicePlugin({
- *   transport,
- *   defaultFrom: { name: 'Acme CRM', address: 'no-reply@acme.com' },
- *   retries: 2,
- * }));
- * ```
+ * Lifecycle:
+ *   - `init`: register sys_email + sys_email_template via manifest;
+ *     build transport (config → provider+apiKey → LogTransport fallback);
+ *     register a transport-only EmailService so dependents can resolve it.
+ *   - `start` (kernel:ready): wire ObjectQL-backed sys_email persistence
+ *     + sys_email_template TemplateLoader; seed built-in auth templates
+ *     (upsert by `(name, locale)`).
  */
 export class EmailServicePlugin implements Plugin {
   name = 'com.objectstack.service.email';
@@ -58,8 +68,20 @@ export class EmailServicePlugin implements Plugin {
     this.options = options;
   }
 
+  private resolveTransport(ctx: PluginContext): IEmailTransport {
+    if (this.options.transport) return this.options.transport;
+    const provider = this.options.provider ?? 'log';
+    if (provider === 'log') return new LogTransport(ctx.logger);
+    return makeTransport({
+      provider,
+      apiKey: this.options.apiKey,
+      options: this.options.providerOptions,
+      logger: ctx.logger,
+    });
+  }
+
   async init(ctx: PluginContext): Promise<void> {
-    // Register sys_email schema via manifest service.
+    // Register sys_email + sys_email_template via manifest service.
     ctx.getService<{ register(m: any): void }>('manifest').register({
       id: 'com.objectstack.service.email',
       name: 'Email Service',
@@ -68,22 +90,28 @@ export class EmailServicePlugin implements Plugin {
       scope: 'system',
       defaultDatasource: 'cloud',
       namespace: 'sys',
-      objects: [SysEmail],
+      objects: [SysEmail, SysEmailTemplate],
     });
 
-    const transport = this.options.transport ?? new LogTransport(ctx.logger);
-    if (!this.options.transport) {
+    const transport = this.resolveTransport(ctx);
+    if (!this.options.transport && (this.options.provider ?? 'log') === 'log') {
       ctx.logger.info(
         'EmailServicePlugin: no transport configured — using LogTransport (mail will NOT be sent)',
       );
+    } else {
+      ctx.logger.info(
+        `EmailServicePlugin: using '${this.options.provider ?? 'log'}' provider`,
+      );
     }
 
-    // Persistence is wired in `start` once the ObjectQL engine is available;
-    // here we register the service synchronously so dependents can resolve it.
+    // Persistence + templateLoader are wired in `start` once the
+    // ObjectQL engine is available; here we register the service
+    // synchronously so dependents can resolve it.
     this.service = new EmailService({
       transport,
       defaultFrom: this.options.defaultFrom,
       retries: this.options.retries,
+      defaultTemplateContext: this.options.defaultTemplateContext,
       logger: ctx.logger,
     });
     ctx.registerService('email', this.service);
@@ -91,37 +119,101 @@ export class EmailServicePlugin implements Plugin {
   }
 
   async start(ctx: PluginContext): Promise<void> {
-    if (this.options.persist === false) return;
     ctx.hook('kernel:ready', async () => {
       let engine: IDataEngine | null = null;
       try { engine = ctx.getService<IDataEngine>('objectql'); }
       catch { try { engine = ctx.getService<IDataEngine>('data'); } catch { /* ignore */ } }
       if (!engine || !this.service) return;
-      const persistence: EmailPersistence = {
-        async insert(row) {
-          const created = await (engine as any).insert('sys_email', row, {
-            context: { isSystem: true, roles: [], permissions: [] },
+
+      const persistence: EmailPersistence | undefined = this.options.persist === false
+        ? undefined
+        : {
+          async insert(row) {
+            const created = await (engine as any).insert('sys_email', row, {
+              context: SYSTEM_CTX,
+            });
+            return created?.id ? { id: String(created.id) } : { id: String(row.id) };
+          },
+          async update(id, patch) {
+            await (engine as any).update('sys_email', { id, ...patch }, {
+              context: SYSTEM_CTX,
+            });
+          },
+        };
+
+      const templateLoader: TemplateLoader = {
+        async load(name, locale) {
+          const where: Record<string, unknown> = { name };
+          if (locale) where.locale = locale;
+          const rows = await (engine as any).find('sys_email_template', {
+            where,
+            limit: 1,
+            context: SYSTEM_CTX,
           });
-          return created?.id ? { id: String(created.id) } : { id: String(row.id) };
-        },
-        async update(id, patch) {
-          await (engine as any).update('sys_email', id, patch, {
-            context: { isSystem: true, roles: [], permissions: [] },
-          });
+          const row = Array.isArray(rows) ? rows[0] : (rows as any)?.data?.[0];
+          return (row as EmailTemplateRow) || null;
         },
       };
-      // Swap the service to persistence-enabled by re-constructing with same options.
-      const upgraded = new EmailService({
-        transport: (this.service as any).options.transport,
-        defaultFrom: (this.service as any).options.defaultFrom,
-        retries: (this.service as any).options.retries,
-        logger: ctx.logger,
-        persistence,
-      });
-      // Replace the registered instance via the same service name.
-      ctx.registerService('email', upgraded);
-      this.service = upgraded;
-      ctx.logger.info('EmailServicePlugin: sys_email persistence enabled');
+
+      // Mutate the existing service instance so consumers that already
+      // captured a reference (e.g. AuthManager) see the upgrade.
+      if (persistence) this.service.setPersistence(persistence);
+      this.service.setTemplateLoader(templateLoader);
+      ctx.logger.info('EmailServicePlugin: sys_email persistence + template loader enabled');
+
+      // Seed built-in + user-provided templates (upsert by name+locale).
+      if (this.options.seedTemplates !== false) {
+        const all = [
+          ...BUILTIN_AUTH_TEMPLATES,
+          ...(this.options.templates ?? []),
+        ];
+        for (const tpl of all) {
+          try { await this.upsertTemplate(engine!, tpl); }
+          catch (err: any) {
+            console.warn('[EmailServicePlugin] seed template failed:', tpl.name, tpl.locale, err?.message || err);
+          }
+        }
+        ctx.logger.info(`EmailServicePlugin: seeded ${all.length} template row(s)`);
+      }
     });
+  }
+
+  private async upsertTemplate(engine: IDataEngine, tpl: EmailTemplate): Promise<void> {
+    const row = {
+      name: tpl.name,
+      label: tpl.label,
+      category: tpl.category,
+      locale: tpl.locale,
+      subject: tpl.subject,
+      body_html: tpl.bodyHtml,
+      ...(tpl.bodyText ? { body_text: tpl.bodyText } : {}),
+      ...(tpl.fromOverride?.address ? {
+        from_address: tpl.fromOverride.address,
+        ...(tpl.fromOverride.name ? { from_name: tpl.fromOverride.name } : {}),
+      } : {}),
+      ...(tpl.replyTo ? { reply_to: tpl.replyTo } : {}),
+      active: tpl.active,
+      is_system: tpl.isSystem,
+      ...(tpl.description ? { description: tpl.description } : {}),
+      ...(tpl.variables?.length ? { variables_json: JSON.stringify(tpl.variables) } : {}),
+    };
+    const existing = await (engine as any).find('sys_email_template', {
+      where: { name: tpl.name, locale: tpl.locale },
+      limit: 1,
+      context: SYSTEM_CTX,
+    });
+    const existingRow = Array.isArray(existing) ? existing[0] : (existing as any)?.data?.[0];
+    if (existingRow?.id) {
+      // Only re-seed if the existing row is system-managed (is_system=true);
+      // never overwrite a tenant-customised row.
+      if (existingRow.is_system === false) return;
+      await (engine as any).update('sys_email_template', { id: existingRow.id, ...row }, {
+        context: SYSTEM_CTX,
+      });
+    } else {
+      await (engine as any).insert('sys_email_template', row, {
+        context: SYSTEM_CTX,
+      });
+    }
   }
 }

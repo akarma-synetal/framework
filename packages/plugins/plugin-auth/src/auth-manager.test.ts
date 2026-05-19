@@ -648,7 +648,7 @@ describe('AuthManager', () => {
       await manager.getAuthInstance();
       warnSpy.mockRestore();
 
-      expect(capturedConfig.emailAndPassword).toEqual({
+      expect(capturedConfig.emailAndPassword).toMatchObject({
         enabled: true,
         minPasswordLength: 12,
         maxPasswordLength: 64,
@@ -656,6 +656,7 @@ describe('AuthManager', () => {
         autoSignIn: false,
         revokeSessionsOnPasswordReset: true,
       });
+      expect(typeof capturedConfig.emailAndPassword.sendResetPassword).toBe('function');
     });
   });
 
@@ -679,10 +680,11 @@ describe('AuthManager', () => {
       await manager.getAuthInstance();
       warnSpy.mockRestore();
 
-      expect(capturedConfig.emailVerification).toEqual({
+      expect(capturedConfig.emailVerification).toMatchObject({
         sendOnSignUp: true,
         expiresIn: 1800,
       });
+      expect(typeof capturedConfig.emailVerification.sendVerificationEmail).toBe('function');
     });
 
     it('should NOT include emailVerification when not provided', async () => {

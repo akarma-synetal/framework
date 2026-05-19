@@ -158,6 +158,22 @@ export class AuthPlugin implements Plugin {
     // loading order.
     if (this.options.registerRoutes) {
       ctx.hook('kernel:ready', async () => {
+        // Inject the email service if available so better-auth callbacks
+        // (sendResetPassword / sendVerificationEmail / sendInvitationEmail
+        // / sendMagicLink) can actually deliver mail. Resolved here on
+        // kernel:ready so EmailServicePlugin has had a chance to register.
+        if (this.authManager) {
+          try {
+            const emailSvc = ctx.getService<any>('email');
+            if (emailSvc) {
+              this.authManager.setEmailService(emailSvc);
+              ctx.logger.info('Auth: email service wired (transactional mail enabled)');
+            }
+          } catch {
+            ctx.logger.info('Auth: no email service registered — auth callbacks will log instead of sending');
+          }
+        }
+
         let httpServer: IHttpServer | null = null;
         try {
           httpServer = ctx.getService<IHttpServer>('http-server');
