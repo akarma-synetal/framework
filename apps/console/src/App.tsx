@@ -15,7 +15,6 @@ import {
   ConsoleShell,
   ConnectedShell,
   RequireOrganization,
-  RootRedirect,
   SystemRedirect,
   LoadingFallback,
   DefaultHomeLayout,
@@ -25,6 +24,7 @@ import {
   DefaultAppContent,
 } from '@object-ui/app-shell';
 import { AccountLoginRedirect } from './components/AccountLoginRedirect';
+import { CloudAwareRootRedirect } from './components/CloudAwareRootRedirect';
 import {
   gotoAccountLogin,
   gotoAccountRegister,
@@ -106,7 +106,7 @@ export function App() {
                 <DefaultAppContent />
               </ProtectedRoute>
             } />
-            <Route path="/" element={<ConnectedShell><RootRedirect /></ConnectedShell>} />
+            <Route path="/" element={<ConnectedShell><CloudAwareRootRedirect /></ConnectedShell>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ConsoleShell>
