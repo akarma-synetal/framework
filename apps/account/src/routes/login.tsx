@@ -116,7 +116,33 @@ function LoginPage() {
       return;
     }
     let cancelled = false;
-    client.auth.getConfig()
+
+    // The per-project worker on Cloudflare cold-starts on first request and
+    // the very first call to `/api/v1/auth/config` may transiently return
+    // 404 (route not yet wired in the freshly-booted kernel). Without
+    // retries the splash gives up immediately on cold-start and the user
+    // sees the local form despite SSO being configured. Try a few times
+    // with linear backoff before falling back.
+    const probeWithRetry = async (
+      maxAttempts: number,
+      delayMs: number,
+    ): Promise<any> => {
+      let lastErr: unknown;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        if (cancelled) throw new Error('cancelled');
+        try {
+          return await client.auth.getConfig();
+        } catch (err) {
+          lastErr = err;
+          if (attempt < maxAttempts) {
+            await new Promise((r) => setTimeout(r, delayMs * attempt));
+          }
+        }
+      }
+      throw lastErr;
+    };
+
+    probeWithRetry(4, 500)
       .then((res: any) => {
         if (cancelled) return;
         const list: Array<{ id: string; enabled: boolean; type?: string }> =
