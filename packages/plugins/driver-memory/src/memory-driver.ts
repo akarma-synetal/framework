@@ -878,8 +878,9 @@ export class InMemoryDriver implements IDataDriver {
     if (groupBy && groupBy.length > 0) {
         for (const record of records) {
             // Create a composite key from group values
-            const keyParts = groupBy.map(field => {
-                const val = getValueByPath(record, field);
+            const keyParts = groupBy.map(g => {
+                const fieldPath = typeof g === 'string' ? g : g.field;
+                const val = getValueByPath(record, fieldPath);
                 return val === undefined || val === null ? 'null' : String(val);
             });
             const key = JSON.stringify(keyParts);
@@ -903,8 +904,10 @@ export class InMemoryDriver implements IDataDriver {
         if (groupBy && groupBy.length > 0) {
              if (groupRecords.length > 0) {
                 const firstRecord = groupRecords[0];
-                for (const field of groupBy) {
-                     this.setValueByPath(row, field, getValueByPath(firstRecord, field));
+                for (const g of groupBy) {
+                     const fieldPath = typeof g === 'string' ? g : (g.alias ?? g.field);
+                     const sourcePath = typeof g === 'string' ? g : g.field;
+                     this.setValueByPath(row, fieldPath, getValueByPath(firstRecord, sourcePath));
                 }
              }
         }
