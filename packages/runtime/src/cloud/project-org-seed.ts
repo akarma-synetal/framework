@@ -79,7 +79,7 @@ export async function seedProjectOrganization(
             slug: seed.slug ?? null,
             logo: seed.logo ?? null,
             metadata: null,
-            createdAt: nowIso,
+            created_at: nowIso,
         });
 
         logger?.info?.('[seedProjectOrganization] org seeded', {
@@ -147,7 +147,7 @@ export async function seedProjectMember(
             organization_id: organizationId,
             user_id: userId,
             role,
-            createdAt: nowIso,
+            created_at: nowIso,
         });
 
         logger?.info?.('[seedProjectMember] member seeded', {

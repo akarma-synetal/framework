@@ -358,30 +358,57 @@ export class ArtifactKernelFactory implements ProjectKernelFactory {
                 hasOrgSeed: !!orgSeed?.id,
                 metaType: typeof (project as any)?.metadata,
                 results: {} as Record<string, any>,
+                errors: {} as Record<string, any>,
+                warns: [] as any[],
+            };
+
+            // Capture seed-helper warn() calls so non-throwing failure
+            // paths (`return 'error'`) still surface their root cause.
+            const capturingLogger = {
+                info: (...args: any[]) => this.logger.info?.(args[0], args[1]),
+                warn: (msg: string, ctx?: any) => {
+                    diag.warns.push({ msg, ctx });
+                    this.logger.warn?.(msg, ctx);
+                },
             };
 
             if (orgSeed?.id && orgSeed?.name) {
-                const { seedProjectOrganization } = await import('./project-org-seed.js');
-                const result = await seedProjectOrganization(kernel, orgSeed, this.logger);
-                console.warn('[ArtifactKernelFactory] orgSeed →', result);
-                diag.results.org = result;
+                try {
+                    const { seedProjectOrganization } = await import('./project-org-seed.js');
+                    const result = await seedProjectOrganization(kernel, orgSeed, capturingLogger);
+                    console.warn('[ArtifactKernelFactory] orgSeed →', result);
+                    diag.results.org = result;
+                } catch (e: any) {
+                    diag.results.org = 'threw';
+                    diag.errors.org = { message: e?.message, stack: e?.stack?.split('\n').slice(0, 5) };
+                }
             }
 
             if (ownerSeed?.userId && ownerSeed?.email) {
-                const { seedProjectOwner } = await import('./project-owner-seed.js');
-                const ownerResult = await seedProjectOwner(kernel, ownerSeed, this.logger);
-                console.warn('[ArtifactKernelFactory] ownerSeed →', ownerResult);
-                diag.results.owner = ownerResult;
+                try {
+                    const { seedProjectOwner } = await import('./project-owner-seed.js');
+                    const ownerResult = await seedProjectOwner(kernel, ownerSeed, capturingLogger);
+                    console.warn('[ArtifactKernelFactory] ownerSeed →', ownerResult);
+                    diag.results.owner = ownerResult;
+                } catch (e: any) {
+                    diag.results.owner = 'threw';
+                    diag.errors.owner = { message: e?.message, stack: e?.stack?.split('\n').slice(0, 5) };
+                }
 
                 if (orgSeed?.id) {
-                    const { seedProjectMember } = await import('./project-org-seed.js');
-                    const memberResult = await seedProjectMember(
-                        kernel,
-                        { userId: ownerSeed.userId, organizationId: orgSeed.id, role: 'owner' },
-                        this.logger,
-                    );
-                    console.warn('[ArtifactKernelFactory] memberSeed →', memberResult);
-                    diag.results.member = memberResult;
+                    try {
+                        const { seedProjectMember } = await import('./project-org-seed.js');
+                        const memberResult = await seedProjectMember(
+                            kernel,
+                            { userId: ownerSeed.userId, organizationId: orgSeed.id, role: 'owner' },
+                            capturingLogger,
+                        );
+                        console.warn('[ArtifactKernelFactory] memberSeed →', memberResult);
+                        diag.results.member = memberResult;
+                    } catch (e: any) {
+                        diag.results.member = 'threw';
+                        diag.errors.member = { message: e?.message, stack: e?.stack?.split('\n').slice(0, 5) };
+                    }
                 }
             }
 

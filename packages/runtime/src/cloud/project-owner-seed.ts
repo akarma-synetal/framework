@@ -88,9 +88,9 @@ export async function seedProjectOwner(
             // here is what unblocks better-auth's accountLinking check on
             // the first SSO callback (alongside the trustedProviders config
             // in plugin-auth/auth-manager.ts).
-            emailVerified: true,
-            createdAt: nowIso,
-            updatedAt: nowIso,
+            email_verified: true,
+            created_at: nowIso,
+            updated_at: nowIso,
         });
 
         logger?.info?.('[seedProjectOwner] owner seeded', {
