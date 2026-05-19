@@ -9,13 +9,11 @@ export {
   SlaPerformanceReport,
   CasesOpenedByDayPriorityReport,
 } from './case.report';
-export { ContactsByAccountReport } from './contact.report';
-export { LeadsBySourceReport, LeadInflowByMonthSourceReport } from './lead.report';
+export { LeadInflowByMonthSourceReport } from './lead.report';
 export {
   OpportunitiesByStageReport,
   WonOpportunitiesByOwnerReport,
   PipelineCoverageByQuarterReport,
   OpportunityFunnelByOwnerStageReport,
 } from './opportunity.report';
-export { TasksByOwnerReport } from './task.report';
 export { CustomerChurnSignalsReport } from './churn.report';

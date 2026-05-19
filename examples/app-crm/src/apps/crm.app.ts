@@ -96,7 +96,6 @@ export const CrmApp = App.create({
         // Single-axis summaries
         { id: 'nav_report_opps_by_stage',     type: 'report', reportName: 'opportunities_by_stage',       label: 'Opportunities by Stage',      icon: 'bar-chart-3' },
         { id: 'nav_report_won_by_owner',      type: 'report', reportName: 'won_opportunities_by_owner',   label: 'Won by Owner',                icon: 'trophy' },
-        { id: 'nav_report_leads_by_source',   type: 'report', reportName: 'leads_by_source',              label: 'Leads by Source',             icon: 'user-plus' },
         { id: 'nav_report_cases_by_status',   type: 'report', reportName: 'cases_by_status_priority',     label: 'Cases by Status × Priority',  icon: 'life-buoy' },
         { id: 'nav_report_sla',               type: 'report', reportName: 'sla_performance',              label: 'SLA Performance',             icon: 'timer' },
         // Joined report — multi-block analytic surface (M3).
