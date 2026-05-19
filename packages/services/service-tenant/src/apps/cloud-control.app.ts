@@ -37,32 +37,14 @@ export const CLOUD_CONTROL_APP: App = {
   // projects. Data-level isolation (which orgs/projects each user sees)
   // is enforced by sharing rules on sys_organization, sys_project, etc.
 
+  // Curated, end-user-focused menu. Cloud Control is the multi-tenant
+  // project control plane; org/user/role/audit/oauth/session management
+  // lives in the Setup App and is intentionally NOT duplicated here.
+  //
+  // Internal operator surfaces (Revisions, Credentials, Package Versions,
+  // Registered Apps) remain accessible via direct URL but are hidden from
+  // the navigation to keep the App focused on real user tasks.
   navigation: [
-    {
-      id: 'group_overview',
-      type: 'group',
-      label: 'Overview',
-      icon: 'layout-dashboard',
-      children: [
-        // Reuse the System Overview dashboard already shipped by plugin-auth
-        // — it surfaces user/session/audit counts which are also useful for
-        // a control-plane operator. Cloud-specific dashboards (active
-        // projects, billing burn, quota breaches) land in a follow-up PR.
-        { id: 'nav_system_overview', type: 'dashboard', label: 'System Overview', dashboardName: 'system_overview', icon: 'activity' },
-      ],
-    },
-    {
-      id: 'group_tenants',
-      type: 'group',
-      label: 'Tenants',
-      icon: 'building-2',
-      children: [
-        { id: 'nav_organizations', type: 'object', label: 'Organizations', objectName: 'sys_organization', icon: 'building-2' },
-        { id: 'nav_members', type: 'object', label: 'Members', objectName: 'sys_member', icon: 'users' },
-        { id: 'nav_invitations', type: 'object', label: 'Invitations', objectName: 'sys_invitation', icon: 'mail' },
-        { id: 'nav_teams', type: 'object', label: 'Teams', objectName: 'sys_team', icon: 'users-round' },
-      ],
-    },
     {
       id: 'group_projects',
       type: 'group',
@@ -75,38 +57,17 @@ export const CLOUD_CONTROL_APP: App = {
       ],
     },
     {
-      id: 'group_operations',
+      id: 'group_marketplace',
       type: 'group',
-      label: 'Operations',
-      icon: 'wrench',
-      children: [
-        { id: 'nav_project_revisions', type: 'object', label: 'Revisions', objectName: 'sys_project_revision', icon: 'history' },
-        { id: 'nav_project_credentials', type: 'object', label: 'Credentials', objectName: 'sys_project_credential', icon: 'key-square' },
-      ],
-    },
-    {
-      id: 'group_packages',
-      type: 'group',
-      label: 'Packages & Apps',
+      label: 'Marketplace',
       icon: 'package',
       children: [
         { id: 'nav_packages', type: 'object', label: 'Packages', objectName: 'sys_package', icon: 'package' },
-        { id: 'nav_package_versions', type: 'object', label: 'Versions', objectName: 'sys_package_version', icon: 'git-commit' },
         { id: 'nav_package_installations', type: 'object', label: 'Installations', objectName: 'sys_package_installation', icon: 'box' },
-        { id: 'nav_apps', type: 'object', label: 'Registered Apps', objectName: 'sys_app', icon: 'app-window' },
       ],
     },
-    {
-      id: 'group_access',
-      type: 'group',
-      label: 'Access & Integrations',
-      icon: 'shield',
-      children: [
-        { id: 'nav_api_keys', type: 'object', label: 'API Keys', objectName: 'sys_api_key', icon: 'key' },
-        { id: 'nav_webhooks', type: 'object', label: 'Webhooks', objectName: 'sys_webhook', icon: 'webhook', requiresObject: 'sys_webhook' },
-        { id: 'nav_oauth_apps', type: 'object', label: 'OAuth Applications', objectName: 'sys_oauth_application', icon: 'app-window', requiresObject: 'sys_oauth_application' },
-      ],
-    },
+    // NOTE: Integrations group (Webhooks) will be re-added once `sys_webhook`
+    // is shipped. Hidden for now to avoid an empty group in the nav.
     {
       id: 'group_billing',
       type: 'group',
@@ -115,16 +76,6 @@ export const CLOUD_CONTROL_APP: App = {
       children: [
         { id: 'nav_billing_periods', type: 'object', label: 'Billing Periods', objectName: 'sys_billing_period', icon: 'receipt' },
         { id: 'nav_quota_usage', type: 'object', label: 'Quota Usage', objectName: 'sys_quota_usage', icon: 'gauge' },
-      ],
-    },
-    {
-      id: 'group_diagnostics',
-      type: 'group',
-      label: 'Diagnostics',
-      icon: 'stethoscope',
-      children: [
-        { id: 'nav_sessions', type: 'object', label: 'Sessions', objectName: 'sys_session', icon: 'monitor' },
-        { id: 'nav_audit_logs', type: 'object', label: 'Audit Logs', objectName: 'sys_audit_log', icon: 'scroll-text' },
       ],
     },
   ],
