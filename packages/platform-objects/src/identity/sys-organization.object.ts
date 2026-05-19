@@ -22,6 +22,46 @@ export const SysOrganization = ObjectSchema.create({
   titleFormat: '{name}',
   compactLayout: ['name', 'slug'],
 
+  // Custom actions — generic CRUD is suppressed (better-auth-managed),
+  // but admins still need to create new orgs from the Setup app.
+  actions: [
+    {
+      name: 'create_organization',
+      label: 'Create Organization',
+      icon: 'plus',
+      variant: 'primary',
+      locations: ['list_toolbar'],
+      type: 'api',
+      target: '/api/v1/auth/organization/create',
+      successMessage: 'Organization created',
+      refreshAfter: true,
+      params: [
+        {
+          name: 'name',
+          label: 'Name',
+          type: 'text',
+          required: true,
+          placeholder: 'Acme Trading',
+        },
+        {
+          name: 'slug',
+          label: 'Slug',
+          type: 'text',
+          required: true,
+          placeholder: 'acme-trading',
+          helpText: 'URL-friendly identifier (lowercase, hyphens). Must be unique.',
+        },
+        {
+          name: 'logo',
+          label: 'Logo URL',
+          type: 'url',
+          required: false,
+          placeholder: 'https://...',
+        },
+      ],
+    },
+  ],
+
   listViews: {
     all_orgs: {
       type: 'grid',

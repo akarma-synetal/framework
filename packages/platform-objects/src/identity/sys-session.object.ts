@@ -26,6 +26,26 @@ export const SysSession = ObjectSchema.create({
   titleFormat: 'Session — {user_id}',
   compactLayout: ['user_id', 'ip_address', 'expires_at'],
 
+  // Custom actions — sessions are managed by better-auth (generic CRUD
+  // suppressed). "Sign out other devices" is the high-value self-service
+  // affordance every IdP exposes. Maps to better-auth's
+  // `revoke-other-sessions` endpoint which terminates every session for
+  // the current user except the one making the request.
+  actions: [
+    {
+      name: 'revoke_my_other_sessions',
+      label: 'Sign out other devices',
+      icon: 'log-out',
+      variant: 'danger',
+      locations: ['list_toolbar'],
+      type: 'api',
+      target: '/api/v1/auth/revoke-other-sessions',
+      confirmText: 'Sign out of every other device where you\'re currently logged in? Your current session will remain active.',
+      successMessage: 'All other sessions revoked',
+      refreshAfter: true,
+    },
+  ],
+
   listViews: {
     mine: {
       type: 'grid',

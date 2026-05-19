@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — M10.34 first-class custom action: "Invite User" on `sys_user` ✨
+
+`sys_user` is `managedBy: 'better-auth'`, so generic CRUD is correctly suppressed (no New/Edit/Delete) — but Setup admins still need a way to add a user. Instead of routing them to a soon-to-be-deprecated organization-members page, we declare a proper schema action that opens a real inline modal and POSTs to the better-auth invite endpoint.
+
+This unblocks "the basic need: add a user to Setup" using the platform's native action system — no bespoke pages, no custom React, no per-object handlers. The same pattern is the canonical answer for every `managedBy: 'X'` table needing custom CRUD-like affordances (Revoke Session, Reset Password, Rotate API Key, …).
+
+**Spec / schema side**
+- Added `actions: [{ name: 'invite_user', label: 'Invite User', icon: 'user-plus', variant: 'primary', locations: ['list_toolbar'], type: 'api', target: '/api/v1/auth/organization/invite-member', successMessage: 'Invitation sent', refreshAfter: true, params: [{ name: 'email', label: 'Email', type: 'email', required: true }, { name: 'role', label: 'Role', type: 'select', required: true, defaultValue: 'member', options: [{label:'Member',value:'member'},{label:'Admin',value:'admin'},{label:'Owner',value:'owner'}] }] }]` to `sys_user.object.ts`.
+- `params: ActionParam[]` triggers the existing `paramCollectionHandler` → renders the generic `ActionParamDialog` (already shipped) — no new dialog code required.
+
+**Console side**
+- Extended `ObjectView.apiHandler` so `type: 'api'` actions whose `target` starts with `/` or `http(s)://` bypass `dataSource.execute()` and go through `authFetch()` directly. This is the path for cross-package endpoints (better-auth, future external service actions) where the relational-row protocol does not apply.
+  - Sends `Authorization: Bearer <token>`, `X-Tenant-ID: <active org>`, and same-origin cookies automatically.
+  - Auto-injects `organizationId` from `useAuth().activeOrganization` when the body doesn't already specify it.
+  - Surfaces server error messages from the response body (`{error}` / `{message}`) in the failure toast.
+- Threaded `activeOrganization` into `ObjectView`'s `<ActionProvider>` context so future CEL predicates / templates can reference it.
+
+**Verified end-to-end** at `/console/apps/setup/sys_user` as a non-admin owner (Linda):
+1. Toolbar shows a single primary "Invite User" button (no New / Import — those remain suppressed by the managed-by affordance gate).
+2. Click → modal opens with `Email` + `Role` fields rendered from `action.params`.
+3. Submit `newhire@acme-trading.test` / `member` → success toast `Invitation sent`.
+4. `sys_invitation` row created: `email=newhire@acme-trading.test, role=member, status=pending, inviter_id=<Linda>, organization_id=<active org>`.
+
 ### Fixed — M10.33 dedup duplicate list-view tabs on Setup objects 🐛
 Several `sys_*` objects (`sys_user`, `sys_organization`, `sys_role`, `sys_session`, `sys_audit_log`) showed two near-identical list-view tabs — e.g. `Users` *and* `All Users` on `sys_user/view/users` vs `sys_user/view/all_users`. The schema-derived view had correct columns; the duplicate `Users` view referenced fields that don't exist on `sys_user` (phone/status/active) and rendered an empty grid.
 

@@ -21,6 +21,44 @@ export const SysInvitation = ObjectSchema.create({
   titleFormat: 'Invitation to {organization_id}',
   compactLayout: ['email', 'organization_id', 'status'],
 
+  // Custom actions — generic CRUD is suppressed (better-auth-managed).
+  // Mirror the `invite_user` toolbar action from sys_user here so admins
+  // landing on the Invitations page get an obvious entry point.
+  actions: [
+    {
+      name: 'invite_user',
+      label: 'Invite User',
+      icon: 'user-plus',
+      variant: 'primary',
+      locations: ['list_toolbar'],
+      type: 'api',
+      target: '/api/v1/auth/organization/invite-member',
+      successMessage: 'Invitation sent',
+      refreshAfter: true,
+      params: [
+        {
+          name: 'email',
+          label: 'Email',
+          type: 'email',
+          required: true,
+          placeholder: 'colleague@example.com',
+        },
+        {
+          name: 'role',
+          label: 'Role',
+          type: 'select',
+          required: true,
+          defaultValue: 'member',
+          options: [
+            { label: 'Member', value: 'member' },
+            { label: 'Admin', value: 'admin' },
+            { label: 'Owner', value: 'owner' },
+          ],
+        },
+      ],
+    },
+  ],
+
   listViews: {
     pending: {
       type: 'grid',
