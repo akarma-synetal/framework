@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — M10.30d audit-log writer now stamps `organization_id` 🐛
+The audit writer in `packages/plugins/plugin-audit/src/audit-writers.ts` was inserting `sys_audit_log`, `sys_activity` and `sys_notification` rows with `tenant_id` populated but **NULL `organization_id`** — the platform-default tenant column that RLS gates reads on. As a result every non-admin member's `tenant_isolation` policy denied 1900+ historical audit rows, so the new Recent Events table widgets on the System/Security Overview dashboards rendered "暂无数据" even when activity existed in their org.
+
+- Both `auditRow` and `activityRow` now stamp `organization_id: tenantId` in addition to the existing `tenant_id` field.
+- `writeAssignmentNotifications` and `writeCommentMentions` now also stamp `organization_id` so the recipient's RLS resolves the notification within their own tenant scope.
+- Verified end-to-end: a `POST /api/v1/data/contact` as Linda (a Marketing manager in org_mpbxw2dqzdcrvsw6) now produces a `sys_audit_log` row with that exact `organization_id`, where previously it would have been NULL. Existing rows (NULL org) remain hidden by RLS; this is intentional — backfilling historical rows without a known org context would be unsafe.
+
+Note: surfacing audit data to non-admin roles via the Setup dashboards is a separate permission-set concern (member_default has no `sys_audit_log` read grant yet). The writer fix unblocks the downstream RLS check; the role grant can be added when the audit-on-dashboard UX is prioritized.
+
 ### Added — M10.30c listViews coverage + dashboard cleanup 🎯
 Followup to M10.30b. Closes the remaining listViews gaps on Setup-visible objects and repairs the two Overview dashboards (whose widget filters were never correct).
 

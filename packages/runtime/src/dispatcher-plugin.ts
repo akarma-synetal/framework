@@ -373,6 +373,19 @@ export function createDispatcherPlugin(config: DispatcherPluginConfig = {}): Plu
                 }
             });
 
+            // POST /cloud/admin/platform-sso/backfill — idempotent admin trigger
+            // for retro-fitting sys_oauth_application rows when boot-time
+            // backfill plugin races/fails. Authenticated by Bearer == OS_AUTH_SECRET
+            // (validated inside handleCloud).
+            server.post(`${prefix}/cloud/admin/platform-sso/backfill`, async (req: any, res: any) => {
+                try {
+                    const result = await dispatcher.handleCloud('/admin/platform-sso/backfill', 'POST', req.body, req.query, { request: req });
+                    sendResult(result, res);
+                } catch (err: any) {
+                    errorResponse(err, res);
+                }
+            });
+
             server.get(`${prefix}/cloud/templates`, async (req: any, res: any) => {
                 try {
                     const result = await dispatcher.handleCloud('/templates', 'GET', {}, req.query, { request: req });
