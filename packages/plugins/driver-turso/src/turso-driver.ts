@@ -167,7 +167,8 @@ export class TursoDriver extends SqlDriver {
   public override readonly name: string = 'com.objectstack.driver.turso';
   public override readonly version: string = '1.0.0';
 
-  public override readonly supports = {
+  public override get supports() {
+    return {
     // Basic CRUD Operations
     create: true,
     read: true,
@@ -192,6 +193,7 @@ export class TursoDriver extends SqlDriver {
     querySubqueries: true,
     queryCTE: true,
     joins: true,
+    queryDateGranularity: this.dateGranularityCapabilities,
 
     // Advanced Features — Turso/libSQL native capabilities
     fullTextSearch: true,  // FTS5
@@ -212,7 +214,8 @@ export class TursoDriver extends SqlDriver {
     connectionPooling: false, // Turso uses concurrency limits, not connection pools
     preparedStatements: true,
     queryCache: false,
-  };
+    };
+  }
 
   private tursoConfig: TursoDriverConfig;
   private libsqlClient: Client | null = null;
