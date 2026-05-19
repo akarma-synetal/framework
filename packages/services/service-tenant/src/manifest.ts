@@ -13,11 +13,15 @@ import {
   SysProjectCredential,
   SysProjectMember,
   SysProjectRevision,
+  SysProjectBranch,
   SysPackage,
   SysPackageVersion,
   SysPackageInstallation,
   SysApp,
+  SysBillingPeriod,
+  SysQuotaUsage,
 } from './objects/index.js';
+import { CLOUD_CONTROL_APP } from './apps/index.js';
 
 export const TENANT_SERVICE_ID = 'com.objectstack.service-tenant';
 export const TENANT_SERVICE_VERSION = '0.2.0';
@@ -28,11 +32,17 @@ export const tenantObjects = [
   SysProjectCredential,
   SysProjectMember,
   SysProjectRevision,
+  SysProjectBranch,
   SysPackage,
   SysPackageVersion,
   SysPackageInstallation,
   SysApp,
+  SysBillingPeriod,
+  SysQuotaUsage,
 ];
+
+/** Control-plane Apps surfaced in the App switcher when service-tenant is loaded. */
+export const tenantApps = [CLOUD_CONTROL_APP];
 
 /** Manifest header shared by compile-time config and runtime registration. */
 export const tenantServiceManifestHeader = {

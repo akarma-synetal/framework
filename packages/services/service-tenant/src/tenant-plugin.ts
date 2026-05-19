@@ -9,7 +9,7 @@ import {
   type ProjectDatabaseAdapter,
 } from './project-provisioning.js';
 import { AppCatalogService } from './services/app-catalog.service.js';
-import { tenantObjects, tenantServiceManifestHeader } from './manifest.js';
+import { tenantObjects, tenantApps, tenantServiceManifestHeader } from './manifest.js';
 
 /**
  * Tenant Plugin Configuration
@@ -87,9 +87,11 @@ export function createTenantPlugin(config: TenantPluginConfig = {}): Plugin {
           manifestService.register({
             ...tenantServiceManifestHeader,
             objects: manifestObjects,
+            apps: tenantApps,
           });
           ctx.logger.info('[TenantPlugin] System objects registered via manifest service', {
             objects: manifestObjects.map((o: any) => o?.name),
+            apps: tenantApps.map((a: any) => a?.name),
           });
 
           // Install the org-scoped app catalog sync service. It listens for

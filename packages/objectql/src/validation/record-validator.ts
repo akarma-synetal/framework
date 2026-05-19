@@ -36,7 +36,11 @@ const SKIP_FIELDS = new Set<string>([
 ]);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const URL_RE = /^https?:\/\/[^\s]+$/i;
+// Permissive URL pattern: accept any scheme:// + non-empty body so that
+// non-HTTP URIs used by drivers (libsql://, postgres://, mysql://, file://, s3://, …)
+// pass field-level validation. Stricter per-field checks can be enforced
+// via custom validators where needed.
+const URL_RE = /^[a-z][a-z0-9+.\-]*:\/\/[^\s]+$/i;
 const PHONE_RE = /^[+()\-\s\d.]{5,}$/;
 
 export interface FieldValidationError {
@@ -121,7 +125,7 @@ function validateOne(name: string, def: FieldDef, value: unknown): FieldValidati
       return { field: name, code: 'invalid_email', message: `${name} must be a valid email address` };
     }
     if (t === 'url' && !URL_RE.test(s)) {
-      return { field: name, code: 'invalid_url', message: `${name} must be a valid URL (http:// or https://)` };
+      return { field: name, code: 'invalid_url', message: `${name} must be a valid URL (scheme://...)` };
     }
     if (t === 'phone' && !PHONE_RE.test(s)) {
       return { field: name, code: 'invalid_phone', message: `${name} must be a valid phone number` };
