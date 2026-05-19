@@ -47,6 +47,86 @@ export const SysUser = ObjectSchema.create({
         { field: 'role', objectOverride: 'sys_member', required: true },
       ],
     },
+
+    // ── Platform admin operations (require better-auth `admin` plugin) ─
+    //
+    // These actions hit /api/v1/auth/admin/* endpoints that are only
+    // wired when `auth.plugins.admin` is enabled. When the plugin is
+    // disabled the actions still render (schema is static) but server
+    // returns 404. UI surfaces them under the row menu so platform
+    // admins can manage accounts without dropping to SQL or
+    // a custom Setup wizard.
+    {
+      name: 'ban_user',
+      label: 'Ban User',
+      icon: 'ban',
+      variant: 'danger',
+      locations: ['list_item'],
+      type: 'api',
+      target: '/api/v1/auth/admin/ban-user',
+      recordIdParam: 'userId',
+      successMessage: 'User banned',
+      refreshAfter: true,
+      confirmText: 'Ban this user? They will be signed out and unable to sign in until unbanned.',
+      params: [
+        { name: 'banReason', label: 'Ban Reason', type: 'text', required: false },
+      ],
+    },
+    {
+      name: 'unban_user',
+      label: 'Unban User',
+      icon: 'check-circle-2',
+      variant: 'secondary',
+      locations: ['list_item'],
+      type: 'api',
+      target: '/api/v1/auth/admin/unban-user',
+      recordIdParam: 'userId',
+      successMessage: 'User unbanned',
+      refreshAfter: true,
+    },
+    {
+      name: 'set_user_password',
+      label: 'Set Password',
+      icon: 'key-round',
+      variant: 'secondary',
+      locations: ['list_item'],
+      type: 'api',
+      target: '/api/v1/auth/admin/set-user-password',
+      recordIdParam: 'userId',
+      successMessage: 'Password updated',
+      refreshAfter: false,
+      params: [
+        { name: 'newPassword', label: 'New Password', type: 'text', required: true },
+      ],
+    },
+    {
+      name: 'set_user_role',
+      label: 'Set Platform Role',
+      icon: 'shield-check',
+      variant: 'secondary',
+      locations: ['list_item'],
+      type: 'api',
+      target: '/api/v1/auth/admin/set-role',
+      recordIdParam: 'userId',
+      successMessage: 'Role updated',
+      refreshAfter: true,
+      params: [
+        { name: 'role', label: 'Platform Role', type: 'text', required: true },
+      ],
+    },
+    {
+      name: 'impersonate_user',
+      label: 'Impersonate User',
+      icon: 'user-cog',
+      variant: 'secondary',
+      locations: ['list_item'],
+      type: 'api',
+      target: '/api/v1/auth/admin/impersonate-user',
+      recordIdParam: 'userId',
+      successMessage: 'Now impersonating user',
+      refreshAfter: true,
+      confirmText: 'Start an impersonation session for this user? Use only for legitimate support cases — actions will be logged.',
+    },
   ],
 
   listViews: {
@@ -79,6 +159,16 @@ export const SysUser = ObjectSchema.create({
       sort: [{ field: 'name', order: 'asc' }],
       pagination: { pageSize: 50 },
     },
+    banned: {
+      type: 'grid',
+      name: 'banned',
+      label: 'Banned',
+      data: { provider: 'object', object: 'sys_user' },
+      columns: ['name', 'email', 'banned', 'ban_reason', 'ban_expires'],
+      filter: [{ field: 'banned', operator: 'equals', value: true }],
+      sort: [{ field: 'updated_at', order: 'desc' }],
+      pagination: { pageSize: 50 },
+    },
   },
 
   fields: {
@@ -109,6 +199,36 @@ export const SysUser = ObjectSchema.create({
       defaultValue: false,
       group: 'Identity',
       description: 'Whether two-factor authentication is enabled for this user. Maintained by the better-auth `twoFactor` plugin.',
+    }),
+
+    // ── Admin (managed by better-auth `admin` plugin when enabled) ───
+    role: Field.text({
+      label: 'Platform Role',
+      required: false,
+      maxLength: 64,
+      group: 'Admin',
+      description: 'Platform-level role (admin, user, …). Set via the Set Platform Role action.',
+    }),
+
+    banned: Field.boolean({
+      label: 'Banned',
+      defaultValue: false,
+      group: 'Admin',
+      description: 'When true, the user cannot sign in. Toggle via Ban User / Unban User actions.',
+    }),
+
+    ban_reason: Field.text({
+      label: 'Ban Reason',
+      required: false,
+      maxLength: 255,
+      group: 'Admin',
+    }),
+
+    ban_expires: Field.datetime({
+      label: 'Ban Expires',
+      required: false,
+      group: 'Admin',
+      description: 'When set, the ban auto-clears at this time.',
     }),
 
     // ── Profile ──────────────────────────────────────────────────

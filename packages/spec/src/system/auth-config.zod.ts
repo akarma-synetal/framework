@@ -57,6 +57,30 @@ export const AuthPluginConfigSchema = lazySchema(() => z.object({
   deviceAuthorization: z.boolean().default(false).describe(
     'Enable RFC 8628 Device Authorization Grant (CLI / TV-style login)',
   ),
+  /**
+   * Enable better-auth's `admin` plugin so platform admins can ban / unban
+   * users, set their password (out-of-band recovery), impersonate them for
+   * support sessions, and assign global platform roles.
+   *
+   * Endpoints exposed under the auth route:
+   *   - `POST /admin/ban-user` / `POST /admin/unban-user`
+   *   - `POST /admin/set-user-password`
+   *   - `POST /admin/impersonate-user` / `POST /admin/stop-impersonating`
+   *   - `POST /admin/set-role`
+   *   - `POST /admin/create-user` / `POST /admin/remove-user`
+   *   - `POST /admin/list-users` / `POST /admin/list-user-sessions`
+   *   - `POST /admin/revoke-user-session(s)`
+   *
+   * The plugin augments `sys_user` with `role`, `banned`, `ban_reason`,
+   * `ban_expires` and `sys_session` with `impersonated_by`. These columns
+   * are mapped to snake_case by `buildAdminPluginSchema()`.
+   *
+   * Only callers whose user has a platform admin role (default: `admin`)
+   * can hit these endpoints; better-auth enforces this internally.
+   */
+  admin: z.boolean().default(false).describe(
+    'Enable platform admin operations (ban/unban, set-password, impersonate, set-role)',
+  ),
 }));
 
 /**

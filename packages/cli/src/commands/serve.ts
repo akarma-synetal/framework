@@ -708,6 +708,15 @@ export default class Serve extends Command {
               socialProviders: Object.keys(socialProviders).length > 0 ? socialProviders : undefined,
               trustedOrigins: trustedOrigins.length ? trustedOrigins : undefined,
               ...(additionalOrgRoles.size > 0 ? { additionalOrgRoles: Array.from(additionalOrgRoles) } : {}),
+              // Enable the admin plugin by default so the Setup app's
+              // ban/unban/set-password/impersonate/set-role row actions
+              // resolve to real endpoints. The plugin self-gates by role
+              // (only users whose `role` column is `admin` can hit
+              // /admin/* endpoints), so leaving it on for everyone is
+              // safe. Opt-out via OS_AUTH_ADMIN=false.
+              plugins: {
+                admin: String(process.env.OS_AUTH_ADMIN ?? 'true').toLowerCase() !== 'false',
+              },
               advanced: process.env.OS_COOKIE_DOMAIN
                 ? ({
                     crossSubDomainCookies: {

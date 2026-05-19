@@ -298,6 +298,35 @@ export const AUTH_TWO_FACTOR_USER_FIELDS = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Admin plugin – user/session field additions
+// ---------------------------------------------------------------------------
+
+/**
+ * Admin plugin adds platform-level admin fields to the `user` model.
+ *
+ * | camelCase (better-auth) | snake_case (ObjectStack) |
+ * |:------------------------|:-------------------------|
+ * | banReason               | ban_reason               |
+ * | banExpires              | ban_expires              |
+ *
+ * `role` and `banned` already have matching snake_case names and are
+ * therefore omitted from this mapping (better-auth's database hooks
+ * read them by the auto-derived column names).
+ */
+export const AUTH_ADMIN_USER_FIELDS = {
+  banReason: 'ban_reason',
+  banExpires: 'ban_expires',
+} as const;
+
+/**
+ * Admin plugin adds an `impersonatedBy` field to the session model
+ * recording the operator user id when an admin impersonates someone.
+ */
+export const AUTH_ADMIN_SESSION_FIELDS = {
+  impersonatedBy: 'impersonated_by',
+} as const;
+
+// ---------------------------------------------------------------------------
 // OAuth Provider plugin – oauthClient table
 // ---------------------------------------------------------------------------
 
@@ -501,6 +530,24 @@ export function buildTwoFactorPluginSchema() {
     twoFactor: AUTH_TWO_FACTOR_SCHEMA,
     user: {
       fields: AUTH_TWO_FACTOR_USER_FIELDS,
+    },
+  };
+}
+
+/**
+ * Builds the `schema` option for better-auth's `admin()` plugin.
+ *
+ * The admin plugin extends the user model with `role`/`banned`/`banReason`/
+ * `banExpires` and the session model with `impersonatedBy`. Only the
+ * snake_case-differing fields are mapped explicitly.
+ */
+export function buildAdminPluginSchema() {
+  return {
+    user: {
+      fields: AUTH_ADMIN_USER_FIELDS,
+    },
+    session: {
+      fields: AUTH_ADMIN_SESSION_FIELDS,
     },
   };
 }

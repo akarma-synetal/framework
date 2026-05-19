@@ -22,6 +22,7 @@ import {
   buildOauthProviderPluginSchema,
   buildDeviceAuthorizationPluginSchema,
   buildJwtPluginSchema,
+  buildAdminPluginSchema,
 } from './auth-schema-config.js';
 
 /**
@@ -271,6 +272,7 @@ export class AuthManager {
       magicLink: pluginConfig.magicLink ?? false,
       oidcProvider: pluginConfig.oidcProvider ?? false,
       deviceAuthorization: pluginConfig.deviceAuthorization ?? false,
+      admin: pluginConfig.admin ?? false,
     };
 
     // bearer() — ALWAYS enabled.
@@ -363,6 +365,18 @@ export class AuthManager {
       const { twoFactor } = await import('better-auth/plugins/two-factor');
       plugins.push(twoFactor({
         schema: buildTwoFactorPluginSchema(),
+      }));
+    }
+
+    if (enabled.admin) {
+      const { admin } = await import('better-auth/plugins/admin');
+      // Platform admin: ban/unban, set-password, impersonate, set-role.
+      // Schema mapping ensures the plugin's added user/session columns
+      // match ObjectStack's snake_case conventions (ban_reason,
+      // ban_expires, impersonated_by). `role` and `banned` are already
+      // snake_case-compatible.
+      plugins.push(admin({
+        schema: buildAdminPluginSchema(),
       }));
     }
 

@@ -126,6 +126,14 @@ export const SysSession = ObjectSchema.create({
       group: 'Client',
     }),
 
+    // ── Admin (managed by better-auth `admin` plugin) ────────────
+    impersonated_by: Field.lookup('sys_user', {
+      label: 'Impersonated By',
+      required: false,
+      group: 'Admin',
+      description: 'User id of the admin that started this impersonation session, if any.',
+    }),
+
     // ── Secret (hidden by default) ──────────────────────────────
     token: Field.text({
       label: 'Session Token',
