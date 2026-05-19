@@ -2,6 +2,11 @@
 
 import type { ReportInput } from '@objectstack/spec/ui';
 
+// Server does not yet evaluate CEL helpers like `{current_year_start}` inside
+// filter values (see plan note "filter-time CEL 求值"). Compute the ISO date
+// at module load as a temporary workaround so the report actually matches rows.
+const CURRENT_YEAR_START = `${new Date().getFullYear()}-01-01`;
+
 export const OpportunitiesByStageReport: ReportInput = {
   name: 'opportunities_by_stage',
   label: 'Opportunities by Stage',
@@ -16,7 +21,7 @@ export const OpportunitiesByStageReport: ReportInput = {
     { field: 'probability', label: 'Probability', aggregate: 'avg' },
   ],
   groupingsDown: [{ field: 'stage', sortOrder: 'asc' }],
-  filter: { stage: { $ne: 'closed_lost' }, close_date: { $gte: '{current_year_start}' } },
+  filter: { stage: { $ne: 'closed_lost' }, close_date: { $gte: CURRENT_YEAR_START } },
   chart: { type: 'bar', title: 'Pipeline by Stage', showLegend: true, xAxis: 'stage', yAxis: 'amount' }
 };
 

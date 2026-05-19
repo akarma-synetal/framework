@@ -59,6 +59,18 @@ export { AuthProxyPlugin } from './cloud/auth-proxy-plugin.js';
 export { KernelManager } from './cloud/kernel-manager.js';
 export type { ProjectKernelFactory, KernelManagerConfig } from './cloud/kernel-manager.js';
 export type { EnvironmentDriverRegistry } from './cloud/environment-registry.js';
+export {
+  PLATFORM_SSO_PROVIDER_ID,
+  derivePlatformSsoClientId,
+  derivePlatformSsoClientSecret,
+  buildPlatformSsoRedirectUri,
+  seedPlatformSsoClient,
+  backfillPlatformSsoClients,
+} from './cloud/platform-sso.js';
+export type {
+  SeedPlatformSsoClientOptions,
+  BackfillPlatformSsoClientsOptions,
+} from './cloud/platform-sso.js';
 
 // Export Sandbox (script body runner) — engine choice is quickjs-emscripten.
 // See packages/runtime/src/sandbox/script-runner.ts for the decision rationale.

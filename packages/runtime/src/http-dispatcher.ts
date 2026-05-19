@@ -1830,6 +1830,31 @@ export class HttpDispatcher {
                     })(),
                 });
 
+                // Platform SSO seed: register a `sys_oauth_application` row
+                // so the per-project runtime can immediately exchange
+                // authorization codes with this cloud control plane. Best
+                // effort — failures are logged but do NOT abort the
+                // project-create flow (the project remains usable with
+                // email/password sign-in as the legacy fallback).
+                try {
+                    const { seedPlatformSsoClient } = await import('./cloud/platform-sso.js');
+                    const baseSecret = (process.env.OS_AUTH_SECRET ?? process.env.AUTH_SECRET ?? '').trim();
+                    if (baseSecret) {
+                        await seedPlatformSsoClient({
+                            ql,
+                            projectId,
+                            hostname: computedHostname,
+                            baseSecret,
+                            logger: console,
+                        });
+                    }
+                } catch (ssoErr) {
+                    console.warn?.('[http-dispatcher] platform SSO seed failed (non-fatal)', {
+                        projectId,
+                        error: (ssoErr as Error)?.message,
+                    });
+                }
+
                 // Fire-and-forget the provisioning work so the POST returns
                 // immediately with a `provisioning` record. The UI can then
                 // refresh (or poll) to observe the transition.

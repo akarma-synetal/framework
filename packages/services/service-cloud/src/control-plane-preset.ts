@@ -256,5 +256,39 @@ export function createControlPlanePlugins(cfg: ControlPlanePresetConfig): any[] 
       const { MetadataPlugin } = await import('@objectstack/metadata');
       return new MetadataPlugin({ watch: false });
     }),
+
+    // ── 7. Platform SSO backfill ─────────────────────────────────────────
+    // Ensure every pre-existing `sys_project` has a matching
+    // `sys_oauth_application` row so per-project deployments can
+    // authenticate against this cloud as a unified IdP. Brand-new
+    // projects get seeded inline by the dispatcher's POST /cloud/projects
+    // handler; this backfill exists to retro-fit anything created before
+    // the feature shipped. Runs once per boot, after the auth plugin (so
+    // `sys_oauth_application` is registered) and after ObjectQL is ready.
+    lazyPlugin('com.objectstack.platform-sso-backfill', async () => ({
+      name: 'com.objectstack.platform-sso-backfill',
+      version: '1.0.0',
+      async start(ctx: any) {
+        try {
+          const baseSecret = (process.env.OS_AUTH_SECRET ?? process.env.AUTH_SECRET ?? cfg.authSecret ?? '').trim();
+          if (!baseSecret) {
+            ctx.logger?.warn?.('[platform-sso-backfill] OS_AUTH_SECRET missing — skipping');
+            return;
+          }
+          const ql = ctx.getService?.('objectql');
+          if (!ql) {
+            ctx.logger?.warn?.('[platform-sso-backfill] objectql service not available — skipping');
+            return;
+          }
+          const { backfillPlatformSsoClients } = await import('@objectstack/runtime');
+          const result = await backfillPlatformSsoClients({ ql, baseSecret, logger: ctx.logger });
+          ctx.logger?.info?.('[platform-sso-backfill] done', result);
+        } catch (err) {
+          ctx.logger?.warn?.('[platform-sso-backfill] failed (non-fatal)', {
+            error: (err as Error)?.message,
+          });
+        }
+      },
+    })),
   ];
 }

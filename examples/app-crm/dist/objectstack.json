@@ -18799,7 +18799,7 @@
           "$ne": "closed_lost"
         },
         "close_date": {
-          "$gte": "{current_year_start}"
+          "$gte": "2026-01-01"
         }
       },
       "chart": {

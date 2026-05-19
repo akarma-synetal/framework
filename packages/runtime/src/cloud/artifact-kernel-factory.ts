@@ -39,6 +39,11 @@ import type { ProjectKernelFactory } from './kernel-manager.js';
 import type { EnvironmentDriverRegistry } from './environment-registry.js';
 import type { ArtifactApiClient } from './artifact-api-client.js';
 import { loadCapabilities } from './capability-loader.js';
+import {
+    PLATFORM_SSO_PROVIDER_ID,
+    derivePlatformSsoClientId,
+    derivePlatformSsoClientSecret,
+} from './platform-sso.js';
 
 type IDataDriver = Contracts.IDataDriver;
 
@@ -153,6 +158,33 @@ export class ArtifactKernelFactory implements ProjectKernelFactory {
                 const baseUrl = project.hostname
                     ? (project.hostname.startsWith('http') ? project.hostname : `https://${project.hostname}`)
                     : undefined;
+
+                // Platform SSO ("Airtable-style unified login"): when the
+                // cloud control-plane is reachable AND the master secret is
+                // shared between the two containers, wire better-auth's
+                // genericOAuth plugin so a builder who already signed in
+                // on `cloud.<root>` is JIT-provisioned as a `sys_user` on
+                // every per-project deployment without re-registering.
+                //
+                // Opt-out: set OS_PLATFORM_SSO=false to fall back to the
+                // legacy "every project owns its own login" mode.
+                const platformSsoEnabled = String(
+                    process.env.OS_PLATFORM_SSO ?? 'true',
+                ).toLowerCase() !== 'false';
+                const cloudBaseUrl = (process.env.OS_CLOUD_URL ?? '').trim().replace(/\/+$/, '');
+                const oidcProviders = platformSsoEnabled
+                    && cloudBaseUrl
+                    && /^https?:\/\//.test(cloudBaseUrl)
+                    ? [{
+                        providerId: PLATFORM_SSO_PROVIDER_ID,
+                        name: 'ObjectStack',
+                        discoveryUrl: `${cloudBaseUrl}/.well-known/openid-configuration`,
+                        clientId: derivePlatformSsoClientId(projectId),
+                        clientSecret: derivePlatformSsoClientSecret(this.authBaseSecret, projectId),
+                        scopes: ['openid', 'email', 'profile'],
+                    }]
+                    : undefined;
+
                 await kernel.use(new AuthPlugin({
                     secret: projectSecret,
                     baseUrl,
@@ -168,7 +200,14 @@ export class ArtifactKernelFactory implements ProjectKernelFactory {
                     // intentionally do NOT pass crossSubDomainCookies here
                     // so cookies stay isolated per project subdomain.
                     trustedOrigins: baseUrl ? [baseUrl] : undefined,
+                    ...(oidcProviders ? { oidcProviders } : {}),
                 } as any));
+                if (oidcProviders) {
+                    this.logger.info?.('[ArtifactKernelFactory] platform SSO wired', {
+                        projectId,
+                        cloudBaseUrl,
+                    });
+                }
             } catch (err: any) {
                 this.logger.warn?.('[ArtifactKernelFactory] AuthPlugin not registered', {
                     projectId,
