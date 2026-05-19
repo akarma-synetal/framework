@@ -439,10 +439,20 @@ export class SqlDriver implements IDataDriver {
       for (const agg of aggregates) {
         const funcName = agg.function || agg.func;
         const rawFunc = this.mapAggregateFunc(funcName);
+        // Spec: `field` is optional for COUNT (means COUNT(*)).
+        const fieldExpr = agg.field ?? '*';
         if (agg.alias) {
-          builder.select(this.knex.raw(`${rawFunc}(??) as ??`, [agg.field, agg.alias]));
+          if (fieldExpr === '*') {
+            builder.select(this.knex.raw(`${rawFunc}(*) as ??`, [agg.alias]));
+          } else {
+            builder.select(this.knex.raw(`${rawFunc}(??) as ??`, [fieldExpr, agg.alias]));
+          }
         } else {
-          builder.select(this.knex.raw(`${rawFunc}(??)`, [agg.field]));
+          if (fieldExpr === '*') {
+            builder.select(this.knex.raw(`${rawFunc}(*)`));
+          } else {
+            builder.select(this.knex.raw(`${rawFunc}(??)`, [fieldExpr]));
+          }
         }
       }
     }
