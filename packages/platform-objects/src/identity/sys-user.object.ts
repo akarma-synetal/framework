@@ -43,25 +43,8 @@ export const SysUser = ObjectSchema.create({
       successMessage: 'Invitation sent',
       refreshAfter: true,
       params: [
-        {
-          name: 'email',
-          label: 'Email',
-          type: 'email',
-          required: true,
-          placeholder: 'colleague@example.com',
-        },
-        {
-          name: 'role',
-          label: 'Role',
-          type: 'select',
-          required: true,
-          defaultValue: 'member',
-          options: [
-            { label: 'Member', value: 'member' },
-            { label: 'Admin', value: 'admin' },
-            { label: 'Owner', value: 'owner' },
-          ],
-        },
+        { field: 'email', required: true },
+        { field: 'role', objectOverride: 'sys_member', required: true },
       ],
     },
   ],

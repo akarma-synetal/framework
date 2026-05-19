@@ -36,25 +36,8 @@ export const SysInvitation = ObjectSchema.create({
       successMessage: 'Invitation sent',
       refreshAfter: true,
       params: [
-        {
-          name: 'email',
-          label: 'Email',
-          type: 'email',
-          required: true,
-          placeholder: 'colleague@example.com',
-        },
-        {
-          name: 'role',
-          label: 'Role',
-          type: 'select',
-          required: true,
-          defaultValue: 'member',
-          options: [
-            { label: 'Member', value: 'member' },
-            { label: 'Admin', value: 'admin' },
-            { label: 'Owner', value: 'owner' },
-          ],
-        },
+        { field: 'email', required: true },
+        { field: 'role', required: true },
       ],
     },
   ],
@@ -125,11 +108,16 @@ export const SysInvitation = ObjectSchema.create({
       description: 'Email address of the invited user',
     }),
     
-    role: Field.text({
+    role: Field.select({
       label: 'Role',
       required: false,
-      maxLength: 100,
       description: 'Role to assign upon acceptance',
+      options: [
+        { label: 'Owner', value: 'owner' },
+        { label: 'Admin', value: 'admin' },
+        { label: 'Member', value: 'member' },
+      ],
+      defaultValue: 'member',
     }),
     
     status: Field.select(['pending', 'accepted', 'rejected', 'expired', 'canceled'], {

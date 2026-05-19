@@ -9,16 +9,56 @@ import { HookBodySchema } from '../data/hook-body.zod';
 
 /**
  * Action Parameter Schema
+ *
  * Defines inputs required before executing an action.
+ *
+ * Two declaration modes:
+ *
+ * 1. **Field-backed** (preferred) — reference an existing object field; the
+ *    runtime resolves the field's label (i18n), type, validation rules,
+ *    options, placeholder, help text, and widget mapping from object
+ *    metadata. Cross-object references use `objectOverride`.
+ *
+ *    ```ts
+ *    params: [
+ *      { field: 'email' },                                 // same object
+ *      { field: 'role', objectOverride: 'sys_member' },    // different object
+ *    ]
+ *    ```
+ *
+ * 2. **Inline** (legacy / bespoke) — declare `name`, `label`, `type` etc.
+ *    inline when no matching object field exists. Inline values may also be
+ *    used alongside `field` to override individual properties.
+ *
+ * `name` is required unless `field` is provided (in which case it defaults
+ * to the field name and is used as the request-body key).
  */
 import { lazySchema } from '../shared/lazy-schema';
 export const ActionParamSchema = lazySchema(() => z.object({
-  name: z.string(),
-  label: I18nLabelSchema,
-  type: FieldType,
-  required: z.boolean().default(false),
+  /** Request-body key. Defaults to `field` when `field` is set. */
+  name: z.string().optional(),
+  /** Reference an existing object field for label/type/validation/options. */
+  field: SnakeCaseIdentifierSchema.optional(),
+  /** Object that owns the referenced field (defaults to the action's parent object). */
+  objectOverride: SnakeCaseIdentifierSchema.optional(),
+  /** Overrides the resolved field label (or sets it for inline params). */
+  label: I18nLabelSchema.optional(),
+  /** Overrides the resolved field type (or sets it for inline params). */
+  type: FieldType.optional(),
+  /** Required override; when omitted falls back to the resolved field's `required`. */
+  required: z.boolean().optional(),
+  /** Select/picklist options override. */
   options: z.array(z.object({ label: I18nLabelSchema, value: z.string() })).optional(),
-}));
+  /** Placeholder override. */
+  placeholder: z.string().optional(),
+  /** Help/description override. */
+  helpText: z.string().optional(),
+  /** Default value for the dialog input. */
+  defaultValue: z.unknown().optional(),
+}).refine(
+  (p) => Boolean(p.name) || Boolean(p.field),
+  { message: 'ActionParam requires either "name" or "field"' },
+));
 
 /**
  * Action type enum values.

@@ -44,11 +44,16 @@ export const SysMember = ObjectSchema.create({
       required: true,
     }),
     
-    role: Field.text({
+    role: Field.select({
       label: 'Role',
       required: false,
-      description: 'Member role within the organization (e.g. admin, member)',
-      maxLength: 100,
+      description: 'Member role within the organization',
+      options: [
+        { label: 'Owner', value: 'owner' },
+        { label: 'Admin', value: 'admin' },
+        { label: 'Member', value: 'member' },
+      ],
+      defaultValue: 'member',
     }),
   },
   
