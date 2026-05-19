@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — M10.30e ObjectQL: `applySystemFields` now applies to managed tables 🐛
+`packages/objectql/src/registry.ts`: `applySystemFields` was early-returning for **every** table with `managedBy` set (admin/append-only/platform/config/system). That meant `sys_audit_log`, `sys_activity`, `sys_approval_action`, `sys_email`, `sys_presence`, etc. never received the implicit `organization_id` column in their in-memory schema, even though the physical DB columns existed. Downstream, SecurityPlugin's field-existence safety net (security-plugin.ts:303-319) dropped the wildcard `tenant_isolation` policy as "field missing on object" → `RLS_DENY_FILTER` → 0 rows for any non-admin member, regardless of writer fixes.
+
+- Narrow the skip to only `managedBy === 'better-auth'` (whose tables have their own migration logic and cannot tolerate framework auto-columns).
+- All other managed buckets — `admin`, `append-only`, `platform`, `config`, `system` — now correctly receive `organization_id` / `tenant_id` / audit columns in their schema.
+- Verified: `GET /api/v1/data/sys_audit_log` as Linda (a non-admin member in `org_mpbxw2dqzdcrvsw6`) now returns her org's 2 rows. Previously returned 0. Combined with the M10.30d writer fix, this lights up the Setup → Overview "Recent Events" dashboards end-to-end for non-admin users.
+
 ### Fixed — M10.30d audit-log writer now stamps `organization_id` 🐛
 The audit writer in `packages/plugins/plugin-audit/src/audit-writers.ts` was inserting `sys_audit_log`, `sys_activity` and `sys_notification` rows with `tenant_id` populated but **NULL `organization_id`** — the platform-default tenant column that RLS gates reads on. As a result every non-admin member's `tenant_isolation` policy denied 1900+ historical audit rows, so the new Recent Events table widgets on the System/Security Overview dashboards rendered "暂无数据" even when activity existed in their org.
 
