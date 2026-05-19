@@ -61,6 +61,24 @@ function LoginPage() {
   useEffect(() => {
     if (!user) return;
 
+    // OAuth-provider hand-off: when the user landed on /login because
+    // better-auth's oauth-provider redirected them here from /oauth2/authorize
+    // (unauthenticated user starting an SSO flow), the original authorize query
+    // params — including `client_id`, `redirect_uri`, the signed `sig`, etc. —
+    // are preserved on the current URL. After login succeeds we must resume
+    // the OAuth flow by sending the same params back to /oauth2/authorize so
+    // the IdP can issue the code and 302 the user back to the RP.
+    //
+    // Without this, the user ends up on the Studio dashboard (the post-login
+    // default) and the RP never sees the callback, so the SSO flow stalls.
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.has('client_id') && sp.has('redirect_uri')) {
+        window.location.assign(`/api/v1/auth/oauth2/authorize${window.location.search}`);
+        return;
+      }
+    }
+
     // If the user has organizations but no active one, auto-select the first
     // org before navigating away. Otherwise consumers like the Console's
     // `RequireOrganization` guard would bounce the user from the redirect

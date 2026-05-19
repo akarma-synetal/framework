@@ -54,6 +54,18 @@ function RegisterPage() {
   useEffect(() => {
     if (!user) return;
 
+    // OAuth-provider hand-off: see apps/account/src/routes/login.tsx for the
+    // full rationale. When the user landed on /register from /oauth2/authorize
+    // we must resume the OAuth flow by replaying the signed authorize params
+    // instead of dropping them into the Studio default landing.
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.has('client_id') && sp.has('redirect_uri')) {
+        window.location.assign(`/api/v1/auth/oauth2/authorize${window.location.search}`);
+        return;
+      }
+    }
+
     // If the freshly-signed-up user already has organizations (the auth
     // plugin auto-provisions a personal workspace, or they accepted an
     // invitation), make sure one is active before navigating away. Without
