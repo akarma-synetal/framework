@@ -1759,17 +1759,33 @@ export class HttpDispatcher {
                 const req = body || {};
                 // Resolve `__session__` placeholders from the active session so clients
                 // can omit these fields and let the server infer them.
+                // Use `resolveCallerUserId` which properly converts plain header
+                // objects to `Headers` instances and probes both
+                // `authService.auth.api.getSession` and `authService.api.getSession`
+                // (better-auth's API shape differs across wrappings).
                 if (req.organization_id === '__session__' || req.created_by === '__session__') {
                     try {
-                        const authService: any = await this.getService(CoreServiceName.enum.auth);
-                        const sessionData = await authService?.api?.getSession?.({
-                            headers: _context?.request?.headers,
-                        });
-                        if (req.organization_id === '__session__') {
-                            req.organization_id = sessionData?.session?.activeOrganizationId ?? undefined;
-                        }
+                        const userId = await this.resolveCallerUserId(_context);
                         if (req.created_by === '__session__') {
-                            req.created_by = sessionData?.user?.id ?? 'system';
+                            req.created_by = userId ?? 'system';
+                        }
+                        if (req.organization_id === '__session__') {
+                            // We still need the activeOrganizationId — fetch the
+                            // session directly via the helper-built Headers.
+                            const authService: any = await this.resolveService(CoreServiceName.enum.auth);
+                            const rawHeaders = _context?.request?.headers;
+                            let headers: any = rawHeaders;
+                            if (rawHeaders && typeof rawHeaders === 'object' && typeof (rawHeaders as any).get !== 'function') {
+                                const h = new Headers();
+                                for (const [k, v] of Object.entries(rawHeaders as Record<string, any>)) {
+                                    if (v == null) continue;
+                                    h.set(k, Array.isArray(v) ? v.join(', ') : String(v));
+                                }
+                                headers = h;
+                            }
+                            const apiObj = authService?.auth?.api ?? authService?.api;
+                            const sessionData = await apiObj?.getSession?.call(apiObj, { headers });
+                            req.organization_id = sessionData?.session?.activeOrganizationId ?? undefined;
                         }
                     } catch {
                         // Fall through — validation below will reject missing fields.
@@ -1869,66 +1885,32 @@ export class HttpDispatcher {
                 // pre-seed a `sys_user` row for this person on first boot.
                 // Without this, the owner lands on their own project as a
                 // brand-new SSO JIT user (no admin role, no membership) and
-                // has to manually promote themselves. We stash the cloud
-                // identity here — the project DB does not exist yet — and let
-                // ArtifactKernelFactory replay the seed once the project's
-                // sys_user table is provisioned. Best-effort: failure to
-                // resolve the user must not abort project creation.
-                //
-                // We prefer `req.created_by` (already resolved upstream from
-                // `__session__` or sent explicitly by the cloud frontend) and
-                // look the user row up directly via objectql. The previous
-                // approach — calling `authService.api.getSession({headers})`
-                // a SECOND time — was unreliable because the cloud's project-
-                // create route is often invoked via an internal RPC where the
-                // original browser cookies do not propagate.
+                // has to manually promote themselves. Best-effort: failure
+                // to resolve must not abort project creation.
                 try {
-                    let ownerUserId: string | undefined = req.created_by && req.created_by !== 'system'
-                        ? String(req.created_by)
-                        : undefined;
-                    let ownerEmail: string | undefined;
-                    let ownerName: string | undefined;
-                    let ownerImage: string | undefined;
-
+                    // Prefer the value already resolved by the upstream
+                    // `__session__` block (now backed by `resolveCallerUserId`);
+                    // fall back to `resolveCallerUserId` directly for callers
+                    // that omitted `created_by` entirely.
+                    let ownerUserId: string | undefined =
+                        req.created_by && req.created_by !== 'system'
+                            ? String(req.created_by)
+                            : undefined;
+                    if (!ownerUserId) {
+                        ownerUserId = await this.resolveCallerUserId(_context);
+                    }
                     if (ownerUserId) {
                         const userRow = await ql.find('sys_user', { where: { id: ownerUserId } } as any);
                         const userRows = Array.isArray(userRow) ? userRow : (userRow?.value ?? []);
                         const u = Array.isArray(userRows) && userRows.length > 0 ? userRows[0] : null;
                         if (u?.email) {
-                            ownerEmail = String(u.email);
-                            ownerName = u.name ? String(u.name) : undefined;
-                            ownerImage = u.image ? String(u.image) : undefined;
+                            (baseMetadata as any).ownerSeed = {
+                                userId: String(ownerUserId),
+                                email: String(u.email),
+                                name: u.name ? String(u.name) : null,
+                                image: u.image ? String(u.image) : null,
+                            };
                         }
-                    }
-
-                    // Fall back to the session probe if `created_by` was not
-                    // set (e.g. CLI scripts) — preserves the prior behaviour
-                    // when cookies are available.
-                    if (!ownerEmail) {
-                        try {
-                            const authService: any = await this.getService(CoreServiceName.enum.auth);
-                            const sessionData = await authService?.api?.getSession?.({
-                                headers: _context?.request?.headers,
-                            });
-                            const u = sessionData?.user;
-                            if (u?.id && u?.email) {
-                                ownerUserId = String(u.id);
-                                ownerEmail = String(u.email);
-                                ownerName = u.name ? String(u.name) : undefined;
-                                ownerImage = u.image ? String(u.image) : undefined;
-                            }
-                        } catch {
-                            // session lookup is best-effort
-                        }
-                    }
-
-                    if (ownerUserId && ownerEmail) {
-                        (baseMetadata as any).ownerSeed = {
-                            userId: ownerUserId,
-                            email: ownerEmail,
-                            name: ownerName ?? null,
-                            image: ownerImage ?? null,
-                        };
                     }
                 } catch {
                     // owner lookup failed entirely — skip seed; later access

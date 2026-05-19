@@ -632,6 +632,25 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         // Normalize legacy params → QueryAST standard (where/fields/orderBy/offset/expand)
         // ====================================================================
 
+        // OData-style `$`-prefixed params → bare aliases that the rest of
+        // this function knows how to normalize. Without this step, params
+        // like `?$top=2&$orderby=...` survive into the catch-all
+        // implicit-filter pass below and get merged into `where` as
+        // bogus field-equality predicates (e.g. `where.$top = "2"`),
+        // which silently returns zero rows for every list endpoint.
+        for (const [dollar, bare] of [
+            ['$top', 'top'],
+            ['$skip', 'skip'],
+            ['$orderby', 'orderBy'],
+            ['$select', 'select'],
+            ['$count', 'count'],
+        ] as const) {
+            if (options[dollar] != null && options[bare] == null) {
+                options[bare] = options[dollar];
+            }
+            delete options[dollar];
+        }
+
         // Numeric fields — normalize top → limit, skip → offset
         if (options.top != null) {
             options.limit = Number(options.top);
