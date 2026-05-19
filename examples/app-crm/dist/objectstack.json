@@ -12931,13 +12931,6 @@
               "reportName": "won_opportunities_by_owner"
             },
             {
-              "id": "nav_report_leads_by_source",
-              "label": "Leads by Source",
-              "icon": "user-plus",
-              "type": "report",
-              "reportName": "leads_by_source"
-            },
-            {
               "id": "nav_report_cases_by_status",
               "label": "Cases by Status × Priority",
               "icon": "life-buoy",
@@ -18558,41 +18551,6 @@
       ]
     },
     {
-      "name": "contacts_by_account",
-      "label": "Contacts by Account",
-      "description": "List of contacts grouped by account",
-      "objectName": "contact",
-      "type": "summary",
-      "columns": [
-        {
-          "field": "full_name",
-          "label": "Name"
-        },
-        {
-          "field": "title",
-          "label": "Title"
-        },
-        {
-          "field": "email",
-          "label": "Email"
-        },
-        {
-          "field": "phone",
-          "label": "Phone"
-        },
-        {
-          "field": "is_primary",
-          "label": "Primary Contact"
-        }
-      ],
-      "groupingsDown": [
-        {
-          "field": "account",
-          "sortOrder": "asc"
-        }
-      ]
-    },
-    {
       "name": "customer_churn_signals",
       "label": "Customer Churn Signals",
       "description": "Three-panel early-warning view: at-risk customers, silent high-value accounts, and recently-lost opportunities.",
@@ -18715,48 +18673,6 @@
           "dateGranularity": "month"
         }
       ]
-    },
-    {
-      "name": "leads_by_source",
-      "label": "Leads by Source and Status",
-      "description": "Lead pipeline analysis",
-      "objectName": "lead",
-      "type": "summary",
-      "columns": [
-        {
-          "field": "full_name",
-          "label": "Name"
-        },
-        {
-          "field": "company",
-          "label": "Company"
-        },
-        {
-          "field": "rating",
-          "label": "Rating"
-        }
-      ],
-      "groupingsDown": [
-        {
-          "field": "lead_source",
-          "sortOrder": "asc"
-        },
-        {
-          "field": "status",
-          "sortOrder": "asc"
-        }
-      ],
-      "filter": {
-        "is_converted": false
-      },
-      "chart": {
-        "type": "pie",
-        "title": "Leads by Source",
-        "xAxis": "lead_source",
-        "yAxis": "full_name",
-        "showLegend": true,
-        "showDataLabels": false
-      }
     },
     {
       "name": "opportunities_by_stage",
@@ -18937,45 +18853,6 @@
         "yAxis": "is_sla_violated",
         "showLegend": false,
         "showDataLabels": false
-      }
-    },
-    {
-      "name": "tasks_by_owner",
-      "label": "Tasks by Owner",
-      "description": "Task summary by owner",
-      "objectName": "task",
-      "type": "summary",
-      "columns": [
-        {
-          "field": "subject",
-          "label": "Subject"
-        },
-        {
-          "field": "status",
-          "label": "Status"
-        },
-        {
-          "field": "priority",
-          "label": "Priority"
-        },
-        {
-          "field": "due_date",
-          "label": "Due Date"
-        },
-        {
-          "field": "actual_hours",
-          "label": "Hours",
-          "aggregate": "sum"
-        }
-      ],
-      "groupingsDown": [
-        {
-          "field": "owner",
-          "sortOrder": "asc"
-        }
-      ],
-      "filter": {
-        "is_completed": false
       }
     },
     {
