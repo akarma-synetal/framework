@@ -172,6 +172,32 @@ export const SysProject = ObjectSchema.create({
     },
 
     // ────────────────────────────────────────────────────────────────────
+    // Quick-access actions — primary "how do I open this project?" CTAs
+    // rendered at the top of the record header. Use ${data.hostname} CEL
+    // templating so each project resolves to its own URL.
+    // ────────────────────────────────────────────────────────────────────
+    {
+      name: 'open_project_console',
+      label: 'Open Console',
+      icon: 'external-link',
+      variant: 'primary',
+      type: 'url',
+      locations: ['record_header'],
+      target: 'https://${data.hostname}/_console',
+      description: 'Open this project\'s admin Console in a new tab.',
+    },
+    {
+      name: 'open_project_api',
+      label: 'API Reference',
+      icon: 'code',
+      variant: 'secondary',
+      type: 'url',
+      locations: ['record_header'],
+      target: 'https://${data.hostname}/api/v1',
+      description: 'Open this project\'s REST API root in a new tab.',
+    },
+
+    // ────────────────────────────────────────────────────────────────────
     // Status-machine row actions (replace direct status field edits).
     // ────────────────────────────────────────────────────────────────────
     {
@@ -310,13 +336,20 @@ export const SysProject = ObjectSchema.create({
     }),
 
     // ── Access ────────────────────────────────────────────────────────
+    //
+    // `hostname` is THE access point for this project. After provisioning,
+    // users open the project at `https://{hostname}/_console` (admin UI)
+    // or hit `https://{hostname}/api/v1/...` (REST). The Open Console /
+    // API Reference actions at the top of the page are shortcuts to this
+    // URL, derived from the hostname value below.
     hostname: Field.text({
-      label: 'Hostname',
+      label: 'Public URL (Hostname)',
       required: false,
       maxLength: 255,
       unique: true,
       readonly: true,
-      description: 'Canonical hostname for this project. Change via Change Hostname action.',
+      description:
+        'The canonical hostname where this project is served. Open `https://<hostname>/_console` for the admin UI, or `https://<hostname>/api/v1/...` for the REST API. Use the Change Hostname action to update.',
       group: 'Access',
     }),
 
