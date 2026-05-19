@@ -317,30 +317,77 @@ const ObjectSchemaBase = z.object({
   abstract: z.boolean().optional().default(false).describe('Is abstract base object (cannot be instantiated)'),
 
   /**
-   * Managed-by hint — declares that the object's data lifecycle is owned
-   * by an external subsystem rather than the generic CRUD pipeline.
+   * Managed-by hint — declares which lifecycle bucket the object belongs
+   * to so UI clients render the appropriate set of CRUD affordances and
+   * the security layer can enforce matching defaults. Modelled after the
+   * way Salesforce / ServiceNow / Workday segregate user-owned business
+   * data from admin-authored configuration, system-driven runtime rows,
+   * and append-only audit trails.
    *
-   * - `better-auth`  — Identity tables (sys_user, sys_session, sys_member,
-   *   sys_organization, sys_api_key, …). Mutations must flow through the
-   *   better-auth API (sign-up, password reset, invite-member, …) so that
-   *   password hashing, token signing, email verification, and invitation
-   *   flows fire correctly. Direct CRUD is denied at the server in the
-   *   default permission sets and the dashboard SHOULD hide the standard
-   *   New / Edit / Delete buttons in favour of custom actions that call
-   *   the better-auth endpoints.
-   * - `system`       — Platform-internal book-keeping (audit logs, JWKS,
-   *   device codes). Read-mostly; never edit directly.
-   * - `platform`     — Same as `system` but reserved for future use by
-   *   ObjectStack itself (metadata snapshots, migration ledgers, …).
+   * - `platform`     — **Default.** User-owned business data. Generic
+   *   New / Import / Edit / Delete affordances are all shown. Example:
+   *   the user's own `sys_attachment`, `sys_comment`, `sys_saved_report`.
+   * - `config`       — Admin-authored metadata / configuration. Generic
+   *   New / Edit / Delete shown (admins author via wizard or form), but
+   *   CSV Import is suppressed (config rows have nested JSON envelopes
+   *   that don't round-trip through a flat sheet; clients should offer a
+   *   purpose-built "Import definition (JSON)" action instead). Example:
+   *   `sys_approval_process`, `sys_sharing_rule`, `sys_role`,
+   *   `sys_permission_set`, `sys_view`, `sys_app`.
+   * - `system`       — Runtime rows whose lifecycle is owned by a
+   *   platform service (the approval engine, the sharing engine, the
+   *   invitation service, …). Generic CRUD is hidden — users interact
+   *   with these via *domain actions* invoked from the source record
+   *   (e.g. "Submit for Approval" on an Opportunity creates an
+   *   `sys_approval_request`; "Recall" on the request changes its
+   *   state). Example: `sys_approval_request`, `sys_record_share`,
+   *   `sys_notification`, `sys_invitation`,
+   *   `sys_user_permission_set` / `sys_role_permission_set`.
+   * - `append-only`  — Immutable audit log. No New / Import / Edit /
+   *   Delete; only View and Export. Example: `sys_approval_action`,
+   *   `sys_audit_log`, `sys_activity`, `sys_email`, `sys_presence`.
+   * - `better-auth`  — Identity tables owned by the better-auth driver
+   *   (sys_user, sys_session, sys_account, sys_member, sys_organization,
+   *   sys_api_key, sys_jwks, sys_verification, sys_two_factor,
+   *   sys_oauth_*, sys_device_code). Mutations must flow through the
+   *   better-auth API so password hashing, token signing, email
+   *   verification, and invitation flows fire correctly. Generic CRUD
+   *   suppressed; replaced by purpose-built actions
+   *   (Invite User, Reset Password, Revoke Session, Rotate Key, …).
    *
-   * The flag is purely declarative — the actual deny is enforced through
-   * permission sets in {@link packages/platform-objects/src/security/default-permission-sets.ts}.
-   * UI clients are expected to honour it by suppressing generic CRUD
-   * affordances when set.
+   * The flag is purely declarative on the schema. Enforcement happens in
+   * two places:
+   *   1. Default permission sets ({@link packages/platform-objects/src/security/default-permission-sets.ts})
+   *      deny direct CRUD for `system` / `append-only` / `better-auth`.
+   *   2. UI clients honour {@link resolveCrudAffordances} to gate the
+   *      New / Import / Edit / Delete / Export buttons accordingly.
+   *
+   * Use {@link userActions} to override the default matrix for a single
+   * field (e.g. an "append-only" table that should still allow Export).
    */
-  managedBy: z.enum(['better-auth', 'system', 'platform']).optional().describe(
-    'Hint that this object is managed by an external subsystem; clients should hide generic CRUD UI and route mutations through the corresponding API.',
+  managedBy: z.enum(['platform', 'config', 'system', 'append-only', 'better-auth']).optional().describe(
+    'Lifecycle bucket — platform (user CRUD) | config (admin authored) | system (engine-managed) | append-only (audit) | better-auth (identity). UI clients honour the resolved affordance matrix.',
   ),
+
+  /**
+   * Per-object override of the generic CRUD affordances that the UI
+   * surfaces. Each flag overrides the default derived from
+   * {@link managedBy} via {@link resolveCrudAffordances}. Useful for the
+   * handful of objects whose lifecycle doesn't cleanly fit a single
+   * bucket — e.g. an `append-only` table that should still expose CSV
+   * Export, or a `config` table that admins legitimately want to bulk
+   * import via CSV.
+   *
+   * Omitting the block (or leaving individual flags `undefined`) keeps
+   * the {@link managedBy}-derived default.
+   */
+  userActions: z.object({
+    create: z.boolean().optional().describe('Show generic "New" button.'),
+    import: z.boolean().optional().describe('Show CSV import wizard entry.'),
+    edit: z.boolean().optional().describe('Allow inline / form edit of existing rows.'),
+    delete: z.boolean().optional().describe('Show row-level delete + bulk delete.'),
+    exportCsv: z.boolean().optional().describe('Show CSV export entry.'),
+  }).optional().describe('Per-object override of the resolved CRUD affordance matrix.'),
 
   /**
    * System-field auto-injection control.
@@ -538,6 +585,85 @@ export type SoftDeleteConfig = z.infer<typeof SoftDeleteConfigSchema>;
 export type VersioningConfig = z.infer<typeof VersioningConfigSchema>;
 export type PartitioningConfig = z.infer<typeof PartitioningConfigSchema>;
 export type CDCConfig = z.infer<typeof CDCConfigSchema>;
+
+/**
+ * Resolved CRUD affordance matrix for an object — what generic
+ * lifecycle actions UI clients should expose in their toolbars.
+ *
+ * Use {@link resolveCrudAffordances} to compute this from a schema; the
+ * `managedBy` flag drives the defaults, and the optional `userActions`
+ * block per-flag-overrides them. UI clients (`ObjectView`,
+ * `RecordDetailView`, `RecordFormPage`, …) gate their buttons on this
+ * matrix in combination with the user's permissions.
+ *
+ * The presence of an affordance here means "the *object* permits this
+ * action conceptually"; the user still needs the matching permission
+ * grant to execute it.
+ */
+export interface CrudAffordances {
+  /** Generic "New" button (single record creation form). */
+  create: boolean;
+  /** CSV bulk-import wizard. Disabled for config / system / append-only / better-auth by default. */
+  import: boolean;
+  /** Inline + form editing of existing rows. */
+  edit: boolean;
+  /** Row-level + bulk delete. */
+  delete: boolean;
+  /** CSV / clipboard export. Allowed even on append-only audit tables by default. */
+  exportCsv: boolean;
+}
+
+/**
+ * Default affordance matrix per {@link ObjectSchemaBase.managedBy} bucket.
+ * Mirrors how Salesforce / ServiceNow / Workday / Notion expose CRUD on
+ * different categories of system tables.
+ *
+ *   platform     — full CRUD (user-owned business data)
+ *   config       — admin authored: New/Edit/Delete OK, no CSV import
+ *                  (definitions have nested envelopes; admins should use
+ *                  a purpose-built "Import definition" action instead)
+ *   system       — engine-managed runtime rows: no generic CRUD; users
+ *                  interact via domain actions on the source record
+ *   append-only  — audit log: View + Export only
+ *   better-auth  — identity tables owned by better-auth driver; CRUD
+ *                  routed through purpose-built actions (Invite, Reset
+ *                  PW, Revoke, …)
+ */
+const CRUD_AFFORDANCE_DEFAULTS: Record<NonNullable<ServiceObject['managedBy']> | 'platform', CrudAffordances> = {
+  platform:      { create: true,  import: true,  edit: true,  delete: true,  exportCsv: true },
+  config:        { create: true,  import: false, edit: true,  delete: true,  exportCsv: true },
+  system:        { create: false, import: false, edit: false, delete: false, exportCsv: true },
+  'append-only': { create: false, import: false, edit: false, delete: false, exportCsv: true },
+  'better-auth': { create: false, import: false, edit: false, delete: false, exportCsv: true },
+};
+
+/**
+ * Resolve the effective CRUD affordance matrix for an object schema.
+ *
+ * Starts from the bucket default keyed off `managedBy` (defaulting to
+ * `'platform'` if unset) and applies the per-flag overrides in
+ * `userActions`. Returns a fresh object so callers can mutate safely.
+ *
+ * @example
+ * ```ts
+ * const aff = resolveCrudAffordances(sysApprovalRequestSchema);
+ * // → { create:false, import:false, edit:false, delete:false, exportCsv:true }
+ * ```
+ */
+export function resolveCrudAffordances(
+  obj: Pick<ServiceObject, 'managedBy' | 'userActions'> | { managedBy?: string; userActions?: ServiceObject['userActions'] },
+): CrudAffordances {
+  const bucket = (obj?.managedBy ?? 'platform') as keyof typeof CRUD_AFFORDANCE_DEFAULTS;
+  const base = CRUD_AFFORDANCE_DEFAULTS[bucket] ?? CRUD_AFFORDANCE_DEFAULTS.platform;
+  const overrides = obj?.userActions ?? {};
+  return {
+    create:    overrides.create    ?? base.create,
+    import:    overrides.import    ?? base.import,
+    edit:      overrides.edit      ?? base.edit,
+    delete:    overrides.delete    ?? base.delete,
+    exportCsv: overrides.exportCsv ?? base.exportCsv,
+  };
+}
 
 // =================================================================
 // Object Ownership Model
