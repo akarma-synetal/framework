@@ -161,6 +161,26 @@ export class EmailServicePlugin implements Plugin {
       this.service.setTemplateLoader(templateLoader);
       ctx.logger.info('EmailServicePlugin: sys_email persistence + template loader enabled');
 
+      // Bind 'email.send.async' queue subscriber for durable, retry-on-failure delivery.
+      // Producers: `queue.publish('email.send.async', sendInput, { maxAttempts: 5, backoff: {...} })`
+      // The queue handles retry / DLQ via sys_job_queue.
+      try {
+        const queue: any = ctx.getService<any>('queue');
+        if (queue && typeof queue.subscribe === 'function' && this.service) {
+          const svc = this.service;
+          await queue.subscribe('email.send.async', async (msg: any) => {
+            const result = await svc.send(msg.data);
+            if (result.status === 'failed') {
+              // Force the queue to retry / DLQ by throwing
+              throw new Error(result.error ?? 'email send failed');
+            }
+          });
+          ctx.logger.info('EmailServicePlugin: subscribed to email.send.async queue');
+        }
+      } catch (err) {
+        ctx.logger.warn('EmailServicePlugin: email.send.async subscription failed', err as any);
+      }
+
       // Seed built-in + user-provided templates (upsert by name+locale).
       if (this.options.seedTemplates !== false) {
         const all = [
@@ -170,7 +190,7 @@ export class EmailServicePlugin implements Plugin {
         for (const tpl of all) {
           try { await this.upsertTemplate(engine!, tpl); }
           catch (err: any) {
-            console.warn('[EmailServicePlugin] seed template failed:', tpl.name, tpl.locale, err?.message || err);
+            ctx.logger.warn(`EmailServicePlugin: seed template failed: ${tpl.name} ${tpl.locale}`, err?.message || err);
           }
         }
         ctx.logger.info(`EmailServicePlugin: seeded ${all.length} template row(s)`);

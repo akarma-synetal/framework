@@ -231,7 +231,7 @@ export class DbQueueAdapter implements IQueueService {
       if (this.running) return;
       this.running = true;
       this.pollOnce()
-        .catch((err) => this.logger?.warn?.('DbQueueAdapter: poll tick failed', err))
+        .catch((err) => { this.logger?.warn?.('DbQueueAdapter: poll tick failed', err); })
         .finally(() => { this.running = false; });
     }, this.opts.pollIntervalMs);
     (this.timer as any)?.unref?.();

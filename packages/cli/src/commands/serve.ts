@@ -301,6 +301,17 @@ export default class Serve extends Command {
       if (requires.includes('auth') && !requires.includes('email')) {
         requires.push('email');
       }
+      // The email + approvals + reports services schedule background work
+      // (durable retries, SLA escalation, scheduled digests). Auto-pull
+      // 'job' and 'queue' so plugins can opt into durable scheduling.
+      // IMPORTANT: prepend, so their plugins load (and their kernel:ready
+      // hooks fire) BEFORE consumers like email/approvals that subscribe
+      // to queues during their own kernel:ready phase.
+      const NEEDS_JOB_OR_QUEUE = ['email', 'approvals', 'reports', 'auth'];
+      if (NEEDS_JOB_OR_QUEUE.some((c) => requires.includes(c))) {
+        if (!requires.includes('queue')) requires.unshift('queue');
+        if (!requires.includes('job')) requires.unshift('job');
+      }
       // Capability → tier: any capability that is gated by a tier
       // here automatically opens that tier when listed in `requires`.
       // Capabilities NOT in this map (e.g. `automation`, `analytics`,
