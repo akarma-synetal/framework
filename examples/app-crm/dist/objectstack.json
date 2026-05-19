@@ -12950,6 +12950,13 @@
               "icon": "timer",
               "type": "report",
               "reportName": "sla_performance"
+            },
+            {
+              "id": "nav_report_churn",
+              "label": "Customer Churn Signals",
+              "icon": "alert-triangle",
+              "type": "report",
+              "reportName": "customer_churn_signals"
             }
           ]
         },
@@ -17909,7 +17916,33 @@
             "showColumnTotals": true,
             "format": "0,0",
             "drillDown": {
-              "enabled": true
+              "enabled": true,
+              "report": {
+                "name": "pipeline_coverage_by_quarter",
+                "objectName": "opportunity",
+                "type": "matrix",
+                "label": "Pipeline Coverage by Forecast × Quarter",
+                "columns": [
+                  {
+                    "field": "amount",
+                    "label": "Pipeline",
+                    "aggregate": "sum"
+                  }
+                ],
+                "groupingsDown": [
+                  {
+                    "field": "forecast_category",
+                    "sortOrder": "asc"
+                  }
+                ],
+                "groupingsAcross": [
+                  {
+                    "field": "close_date",
+                    "sortOrder": "asc",
+                    "dateGranularity": "quarter"
+                  }
+                ]
+              }
             }
           }
         }
@@ -18556,6 +18589,103 @@
         {
           "field": "account",
           "sortOrder": "asc"
+        }
+      ]
+    },
+    {
+      "name": "customer_churn_signals",
+      "label": "Customer Churn Signals",
+      "description": "Three-panel early-warning view: at-risk customers, silent high-value accounts, and recently-lost opportunities.",
+      "objectName": "account",
+      "type": "joined",
+      "columns": [],
+      "blocks": [
+        {
+          "name": "at_risk_accounts",
+          "label": "At-Risk Accounts",
+          "description": "Active accounts with no activity in 14+ days, grouped by industry.",
+          "type": "summary",
+          "objectName": "account",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Account"
+            },
+            {
+              "field": "id",
+              "label": "Accounts",
+              "aggregate": "count"
+            }
+          ],
+          "groupingsDown": [
+            {
+              "field": "industry",
+              "sortOrder": "asc"
+            }
+          ],
+          "filter": {
+            "is_active": true,
+            "last_activity_date": {
+              "$lt": "2026-05-05"
+            }
+          }
+        },
+        {
+          "name": "silent_high_value",
+          "label": "Silent High-Value Accounts",
+          "description": "Active accounts gone quiet for 30+ days, grouped by type.",
+          "type": "summary",
+          "objectName": "account",
+          "columns": [
+            {
+              "field": "id",
+              "label": "Accounts",
+              "aggregate": "count"
+            }
+          ],
+          "groupingsDown": [
+            {
+              "field": "type",
+              "sortOrder": "asc"
+            }
+          ],
+          "filter": {
+            "is_active": true,
+            "last_activity_date": {
+              "$lt": "2026-04-19"
+            }
+          }
+        },
+        {
+          "name": "recently_closed_lost",
+          "label": "Recently Lost Opportunities",
+          "description": "Opportunities closed-lost in the last 30 days — investigate before the customer fully churns.",
+          "type": "summary",
+          "objectName": "opportunity",
+          "columns": [
+            {
+              "field": "amount",
+              "label": "Lost Revenue",
+              "aggregate": "sum"
+            },
+            {
+              "field": "id",
+              "label": "Deals",
+              "aggregate": "count"
+            }
+          ],
+          "groupingsDown": [
+            {
+              "field": "owner",
+              "sortOrder": "asc"
+            }
+          ],
+          "filter": {
+            "stage": "closed_lost",
+            "close_date": {
+              "$gte": "2026-04-19"
+            }
+          }
         }
       ]
     },
@@ -24607,6 +24737,7 @@
     "auth",
     "ui",
     "storage",
-    "approvals"
+    "approvals",
+    "sharing"
   ]
 }

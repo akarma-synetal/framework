@@ -18,3 +18,4 @@ export {
   OpportunityFunnelByOwnerStageReport,
 } from './opportunity.report';
 export { TasksByOwnerReport } from './task.report';
+export { CustomerChurnSignalsReport } from './churn.report';

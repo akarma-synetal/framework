@@ -99,6 +99,8 @@ export const CrmApp = App.create({
         { id: 'nav_report_leads_by_source',   type: 'report', reportName: 'leads_by_source',              label: 'Leads by Source',             icon: 'user-plus' },
         { id: 'nav_report_cases_by_status',   type: 'report', reportName: 'cases_by_status_priority',     label: 'Cases by Status × Priority',  icon: 'life-buoy' },
         { id: 'nav_report_sla',               type: 'report', reportName: 'sla_performance',              label: 'SLA Performance',             icon: 'timer' },
+        // Joined report — multi-block analytic surface (M3).
+        { id: 'nav_report_churn',             type: 'report', reportName: 'customer_churn_signals',       label: 'Customer Churn Signals',      icon: 'alert-triangle' },
       ],
     },
     {

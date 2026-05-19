@@ -50,6 +50,49 @@ export const ReportChartSchema = lazySchema(() => ChartConfigSchema.extend({
 }));
 
 /**
+ * Joined Report Block Schema
+ *
+ * Represents a single sub-report inside a `type: 'joined'` report. Each block
+ * is a self-contained, independently-queried report stacked vertically (or
+ * arranged in a grid) inside the joined container. Blocks are used for
+ * comparative dashboards where each panel is a different slice of the same
+ * domain — e.g. "new customers / churned / silent" in a customer-churn
+ * report, or "new / qualified / closed" in a lead-funnel report.
+ *
+ * Blocks may declare their own filter (combined with the container filter
+ * via `$and` at render time) and their own grouping / aggregation.
+ *
+ * Notes for implementers:
+ * - `type` defaults to `tabular` — leave a block's type implicit if the
+ *   sub-report is just a list. Set explicitly to `summary` or `matrix` for
+ *   aggregated blocks.
+ * - The schema is intentionally permissive about the column shape: blocks
+ *   are not allowed to be themselves `joined` (no recursion).
+ */
+export const JoinedReportBlockSchema: z.ZodTypeAny = lazySchema(() => z.object({
+  /** Stable id for the block (used as react key, telemetry, deeplinks). */
+  name: SnakeCaseIdentifierSchema,
+  /** Human label shown above the block. Falls back to `name`. */
+  label: I18nLabelSchema.optional(),
+  /** Optional description rendered below the label. */
+  description: I18nLabelSchema.optional(),
+  /** Block report type — `joined` is intentionally excluded (no recursion). */
+  type: z.enum(['tabular', 'summary', 'matrix']).default('tabular'),
+  /** Object queried by this block. Defaults to the container's objectName. */
+  objectName: z.string().optional(),
+  /** Columns to display / aggregate. Same shape as `Report.columns`. */
+  columns: z.array(ReportColumnSchema),
+  /** Row groupings (same shape as `Report.groupingsDown`). */
+  groupingsDown: z.array(ReportGroupingSchema).optional(),
+  /** Column groupings — only meaningful when `type: matrix`. */
+  groupingsAcross: z.array(ReportGroupingSchema).optional(),
+  /** Block-specific filter, ANDed with the container filter at render time. */
+  filter: FilterConditionSchema.optional(),
+  /** Optional inline chart configuration. */
+  chart: ReportChartSchema.optional(),
+}));
+
+/**
  * Report Schema
  * Deep data analysis definition.
  */
@@ -82,7 +125,23 @@ export const ReportSchema = lazySchema(() => z.object({
 
   /** Performance optimization settings */
   performance: PerformanceConfigSchema.optional().describe('Performance optimization settings'),
+
+  /**
+   * Joined report blocks — only meaningful when `type: 'joined'`.
+   *
+   * A joined report renders multiple independent sub-reports stacked
+   * vertically in the same view. Each block declares its own object,
+   * columns, groupings and filter. The container-level `filter` is ANDed
+   * into every block at query time so a top-level scope (e.g. "this
+   * quarter") flows down without per-block duplication.
+   *
+   * Renderers must ignore `blocks` when `type !== 'joined'`.
+   */
+  blocks: z.array(JoinedReportBlockSchema).optional().describe('Sub-reports for type=joined'),
 }));
+
+export type JoinedReportBlock = z.infer<typeof JoinedReportBlockSchema>;
+export type JoinedReportBlockInput = z.input<typeof JoinedReportBlockSchema>;
 
 /**
  * Report Types

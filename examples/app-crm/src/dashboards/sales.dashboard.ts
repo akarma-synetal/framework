@@ -275,7 +275,23 @@ export const SalesDashboard: Dashboard = {
         showRowTotals: true,
         showColumnTotals: true,
         format: '0,0',
-        drillDown: { enabled: true },
+        drillDown: {
+          enabled: true,
+          // M3 dashboard→report drill: clicking a pivot cell opens the
+          // PipelineCoverageByQuarter matrix report scoped to that stage +
+          // lead-source slice, so the sales manager can break the cell apart
+          // by forecast category × close quarter before drilling further
+          // into the underlying opportunity records.
+          report: {
+            name: 'pipeline_coverage_by_quarter',
+            objectName: 'opportunity',
+            type: 'matrix',
+            label: 'Pipeline Coverage by Forecast × Quarter',
+            columns: [{ field: 'amount', label: 'Pipeline', aggregate: 'sum' }],
+            groupingsDown: [{ field: 'forecast_category', sortOrder: 'asc' }],
+            groupingsAcross: [{ field: 'close_date', sortOrder: 'asc', dateGranularity: 'quarter' }],
+          },
+        },
       },
     },
   ],
