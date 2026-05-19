@@ -42,6 +42,43 @@ export const SysTwoFactor = ObjectSchema.create({
       pagination: { pageSize: 50 },
     },
   },
+
+  // Toolbar actions for self-service 2FA enrollment. The actual TOTP secret
+  // and backup codes returned by better-auth must be shown in the response
+  // toast / dialog — the action runner surfaces successMessage; the raw
+  // payload is logged client-side for now (TODO: dedicated 2FA setup wizard).
+  actions: [
+    {
+      name: 'enable_two_factor',
+      label: 'Enable 2FA',
+      icon: 'shield-check',
+      variant: 'primary',
+      locations: ['list_toolbar'],
+      type: 'api',
+      target: '/api/v1/auth/two-factor/enable',
+      successMessage: '2FA enrollment started — check response for TOTP URI and backup codes',
+      refreshAfter: true,
+      params: [
+        { name: 'password', label: 'Current Password', type: 'text', required: true },
+      ],
+    },
+    {
+      name: 'disable_two_factor',
+      label: 'Disable 2FA',
+      icon: 'shield-off',
+      variant: 'danger',
+      locations: ['list_toolbar'],
+      type: 'api',
+      target: '/api/v1/auth/two-factor/disable',
+      confirmText: 'Disable two-factor authentication on your account?',
+      successMessage: '2FA disabled',
+      refreshAfter: true,
+      params: [
+        { name: 'password', label: 'Current Password', type: 'text', required: true },
+      ],
+    },
+  ],
+
   
   fields: {
     id: Field.text({
