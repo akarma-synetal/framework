@@ -16,7 +16,7 @@ import { resolve as resolvePath } from 'node:path';
 import type * as Contracts from '@objectstack/spec/contracts';
 import type { ProjectTemplate } from './multi-project-plugin.js';
 import { createControlPlanePlugins } from './control-plane-preset.js';
-import { createStudioRuntimeConfigPlugin, createTemplatesRoutePlugin } from './multi-project-plugins.js';
+import { createTemplatesRoutePlugin } from './multi-project-plugins.js';
 import { createCloudArtifactApiPlugin } from './cloud-artifact-api-plugin.js';
 import { resolveDefaultDataDir } from './data-dir.js';
 import { resolveStoragePluginFromEnv, resolveStorageFromEnv } from './storage-env.js';
@@ -161,7 +161,6 @@ export async function createCloudStack(config: CloudStackConfig): Promise<{
             baseUrl,
         }),
         ...(storageEnv.plugin ? [storageEnv.plugin] : []),
-        createStudioRuntimeConfigPlugin({ apiPrefix }),
         createTemplatesRoutePlugin(templateList, { apiPrefix }),
         createCloudArtifactApiPlugin({ controlDriverPromise, apiPrefix }),
     ];

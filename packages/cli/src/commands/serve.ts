@@ -1106,18 +1106,26 @@ export default class Serve extends Command {
         const consolePath = consoleEnabled ? resolveConsolePath() : null;
         const consoleWillMount = !!(consolePath && hasConsoleDist(consolePath));
 
-        const studioPath = resolveStudioPath();
-        if (!studioPath) {
-          console.warn(chalk.yellow(`  ⚠ @objectstack/studio not found — skipping UI`));
-        } else if (hasStudioDist(studioPath)) {
-          const distPath = path.join(studioPath, 'dist');
-          await kernel.use(createStudioStaticPlugin(distPath, {
-            isDev,
-            rootRedirect: !consoleWillMount,
-          }));
-          trackPlugin('StudioUI');
-        } else {
-          console.warn(chalk.yellow(`  ⚠ Studio dist not found — run "pnpm --filter @objectstack/studio build" first`));
+        // The `OS_DISABLE_STUDIO=1` env var lets a host (e.g. apps/cloud,
+        // which is a pure control plane) opt out of the Studio designer
+        // entirely while keeping Account/Console. Studio is meaningless
+        // when there are no per-project kernels in the same process.
+        const studioEnabled = process.env.OS_DISABLE_STUDIO !== '1';
+
+        if (studioEnabled) {
+          const studioPath = resolveStudioPath();
+          if (!studioPath) {
+            console.warn(chalk.yellow(`  ⚠ @objectstack/studio not found — skipping UI`));
+          } else if (hasStudioDist(studioPath)) {
+            const distPath = path.join(studioPath, 'dist');
+            await kernel.use(createStudioStaticPlugin(distPath, {
+              isDev,
+              rootRedirect: !consoleWillMount,
+            }));
+            trackPlugin('StudioUI');
+          } else {
+            console.warn(chalk.yellow(`  ⚠ Studio dist not found — run "pnpm --filter @objectstack/studio build" first`));
+          }
         }
 
         // ── Account portal ─────────────────────────────────────────

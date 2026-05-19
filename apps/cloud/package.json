@@ -5,9 +5,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "PORT=${PORT:-4000} objectstack dev",
+    "dev": "OS_DISABLE_STUDIO=1 PORT=${PORT:-4000} objectstack dev",
     "build": "tsup",
-    "start": "PORT=${PORT:-4000} objectstack serve dist/objectstack.config.js --prebuilt",
+    "start": "OS_DISABLE_STUDIO=1 PORT=${PORT:-4000} objectstack serve dist/objectstack.config.js --prebuilt",
     "doctor": "objectstack doctor",
     "typecheck": "tsc --noEmit",
     "test": "objectstack test",
@@ -46,7 +46,6 @@
     "@objectstack/service-package": "workspace:*",
     "@objectstack/service-tenant": "workspace:*",
     "@objectstack/spec": "workspace:*",
-    "@objectstack/studio": "workspace:*",
     "hono": "^4.12.19",
     "pg": "^8.21.0"
   },

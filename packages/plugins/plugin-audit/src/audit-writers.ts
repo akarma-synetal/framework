@@ -155,12 +155,13 @@ export function installAuditWriters(engine: any, packageId = 'com.objectstack.au
    * audit failures.
    */
   const writeAudit = async (ctx: HookContext) => {
+    process.stderr.write(`[AuditWriter] hook event=${ctx.event} object=${ctx.object} hasApi=${!!(ctx as any).api} hasSudo=${!!(ctx as any).api?.sudo}\n`);
     if (SKIP_OBJECTS.has(ctx.object)) return;
     const action = actionFor(ctx.event);
     if (!action) return;
 
     const api: any = (ctx as any).api;
-    if (!api?.sudo) return;
+    if (!api?.sudo) { process.stderr.write(`[AuditWriter] BAIL no api.sudo for ${ctx.object}\n`); return; }
 
     const after: any = ctx.result;
     const before: any = (ctx as any).__previous ?? (ctx as any).previous ?? null;
@@ -235,6 +236,7 @@ export function installAuditWriters(engine: any, packageId = 'com.objectstack.au
     try {
       const sys = api.sudo();
       await sys.object('sys_audit_log').create(auditRow);
+      process.stderr.write(`[AuditWriter] WROTE audit_log object=${ctx.object} action=${action}\n`);
       await sys.object('sys_activity').create(activityRow);
       // M10.8: write per-user inbox notifications. Best-effort; never
       // throws into the user-facing CRUD path. Covers two common cases:
@@ -257,6 +259,7 @@ export function installAuditWriters(engine: any, packageId = 'com.objectstack.au
         tenantId: tenantId ?? null,
       });
     } catch (err) {
+      process.stderr.write(`[AuditWriter] WRITE FAILED: ${String((err as any)?.message ?? err)}\n`);
       // Log via engine logger if available, but never throw.
       try { (engine as any).logger?.warn?.('Audit write failed', { object: ctx.object, action, err: String((err as any)?.message ?? err) }); } catch {}
     }
