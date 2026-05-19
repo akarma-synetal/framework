@@ -18907,6 +18907,7 @@
       "columns": [
         {
           "field": "case_number",
+          "label": "Cases",
           "aggregate": "count"
         },
         {

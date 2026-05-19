@@ -29,7 +29,7 @@ export const SlaPerformanceReport: ReportInput = {
   objectName: 'case',
   type: 'summary',
   columns: [
-    { field: 'case_number', aggregate: 'count' },
+    { field: 'case_number', label: 'Cases', aggregate: 'count' },
     { field: 'is_sla_violated', label: 'SLA Violated', aggregate: 'count' },
     { field: 'resolution_time_hours', label: 'Avg Resolution Time', aggregate: 'avg' },
   ],
