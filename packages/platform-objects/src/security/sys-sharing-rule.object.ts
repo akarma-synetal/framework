@@ -37,6 +37,48 @@ export const SysSharingRule = ObjectSchema.create({
   titleFormat: '{label}',
   compactLayout: ['name', 'object_name', 'recipient_type', 'recipient_id', 'access_level', 'active'],
 
+  listViews: {
+    active: {
+      type: 'grid',
+      name: 'active',
+      label: 'Active',
+      data: { provider: 'object', object: 'sys_sharing_rule' },
+      columns: ['label', 'object_name', 'recipient_type', 'recipient_id', 'access_level', 'updated_at'],
+      filter: [{ field: 'active', operator: 'equals', value: true }],
+      sort: [{ field: 'object_name', order: 'asc' }, { field: 'label', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+    inactive: {
+      type: 'grid',
+      name: 'inactive',
+      label: 'Inactive',
+      data: { provider: 'object', object: 'sys_sharing_rule' },
+      columns: ['label', 'object_name', 'recipient_type', 'recipient_id', 'updated_at'],
+      filter: [{ field: 'active', operator: 'equals', value: false }],
+      sort: [{ field: 'label', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+    by_object: {
+      type: 'grid',
+      name: 'by_object',
+      label: 'By Object',
+      data: { provider: 'object', object: 'sys_sharing_rule' },
+      columns: ['object_name', 'label', 'recipient_type', 'access_level', 'active'],
+      sort: [{ field: 'object_name', order: 'asc' }, { field: 'label', order: 'asc' }],
+      grouping: { fields: [{ field: 'object_name', order: 'asc', collapsed: false }] },
+      pagination: { pageSize: 100 },
+    },
+    all_rules: {
+      type: 'grid',
+      name: 'all_rules',
+      label: 'All',
+      data: { provider: 'object', object: 'sys_sharing_rule' },
+      columns: ['label', 'object_name', 'recipient_type', 'recipient_id', 'access_level', 'active', 'updated_at'],
+      sort: [{ field: 'label', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+  },
+
   fields: {
     id: Field.text({ label: 'Rule ID', required: true, readonly: true, group: 'System' }),
 

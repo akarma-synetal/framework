@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — M10.30b Setup app audit + listViews batch 🎯
+Followup to M10.30a. Walked every Setup menu in a real tenant; produced verdict matrix; shipped the safe fixes plus structural cleanup.
+
+- **`packages/platform-objects/src/apps/setup.app.ts`** — sidebar trimmed from 7 groups / 41 menus → 6 groups / 26 menus with no loss of capability:
+  - Removed 5 M:N join-table menus (Department Members, Team Members, Org Members, User Permission Sets, Role Permission Sets) — these are tabs on parent records, not entry points.
+  - Removed 3 marketplace-only menus (Apps, Packages, Installations) which only render when `@objectstack/service-tenant` is loaded; in single-project runtimes they 404'd.
+  - Removed 3 OAuth satellite menus (Access Tokens, Refresh Tokens, Consents); they live under their parent OAuth Application detail.
+  - Removed Activity + Comments from Diagnostics; both are CRM operational data, not platform admin surfaces.
+  - Demoted "All Metadata" from a top-level Platform group to Advanced/debug. Platform group is now empty and removed.
+  - Renamed "Linked Accounts" → "Identity Links" to disambiguate from sys_user / org members.
+- **listViews extension** — mirroring the M10.30a pattern, the following sys_* schemas now ship curated, segmented views:
+  - `sys_user`: All Users / Unverified / 2FA Enabled
+  - `sys_role`: Active / Default / Custom / All
+  - `sys_permission_set`: Active / Inactive / All
+  - `sys_invitation`: Pending / Accepted / Expired-Canceled / All
+  - `sys_session`: My Sessions / All
+  - `sys_sharing_rule`: Active / Inactive / By Object / All
+  - `sys_department`: Active / Inactive / By Kind / All
+  - `sys_team`: By Organization / All
+  - `sys_organization`: All (curated columns)
+- **Classification fixes** (correctness):
+  - `sys_metadata` — `managedBy: 'config'` → `'system'`. The metadata table backs every typed config object; writing raw rows here bypasses Zod validation. The list page now correctly hides the New button (Export-only).
+  - `sys_user_preference` — `managedBy: 'platform'` → `'system'`. Per-user state authored from the user's own settings page; the admin list is a support/diagnostic surface only. New + Import buttons are now correctly hidden.
+
 ### Added — M10.30 Built-in list views for system objects 🎯
 - **`packages/spec/src/data/object.zod.ts`** — added optional `listViews?: Record<string, ListViewSchema>` to `ObjectSchemaBase`. Already consumed by the console's `ObjectView`; previously dead because no schema declared it (Zod was stripping unknown keys). Authors can now bundle curated, segmented list views directly with the object definition.
 - **`packages/platform-objects/src/audit/sys-approval-request.object.ts`** — ships 4 views: `my_pending` (`status=pending AND pending_approvers contains {current_user_id}`, sort `updated_at desc`), `submitted_by_me` (`submitter_id={current_user_id}`), `completed` (`status in approved/rejected/recalled`, sort `completed_at desc`), `all_requests`.

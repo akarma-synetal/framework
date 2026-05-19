@@ -119,7 +119,7 @@
   "devDependencies": {
     "@types/node": "^25.9.0",
     "@vitest/coverage-v8": "^4.1.6",
-    "ai": "^6.0.184",
+    "ai": "^6.0.185",
     "tsx": "^4.22.2",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
