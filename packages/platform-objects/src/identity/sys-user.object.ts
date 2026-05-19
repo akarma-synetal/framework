@@ -25,6 +25,38 @@ export const SysUser = ObjectSchema.create({
   titleFormat: '{name}',
   compactLayout: ['name', 'email', 'email_verified'],
 
+  listViews: {
+    all_users: {
+      type: 'grid',
+      name: 'all_users',
+      label: 'All Users',
+      data: { provider: 'object', object: 'sys_user' },
+      columns: ['name', 'email', 'email_verified', 'two_factor_enabled', 'created_at'],
+      sort: [{ field: 'name', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+    unverified: {
+      type: 'grid',
+      name: 'unverified',
+      label: 'Unverified',
+      data: { provider: 'object', object: 'sys_user' },
+      columns: ['name', 'email', 'created_at'],
+      filter: [{ field: 'email_verified', operator: 'equals', value: false }],
+      sort: [{ field: 'created_at', order: 'desc' }],
+      pagination: { pageSize: 50 },
+    },
+    two_factor: {
+      type: 'grid',
+      name: 'two_factor',
+      label: '2FA Enabled',
+      data: { provider: 'object', object: 'sys_user' },
+      columns: ['name', 'email', 'two_factor_enabled', 'updated_at'],
+      filter: [{ field: 'two_factor_enabled', operator: 'equals', value: true }],
+      sort: [{ field: 'name', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+  },
+
   fields: {
     // ── Identity (primary business fields) ───────────────────────
     name: Field.text({

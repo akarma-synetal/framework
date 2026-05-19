@@ -22,7 +22,10 @@ export const SysUserPreference = ObjectSchema.create({
   pluralLabel: 'User Preferences',
   icon: 'settings',
   isSystem: true,
-  managedBy: 'platform',
+  // managedBy: 'system' — preferences are per-user state authored from
+  // the user's own settings page, never created by an admin. The list
+  // surface in Setup is a support/diagnostic view only.
+  managedBy: 'system',
   description: 'Per-user key-value preferences (theme, locale, etc.)',
   titleFormat: '{key}',
   compactLayout: ['user_id', 'key'],

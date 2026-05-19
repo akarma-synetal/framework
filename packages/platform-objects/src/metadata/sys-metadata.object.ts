@@ -20,7 +20,13 @@ export const SysMetadataObject = ObjectSchema.create({
   pluralLabel: 'System Metadata',
   icon: 'settings',
   isSystem: true,
-  managedBy: 'config',
+  // managedBy: 'system' — the metadata table backs every other config
+  // object. Writing rows directly here bypasses the typed Zod APIs and
+  // would let an admin inject malformed payloads. The "All Metadata"
+  // menu is therefore a read-only debug surface (Export only); typed
+  // edits flow through the dedicated per-type pages (Approval Process,
+  // Sharing Rule, etc.).
+  managedBy: 'system',
   description: 'Stores platform and user-scope metadata records (objects, views, flows, etc.)',
 
   fields: {

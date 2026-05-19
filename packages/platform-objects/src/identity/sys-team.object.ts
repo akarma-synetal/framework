@@ -22,6 +22,28 @@ export const SysTeam = ObjectSchema.create({
   titleFormat: '{name}',
   compactLayout: ['name', 'organization_id'],
 
+  listViews: {
+    by_org: {
+      type: 'grid',
+      name: 'by_org',
+      label: 'By Organization',
+      data: { provider: 'object', object: 'sys_team' },
+      columns: ['organization_id', 'name', 'created_at', 'updated_at'],
+      sort: [{ field: 'organization_id', order: 'asc' }, { field: 'name', order: 'asc' }],
+      grouping: { fields: [{ field: 'organization_id', order: 'asc', collapsed: false }] },
+      pagination: { pageSize: 100 },
+    },
+    all_teams: {
+      type: 'grid',
+      name: 'all_teams',
+      label: 'All',
+      data: { provider: 'object', object: 'sys_team' },
+      columns: ['name', 'organization_id', 'created_at', 'updated_at'],
+      sort: [{ field: 'name', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+  },
+
   fields: {
     // ── Identity ─────────────────────────────────────────────────
     name: Field.text({

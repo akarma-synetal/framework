@@ -20,6 +20,48 @@ export const SysInvitation = ObjectSchema.create({
   description: 'Organization invitations for user onboarding',
   titleFormat: 'Invitation to {organization_id}',
   compactLayout: ['email', 'organization_id', 'status'],
+
+  listViews: {
+    pending: {
+      type: 'grid',
+      name: 'pending',
+      label: 'Pending',
+      data: { provider: 'object', object: 'sys_invitation' },
+      columns: ['email', 'role', 'organization_id', 'inviter_id', 'expires_at'],
+      filter: [{ field: 'status', operator: 'equals', value: 'pending' }],
+      sort: [{ field: 'expires_at', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+    accepted: {
+      type: 'grid',
+      name: 'accepted',
+      label: 'Accepted',
+      data: { provider: 'object', object: 'sys_invitation' },
+      columns: ['email', 'role', 'organization_id', 'inviter_id', 'created_at'],
+      filter: [{ field: 'status', operator: 'equals', value: 'accepted' }],
+      sort: [{ field: 'created_at', order: 'desc' }],
+      pagination: { pageSize: 50 },
+    },
+    expired: {
+      type: 'grid',
+      name: 'expired',
+      label: 'Expired / Canceled',
+      data: { provider: 'object', object: 'sys_invitation' },
+      columns: ['email', 'status', 'organization_id', 'expires_at'],
+      filter: [{ field: 'status', operator: 'in', value: ['expired', 'rejected', 'canceled'] }],
+      sort: [{ field: 'expires_at', order: 'desc' }],
+      pagination: { pageSize: 50 },
+    },
+    all_invitations: {
+      type: 'grid',
+      name: 'all_invitations',
+      label: 'All',
+      data: { provider: 'object', object: 'sys_invitation' },
+      columns: ['email', 'status', 'role', 'organization_id', 'inviter_id', 'created_at'],
+      sort: [{ field: 'created_at', order: 'desc' }],
+      pagination: { pageSize: 50 },
+    },
+  },
   
   fields: {
     id: Field.text({

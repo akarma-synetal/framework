@@ -26,6 +26,28 @@ export const SysSession = ObjectSchema.create({
   titleFormat: 'Session — {user_id}',
   compactLayout: ['user_id', 'ip_address', 'expires_at'],
 
+  listViews: {
+    mine: {
+      type: 'grid',
+      name: 'mine',
+      label: 'My Sessions',
+      data: { provider: 'object', object: 'sys_session' },
+      columns: ['ip_address', 'active_organization_id', 'created_at', 'expires_at'],
+      filter: [{ field: 'user_id', operator: 'equals', value: '{current_user_id}' }],
+      sort: [{ field: 'created_at', order: 'desc' }],
+      pagination: { pageSize: 50 },
+    },
+    all_sessions: {
+      type: 'grid',
+      name: 'all_sessions',
+      label: 'All',
+      data: { provider: 'object', object: 'sys_session' },
+      columns: ['user_id', 'ip_address', 'active_organization_id', 'created_at', 'expires_at'],
+      sort: [{ field: 'created_at', order: 'desc' }],
+      pagination: { pageSize: 50 },
+    },
+  },
+
   fields: {
     // ── Session owner & expiry ──────────────────────────────────
     user_id: Field.lookup('sys_user', {

@@ -57,13 +57,14 @@ export const SETUP_APP: App = {
         // and which tenants/teams they belong to. `sys_department` is the
         // platform-owned org skeleton (M10.17.1); `sys_team` is better-auth's
         // flat collaboration grouping.
+        //
+        // M10.30b: removed top-level Department Members / Team Members /
+        // Org Members entries — they are M:N join tables and the natural
+        // entry point is the parent record's detail page.
         { id: 'nav_users', type: 'object', label: 'Users', objectName: 'sys_user', icon: 'user' },
         { id: 'nav_departments', type: 'object', label: 'Departments', objectName: 'sys_department', icon: 'building', requiresObject: 'sys_department' },
-        { id: 'nav_department_members', type: 'object', label: 'Department Members', objectName: 'sys_department_member', icon: 'user-cog', requiresObject: 'sys_department_member' },
         { id: 'nav_teams', type: 'object', label: 'Teams', objectName: 'sys_team', icon: 'users-round' },
-        { id: 'nav_team_members', type: 'object', label: 'Team Members', objectName: 'sys_team_member', icon: 'users' },
         { id: 'nav_organizations', type: 'object', label: 'Organizations', objectName: 'sys_organization', icon: 'building-2' },
-        { id: 'nav_members', type: 'object', label: 'Org Members', objectName: 'sys_member', icon: 'user-check' },
         { id: 'nav_invitations', type: 'object', label: 'Invitations', objectName: 'sys_invitation', icon: 'mail' },
       ],
     },
@@ -73,10 +74,11 @@ export const SETUP_APP: App = {
       label: 'Access Control',
       icon: 'shield',
       children: [
+        // M10.30b: removed top-level User Permission Sets / Role Permission
+        // Sets entries — same M:N → parent-detail-tab argument as the
+        // People & Org cleanup.
         { id: 'nav_roles', type: 'object', label: 'Roles', objectName: 'sys_role', icon: 'shield-check' },
         { id: 'nav_permission_sets', type: 'object', label: 'Permission Sets', objectName: 'sys_permission_set', icon: 'lock' },
-        { id: 'nav_user_permission_sets', type: 'object', label: 'User Permission Sets', objectName: 'sys_user_permission_set', icon: 'user-check' },
-        { id: 'nav_role_permission_sets', type: 'object', label: 'Role Permission Sets', objectName: 'sys_role_permission_set', icon: 'shield-plus' },
         { id: 'nav_sharing_rules', type: 'object', label: 'Sharing Rules', objectName: 'sys_sharing_rule', icon: 'share-2', requiresObject: 'sys_sharing_rule' },
         { id: 'nav_record_shares', type: 'object', label: 'Record Shares', objectName: 'sys_record_share', icon: 'link', requiresObject: 'sys_record_share' },
         { id: 'nav_api_keys', type: 'object', label: 'API Keys', objectName: 'sys_api_key', icon: 'key' },
@@ -94,35 +96,17 @@ export const SETUP_APP: App = {
       ],
     },
     {
-      id: 'group_platform',
-      type: 'group',
-      label: 'Platform',
-      icon: 'layers',
-      children: [
-        // `sys_app` / `sys_package` / `sys_package_installation` are
-        // contributed by `@objectstack/service-tenant` (control-plane scope).
-        // Single-project runtimes do not register them — the `requiresObject`
-        // capability flag tells the frontend to hide these entries when the
-        // backing object is not in the SchemaRegistry, avoiding the
-        // 404-when-clicked trap.
-        { id: 'nav_apps', type: 'object', label: 'Apps', objectName: 'sys_app', icon: 'layout-grid', requiresObject: 'sys_app' },
-        { id: 'nav_packages', type: 'object', label: 'Packages', objectName: 'sys_package', icon: 'package', requiresObject: 'sys_package' },
-        { id: 'nav_package_installations', type: 'object', label: 'Installations', objectName: 'sys_package_installation', icon: 'package-check', requiresObject: 'sys_package_installation' },
-        { id: 'nav_metadata', type: 'object', label: 'All Metadata', objectName: 'sys_metadata', icon: 'file-cog' },
-      ],
-    },
-    {
       id: 'group_diagnostics',
       type: 'group',
       label: 'Diagnostics',
       icon: 'stethoscope',
       children: [
-        // Day-to-day observability surfaces.
+        // Day-to-day observability surfaces. M10.30b removed `sys_activity`
+        // and `sys_comment` — both are CRM operational data authored from
+        // record pages, not platform admin surfaces.
         { id: 'nav_sessions', type: 'object', label: 'Sessions', objectName: 'sys_session', icon: 'monitor' },
         { id: 'nav_audit_logs', type: 'object', label: 'Audit Logs', objectName: 'sys_audit_log', icon: 'scroll-text' },
-        { id: 'nav_activity', type: 'object', label: 'Activity', objectName: 'sys_activity', icon: 'activity' },
         { id: 'nav_notifications', type: 'object', label: 'Notifications', objectName: 'sys_notification', icon: 'bell', requiresObject: 'sys_notification' },
-        { id: 'nav_comments', type: 'object', label: 'Comments', objectName: 'sys_comment', icon: 'message-square' },
       ],
     },
     {
@@ -137,16 +121,26 @@ export const SETUP_APP: App = {
         // to SQL. The objectui sidebar collapses this group by default;
         // edits should hit the read-only banner since these are all
         // `managedBy: 'better-auth'`.
-        { id: 'nav_oauth_apps', type: 'object', label: 'OAuth Apps', objectName: 'sys_oauth_application', icon: 'app-window' },
-        { id: 'nav_oauth_access_tokens', type: 'object', label: 'OAuth Access Tokens', objectName: 'sys_oauth_access_token', icon: 'key-square' },
-        { id: 'nav_oauth_refresh_tokens', type: 'object', label: 'OAuth Refresh Tokens', objectName: 'sys_oauth_refresh_token', icon: 'refresh-cw' },
-        { id: 'nav_oauth_consents', type: 'object', label: 'OAuth Consents', objectName: 'sys_oauth_consent', icon: 'check-square' },
+        //
+        // M10.30b changes:
+        //  - Removed the 3 OAuth satellite menus (access tokens / refresh
+        //    tokens / consents). They live under their parent OAuth App.
+        //  - Renamed "Linked Accounts" → "Identity Links" to distinguish
+        //    from sys_user / org members.
+        //  - Demoted "All Metadata" from the (now-deleted) Platform group
+        //    to this Advanced/debug bucket.
+        //  - The marketplace-only `sys_app` / `sys_package` /
+        //    `sys_package_installation` menus have been removed entirely;
+        //    they are contributed by `@objectstack/service-tenant`
+        //    (control-plane) and are not present in single-project runtimes.
+        { id: 'nav_oauth_apps', type: 'object', label: 'OAuth Applications', objectName: 'sys_oauth_application', icon: 'app-window' },
         { id: 'nav_jwks', type: 'object', label: 'Signing Keys (JWKS)', objectName: 'sys_jwks', icon: 'key-round' },
         { id: 'nav_verifications', type: 'object', label: 'Verifications', objectName: 'sys_verification', icon: 'mail-check' },
         { id: 'nav_two_factor', type: 'object', label: 'Two-Factor', objectName: 'sys_two_factor', icon: 'smartphone' },
         { id: 'nav_device_codes', type: 'object', label: 'Device Codes', objectName: 'sys_device_code', icon: 'qr-code' },
-        { id: 'nav_accounts', type: 'object', label: 'Linked Accounts', objectName: 'sys_account', icon: 'link-2' },
+        { id: 'nav_accounts', type: 'object', label: 'Identity Links', objectName: 'sys_account', icon: 'link-2' },
         { id: 'nav_user_preferences', type: 'object', label: 'User Preferences', objectName: 'sys_user_preference', icon: 'sliders' },
+        { id: 'nav_metadata', type: 'object', label: 'All Metadata', objectName: 'sys_metadata', icon: 'file-cog' },
       ],
     },
   ],

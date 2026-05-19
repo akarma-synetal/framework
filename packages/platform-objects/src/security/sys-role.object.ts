@@ -22,6 +22,48 @@ export const SysRole = ObjectSchema.create({
   titleFormat: '{label}',
   compactLayout: ['label', 'name', 'active', 'is_default'],
 
+  listViews: {
+    active: {
+      type: 'grid',
+      name: 'active',
+      label: 'Active',
+      data: { provider: 'object', object: 'sys_role' },
+      columns: ['label', 'name', 'is_default', 'updated_at'],
+      filter: [{ field: 'active', operator: 'equals', value: true }],
+      sort: [{ field: 'label', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+    default_roles: {
+      type: 'grid',
+      name: 'default_roles',
+      label: 'Default',
+      data: { provider: 'object', object: 'sys_role' },
+      columns: ['label', 'name', 'description', 'active'],
+      filter: [{ field: 'is_default', operator: 'equals', value: true }],
+      sort: [{ field: 'label', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+    custom: {
+      type: 'grid',
+      name: 'custom',
+      label: 'Custom',
+      data: { provider: 'object', object: 'sys_role' },
+      columns: ['label', 'name', 'active', 'updated_at'],
+      filter: [{ field: 'is_default', operator: 'equals', value: false }],
+      sort: [{ field: 'label', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+    all_roles: {
+      type: 'grid',
+      name: 'all_roles',
+      label: 'All',
+      data: { provider: 'object', object: 'sys_role' },
+      columns: ['label', 'name', 'active', 'is_default', 'updated_at'],
+      sort: [{ field: 'label', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+  },
+
   fields: {
     // ── Identity ─────────────────────────────────────────────────
     label: Field.text({

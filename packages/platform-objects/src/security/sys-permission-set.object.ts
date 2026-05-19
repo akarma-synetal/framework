@@ -23,6 +23,38 @@ export const SysPermissionSet = ObjectSchema.create({
   titleFormat: '{label}',
   compactLayout: ['label', 'name', 'active'],
 
+  listViews: {
+    active: {
+      type: 'grid',
+      name: 'active',
+      label: 'Active',
+      data: { provider: 'object', object: 'sys_permission_set' },
+      columns: ['label', 'name', 'description', 'updated_at'],
+      filter: [{ field: 'active', operator: 'equals', value: true }],
+      sort: [{ field: 'label', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+    inactive: {
+      type: 'grid',
+      name: 'inactive',
+      label: 'Inactive',
+      data: { provider: 'object', object: 'sys_permission_set' },
+      columns: ['label', 'name', 'updated_at'],
+      filter: [{ field: 'active', operator: 'equals', value: false }],
+      sort: [{ field: 'label', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+    all_permsets: {
+      type: 'grid',
+      name: 'all_permsets',
+      label: 'All',
+      data: { provider: 'object', object: 'sys_permission_set' },
+      columns: ['label', 'name', 'active', 'updated_at'],
+      sort: [{ field: 'label', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+  },
+
   fields: {
     // ── Identity ─────────────────────────────────────────────────
     label: Field.text({

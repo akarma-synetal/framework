@@ -22,6 +22,18 @@ export const SysOrganization = ObjectSchema.create({
   titleFormat: '{name}',
   compactLayout: ['name', 'slug'],
 
+  listViews: {
+    all_orgs: {
+      type: 'grid',
+      name: 'all_orgs',
+      label: 'All',
+      data: { provider: 'object', object: 'sys_organization' },
+      columns: ['name', 'slug', 'created_at', 'updated_at'],
+      sort: [{ field: 'name', order: 'asc' }],
+      pagination: { pageSize: 50 },
+    },
+  },
+
   fields: {
     // ── Identity ─────────────────────────────────────────────────
     name: Field.text({

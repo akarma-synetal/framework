@@ -32,6 +32,48 @@ export const SysDepartment = ObjectSchema.create({
   titleFormat: '{name}',
   compactLayout: ['name', 'kind', 'parent_department_id', 'manager_user_id'],
 
+  listViews: {
+    active: {
+      type: 'grid',
+      name: 'active',
+      label: 'Active',
+      data: { provider: 'object', object: 'sys_department' },
+      columns: ['name', 'code', 'kind', 'parent_department_id', 'manager_user_id', 'effective_from'],
+      filter: [{ field: 'active', operator: 'equals', value: true }],
+      sort: [{ field: 'name', order: 'asc' }],
+      pagination: { pageSize: 100 },
+    },
+    inactive: {
+      type: 'grid',
+      name: 'inactive',
+      label: 'Inactive',
+      data: { provider: 'object', object: 'sys_department' },
+      columns: ['name', 'code', 'kind', 'effective_to'],
+      filter: [{ field: 'active', operator: 'equals', value: false }],
+      sort: [{ field: 'effective_to', order: 'desc' }],
+      pagination: { pageSize: 50 },
+    },
+    by_kind: {
+      type: 'grid',
+      name: 'by_kind',
+      label: 'By Kind',
+      data: { provider: 'object', object: 'sys_department' },
+      columns: ['kind', 'name', 'code', 'parent_department_id', 'manager_user_id', 'active'],
+      sort: [{ field: 'kind', order: 'asc' }, { field: 'name', order: 'asc' }],
+      grouping: { fields: [{ field: 'kind', order: 'asc', collapsed: false }] },
+      pagination: { pageSize: 100 },
+    },
+    all_departments: {
+      type: 'grid',
+      name: 'all_departments',
+      label: 'All',
+      data: { provider: 'object', object: 'sys_department' },
+      columns: ['name', 'code', 'kind', 'parent_department_id', 'manager_user_id', 'active'],
+      sort: [{ field: 'name', order: 'asc' }],
+      pagination: { pageSize: 100 },
+    },
+  },
+
   fields: {
     // ── Identity ─────────────────────────────────────────────────
     name: Field.text({
