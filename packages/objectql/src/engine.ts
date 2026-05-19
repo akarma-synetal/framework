@@ -1736,12 +1736,21 @@ export class ObjectQL implements IDataEngine {
         // and would silently return ungrouped raw rows. Fall back to find()
         // for drivers that handle aggregations through their query AST.
         const drv = driver as any;
-        const hasStructuredGroupBy = Array.isArray(query.groupBy)
-            && (query.groupBy as any[]).some((g) => typeof g !== 'string');
-        // Structured groupBy items ({field, dateGranularity}) cannot be
-        // expressed in a single portable SQL expression — bypass the driver
-        // and use the in-memory bucket+aggregate path instead.
-        if (typeof drv.aggregate === 'function' && !hasStructuredGroupBy) {
+        // Structured groupBy items ({field, dateGranularity}) require the
+        // driver to advertise per-granularity native bucket support via
+        // `supports.queryDateGranularity[g]`. If every structured item is
+        // supported we can push the aggregate down to the driver; otherwise
+        // we fall back to driver.find() + in-memory bucketing so the result
+        // remains correct on partial-support dialects (e.g. SQLite + week).
+        const groupByItems = Array.isArray(query.groupBy) ? (query.groupBy as any[]) : [];
+        const granularityCaps: Record<string, boolean> | undefined =
+            drv?.supports?.queryDateGranularity;
+        const structuredItems = groupByItems.filter((g) => typeof g !== 'string');
+        const allStructuredSupported = structuredItems.every((g: any) => {
+            if (!g?.dateGranularity) return true; // plain {field} object is fine
+            return granularityCaps?.[g.dateGranularity] === true;
+        });
+        if (typeof drv.aggregate === 'function' && allStructuredSupported) {
             return drv.aggregate(object, ast);
         }
         // In-memory fallback path: ask the driver for raw rows, then bucket +

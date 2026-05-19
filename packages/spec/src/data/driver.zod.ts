@@ -1,7 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
-import { QuerySchema } from '../data/query.zod';
+import { QuerySchema, DateGranularity } from '../data/query.zod';
 import { IsolationLevelEnum } from '../shared/enums.zod';
 
 /**
@@ -127,6 +127,27 @@ export const DriverCapabilitiesSchema = lazySchema(() => z.object({
    * If false, ObjectQL will compute aggregations in memory.
    */
   queryAggregations: z.boolean().default(false).describe('Supports GROUP BY and aggregation functions'),
+
+  /**
+   * Per-granularity native SQL date bucketing support.
+   *
+   * Drivers that can emit `DATE_TRUNC` / `DATE_FORMAT` / `strftime` / `$dateTrunc`
+   * for `groupBy` items shaped as `{ field, dateGranularity }` should advertise
+   * the granularities they handle here, e.g. `{ day: true, week: false }` for a
+   * SQLite build whose `strftime` lacks ISO week (`%V`).
+   *
+   * When omitted (or a granularity is falsy), the engine falls back to fetching
+   * raw rows and bucketing in-memory (`applyInMemoryAggregation`), which is
+   * always correct but loads the full row set into Node.
+   *
+   * **Output contract** (CRITICAL): the native SQL expression MUST produce the
+   * same string label as `bucketDateValue()` in `@objectstack/objectql` —
+   * `YYYY` / `YYYY-MM` / `YYYY-MM-DD` / `YYYY-Q[1-4]` / `YYYY-W[01-53]` (ISO-8601,
+   * weeks start Monday). Any drift will misalign drill `groupKey` filters
+   * between the two paths.
+   */
+  queryDateGranularity: z.record(DateGranularity, z.boolean()).optional()
+    .describe('Per-granularity native date bucketing (day/week/month/quarter/year). Missing keys fall back to in-memory bucketing.'),
 
   /**
    * Whether the driver supports ORDER BY sorting.

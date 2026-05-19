@@ -68,52 +68,60 @@ export class SqlDriver implements IDataDriver {
   // IDataDriver metadata
   public readonly name: string = 'com.objectstack.driver.sql';
   public readonly version: string = '1.0.0';
-  public readonly supports = {
-    // Basic CRUD Operations
-    create: true,
-    read: true,
-    update: true,
-    delete: true,
+  public get supports() {
+    return {
+      // Basic CRUD Operations
+      create: true,
+      read: true,
+      update: true,
+      delete: true,
 
-    // Bulk Operations
-    bulkCreate: true,
-    bulkUpdate: true,
-    bulkDelete: true,
+      // Bulk Operations
+      bulkCreate: true,
+      bulkUpdate: true,
+      bulkDelete: true,
 
-    // Transaction & Connection Management
-    transactions: true,
-    savepoints: false,
+      // Transaction & Connection Management
+      transactions: true,
+      savepoints: false,
 
-    // Query Operations
-    queryFilters: true,
-    queryAggregations: true,
-    querySorting: true,
-    queryPagination: true,
-    queryWindowFunctions: true,
-    querySubqueries: true,
-    queryCTE: false,
-    joins: true,
+      // Query Operations
+      queryFilters: true,
+      queryAggregations: true,
+      /**
+       * Per-granularity native date bucket support. Granularities marked
+       * `false` (or absent) fall back to in-memory `bucketDateValue()` via
+       * `engine.findData` — see `buildDateBucketExpr()` for the SQL emitted.
+       */
+      queryDateGranularity: this.dateGranularityCapabilities,
+      querySorting: true,
+      queryPagination: true,
+      queryWindowFunctions: true,
+      querySubqueries: true,
+      queryCTE: false,
+      joins: true,
 
-    // Advanced Features
-    fullTextSearch: false,
-    jsonQuery: false,
-    geospatialQuery: false,
-    streaming: false,
-    jsonFields: true,
-    arrayFields: true,
-    vectorSearch: false,
+      // Advanced Features
+      fullTextSearch: false,
+      jsonQuery: false,
+      geospatialQuery: false,
+      streaming: false,
+      jsonFields: true,
+      arrayFields: true,
+      vectorSearch: false,
 
-    // Schema Management
-    schemaSync: true,
-    batchSchemaSync: false,
-    migrations: false,
-    indexes: false,
+      // Schema Management
+      schemaSync: true,
+      batchSchemaSync: false,
+      migrations: false,
+      indexes: false,
 
-    // Performance & Optimization
-    connectionPooling: true,
-    preparedStatements: true,
-    queryCache: false,
-  };
+      // Performance & Optimization
+      connectionPooling: true,
+      preparedStatements: true,
+      queryCache: false,
+    };
+  }
 
   protected knex: Knex;
   protected config: Knex.Config;
@@ -137,6 +145,82 @@ export class SqlDriver implements IDataDriver {
   protected get isMysql(): boolean {
     const c = (this.config as any).client;
     return c === 'mysql' || c === 'mysql2';
+  }
+
+  /**
+   * Per-granularity native SQL bucket support, computed from dialect.
+   *
+   * Must match `bucketDateValue()` in @objectstack/objectql exactly:
+   *   year    → 'YYYY'
+   *   month   → 'YYYY-MM'
+   *   day     → 'YYYY-MM-DD'
+   *   quarter → 'YYYY-Q[1-4]'
+   *   week    → 'YYYY-W[01-53]' (ISO-8601)
+   *
+   * Granularities not listed (or set to false) fall back to in-memory bucketing
+   * via engine.findData → applyInMemoryAggregation.
+   */
+  protected get dateGranularityCapabilities(): Record<string, boolean> {
+    if (this.isPostgres) {
+      return { day: true, month: true, quarter: true, year: true, week: true };
+    }
+    if (this.isMysql) {
+      return { day: true, month: true, quarter: true, year: true, week: true };
+    }
+    if (this.isSqlite) {
+      // SQLite's strftime gained ISO week (%V) in 3.46 (2024-05-23); play it safe
+      // and bucket week in-memory. Day/month/year/quarter are universally available.
+      return { day: true, month: true, quarter: true, year: true, week: false };
+    }
+    return {};
+  }
+
+  /**
+   * Build SQL fragment + bindings for a date bucket expression.
+   * Returns `null` when the current dialect does not support the requested
+   * granularity — callers must fall back to in-memory bucketing.
+   *
+   * Exposed as `{sql, bindings}` (not `Knex.Raw`) so callers can both
+   * `groupByRaw()` and embed the same expression inside a `select() as alias`
+   * with correctly forwarded identifier bindings.
+   */
+  protected buildDateBucketExpr(
+    field: string,
+    granularity: 'day' | 'week' | 'month' | 'quarter' | 'year',
+  ): { sql: string; bindings: any[] } | null {
+    if (!this.dateGranularityCapabilities[granularity]) return null;
+
+    if (this.isPostgres) {
+      switch (granularity) {
+        case 'year':    return { sql: `to_char((??)::timestamptz AT TIME ZONE 'UTC', 'YYYY')`, bindings: [field] };
+        case 'month':   return { sql: `to_char((??)::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM')`, bindings: [field] };
+        case 'day':     return { sql: `to_char((??)::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD')`, bindings: [field] };
+        case 'quarter': return { sql: `to_char((??)::timestamptz AT TIME ZONE 'UTC', 'YYYY"-Q"Q')`, bindings: [field] };
+        case 'week':    return { sql: `to_char((??)::timestamptz AT TIME ZONE 'UTC', 'IYYY"-W"IW')`, bindings: [field] };
+      }
+    }
+
+    if (this.isMysql) {
+      switch (granularity) {
+        case 'year':    return { sql: `date_format(convert_tz(??, @@session.time_zone, '+00:00'), '%Y')`, bindings: [field] };
+        case 'month':   return { sql: `date_format(convert_tz(??, @@session.time_zone, '+00:00'), '%Y-%m')`, bindings: [field] };
+        case 'day':     return { sql: `date_format(convert_tz(??, @@session.time_zone, '+00:00'), '%Y-%m-%d')`, bindings: [field] };
+        case 'quarter': return { sql: `concat(date_format(convert_tz(??, @@session.time_zone, '+00:00'), '%Y'), '-Q', quarter(convert_tz(??, @@session.time_zone, '+00:00')))`, bindings: [field, field] };
+        case 'week':    return { sql: `date_format(convert_tz(??, @@session.time_zone, '+00:00'), '%x-W%v')`, bindings: [field] };
+      }
+    }
+
+    if (this.isSqlite) {
+      switch (granularity) {
+        case 'year':    return { sql: `strftime('%Y', ??)`, bindings: [field] };
+        case 'month':   return { sql: `strftime('%Y-%m', ??)`, bindings: [field] };
+        case 'day':     return { sql: `strftime('%Y-%m-%d', ??)`, bindings: [field] };
+        case 'quarter': return { sql: `(strftime('%Y', ??) || '-Q' || ((cast(strftime('%m', ??) as integer) - 1) / 3 + 1))`, bindings: [field, field] };
+        case 'week':    return null; // see capabilities note
+      }
+    }
+
+    return null;
   }
 
   constructor(config: SqlDriverConfig) {
@@ -428,9 +512,30 @@ export class SqlDriver implements IDataDriver {
     }
 
     if (query.groupBy) {
-      builder.groupBy(query.groupBy);
-      for (const field of query.groupBy) {
-        builder.select(field);
+      // groupBy items may be plain strings ('region') or structured objects
+      // ({ field: 'closed_at', dateGranularity: 'quarter' }). For structured
+      // items we emit a dialect-specific bucket expression aliased as the
+      // field name so the resulting row keys match in-memory bucketDateValue.
+      for (const g of query.groupBy as Array<string | { field: string; dateGranularity?: string }>) {
+        if (typeof g === 'string') {
+          builder.groupBy(g);
+          builder.select(g);
+        } else if (g && typeof g === 'object' && g.field) {
+          if (g.dateGranularity) {
+            const bucket = this.buildDateBucketExpr(g.field, g.dateGranularity as any);
+            if (!bucket) {
+              throw new Error(
+                `SqlDriver: dateGranularity '${g.dateGranularity}' not supported on dialect ` +
+                  `'${(this.config as any).client}'. Engine must fall back to in-memory bucketing.`,
+              );
+            }
+            builder.groupByRaw(bucket.sql, bucket.bindings);
+            builder.select(this.knex.raw(`${bucket.sql} as ??`, [...bucket.bindings, g.field]));
+          } else {
+            builder.groupBy(g.field);
+            builder.select(g.field);
+          }
+        }
       }
     }
 
