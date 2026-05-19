@@ -39,6 +39,21 @@ export const en: TranslationData = {
         is_active: { label: 'Active' },
         last_activity_date: { label: 'Last Activity Date' },
         brand_color: { label: 'Brand Color' },
+        tier: {
+          label: 'Customer Tier',
+          options: { strategic: 'Strategic', enterprise: 'Enterprise', mid_market: 'Mid-Market', smb: 'SMB' },
+        },
+        segment: {
+          label: 'Segment',
+          options: { net_new: 'Net New', growth: 'Growth', at_risk: 'At Risk', stable: 'Stable' },
+        },
+        health_score: {
+          label: 'Health Score',
+          help: 'CSM-maintained health indicator',
+          options: { healthy: 'Healthy', watching: 'Watching', at_risk: 'At Risk', churning: 'Churning' },
+        },
+        renewal_owner: { label: 'Renewal Owner (CSM)' },
+        next_renewal_date: { label: 'Next Renewal Date' },
       },
       _views: {
         all_accounts: { label: 'All Accounts', description: 'Primary account list with revenue & industry summaries' },
@@ -217,6 +232,26 @@ export const en: TranslationData = {
         campaign: { label: 'Campaign' },
         days_in_stage: { label: 'Days in Current Stage' },
         is_private: { label: 'Private' },
+        approval_status: {
+          label: 'Approval Status',
+          options: { not_required: 'Not Required', pending: 'Pending', approved: 'Approved', rejected: 'Rejected' },
+        },
+        approved_date: { label: 'Approved Date' },
+        win_reason: {
+          label: 'Win Reason',
+          options: {
+            better_product: 'Better Product', better_price: 'Better Price', relationship: 'Existing Relationship',
+            better_support: 'Better Support', best_fit: 'Best Fit / Features', other: 'Other',
+          },
+        },
+        loss_reason: {
+          label: 'Loss Reason',
+          options: {
+            price: 'Price Too High', competitor: 'Lost to Competitor', no_budget: 'No Budget',
+            no_decision: 'No Decision', timing: 'Bad Timing', features: 'Missing Features', other: 'Other',
+          },
+        },
+        loss_details: { label: 'Loss/Win Details' },
       },
       _views: {
         all_opportunities: { label: 'All Opportunities' },

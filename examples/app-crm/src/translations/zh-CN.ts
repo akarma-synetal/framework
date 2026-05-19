@@ -39,6 +39,21 @@ export const zhCN: TranslationData = {
         is_active: { label: '是否活跃' },
         last_activity_date: { label: '最近活动日期' },
         brand_color: { label: '品牌色' },
+        tier: {
+          label: '客户分层',
+          options: { strategic: '战略客户', enterprise: '企业客户', mid_market: '中型客户', smb: '中小客户' },
+        },
+        segment: {
+          label: '客户细分',
+          options: { net_new: '全新客户', growth: '增长客户', at_risk: '风险客户', stable: '稳定客户' },
+        },
+        health_score: {
+          label: '健康度',
+          help: '客户成功经理维护的健康度指标',
+          options: { healthy: '健康', watching: '关注', at_risk: '风险', churning: '流失中' },
+        },
+        renewal_owner: { label: '续约负责人 (CSM)' },
+        next_renewal_date: { label: '下次续约日期' },
       },
       _views: {
         all_accounts: { label: '全部客户', description: '客户主列表，包含营收与行业摘要' },
@@ -517,6 +532,26 @@ export const zhCN: TranslationData = {
         campaign: { label: '营销活动' },
         days_in_stage: { label: '当前阶段天数' },
         is_private: { label: '私密' },
+        approval_status: {
+          label: '审批状态',
+          options: { not_required: '无需审批', pending: '审批中', approved: '已批准', rejected: '已驳回' },
+        },
+        approved_date: { label: '批准时间' },
+        win_reason: {
+          label: '赢单原因',
+          options: {
+            better_product: '产品更优', better_price: '价格更优', relationship: '客户关系',
+            better_support: '支持更好', best_fit: '最佳契合', other: '其他',
+          },
+        },
+        loss_reason: {
+          label: '丢单原因',
+          options: {
+            price: '价格过高', competitor: '输给竞争对手', no_budget: '无预算',
+            no_decision: '未决策', timing: '时机不合适', features: '功能缺失', other: '其他',
+          },
+        },
+        loss_details: { label: '赢/丢单详情' },
       },
       _views: {
         all_opportunities: { label: '全部商机' },
