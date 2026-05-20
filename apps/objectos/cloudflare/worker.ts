@@ -4,7 +4,7 @@
 // when shipping a hotfix that lives inside the Container image. The
 // DO only reloads when worker code changes, so a no-op edit here
 // guarantees the container restarts with the freshly-pushed image.
-// build: 2026-05-20T11:30Z full-wipe-redeploy-2f115ab6
+// build: 2026-05-20T15:08Z sso-trusted-origins-fix
 
 /**
  * Cloudflare Containers entrypoint for ObjectOS.
@@ -192,6 +192,13 @@ export class ObjectOSContainer extends Container<Env> {
         // Schema sync against a cold remote DB easily exceeds Workers'
         // ~30s inbound budget; run migrations out of band before deploy.
         OS_SKIP_SCHEMA_SYNC: '1',
+        // Trust the entire platform subdomain space for better-auth's
+        // CSRF/callbackURL check. Without this, renaming a project's
+        // hostname leaves the cached per-project AuthPlugin rejecting
+        // SSO callbacks at the new host with INVALID_CALLBACK_URL.
+        // Mirrors apps/cloud's posture; override via secret if needed.
+        OS_TRUSTED_ORIGINS: 'https://*.objectos.app,https://*.objectstack.workers.dev',
+        OS_ROOT_DOMAIN: 'objectos.app',
     };
 
     constructor(state: DurableObjectState, env: Env) {

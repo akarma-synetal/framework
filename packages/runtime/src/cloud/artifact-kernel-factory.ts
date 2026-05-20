@@ -171,7 +171,10 @@ export class ArtifactKernelFactory implements ProjectKernelFactory {
                     : undefined;
 
                 // Build the list of trusted origins for CSRF.
-                // - Production: just the project's https baseUrl.
+                // - Production: just the project's https baseUrl + any
+                //   platform-wide origins from OS_TRUSTED_ORIGINS (so
+                //   hostname renames don't require a kernel evict — the
+                //   parent worker already trusts `https://*.<rootdomain>`).
                 // - Dev (*.localhost): also trust http variants on any port so
                 //   the local objectos dev server (PORT=4100 or any user-chosen
                 //   port) can complete sign-in from the browser. baseUrl alone
@@ -180,6 +183,25 @@ export class ArtifactKernelFactory implements ProjectKernelFactory {
                 //   match — leading to better-auth "Invalid origin" 403.
                 const trustedOriginsList: string[] = [];
                 if (baseUrl) trustedOriginsList.push(baseUrl);
+                // Inherit platform trusted-origin wildcards from the host
+                // worker. Without this, renaming an environment leaves the
+                // cached per-project kernel rejecting callbackURL=<new-host>
+                // with INVALID_CALLBACK_URL until the next cold-start.
+                const platformOrigins = (process.env.OS_TRUSTED_ORIGINS ?? '')
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                for (const o of platformOrigins) {
+                    if (!trustedOriginsList.includes(o)) trustedOriginsList.push(o);
+                }
+                // Convenience: when OS_ROOT_DOMAIN is set, trust the entire
+                // platform subdomain space. Matches the host worker's CORS
+                // posture so SSO survives any future tenant-domain rename.
+                const rootDomain = (process.env.OS_ROOT_DOMAIN ?? '').trim().replace(/^https?:\/\//, '');
+                if (rootDomain) {
+                    const wildcard = `https://*.${rootDomain}`;
+                    if (!trustedOriginsList.includes(wildcard)) trustedOriginsList.push(wildcard);
+                }
                 if (project.hostname) {
                     const bareHost = project.hostname.replace(/^https?:\/\//, '');
                     if (bareHost.endsWith('.localhost') || bareHost === 'localhost') {

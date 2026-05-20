@@ -73,11 +73,18 @@ async function reseedPlatformSsoForHostname(
                 return await (driver.create as any)(object, data);
             },
             update: async (object: string, data: any, where: any, _opts?: any) => {
-                const id = where?.id;
+                // `seedPlatformSsoClient` passes the QL-style `{ where: { id } }`
+                // wrapper as the 3rd arg. Older callers may pass a bare
+                // `{ id }`. Accept both shapes — without this unwrap the
+                // update silently no-ops because driver.update never gets
+                // called, leaving `redirect_uris` stale after a rename
+                // (manifests as INVALID_CALLBACK_URL on next SSO login).
+                const filter = where?.where ?? where ?? {};
+                const id = filter?.id;
                 if (id) {
                     return await (driver.update as any)(object, id, data);
                 }
-                const rows = await (driver.find as any)(object, { where, limit: 1 });
+                const rows = await (driver.find as any)(object, { where: filter, limit: 1 });
                 const list = Array.isArray(rows) ? rows : Array.isArray((rows as any)?.records) ? (rows as any).records : [];
                 const row = list[0];
                 if (row?.id) {
