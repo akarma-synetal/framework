@@ -277,6 +277,54 @@ export class SecurityPlugin implements Plugin {
         }
       }
 
+      // 2.5. Field-Level Security write enforcement.
+      //
+      // The client-side masker (ObjectForm / inline grid) already hides
+      // non-editable fields from the UI, but that is a UX layer only —
+      // a hand-crafted POST / direct ObjectQL call can still target a
+      // forbidden field. We fail-closed here with an explicit 403 and
+      // the offending field names, so:
+      //
+      //   - honest clients get an actionable error (vs. silent drop,
+      //     which manifests as a confusing partial-save), and
+      //   - probing clients see that the boundary is enforced (vs.
+      //     getting a 200 with the field silently ignored, which
+      //     reveals nothing).
+      //
+      // Runs BEFORE the tenant/owner auto-injection (step 3.5) so the
+      // system-set fields are not subject to the user's edit
+      // permissions — they are populated from the execution context,
+      // not from the caller's payload.
+      if (
+        (opCtx.operation === 'insert' || opCtx.operation === 'update') &&
+        opCtx.data &&
+        permissionSets.length > 0
+      ) {
+        const fieldPerms = this.permissionEvaluator.getFieldPermissions(
+          opCtx.object,
+          permissionSets,
+        );
+        if (Object.keys(fieldPerms).length > 0) {
+          const forbidden = this.fieldMasker.detectForbiddenWrites(
+            opCtx.data,
+            fieldPerms,
+          );
+          if (forbidden.length > 0) {
+            throw new PermissionDeniedError(
+              `[Security] Field write denied: not permitted to edit ` +
+                `[${forbidden.join(', ')}] on '${opCtx.object}'`,
+              {
+                operation: opCtx.operation,
+                object: opCtx.object,
+                roles,
+                permissionSets: explicitPermissionSets,
+                forbiddenFields: forbidden,
+              },
+            );
+          }
+        }
+      }
+
       // 3.5. Auto-inject tenancy/ownership fields on insert.
       //
       // When an authenticated user inserts a record, the canonical

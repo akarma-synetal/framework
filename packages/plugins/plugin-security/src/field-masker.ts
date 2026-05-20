@@ -63,6 +63,45 @@ export class FieldMasker {
     return result;
   }
 
+  /**
+   * Detect which fields in the caller's write payload would touch a
+   * field they are not allowed to edit. Returns the set of offending
+   * field names (no duplicates, sorted for stable error messages).
+   *
+   * Used by the security middleware on insert/update to fail-closed
+   * with an explicit 403 rather than silently dropping fields — a
+   * silent drop hides the security boundary from honest clients
+   * (their update partially "doesn't save") and gives an attacker no
+   * negative signal that the field exists. Throwing makes the
+   * boundary observable in both directions.
+   *
+   * `data` may be a single record or an array of records (bulk insert);
+   * either way the returned list is the union across all rows.
+   *
+   * Fields without a permission entry pass through — permission sets
+   * are an allow-list at the field level only for fields they
+   * explicitly enumerate. Most objects do not declare per-field rules
+   * and remain fully editable.
+   */
+  detectForbiddenWrites(
+    data: Record<string, any> | Record<string, any>[],
+    fieldPermissions: Record<string, FieldPermission>
+  ): string[] {
+    if (Object.keys(fieldPermissions).length === 0) return [];
+    const nonEditable = new Set(this.getNonEditableFields(fieldPermissions));
+    if (nonEditable.size === 0) return [];
+
+    const offenders = new Set<string>();
+    const rows = Array.isArray(data) ? data : [data];
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue;
+      for (const field of Object.keys(row)) {
+        if (nonEditable.has(field)) offenders.add(field);
+      }
+    }
+    return Array.from(offenders).sort();
+  }
+
   private maskRecord(record: any, hiddenFields: string[]): any {
     if (!record || typeof record !== 'object') return record;
 

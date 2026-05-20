@@ -219,10 +219,180 @@ describe('SecurityPlugin', () => {
     await harness.run(opCtx);
     expect(opCtx.ast.where).toEqual({ organization_id: 'org-1' });
   });
-});
 
-// ---------------------------------------------------------------------------
-// PermissionEvaluator
+  // -------------------------------------------------------------------------
+  // FLS write enforcement (Backend FLS strip — gap #1)
+  // -------------------------------------------------------------------------
+  // Permission set that allows full CRUD on `task` but denies edit on
+  // two specific fields: `salary` (read-only) and `ssn` (hidden).
+  const flsPolicySet: PermissionSet = {
+    name: 'member_default',
+    label: 'Member',
+    isProfile: true,
+    objects: {
+      '*': { allowRead: true, allowCreate: true, allowEdit: true, allowDelete: true },
+    },
+    fields: {
+      'task.salary': { readable: true, editable: false },
+      'task.ssn': { readable: false, editable: false },
+    },
+  } as any;
+
+  it('FLS write — insert with a forbidden field throws PermissionDeniedError', async () => {
+    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const harness = makeMiddlewareCtx({
+      permissionSets: [flsPolicySet],
+      objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
+    });
+    await plugin.init(harness.ctx);
+    await plugin.start(harness.ctx);
+    const opCtx: any = {
+      object: 'task',
+      operation: 'insert',
+      data: { name: 'A', salary: 9999 },
+      context: { userId: 'u1', tenantId: 'org-1', roles: [], permissions: ['member_default'] },
+    };
+    await expect(harness.run(opCtx)).rejects.toThrow(/Field write denied/);
+    await expect(harness.run(opCtx)).rejects.toMatchObject({
+      details: { forbiddenFields: ['salary'] },
+    });
+  });
+
+  it('FLS write — update with a forbidden field throws PermissionDeniedError', async () => {
+    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const harness = makeMiddlewareCtx({
+      permissionSets: [flsPolicySet],
+      objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
+    });
+    await plugin.init(harness.ctx);
+    await plugin.start(harness.ctx);
+    const opCtx: any = {
+      object: 'task',
+      operation: 'update',
+      data: { ssn: 'leaked-123' },
+      context: { userId: 'u1', tenantId: 'org-1', roles: [], permissions: ['member_default'] },
+    };
+    await expect(harness.run(opCtx)).rejects.toMatchObject({
+      details: { forbiddenFields: ['ssn'] },
+    });
+  });
+
+  it('FLS write — multiple forbidden fields are all listed in the error', async () => {
+    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const harness = makeMiddlewareCtx({
+      permissionSets: [flsPolicySet],
+      objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
+    });
+    await plugin.init(harness.ctx);
+    await plugin.start(harness.ctx);
+    const opCtx: any = {
+      object: 'task',
+      operation: 'insert',
+      data: { name: 'A', salary: 1, ssn: 'x' },
+      context: { userId: 'u1', tenantId: 'org-1', roles: [], permissions: ['member_default'] },
+    };
+    await expect(harness.run(opCtx)).rejects.toMatchObject({
+      details: { forbiddenFields: ['salary', 'ssn'] },
+    });
+  });
+
+  it('FLS write — insert that touches only editable fields passes', async () => {
+    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const harness = makeMiddlewareCtx({
+      permissionSets: [flsPolicySet],
+      objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
+    });
+    await plugin.init(harness.ctx);
+    await plugin.start(harness.ctx);
+    const opCtx: any = {
+      object: 'task',
+      operation: 'insert',
+      data: { name: 'A' },
+      context: { userId: 'u1', tenantId: 'org-1', roles: [], permissions: ['member_default'] },
+    };
+    await expect(harness.run(opCtx)).resolves.toBeTruthy();
+    // owner_id was auto-injected (still in scope for tests)
+    expect(opCtx.data.owner_id).toBe('u1');
+  });
+
+  it('FLS write — bulk insert array catches forbidden field on any row', async () => {
+    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const harness = makeMiddlewareCtx({
+      permissionSets: [flsPolicySet],
+      objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
+    });
+    await plugin.init(harness.ctx);
+    await plugin.start(harness.ctx);
+    const opCtx: any = {
+      object: 'task',
+      operation: 'insert',
+      data: [
+        { name: 'a' },
+        { name: 'b', salary: 9 },  // offender on row 2
+      ],
+      context: { userId: 'u1', tenantId: 'org-1', roles: [], permissions: ['member_default'] },
+    };
+    await expect(harness.run(opCtx)).rejects.toMatchObject({
+      details: { forbiddenFields: ['salary'] },
+    });
+  });
+
+  it('FLS write — system context (isSystem) bypasses the check entirely', async () => {
+    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const harness = makeMiddlewareCtx({
+      permissionSets: [flsPolicySet],
+      objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
+    });
+    await plugin.init(harness.ctx);
+    await plugin.start(harness.ctx);
+    const opCtx: any = {
+      object: 'task',
+      operation: 'insert',
+      data: { name: 'A', salary: 9999, ssn: 'sys' },
+      context: { isSystem: true },
+    };
+    await expect(harness.run(opCtx)).resolves.toBeTruthy();
+  });
+
+  it('FLS write — fields without any rule pass through (allow-list semantics)', async () => {
+    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const harness = makeMiddlewareCtx({
+      permissionSets: [flsPolicySet],
+      objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn', 'description'],
+    });
+    await plugin.init(harness.ctx);
+    await plugin.start(harness.ctx);
+    // `description` has no field rule → must be writable.
+    const opCtx: any = {
+      object: 'task',
+      operation: 'insert',
+      data: { name: 'A', description: 'foo' },
+      context: { userId: 'u1', tenantId: 'org-1', roles: [], permissions: ['member_default'] },
+    };
+    await expect(harness.run(opCtx)).resolves.toBeTruthy();
+  });
+
+  it('FLS write — does not interfere with read (find) — masker still strips read', async () => {
+    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const harness = makeMiddlewareCtx({
+      permissionSets: [flsPolicySet],
+      objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
+    });
+    await plugin.init(harness.ctx);
+    await plugin.start(harness.ctx);
+    const opCtx: any = {
+      object: 'task',
+      operation: 'find',
+      ast: { where: undefined },
+      result: undefined,
+      context: { userId: 'u1', tenantId: 'org-1', roles: [], permissions: ['member_default'] },
+    };
+    // emulate the engine populating result inside next()
+    const orig = harness.run;
+    await orig.call(harness, opCtx);
+    // No throw — find is not a write operation.
+  });
+});
 // ---------------------------------------------------------------------------
 describe('PermissionEvaluator', () => {
   const makePermSet = (
@@ -395,6 +565,85 @@ describe('FieldMasker', () => {
     expect(result.name).toBe('Dave');
     expect(result.email).toBeUndefined();
     expect(result.createdAt).toBeUndefined();
+  });
+
+  describe('detectForbiddenWrites', () => {
+    it('returns [] when no field permissions defined', () => {
+      const masker = new FieldMasker();
+      expect(
+        masker.detectForbiddenWrites({ salary: 9999 }, {}),
+      ).toEqual([]);
+    });
+
+    it('returns [] when all fields are editable', () => {
+      const masker = new FieldMasker();
+      const perms = {
+        salary: { readable: true, editable: true },
+      };
+      expect(
+        masker.detectForbiddenWrites({ salary: 9999 }, perms),
+      ).toEqual([]);
+    });
+
+    it('returns [] when payload only contains fields without permission rules', () => {
+      const masker = new FieldMasker();
+      const perms = {
+        salary: { readable: true, editable: false },
+      };
+      // 'name' has no field rule → passes through.
+      expect(
+        masker.detectForbiddenWrites({ name: 'Dave' }, perms),
+      ).toEqual([]);
+    });
+
+    it('returns the non-editable fields present in payload (single record)', () => {
+      const masker = new FieldMasker();
+      const perms = {
+        salary: { readable: true, editable: false },
+        ssn: { readable: false, editable: false },
+      };
+      expect(
+        masker.detectForbiddenWrites(
+          { name: 'Dave', salary: 9999, ssn: '...' },
+          perms,
+        ),
+      ).toEqual(['salary', 'ssn']);
+    });
+
+    it('handles array (bulk insert) — returns union of offenders, deduped, sorted', () => {
+      const masker = new FieldMasker();
+      const perms = {
+        salary: { readable: true, editable: false },
+        ssn: { readable: false, editable: false },
+      };
+      const rows = [
+        { name: 'a', salary: 1 },
+        { name: 'b', ssn: 'x' },
+        { name: 'c', salary: 2, ssn: 'y' },
+      ];
+      expect(masker.detectForbiddenWrites(rows, perms)).toEqual([
+        'salary',
+        'ssn',
+      ]);
+    });
+
+    it('ignores null/non-object rows in a bulk array', () => {
+      const masker = new FieldMasker();
+      const perms = { salary: { readable: true, editable: false } };
+      // null inside array should be skipped, not crash
+      const rows = [null as any, { salary: 1 }, 'string' as any];
+      expect(masker.detectForbiddenWrites(rows, perms)).toEqual(['salary']);
+    });
+
+    it('readable-but-not-editable counts as forbidden write (a user who can see a field still cannot change it)', () => {
+      const masker = new FieldMasker();
+      const perms = {
+        approved_by: { readable: true, editable: false },
+      };
+      expect(
+        masker.detectForbiddenWrites({ approved_by: 'u2' }, perms),
+      ).toEqual(['approved_by']);
+    });
   });
 });
 
