@@ -421,3 +421,26 @@ export function resolveSettingsActionSuccess(
     ?? fallback
   );
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// SettingsCommon — cross-namespace UI strings (source badges, etc.)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve the human label for a `ResolvedSettingValue.source` value.
+ * Walks the locale chain and falls back to the literal source key
+ * (capitalised by the caller if desired) when no translation exists.
+ */
+export function resolveSettingsSourceLabel(
+  bundle: TranslationBundle | undefined,
+  source: 'env' | 'global' | 'tenant' | 'user' | 'default',
+  fallback: string,
+  opts?: ResolveOptions,
+): string {
+  if (!bundle) return fallback;
+  for (const code of localeChain(opts)) {
+    const label = pickData(bundle, code)?.settingsCommon?.sourceLabels?.[source];
+    if (typeof label === 'string' && label.length > 0) return label;
+  }
+  return fallback;
+}

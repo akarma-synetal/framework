@@ -10,6 +10,15 @@ import type { TranslationData } from '@objectstack/spec/system';
  * always have at least an English entry to fall back to.
  */
 export const en: TranslationData = {
+  settingsCommon: {
+    sourceLabels: {
+      env: 'Env',
+      global: 'Global',
+      tenant: 'Tenant',
+      user: 'User',
+      default: 'Default',
+    },
+  },
   settings: {
     mail: {
       title: 'Mail Delivery',

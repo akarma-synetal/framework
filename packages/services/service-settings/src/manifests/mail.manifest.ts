@@ -14,7 +14,7 @@ const manifest = {
   label: 'Mail Delivery',
   icon: 'Mail',
   description: 'SMTP and transactional email provider configuration.',
-  scope: 'tenant',
+  scope: 'global',
   readPermission: 'setup.access',
   writePermission: 'setup.write',
   category: 'Communication',

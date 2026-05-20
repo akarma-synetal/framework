@@ -90,7 +90,42 @@ describe('SettingsService — encryption round-trip', () => {
     await svc.setMany('mail', { provider: 'sendgrid', api_key: 'sg-secret-123', from_email: 'a@b.com' });
     const ns = await svc.getNamespace('mail');
     expect(ns.values.api_key.value).toBe('sg-secret-123');
-    expect(ns.values.api_key.source).toBe('tenant');
+    expect(ns.values.api_key.source).toBe('global');
+  });
+});
+
+describe('SettingsService — global scope', () => {
+  it('mail manifest defaults to global scope', () => {
+    expect(mailSettingsManifest.scope).toBe('global');
+  });
+
+  it('returns source="global" for platform-wide values', async () => {
+    const svc = new SettingsService({ env: {} });
+    svc.registerManifest(mailSettingsManifest);
+    await svc.setMany('mail', { provider: 'smtp', from_email: 'ops@example.com' });
+    const r = await svc.get('mail', 'from_email');
+    expect(r.source).toBe('global');
+    expect(r.value).toBe('ops@example.com');
+    expect(r.locked).toBe(false);
+  });
+
+  it('global value is visible from any user context (no per-user isolation)', async () => {
+    const svc = new SettingsService({ env: {} });
+    svc.registerManifest(mailSettingsManifest);
+    await svc.setMany('mail', { provider: 'smtp', from_email: 'ops@example.com' }, { userId: 'u1' });
+    const fromU2 = await svc.get('mail', 'from_email', { userId: 'u2' });
+    expect(fromU2.source).toBe('global');
+    expect(fromU2.value).toBe('ops@example.com');
+  });
+
+  it('env still wins over global', async () => {
+    const svc = new SettingsService({ env: { MAIL_FROM_EMAIL: 'env@example.com' } });
+    svc.registerManifest(mailSettingsManifest);
+    await svc.set('mail', 'from_email', 'global@example.com').catch(() => {});
+    const r = await svc.get('mail', 'from_email');
+    expect(r.source).toBe('env');
+    expect(r.value).toBe('env@example.com');
+    expect(r.locked).toBe(true);
   });
 });
 
@@ -176,5 +211,83 @@ describe('SettingsService — user-scoped values', () => {
     expect((await svc.get('prefs', 'nick', { userId: 'u1' })).value).toBe('alice');
     expect((await svc.get('prefs', 'nick', { userId: 'u2' })).value).toBe('bob');
     expect((await svc.get('prefs', 'nick', { userId: 'u3' })).value).toBe('anon');
+  });
+});
+
+describe('SettingsService — Phase 1 change events + client', () => {
+  it('fires settings:changed on set with namespace, key, scope, action', async () => {
+    const svc = new SettingsService({ env: {} });
+    svc.registerManifest(mailSettingsManifest);
+    const events: any[] = [];
+    const off = svc.subscribe('mail', (e) => events.push(e));
+
+    await svc.set('mail', 'from_email', 'a@b.c');
+    await svc.set('mail', 'from_email', null);
+
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({ namespace: 'mail', key: 'from_email', scope: 'global', action: 'set' });
+    expect(events[1]).toMatchObject({ namespace: 'mail', key: 'from_email', scope: 'global', action: 'reset' });
+    expect(typeof events[0].at).toBe('string');
+
+    off();
+    await svc.set('mail', 'from_email', 'x@y.z');
+    expect(events).toHaveLength(2);
+  });
+
+  it('filters subscribers by namespace', async () => {
+    const svc = new SettingsService({ env: {} });
+    svc.registerManifest(mailSettingsManifest);
+    svc.registerManifest(brandingSettingsManifest);
+    const mailEvents: any[] = [];
+    const allEvents: any[] = [];
+    svc.subscribe('mail', (e) => mailEvents.push(e));
+    svc.subscribe(undefined, (e) => allEvents.push(e));
+
+    await svc.set('mail', 'from_email', 'a@b.c');
+    await svc.set('branding', 'workspace_name', 'X');
+
+    expect(mailEvents).toHaveLength(1);
+    expect(allEvents).toHaveLength(2);
+  });
+
+  it('createClient exposes reactive snapshot that refreshes after set', async () => {
+    const svc = new SettingsService({ env: {} });
+    svc.registerManifest(mailSettingsManifest);
+    await svc.set('mail', 'from_email', 'initial@x.y');
+
+    const client = await svc.createClient<{ from_email?: string; provider?: string }>('mail');
+    expect(client.current.from_email).toBe('initial@x.y');
+    expect(client.get('provider')).toBe('smtp');
+
+    await svc.set('mail', 'from_email', 'updated@x.y');
+    // Allow microtask drain so the subscriber callback completes.
+    await new Promise((r) => setImmediate(r));
+    expect(client.current.from_email).toBe('updated@x.y');
+
+    client.dispose();
+  });
+
+  it('createClient honours an explicit parser', async () => {
+    const svc = new SettingsService({ env: {} });
+    svc.registerManifest(mailSettingsManifest);
+    await svc.set('mail', 'smtp_port', 2525);
+
+    const client = await svc.createClient<{ smtp_port: number; provider: string }>('mail', {
+      parse: (raw) => ({
+        smtp_port: Number(raw.smtp_port ?? 0),
+        provider: String(raw.provider ?? 'smtp'),
+      }),
+    });
+    expect(client.current).toEqual({ smtp_port: 2525, provider: 'smtp' });
+  });
+
+  it('handler exceptions do not break the writer', async () => {
+    const svc = new SettingsService({ env: {} });
+    svc.registerManifest(mailSettingsManifest);
+    svc.subscribe('mail', () => {
+      throw new Error('listener boom');
+    });
+    // Must not throw despite the bad listener.
+    await expect(svc.set('mail', 'from_email', 'ok@x.y')).resolves.toBeDefined();
   });
 });

@@ -125,6 +125,72 @@ export class EmailServicePlugin implements Plugin {
       catch { try { engine = ctx.getService<IDataEngine>('data'); } catch { /* ignore */ } }
       if (!engine || !this.service) return;
 
+      // ── Bind to the `mail` settings namespace (Phase 1) ──────────────
+      // Allows the admin UI to live-update SMTP/provider/from-address
+      // without restarting the process. Env-locked fields still win at
+      // the resolver level, so config-via-env keeps its precedence.
+      try {
+        const settings = ctx.getService<any>('settings');
+        if (settings && typeof settings.createClient === 'function') {
+          const applySettings = async () => {
+            try {
+              const payload = await settings.getNamespace('mail');
+              const values: Record<string, unknown> = {};
+              for (const [k, v] of Object.entries(payload.values as Record<string, any>)) {
+                values[k] = v?.value;
+              }
+              this.applyMailSettings(values, ctx);
+            } catch (err: any) {
+              ctx.logger.warn('EmailServicePlugin: failed to apply mail settings: ' + (err?.message ?? err));
+            }
+          };
+          await applySettings();
+          // Subscribe to namespace changes; rebuild on every update.
+          if (typeof settings.subscribe === 'function') {
+            settings.subscribe('mail', () => {
+              void applySettings();
+            });
+            ctx.logger.info('EmailServicePlugin: bound to settings:changed for namespace=mail');
+          }
+
+          // Register the `mail/test` action handler so saving + sending
+          // a test email actually exercises the live transport.
+          if (typeof settings.registerAction === 'function') {
+            const svc = this.service;
+            settings.registerAction('mail', 'test', async ({ values, ctx: actionCtx }: any) => {
+              const to = (actionCtx?.body?.to as string | undefined)
+                ?? (values.from_email as string | undefined);
+              if (!to) {
+                return { ok: false, severity: 'error', message: 'Provide a "to" address (or set from_email).' };
+              }
+              try {
+                const result = await svc.send({
+                  to,
+                  from: values.from_email ? {
+                    address: String(values.from_email),
+                    name: values.from_name ? String(values.from_name) : undefined,
+                  } : undefined,
+                  subject: 'ObjectStack mail test',
+                  text: 'This is a test email from the ObjectStack settings page.',
+                });
+                if (result.status === 'failed') {
+                  return { ok: false, severity: 'error', message: result.error ?? 'Send failed.' };
+                }
+                return {
+                  ok: true,
+                  severity: 'info',
+                  message: `Sent test email to ${to} (id=${result.id}).`,
+                };
+              } catch (err: any) {
+                return { ok: false, severity: 'error', message: err?.message ?? String(err) };
+              }
+            });
+          }
+        }
+      } catch {
+        // settings service not registered — env/constructor opts remain authoritative.
+      }
+
       const persistence: EmailPersistence | undefined = this.options.persist === false
         ? undefined
         : {
@@ -196,6 +262,62 @@ export class EmailServicePlugin implements Plugin {
         ctx.logger.info(`EmailServicePlugin: seeded ${all.length} template row(s)`);
       }
     });
+  }
+
+  /**
+   * Translate the `mail` settings namespace snapshot into a transport
+   * and `defaultFrom`, then hot-swap them on the running EmailService.
+   *
+   * Behaviour:
+   *  - `provider = 'log' | 'smtp'` keeps the LogTransport (real SMTP
+   *    delivery requires `@objectstack/plugin-mail-smtp`, which is not
+   *    a dependency of this package). The from-address is still applied.
+   *  - `provider = 'resend' | 'postmark'` rebuilds the transport using
+   *    `api_key` from settings. If `api_key` is missing the swap is
+   *    skipped and a warning is logged — the previous transport stays.
+   *
+   * Env-locked fields (handled in SettingsService.get) still resolve
+   * before this method ever sees them, so an env override transparently
+   * wins.
+   */
+  private applyMailSettings(values: Record<string, unknown>, ctx: PluginContext): void {
+    if (!this.service) return;
+
+    const fromEmail = typeof values.from_email === 'string' ? values.from_email : undefined;
+    const fromName = typeof values.from_name === 'string' ? values.from_name : undefined;
+    if (fromEmail) this.service.setDefaultFrom({ address: fromEmail, name: fromName });
+
+    const provider = String(values.provider ?? 'smtp');
+    if (provider === 'smtp' || provider === 'log') {
+      // No SMTP transport ships in core; settings-only edits become
+      // a no-op for transport but still apply `defaultFrom`. Users
+      // wanting real SMTP install `@objectstack/plugin-mail-smtp`
+      // and configure it via constructor opts.
+      ctx.logger.info(
+        `EmailServicePlugin: mail settings applied (provider=${provider}, from=${fromEmail ?? '∅'}); transport unchanged.`,
+      );
+      return;
+    }
+
+    const apiKey = typeof values.api_key === 'string' ? values.api_key : undefined;
+    if (!apiKey) {
+      ctx.logger.warn(
+        `EmailServicePlugin: provider='${provider}' selected but api_key is empty — transport NOT rebuilt.`,
+      );
+      return;
+    }
+
+    try {
+      const transport = makeTransport({
+        provider: provider as 'resend' | 'postmark',
+        apiKey,
+        logger: ctx.logger,
+      });
+      this.service.setTransport(transport);
+      ctx.logger.info(`EmailServicePlugin: transport rebuilt from settings (provider=${provider}).`);
+    } catch (err: any) {
+      ctx.logger.warn('EmailServicePlugin: failed to rebuild transport: ' + (err?.message ?? err));
+    }
   }
 
   private async upsertTemplate(engine: IDataEngine, tpl: EmailTemplate): Promise<void> {

@@ -6,6 +6,15 @@ import type { TranslationData } from '@objectstack/spec/system';
  * 日本語 (ja-JP) — built-in settings manifest translations.
  */
 export const jaJP: TranslationData = {
+  settingsCommon: {
+    sourceLabels: {
+      env: '環境変数',
+      global: 'グローバル',
+      tenant: 'テナント',
+      user: 'ユーザー',
+      default: 'デフォルト',
+    },
+  },
   settings: {
     mail: {
       title: 'メール配信',

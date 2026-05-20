@@ -57,9 +57,23 @@ export interface SettingsRow {
  * pulling the whole `IDataEngine`.
  */
 export interface SettingsEngine {
-  find(objectName: string, opts: { where?: Record<string, unknown>; limit?: number }): Promise<any[]>;
-  insert(objectName: string, data: Record<string, unknown>): Promise<any>;
-  update(objectName: string, opts: { where: Record<string, unknown>; data: Record<string, unknown> }): Promise<any>;
+  find(
+    objectName: string,
+    opts: { where?: Record<string, unknown>; limit?: number; bypassTenantAudit?: boolean },
+  ): Promise<any[]>;
+  insert(
+    objectName: string,
+    data: Record<string, unknown>,
+    opts?: { bypassTenantAudit?: boolean },
+  ): Promise<any>;
+  update(
+    objectName: string,
+    opts: {
+      where: Record<string, unknown>;
+      data: Record<string, unknown>;
+      bypassTenantAudit?: boolean;
+    },
+  ): Promise<any>;
   delete?(objectName: string, opts: { where: Record<string, unknown> }): Promise<any>;
 }
 

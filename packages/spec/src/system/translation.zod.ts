@@ -192,6 +192,21 @@ export const TranslationDataSchema = lazySchema(() => z.object({
       successMessage: z.string().optional().describe('Translated success toast/message'),
     })).optional().describe('Action button translations keyed by action id'),
   })).optional().describe('Settings manifest translations keyed by namespace'),
+
+  /**
+   * Cross-namespace strings used by the Settings UI shell — source
+   * badges, inheritance chips, lock reasons, common actions. Resolved
+   * via the `resolveSettingsCommon*` helpers in `i18n-resolver.ts`.
+   */
+  settingsCommon: z.object({
+    sourceLabels: z.object({
+      env: z.string().optional(),
+      global: z.string().optional(),
+      tenant: z.string().optional(),
+      user: z.string().optional(),
+      default: z.string().optional(),
+    }).optional().describe('Source badge labels by resolution layer'),
+  }).optional().describe('Cross-namespace Settings UI strings'),
 }).describe('Translation data for objects, apps, and UI messages'));
 
 export type TranslationData = z.infer<typeof TranslationDataSchema>;

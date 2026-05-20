@@ -6,6 +6,15 @@ import type { TranslationData } from '@objectstack/spec/system';
  * 简体中文 (zh-CN) — built-in settings manifest translations.
  */
 export const zhCN: TranslationData = {
+  settingsCommon: {
+    sourceLabels: {
+      env: '环境变量',
+      global: '全局',
+      tenant: '租户',
+      user: '用户',
+      default: '默认',
+    },
+  },
   settings: {
     mail: {
       title: '邮件投递',

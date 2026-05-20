@@ -112,14 +112,24 @@ export type SpecifierHandler = z.infer<typeof SpecifierHandlerSchema>;
 /**
  * Scope of a specifier value.
  *
- * - `tenant`  — value applies to the whole tenant (the common case).
- *               In project-kernel mode this is per-project; in
- *               control-plane mode this is per-tenant. The resolver
- *               abstracts the difference.
+ * Specifier resolution scopes. Listed in cascade order (low → high
+ * priority): `env` always wins, then walk down `global → tenant → user`,
+ * falling back to `default` (declared on the specifier). Adding a new
+ * scope here requires updating the SettingsService cascade resolver and
+ * the source-badge i18n entries on the UI side.
+ *
+ * - `global`  — platform-wide value (one row per deployment). Use for
+ *               infrastructure-style settings such as outbound mail
+ *               provider, SSO endpoints, telemetry, license. Written
+ *               with `tenant_id=null`, `user_id=null`.
+ * - `tenant`  — value applies to the whole tenant (the common case for
+ *               product-level preferences such as branding). In
+ *               project-kernel mode this is per-project; in
+ *               control-plane mode this is per-tenant.
  * - `user`    — value is per-user; the resolver scopes reads/writes
  *               to ctx.user_id.
  */
-export const SpecifierScopeSchema = z.enum(['tenant', 'user']);
+export const SpecifierScopeSchema = z.enum(['global', 'tenant', 'user']);
 export type SpecifierScope = z.infer<typeof SpecifierScopeSchema>;
 
 // ---------------------------------------------------------------------------
@@ -428,8 +438,8 @@ export const ResolvedSettingValueSchema = lazySchema(() => z.object({
   /** The effective value (after resolution). May be null when unset. */
   value: z.unknown().describe('Effective value (post-resolution)'),
 
-  /** Which layer of the hierarchy provided the value. */
-  source: z.enum(['env', 'tenant', 'user', 'default']).describe('Resolution source'),
+  /** Which layer of the cascade provided the value (env > global > tenant > user > default). */
+  source: z.enum(['env', 'global', 'tenant', 'user', 'default']).describe('Resolution source'),
 
   /**
    * True when the value cannot be overridden from the UI. Today this

@@ -14,9 +14,10 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
  *
  * Resolution order (handled by `SettingsService.get`):
  *   1. process.env override                    (source='env',     locked=true)
- *   2. sys_setting WHERE scope='tenant'        (source='tenant')
- *   3. sys_setting WHERE scope='user'          (source='user')
- *   4. manifest specifier.default              (source='default')
+ *   2. sys_setting WHERE scope='global'        (source='global')
+ *   3. sys_setting WHERE scope='tenant'        (source='tenant')
+ *   4. sys_setting WHERE scope='user'          (source='user')
+ *   5. manifest specifier.default              (source='default')
  *
  * Encryption: rows with `encrypted=true` store ciphertext in `value_enc`
  * and leave `value` null. The plain value is never written to audit log
@@ -119,6 +120,7 @@ export const SysSetting = ObjectSchema.create({
 
     scope: Field.select(
       [
+        { label: 'Global', value: 'global' },
         { label: 'Tenant', value: 'tenant' },
         { label: 'User',   value: 'user' },
         { label: 'Runtime',value: 'runtime' },

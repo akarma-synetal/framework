@@ -6,6 +6,9 @@ import type {
   SettingsNamespacePayload,
   SettingsActionResult,
   SpecifierScope,
+  SettingsChangeEvent,
+  SettingsChangeHandler,
+  SettingsUnsubscribe,
 } from '@objectstack/spec/system';
 import {
   type CryptoAdapter,
@@ -64,6 +67,11 @@ export class SettingsService {
   private readonly registry = new Map<string, RegisteredManifest>();
   /** In-memory fallback when no engine is wired. */
   private readonly memory: SettingsRow[] = [];
+  /** Change subscribers, optionally scoped to a namespace. */
+  private readonly subscribers = new Set<{
+    ns?: string;
+    handler: SettingsChangeHandler;
+  }>();
 
   constructor(opts: SettingsServiceOptions = {}) {
     this.engine = opts.engine;
@@ -82,6 +90,46 @@ export class SettingsService {
   bindEngine(engine: SettingsEngine, audit?: SettingsAuditSink): void {
     this.engine = engine;
     if (audit) this.audit = audit;
+  }
+
+  // ---------------------------------------------------------------------
+  // Change events (Phase 1)
+  // ---------------------------------------------------------------------
+
+  /**
+   * Subscribe to `settings:changed` events. When `namespace` is set the
+   * handler only fires for that namespace, otherwise it fires for every
+   * mutation across the service.
+   *
+   * Returns an idempotent unsubscribe handle — call it from the
+   * consumer's shutdown hook to avoid leaks.
+   */
+  subscribe(
+    namespace: string | undefined,
+    handler: SettingsChangeHandler,
+  ): SettingsUnsubscribe {
+    const entry = { ns: namespace, handler };
+    this.subscribers.add(entry);
+    return () => {
+      this.subscribers.delete(entry);
+    };
+  }
+
+  /**
+   * Dispatch a change event to all matching subscribers. Errors thrown
+   * by a handler are swallowed to keep the bus crash-safe — handlers
+   * are expected to enqueue async work themselves.
+   */
+  private emitChange(event: SettingsChangeEvent): void {
+    if (this.subscribers.size === 0) return;
+    for (const sub of this.subscribers) {
+      if (sub.ns && sub.ns !== event.namespace) continue;
+      try {
+        sub.handler(event);
+      } catch {
+        // Swallow — never break the writer because a listener misbehaves.
+      }
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -156,9 +204,24 @@ export class SettingsService {
     }
 
     const scope = reg.scopes.get(key)!;
+    // For 'user' scope we pre-filter by user_id; for 'tenant' and 'global'
+    // we load everything for the namespace and pick the right row below.
     const rows = await this.loadRows(namespace, scope === 'user' ? ctx.userId ?? null : null);
 
-    // 2. tenant / user row
+    // 2. cascade walk — env (handled above) > global > tenant > user
+    //
+    // We always check higher scopes first so a platform-level value can
+    // shadow a tenant-level row that was carried over from an older
+    // version of a manifest. The Phase 2 work will surface the full
+    // cascade chain on `ResolvedSettingValue.cascadeChain`.
+    const globalRow = rows.find((r) => r.key === key && r.scope === 'global');
+    if (globalRow) {
+      return {
+        value: (await this.materialiseRow(globalRow)) as T,
+        source: 'global',
+        locked: false,
+      };
+    }
     const row = rows.find((r) => r.key === key && r.scope === scope);
     if (row) {
       const value = await this.materialiseRow(row);
@@ -187,6 +250,75 @@ export class SettingsService {
       values[key] = await this.get(namespace, key, ctx);
     }
     return { manifest: reg.manifest, values };
+  }
+
+  // ---------------------------------------------------------------------
+  // Reactive client (Phase 1)
+  // ---------------------------------------------------------------------
+
+  /**
+   * Build a reactive `ISettingsClient` for a namespace.
+   *
+   * The client maintains an internal snapshot of the resolved values,
+   * refreshing on every `settings:changed` event for the namespace.
+   * Consumers call `current` / `get(key)` for synchronous reads and
+   * register handlers via `onChange()`.
+   *
+   * `schema` is optional. When supplied, the snapshot is parsed (and
+   * defaulted) through the Zod schema on each refresh — this gives
+   * plugins strong types and runtime validation in one call. When
+   * absent, raw resolved values flow through unchanged (used by the
+   * dynamic console UI which validates per-field).
+   */
+  async createClient<T extends Record<string, unknown> = Record<string, unknown>>(
+    namespace: string,
+    opts: {
+      ctx?: SettingsContext;
+      parse?: (raw: Record<string, unknown>) => T;
+    } = {},
+  ): Promise<{
+    readonly namespace: string;
+    readonly current: T;
+    get<K extends keyof T>(key: K): T[K];
+    onChange(handler: SettingsChangeHandler): SettingsUnsubscribe;
+    refresh(): Promise<void>;
+    dispose(): void;
+  }> {
+    const ctx = opts.ctx ?? {};
+    let snapshot: T = await this.snapshotOf<T>(namespace, ctx, opts.parse);
+
+    const off = this.subscribe(namespace, () => {
+      // Fire-and-forget refresh; new readers see the latest snapshot.
+      void this.snapshotOf<T>(namespace, ctx, opts.parse).then((next) => {
+        snapshot = next;
+      });
+    });
+
+    return {
+      namespace,
+      get current() {
+        return snapshot;
+      },
+      get<K extends keyof T>(key: K): T[K] {
+        return snapshot[key];
+      },
+      onChange: (handler) => this.subscribe(namespace, handler),
+      refresh: async () => {
+        snapshot = await this.snapshotOf<T>(namespace, ctx, opts.parse);
+      },
+      dispose: off,
+    };
+  }
+
+  private async snapshotOf<T>(
+    namespace: string,
+    ctx: SettingsContext,
+    parse?: (raw: Record<string, unknown>) => T,
+  ): Promise<T> {
+    const payload = await this.getNamespace(namespace, ctx);
+    const raw: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(payload.values)) raw[k] = v.value;
+    return parse ? parse(raw) : (raw as T);
   }
 
   // ---------------------------------------------------------------------
@@ -221,6 +353,9 @@ export class SettingsService {
 
     for (const [key, rawValue] of Object.entries(patch)) {
       const scope = reg.scopes.get(key)!;
+      // global rows are platform-wide (tenant_id=null, user_id=null);
+      // user rows pin to ctx.userId; tenant rows leave user_id null and
+      // let the engine's tenant scoping fill in tenant_id from ctx.
       const userId = scope === 'user' ? ctx.userId ?? null : null;
       const isEncrypted = reg.encryptedKeys.has(key);
       const isNull = rawValue === null || typeof rawValue === 'undefined';
@@ -264,6 +399,14 @@ export class SettingsService {
           requestId: ctx.requestId,
         });
       }
+
+      this.emitChange({
+        namespace,
+        key,
+        scope,
+        action: isNull ? 'reset' : 'set',
+        at: new Date().toISOString(),
+      });
     }
 
     // Re-resolve so callers see the post-write effective values.
@@ -314,7 +457,15 @@ export class SettingsService {
     if (this.engine) {
       const where: Record<string, unknown> = { namespace };
       if (userId !== null) where.user_id = userId;
-      const rows = await this.engine.find(this.objectName, { where });
+      // Settings rows include platform-wide (`global` scope, tenant_id=null)
+      // entries; bypass the tenant-scoping audit warning so loads work
+      // uniformly across global/tenant/user without log noise. Per-tenant
+      // isolation for `tenant`-scope rows is still enforced by the engine
+      // once an ExecutionContext.tenantId is plumbed through (Phase 2+).
+      const rows = await this.engine.find(this.objectName, {
+        where,
+        bypassTenantAudit: true,
+      } as any);
       return rows.map((r) => ({
         namespace: r.namespace,
         key: r.key,
@@ -328,7 +479,9 @@ export class SettingsService {
       }));
     }
     return this.memory.filter(
-      (r) => r.namespace === namespace && (userId === null || r.user_id === userId || r.scope === 'tenant'),
+      (r) =>
+        r.namespace === namespace &&
+        (userId === null || r.user_id === userId || r.scope === 'tenant' || r.scope === 'global'),
     );
   }
 
@@ -340,11 +493,23 @@ export class SettingsService {
         scope: row.scope,
         user_id: row.user_id ?? null,
       };
-      const existing = await this.engine.find(this.objectName, { where, limit: 1 });
+      // global rows are platform-wide — bypass the tenant audit warning
+      // (we intentionally write tenant_id=null). tenant/user rows still
+      // benefit from the warning when ctx.tenantId is missing.
+      const bypass = row.scope === 'global' ? { bypassTenantAudit: true } : {};
+      const existing = await this.engine.find(this.objectName, {
+        where,
+        limit: 1,
+        ...bypass,
+      } as any);
       if (existing[0]) {
-        await this.engine.update(this.objectName, { where, data: { ...row } });
+        await this.engine.update(this.objectName, {
+          where,
+          data: { ...row },
+          ...bypass,
+        } as any);
       } else {
-        await this.engine.insert(this.objectName, { ...row });
+        await this.engine.insert(this.objectName, { ...row }, bypass as any);
       }
       return;
     }

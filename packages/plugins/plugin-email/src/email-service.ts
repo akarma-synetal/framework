@@ -200,6 +200,21 @@ export class EmailService implements IEmailService {
     this.options.persistence = persistence;
   }
 
+  /**
+   * Hot-swap the underlying transport. Used by EmailServicePlugin when
+   * the `mail` settings namespace changes (e.g. SMTP host updated in
+   * the admin UI) so subsequent `send()` calls go through the new
+   * transport without restarting the process.
+   */
+  setTransport(transport: IEmailTransport): void {
+    this.options.transport = transport;
+  }
+
+  /** Replace the default `from` address used when callers omit `input.from`. */
+  setDefaultFrom(from: EmailAddress | undefined): void {
+    this.options.defaultFrom = from;
+  }
+
   async send(input: SendEmailInput): Promise<SendEmailResult> {
     let normalized: NormalizedEmailMessage;
     try {

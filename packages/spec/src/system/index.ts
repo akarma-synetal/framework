@@ -40,6 +40,7 @@ export * from './training.zod';
 
 // Settings (ADR-0007: Manifest + K/V Store + Resolver)
 export * from './settings-manifest.zod';
+export * from './settings-client.zod';
 
 // Runtime Services
 export * from './job.zod';
