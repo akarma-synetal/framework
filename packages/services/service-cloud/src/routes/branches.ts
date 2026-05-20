@@ -1,7 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 /**
- * Branch endpoints — git-style logical branches over `sys_project_revision`.
+ * Branch endpoints — git-style logical branches over `sys_environment_revision`.
  *
  *   GET    /cloud/projects/:id/branches
  *   POST   /cloud/projects/:id/branches/:name/rename
@@ -82,16 +82,16 @@ export async function setBranchHead(
     revisionId: string,
 ): Promise<void> {
     try {
-        const heads = (await driver.find('sys_project_revision_DEPRECATED', {
+        const heads = (await driver.find('sys_environment_revision', {
             where: { environment_id: projectId, branch, is_branch_head: true },
             limit: 100,
         })) as BranchHeadRow[];
         for (const h of heads) {
             if (h.id !== revisionId) {
-                await driver.update('sys_project_revision_DEPRECATED', h.id, { is_branch_head: false });
+                await driver.update('sys_environment_revision', h.id, { is_branch_head: false });
             }
         }
-        await driver.update('sys_project_revision_DEPRECATED', revisionId, {
+        await driver.update('sys_environment_revision', revisionId, {
             branch,
             is_branch_head: true,
         });
@@ -175,7 +175,7 @@ export function registerBranchRoutes(server: IHttpServer, deps: RouteDeps): void
         if (!driver) return controlPlaneUnavailable(res);
 
         try {
-            const rows = (await (driver.find as any)('sys_project_revision_DEPRECATED', {
+            const rows = (await (driver.find as any)('sys_environment_revision', {
                 where: { environment_id: projectId },
                 orderBy: [{ field: 'published_at', direction: 'desc' }],
                 limit: 5000,
@@ -215,7 +215,7 @@ export function registerBranchRoutes(server: IHttpServer, deps: RouteDeps): void
         if (!driver) return controlPlaneUnavailable(res);
 
         try {
-            const collisions = (await (driver.find as any)('sys_project_revision_DEPRECATED', {
+            const collisions = (await (driver.find as any)('sys_environment_revision', {
                 where: { environment_id: projectId, branch: normalizedNew },
                 limit: 1,
             })) as any[];
@@ -223,12 +223,12 @@ export function registerBranchRoutes(server: IHttpServer, deps: RouteDeps): void
                 return res.status(409).json(fail(`Branch '${normalizedNew}' already exists`, 409));
             }
 
-            const rows = (await (driver.find as any)('sys_project_revision_DEPRECATED', {
+            const rows = (await (driver.find as any)('sys_environment_revision', {
                 where: { environment_id: projectId, branch: oldName },
                 limit: 5000,
             })) as BranchHeadRow[];
             for (const r of rows) {
-                await (driver.update as any)('sys_project_revision_DEPRECATED', r.id, { branch: normalizedNew });
+                await (driver.update as any)('sys_environment_revision', r.id, { branch: normalizedNew });
             }
             return res.json(ok({ projectId, from: oldName, to: normalizedNew, renamed: rows.length }));
         } catch (err: any) {
@@ -259,7 +259,7 @@ export function registerBranchRoutes(server: IHttpServer, deps: RouteDeps): void
         if (!driver) return controlPlaneUnavailable(res);
 
         try {
-            const rows = (await (driver.find as any)('sys_project_revision_DEPRECATED', {
+            const rows = (await (driver.find as any)('sys_environment_revision', {
                 where: { environment_id: projectId, branch: name },
                 limit: 5000,
             })) as BranchHeadRow[];
@@ -275,7 +275,7 @@ export function registerBranchRoutes(server: IHttpServer, deps: RouteDeps): void
             }
             for (const r of rows) {
                 if (r.is_branch_head) {
-                    await (driver.update as any)('sys_project_revision_DEPRECATED', r.id, { is_branch_head: false });
+                    await (driver.update as any)('sys_environment_revision', r.id, { is_branch_head: false });
                 }
             }
             return res.json(ok({ projectId, branch: name, demoted: rows.filter((r) => r.is_branch_head).length, totalRevisions: rows.length }));

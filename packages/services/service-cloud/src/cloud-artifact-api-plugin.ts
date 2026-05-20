@@ -7,7 +7,7 @@
  * registration to the `routes/cloud.ts` and `routes/public.ts` modules.
  *
  *   P0 — Pluggable storage via {@link IStorageService} (fallback to local FS).
- *   P1 — Version history via `sys_project_revision`, commit-aware GET, rollback.
+ *   P1 — Version history via `sys_environment_revision`, commit-aware GET, rollback.
  *
  * Routes registered:
  *   GET  /cloud/resolve-hostname?host=...

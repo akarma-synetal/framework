@@ -1,21 +1,23 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
+import { lazySchema } from '../shared/lazy-schema';
 
 /**
- * Project Package Installation Protocol
+ * # Environment Package Installation Protocol
  *
- * Models `sys_package_installation` — the pairing between a project and a
- * specific, immutable package version snapshot (`sys_package_version`).
+ * Models `sys_package_installation` — the pairing between an Environment and
+ * a specific, immutable `sys_package_version` snapshot.
  *
  * Key invariants (per ADR-0003):
- * - One active version per package per project at any time.
+ * - One active version per package per environment at any time
+ *   (UNIQUE `(environment_id, package_id)`).
  * - **Upgrade** = atomic `UPDATE package_version_id` to a newer version UUID.
  * - **Rollback** = atomic `UPDATE package_version_id` to an older version UUID.
  * - Only `status = 'published'` versions may be installed in production
- *   projects (draft/pre-release allowed in dev/sandbox with `allowDraft`).
+ *   environments (draft/pre-release allowed in dev/sandbox with `allowDraft`).
  *
- * Stored in the **Control Plane DB** (not in project DBs).
+ * Stored in the **Control Plane DB** (not in environment data-plane DBs).
  */
 
 // ---------------------------------------------------------------------------
@@ -23,37 +25,36 @@ import { z } from 'zod';
 // ---------------------------------------------------------------------------
 
 /**
- * Lifecycle status of a package installation within a project.
+ * Lifecycle status of a package installation within an environment.
  */
-import { lazySchema } from '../shared/lazy-schema';
-export const ProjectPackageStatusSchema = lazySchema(() => z
+export const EnvironmentPackageStatusSchema = lazySchema(() => z
   .enum([
-    'installed',   // Active and running; metadata loaded into this project
+    'installed',   // Active and running; metadata loaded into this environment
     'installing',  // Install in progress (async)
     'upgrading',   // Version swap in progress (async)
     'disabled',    // Installed but not active — metadata not loaded
     'error',       // Install/upgrade failed; see errorMessage
   ])
-  .describe('Package installation status within a project'));
+  .describe('Package installation status within an environment'));
 
-export type ProjectPackageStatus = z.infer<typeof ProjectPackageStatusSchema>;
+export type EnvironmentPackageStatus = z.infer<typeof EnvironmentPackageStatusSchema>;
 
 // ---------------------------------------------------------------------------
-// sys_package_installation — Project ↔ version pairing
+// sys_package_installation — Environment ↔ version pairing
 // ---------------------------------------------------------------------------
 
 /**
  * One row in `sys_package_installation`.
  *
- * Unique by `(project_id, package_id)` — only one version of a given
- * package may be active per project.
+ * Unique by `(environment_id, package_id)` — only one version of a given
+ * package may be active per environment.
  */
-export const ProjectPackageInstallationSchema = lazySchema(() => z.object({
+export const EnvironmentPackageInstallationSchema = lazySchema(() => z.object({
   /** Unique installation record ID (UUID). */
   id: z.string().uuid().describe('Unique installation record ID'),
 
-  /** Project that owns this installation (FK → sys_project). */
-  projectId: z.string().uuid().describe('Project this installation belongs to'),
+  /** Environment that owns this installation (FK → sys_environment). */
+  environmentId: z.string().uuid().describe('Environment this installation belongs to'),
 
   /**
    * The specific, immutable version snapshot that is installed
@@ -67,14 +68,14 @@ export const ProjectPackageInstallationSchema = lazySchema(() => z.object({
 
   /**
    * Denormalized package UUID (FK → sys_package.id) copied from the version
-   * row at install time. Used for the UNIQUE (project_id, package_id)
+   * row at install time. Used for the UNIQUE (environment_id, package_id)
    * constraint without a join.
    */
   packageId: z.string().uuid()
     .describe('UUID of the parent sys_package row (denormalized for constraint enforcement)'),
 
-  /** Current lifecycle status within this project. */
-  status: ProjectPackageStatusSchema.default('installed'),
+  /** Current lifecycle status within this environment. */
+  status: EnvironmentPackageStatusSchema.default('installed'),
 
   /** Whether the package is active (metadata loaded and available). */
   enabled: z.boolean().default(true).describe('Whether the package metadata is loaded'),
@@ -85,6 +86,16 @@ export const ProjectPackageInstallationSchema = lazySchema(() => z.object({
    */
   settings: z.record(z.string(), z.unknown()).optional()
     .describe('Per-installation configuration settings'),
+
+  /**
+   * When true, the environment runtime will replay the package's seed
+   * datasets (demo Accounts / Contacts / …) into the primary organization
+   * the next time the environment kernel boots. Set at install time and
+   * never auto-cleared so the env can re-seed on cold-start until the user
+   * explicitly disables it.
+   */
+  withSampleData: z.boolean().optional().default(false)
+    .describe('Replay the package seed datasets on next kernel cold-start'),
 
   /** ISO-8601 timestamp when this installation was created. */
   installedAt: z.string().datetime().describe('Installation timestamp (ISO-8601)'),
@@ -97,42 +108,45 @@ export const ProjectPackageInstallationSchema = lazySchema(() => z.object({
 
   /** Error details when `status === "error"`. */
   errorMessage: z.string().optional().describe('Error message when status is error'),
-}).describe('Package installation record in a project (sys_package_installation)'));
+}).describe('Package installation record in an environment (sys_package_installation)'));
 
-export type ProjectPackageInstallation = z.infer<typeof ProjectPackageInstallationSchema>;
+export type EnvironmentPackageInstallation = z.infer<typeof EnvironmentPackageInstallationSchema>;
 
 // ---------------------------------------------------------------------------
 // Install / Upgrade / Rollback requests
 // ---------------------------------------------------------------------------
 
 /**
- * Request body for `POST /cloud/projects/:projectId/packages`.
+ * Request body for `POST /cloud/environments/:environmentId/packages`
+ * (or the legacy `/cloud/projects/:projectId/packages` alias).
  */
-export const InstallPackageToProjectRequestSchema = lazySchema(() => z.object({
+export const InstallPackageToEnvironmentRequestSchema = lazySchema(() => z.object({
   packageVersionId: z.string().uuid().optional()
     .describe('Exact package version UUID to install (preferred)'),
   packageManifestId: z.string().optional()
     .describe('Package manifest ID (reverse-domain, e.g. com.acme.crm) — resolved to version UUID'),
   version: z.string().optional().describe('Version string (defaults to latest published)'),
   allowDraft: z.boolean().default(false)
-    .describe('Allow installing a draft version (dev/sandbox projects only)'),
+    .describe('Allow installing a draft version (dev/sandbox environments only)'),
   settings: z.record(z.string(), z.unknown()).optional()
     .describe('Installation-time configuration settings'),
+  withSampleData: z.boolean().optional().default(false)
+    .describe('Replay the package seed datasets on next kernel cold-start'),
   enableOnInstall: z.boolean().default(true)
     .describe('Activate the package immediately after install'),
   installedBy: z.string().optional().describe('User ID of the installer'),
-}).describe('Install a package version into a specific project')
+}).describe('Install a package version into a specific environment')
   .refine(
     data => data.packageVersionId != null || data.packageManifestId != null,
     { message: 'Either packageVersionId or packageManifestId must be provided' }
   ));
 
-export type InstallPackageToProjectRequest = z.infer<typeof InstallPackageToProjectRequestSchema>;
+export type InstallPackageToEnvironmentRequest = z.infer<typeof InstallPackageToEnvironmentRequestSchema>;
 
 /**
  * Request body for upgrading a package installation.
  */
-export const UpgradeProjectPackageRequestSchema = lazySchema(() => z.object({
+export const UpgradeEnvironmentPackageRequestSchema = lazySchema(() => z.object({
   targetPackageVersionId: z.string().uuid().optional()
     .describe('Target package version UUID (preferred)'),
   targetVersion: z.string().optional()
@@ -142,30 +156,30 @@ export const UpgradeProjectPackageRequestSchema = lazySchema(() => z.object({
   upgradedBy: z.string().optional().describe('User ID performing the upgrade'),
 }).describe('Upgrade a package installation to a newer version'));
 
-export type UpgradeProjectPackageRequest = z.infer<typeof UpgradeProjectPackageRequestSchema>;
+export type UpgradeEnvironmentPackageRequest = z.infer<typeof UpgradeEnvironmentPackageRequestSchema>;
 
 /**
  * Request body for rolling back a package installation.
  */
-export const RollbackProjectPackageRequestSchema = lazySchema(() => z.object({
+export const RollbackEnvironmentPackageRequestSchema = lazySchema(() => z.object({
   targetPackageVersionId: z.string().uuid()
     .describe('Package version UUID to roll back to'),
   rolledBackBy: z.string().optional().describe('User ID performing the rollback'),
 }).describe('Roll back a package installation to a specific older version'));
 
-export type RollbackProjectPackageRequest = z.infer<typeof RollbackProjectPackageRequestSchema>;
+export type RollbackEnvironmentPackageRequest = z.infer<typeof RollbackEnvironmentPackageRequestSchema>;
 
 // ---------------------------------------------------------------------------
 // Response schemas
 // ---------------------------------------------------------------------------
 
 /**
- * Response from `GET /cloud/projects/:projectId/packages`.
+ * Response from `GET /cloud/environments/:environmentId/packages`.
  */
-export const ListProjectPackagesResponseSchema = lazySchema(() => z.object({
-  packages: z.array(ProjectPackageInstallationSchema)
-    .describe('Packages installed in this project'),
+export const ListEnvironmentPackagesResponseSchema = lazySchema(() => z.object({
+  packages: z.array(EnvironmentPackageInstallationSchema)
+    .describe('Packages installed in this environment'),
   total: z.number().describe('Total count'),
-}).describe('List of packages installed in a project'));
+}).describe('List of packages installed in an environment'));
 
-export type ListProjectPackagesResponse = z.infer<typeof ListProjectPackagesResponseSchema>;
+export type ListEnvironmentPackagesResponse = z.infer<typeof ListEnvironmentPackagesResponseSchema>;

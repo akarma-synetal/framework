@@ -22,19 +22,19 @@ describe('ProjectProvisioningService.provisionProject', () => {
       createdBy: 'user-1',
     });
 
-    expect(result.project.id).toMatch(UUID_RE);
-    expect(result.project.organizationId).toBe('org-123');
-    expect(result.project.displayName).toBe('Alice dev');
-    expect(result.project.status).toBe('active');
-    expect(result.project.isDefault).toBe(false);
-    expect(result.project.isSystem).toBe(false);
+    expect(result.environment.id).toMatch(UUID_RE);
+    expect(result.environment.organizationId).toBe('org-123');
+    expect(result.environment.displayName).toBe('Alice dev');
+    expect(result.environment.status).toBe('active');
+    expect(result.environment.isDefault).toBe(false);
+    expect(result.environment.isSystem).toBe(false);
 
     // Database addressing is on the project row
-    expect(result.project.storageLimitMb).toBe(2048);
-    expect(result.project.databaseDriver).toBe('turso');
-    expect(result.project.databaseUrl).toContain('libsql://');
+    expect(result.environment.storageLimitMb).toBe(2048);
+    expect(result.environment.databaseDriver).toBe('turso');
+    expect(result.environment.databaseUrl).toContain('libsql://');
 
-    expect(result.credential.projectId).toBe(result.project.id);
+    expect(result.credential.environmentId).toBe(result.environment.id);
     expect(result.credential.status).toBe('active');
     expect(result.credential.authorization).toBe('full_access');
     expect(result.credential.encryptionKeyId).toBe('noop');
@@ -130,22 +130,22 @@ describe('ProjectProvisioningService.provisionSystemProject', () => {
 
     const result = await svc.provisionSystemProject();
 
-    expect(result.project.id).toBe(SYSTEM_PROJECT_ID);
-    expect(result.project.organizationId).toBe(PLATFORM_ORG_ID);
-    expect(result.project.displayName).toBe('System');
-    expect(result.project.isDefault).toBe(false);
-    expect(result.project.isSystem).toBe(true);
-    expect(result.project.plan).toBe('enterprise');
-    expect(result.project.status).toBe('active');
-    expect(result.project.createdBy).toBe('system');
-    expect(result.project.hostname).toBe('system.objectstack.internal');
+    expect(result.environment.id).toBe(SYSTEM_PROJECT_ID);
+    expect(result.environment.organizationId).toBe(PLATFORM_ORG_ID);
+    expect(result.environment.displayName).toBe('System');
+    expect(result.environment.isDefault).toBe(false);
+    expect(result.environment.isSystem).toBe(true);
+    expect(result.environment.plan).toBe('enterprise');
+    expect(result.environment.status).toBe('active');
+    expect(result.environment.createdBy).toBe('system');
+    expect(result.environment.hostname).toBe('system.objectstack.internal');
 
     // System project uses control plane DB - no separate physical DB
-    expect(result.project.databaseUrl).toBeUndefined();
-    expect(result.project.databaseDriver).toBeUndefined();
-    expect(result.project.storageLimitMb).toBeUndefined();
+    expect(result.environment.databaseUrl).toBeUndefined();
+    expect(result.environment.databaseDriver).toBeUndefined();
+    expect(result.environment.storageLimitMb).toBeUndefined();
 
-    expect(result.credential.projectId).toBe(SYSTEM_PROJECT_ID);
+    expect(result.credential.environmentId).toBe(SYSTEM_PROJECT_ID);
     expect(result.credential.secretCiphertext).toBe('');
 
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
@@ -225,8 +225,8 @@ describe('ProjectProvisioningService.provisionSystemProject', () => {
     expect(driver.create).not.toHaveBeenCalled();
 
     // Should return the existing project
-    expect(result.project.id).toBe(SYSTEM_PROJECT_ID);
-    expect(result.project.isSystem).toBe(true);
+    expect(result.environment.id).toBe(SYSTEM_PROJECT_ID);
+    expect(result.environment.isSystem).toBe(true);
     expect(result.warnings).toContain('System project already exists');
   });
 
@@ -235,8 +235,8 @@ describe('ProjectProvisioningService.provisionSystemProject', () => {
 
     const result = await svc.provisionSystemProject();
 
-    expect(result.project.metadata).toBeDefined();
-    expect(result.project.metadata?.description).toBe('Built-in system project for platform infrastructure');
-    expect(result.project.metadata?.protected).toBe(true);
+    expect(result.environment.metadata).toBeDefined();
+    expect(result.environment.metadata?.description).toBe('Built-in system project for platform infrastructure');
+    expect(result.environment.metadata?.protected).toBe(true);
   });
 });

@@ -3,36 +3,43 @@
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 /**
- * sys_project_revision — Per-Project Artifact Revision History
+ * sys_environment_revision — Per-Environment Artifact Revision History
  *
- * One row per `objectstack publish`. Each row records a content-addressable
- * pointer to the compiled artifact stored in IStorageService (S3, local fs,
- * etc.) plus enough provenance to support rollback, audit, and "preview at
- * commit" UX in Studio.
+ * One row per `objectstack publish` (a.k.a. CLI deploy). Each row records a
+ * content-addressable pointer to the compiled artifact stored in
+ * IStorageService (S3, R2, local fs, …) plus enough provenance to support
+ * rollback, audit, and "preview at commit" UX in Studio.
+ *
+ * Per ADR-0006 v3, the runtime container is `sys_environment`, so the
+ * deployment history lives next to it as `sys_environment_revision`. The
+ * dormant `sys_project_revision` schema from the rename was a placeholder
+ * for the future dev-workspace Project (Phase 5) and is **not** the
+ * deployment table — that one is this row.
  *
  * Lifecycle:
- *   - `is_current = true` for at most one row per project. Activating a
+ *   - `is_current = true` for at most one row per environment. Activating a
  *     historical revision flips the flag (atomic UPDATE in the cloud-
  *     artifact plugin's POST /activate handler).
- *   - Rows are immutable apart from `is_current` and `note`.
+ *   - Rows are immutable apart from `is_current`, `is_branch_head`,
+ *     `branch` (during rename), and `note`.
  *   - `storage_key` is content-addressable
- *     (`artifacts/<project_id>/<commit_id>.json` by default), so re-
- *     publishing identical content is a no-op upload.
+ *     (`artifacts/orgs/<org_id>/projects/<env_id>/<commit_id>.json` by
+ *     default), so re-publishing identical content is a no-op upload.
  *
  * Lives in the control plane only.
  *
  * @namespace sys
  */
-export const SysProjectRevision = ObjectSchema.create({
-  name: 'sys_project_revision',
-  label: 'Project Revision',
-  pluralLabel: 'Project Revisions',
+export const SysEnvironmentRevision = ObjectSchema.create({
+  name: 'sys_environment_revision',
+  label: 'Environment Revision',
+  pluralLabel: 'Environment Revisions',
   icon: 'git-commit',
   isSystem: true,
   managedBy: 'config',
-  description: 'Immutable history of compiled artifacts published per project.',
+  description: 'Immutable history of compiled artifacts published per environment (CLI deploy log).',
   titleFormat: '{commit_id}',
-  compactLayout: ['commit_id', 'project_id', 'is_current', 'published_at'],
+  compactLayout: ['commit_id', 'environment_id', 'branch', 'is_current', 'published_at'],
 
   fields: {
     id: Field.text({
@@ -53,13 +60,13 @@ export const SysProjectRevision = ObjectSchema.create({
       label: 'Updated At',
       defaultValue: 'NOW()',
       readonly: true,
-      description: 'Last update timestamp (only `is_current` / `note` mutate).',
+      description: 'Last update timestamp (only `is_current` / `is_branch_head` / `branch` / `note` mutate).',
     }),
 
-    project_id: Field.lookup('sys_project', {
-      label: 'Project',
+    environment_id: Field.lookup('sys_environment', {
+      label: 'Environment',
       required: true,
-      description: 'Foreign key to sys_project.',
+      description: 'Foreign key to sys_environment (the runtime container this revision was published to).',
     }),
 
     commit_id: Field.text({
@@ -67,7 +74,7 @@ export const SysProjectRevision = ObjectSchema.create({
       required: true,
       maxLength: 64,
       description:
-        'Short content hash of the artifact (sha256 prefix of the canonical body). Unique per project.',
+        'Short content hash of the artifact (sha256 prefix of the canonical body). Unique per environment.',
     }),
 
     checksum: Field.text({
@@ -82,7 +89,7 @@ export const SysProjectRevision = ObjectSchema.create({
       required: true,
       maxLength: 512,
       description:
-        'Key within IStorageService (e.g. artifacts/<project_id>/<commit_id>.json).',
+        'Key within IStorageService (e.g. artifacts/orgs/<org_id>/projects/<env_id>/<commit_id>.json).',
     }),
 
     storage_adapter: Field.text({
@@ -136,7 +143,7 @@ export const SysProjectRevision = ObjectSchema.create({
       required: true,
       defaultValue: false,
       description:
-        'Whether this revision is the active one for the project. At most one row per project carries `true`.',
+        'Whether this revision is the active one for the environment. At most one row per environment carries `true`.',
     }),
 
     branch: Field.text({
@@ -156,16 +163,16 @@ export const SysProjectRevision = ObjectSchema.create({
       defaultValue: false,
       description:
         'Whether this revision is the latest published commit on its branch. At most one ' +
-        'row per (project_id, branch) carries `true`. Used by branch-tracking preview URLs.',
+        'row per (environment_id, branch) carries `true`. Used by branch-tracking preview URLs.',
     }),
   },
 
   indexes: [
-    { fields: ['project_id', 'commit_id'], unique: true },
-    { fields: ['project_id', 'is_current'] },
-    { fields: ['project_id', 'published_at'] },
-    { fields: ['project_id', 'branch', 'is_branch_head'] },
-    { fields: ['project_id', 'branch', 'published_at'] },
+    { fields: ['environment_id', 'commit_id'], unique: true },
+    { fields: ['environment_id', 'is_current'] },
+    { fields: ['environment_id', 'published_at'] },
+    { fields: ['environment_id', 'branch', 'is_branch_head'] },
+    { fields: ['environment_id', 'branch', 'published_at'] },
   ],
 
   enable: {

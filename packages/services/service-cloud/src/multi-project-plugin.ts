@@ -53,7 +53,7 @@ export interface MultiProjectPluginConfig {
     ttlMs?: number;
     /** Direct storage adapter for artifact publishing. Bypasses kernel.getService('file-storage'). */
     storage?: any;
-    /** Adapter name (e.g. 's3', 'local') — used when persisting sys_project_revision rows. */
+    /** Adapter name (e.g. 's3', 'local') — used when persisting sys_environment_revision rows. */
     storageAdapterName?: string;
 }
 
@@ -273,7 +273,7 @@ function createTemplateSeeder(
             try { await flushable.flush(); } catch { /* best effort */ }
         }
 
-        // Publish the seeded bundle as a sys_project_revision so the
+        // Publish the seeded bundle as a sys_environment_revision so the
         // artifact API serves it to remote runtimes (objectos in cloud
         // mode reads `GET /cloud/projects/:id/artifact`). Without this
         // step, the seeded data only lives in this project's metadata

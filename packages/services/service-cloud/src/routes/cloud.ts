@@ -134,12 +134,12 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
         try {
             let rev: any = null;
             if (requestedCommit) {
-                rev = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+                rev = await (driver.findOne as any)('sys_environment_revision', {
                     where: { environment_id: projectId, commit_id: requestedCommit },
                 });
                 if (!rev) return res.status(404).json(fail(`Revision '${requestedCommit}' not found for project '${projectId}'`, 404));
             } else {
-                rev = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+                rev = await (driver.findOne as any)('sys_environment_revision', {
                     where: { environment_id: projectId, is_current: true },
                 });
             }
@@ -307,22 +307,22 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
         let revisionCreated = false;
         let revisionId: string | null = null;
         try {
-            const existing = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+            const existing = await (driver.findOne as any)('sys_environment_revision', {
                 where: { environment_id: projectId, commit_id: commitId },
             });
 
             if (!existing) {
                 try {
-                    const oldCurrent = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+                    const oldCurrent = await (driver.findOne as any)('sys_environment_revision', {
                         where: { environment_id: projectId, is_current: true },
                     });
                     if (oldCurrent) {
-                        await (driver.update as any)('sys_project_revision_DEPRECATED', oldCurrent.id, { is_current: false });
+                        await (driver.update as any)('sys_environment_revision', oldCurrent.id, { is_current: false });
                     }
                 } catch { /* table may not exist yet */ }
 
                 revisionId = randomUUID();
-                await (driver.create as any)('sys_project_revision_DEPRECATED', {
+                await (driver.create as any)('sys_environment_revision', {
                     id: revisionId,
                     project_id: projectId,
                     commit_id: commitId,
@@ -344,14 +344,14 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
                 // Re-publish same commit: ensure it's current AND that branch head reflects this push
                 if (!existing.is_current) {
                     try {
-                        const oldCurrent = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+                        const oldCurrent = await (driver.findOne as any)('sys_environment_revision', {
                             where: { environment_id: projectId, is_current: true },
                         });
                         if (oldCurrent && oldCurrent.id !== existing.id) {
-                            await (driver.update as any)('sys_project_revision_DEPRECATED', oldCurrent.id, { is_current: false });
+                            await (driver.update as any)('sys_environment_revision', oldCurrent.id, { is_current: false });
                         }
                     } catch { /* ok */ }
-                    await (driver.update as any)('sys_project_revision_DEPRECATED', existing.id, { is_current: true });
+                    await (driver.update as any)('sys_environment_revision', existing.id, { is_current: true });
                 }
             }
 
@@ -424,7 +424,7 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
                     query.where.branch = branchFilter;
                 }
             }
-            const rows = await (driver.find as any)('sys_project_revision_DEPRECATED', query);
+            const rows = await (driver.find as any)('sys_environment_revision', query);
             const hasMore = rows.length > limit;
             const items = hasMore ? rows.slice(0, limit) : rows;
             const nextCursor = hasMore ? items[items.length - 1]?.published_at : undefined;
@@ -468,11 +468,11 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
         try {
             // Accept full commit id or a 8+ char prefix (matches the
             // 12-char display in the Studio recent-revisions list).
-            let target = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+            let target = await (driver.findOne as any)('sys_environment_revision', {
                 where: { environment_id: projectId, commit_id: commitId },
             });
             if (!target && commitId.length >= 8) {
-                const candidates = await (driver.find as any)('sys_project_revision_DEPRECATED', {
+                const candidates = await (driver.find as any)('sys_environment_revision', {
                     where: { environment_id: projectId, commit_id: { $like: `${commitId}%` } },
                     limit: 2,
                 });
@@ -484,14 +484,14 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
             }
             if (!target) return res.status(404).json(fail(`Revision '${commitId}' not found`, 404));
 
-            const oldCurrent = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+            const oldCurrent = await (driver.findOne as any)('sys_environment_revision', {
                 where: { environment_id: projectId, is_current: true },
             });
             if (oldCurrent && oldCurrent.id !== target.id) {
-                await (driver.update as any)('sys_project_revision_DEPRECATED', oldCurrent.id, { is_current: false });
+                await (driver.update as any)('sys_environment_revision', oldCurrent.id, { is_current: false });
             }
 
-            await (driver.update as any)('sys_project_revision_DEPRECATED', target.id, { is_current: true });
+            await (driver.update as any)('sys_environment_revision', target.id, { is_current: true });
 
             const project = await (driver.findOne as any)('sys_environment', { where: { id: projectId } });
             if (project) {
@@ -536,7 +536,7 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
             : null;
 
         try {
-            const all = (await (driver.find as any)('sys_project_revision_DEPRECATED', {
+            const all = (await (driver.find as any)('sys_environment_revision', {
                 where: { environment_id: projectId },
                 orderBy: [{ field: 'published_at', direction: 'desc' }],
                 limit: 10_000,
@@ -572,7 +572,7 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
                     }
                 }
                 try {
-                    await (driver.delete as any)('sys_project_revision_DEPRECATED', r.id);
+                    await (driver.delete as any)('sys_environment_revision', r.id);
                     deletedRows++;
                 } catch (delErr: any) {
                     console.warn('[CloudArtifactAPI] Failed to delete revision row', r.id, delErr?.message);

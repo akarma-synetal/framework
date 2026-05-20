@@ -41,7 +41,7 @@ import {
   type ReactNode,
 } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import type { ProjectType } from '@objectstack/spec/cloud';
+import type { EnvironmentType as ProjectType } from '@objectstack/spec/cloud';
 import {
   Dialog,
   DialogContent,

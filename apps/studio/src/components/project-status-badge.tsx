@@ -15,7 +15,7 @@
 
 import { Loader2, AlertTriangle, CheckCircle2, PauseCircle, Archive, MoveRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ProjectStatus } from '@objectstack/spec/cloud';
+import type { EnvironmentStatus as ProjectStatus } from '@objectstack/spec/cloud';
 
 const VARIANT: Record<ProjectStatus, string> = {
   provisioning:

@@ -57,7 +57,7 @@ export function registerPublicRoutes(server: IHttpServer, deps: RouteDeps): void
             return res.status(404).json(fail('not found', 404));
         }
 
-        const current = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+        const current = await (driver.findOne as any)('sys_environment_revision', {
             where: { environment_id: projectId, is_current: true },
         });
 
@@ -93,11 +93,11 @@ export function registerPublicRoutes(server: IHttpServer, deps: RouteDeps): void
         let rev: any = null;
         try {
             if (requestedCommit) {
-                rev = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+                rev = await (driver.findOne as any)('sys_environment_revision', {
                     where: { environment_id: projectId, commit_id: requestedCommit },
                 });
             } else {
-                rev = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+                rev = await (driver.findOne as any)('sys_environment_revision', {
                     where: { environment_id: projectId, is_current: true },
                 });
             }
@@ -173,7 +173,7 @@ export function registerPublicRoutes(server: IHttpServer, deps: RouteDeps): void
         const limit = Math.min(Math.max(Number(req.query?.limit ?? 20), 1), 100);
         let rows: any[] = [];
         try {
-            rows = (await (driver.find as any)('sys_project_revision_DEPRECATED', {
+            rows = (await (driver.find as any)('sys_environment_revision', {
                 where: { environment_id: projectId },
                 orderBy: [{ field: 'published_at', direction: 'desc' }],
                 limit,

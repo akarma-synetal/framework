@@ -1,64 +1,52 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
-import { TenantPlanSchema } from './tenant.zod';
-
-/**
- * Project-Per-Database Isolation Protocol
- *
- * Each **project** owns a physically isolated database. The Control Plane stores
- * all project metadata; project DBs contain only business data rows.
- *
- * Split of concerns:
- * - **Control Plane**: `sys_project` (includes physical DB addressing),
- *   `sys_package_installation` (with project_id), `sys_metadata` (with project_id),
- *   `sys_project_credential`, `sys_project_member`.
- * - **Data Plane**: each project DB contains only business objects
- *   (account, task, …). No system tables, no `project_id` columns.
- */
-
-// ---------------------------------------------------------------------------
-// Project registry
-// ---------------------------------------------------------------------------
-
-/**
- * Project type — canonical buckets per industry convention
- * (Salesforce, Power Platform, ServiceNow all use this taxonomy).
- */
 import { lazySchema } from '../shared/lazy-schema';
-export const ProjectTypeSchema = lazySchema(() => z
-  .enum(['production', 'sandbox', 'development', 'test', 'staging', 'preview', 'trial'])
-  .describe('Project type (prod/sandbox/dev/test/…)'));
-
-export type ProjectType = z.infer<typeof ProjectTypeSchema>;
 
 /**
- * Project lifecycle status
+ * # Project Protocol (dev-workspace / source-of-truth) — Phase 5 / forward-looking
+ *
+ * As of ADR-0006 v3 the name **Project** has been reassigned. It no longer
+ * refers to the runtime container (that is now {@link ./environment.zod.ts}
+ * `Environment`). A **Project** is reserved for the future *source-of-truth
+ * dev workspace* concept — analogous to a git repository:
+ *
+ * - **Project** (`sys_project`) — identity row that will own branches,
+ *   revisions and access control. Metadata authored here will publish into
+ *   compiled artifacts and deploy to one or more {@link Environment}s.
+ * - **ProjectBranch** (`sys_project_branch`) — long-lived branch
+ *   (production/staging/preview/sandbox) of a project.
+ * - **ProjectRevision** (`sys_project_revision`) — immutable per-publish
+ *   history of authored metadata (distinct from
+ *   `sys_environment_revision`, which is the deploy-target history that the
+ *   CLI `publish` flow writes today).
+ *
+ * **Status:** Phase 5 has not started. No `sys_project*` ObjectSchemas are
+ * registered in `service-tenant` today; the corresponding tables do not
+ * exist. The CLI deploy flow currently writes only `sys_environment_revision`.
+ * The schemas below describe the *target shape* so SDK consumers can plan
+ * forward without importing service code.
+ */
+
+// ---------------------------------------------------------------------------
+// Project (dev-workspace) — identity
+// ---------------------------------------------------------------------------
+
+/**
+ * Project lifecycle status.
  */
 export const ProjectStatusSchema = lazySchema(() => z
-  .enum(['provisioning', 'active', 'suspended', 'archived', 'failed', 'migrating'])
+  .enum(['active', 'archived', 'failed'])
   .describe('Project lifecycle status'));
 
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
 
 /**
- * Backend driver registry — keys used by the data-plane driver factory.
- * Kept open-ended (`z.string()`) so third-party drivers can register new
- * backends without a core release.
- */
-export const ProjectDriverSchema = lazySchema(() => z
-  .string()
-  .min(1)
-  .describe('Data-plane driver key (e.g. `turso`, `libsql`, `sqlite`, `postgres`)'));
-
-export type ProjectDriver = z.infer<typeof ProjectDriverSchema>;
-
-/**
- * Project — one logical runtime of an organization's data.
+ * Project — the source-of-truth dev workspace for a group of metadata.
  *
- * An organization may own many projects. Physical database connection info is
- * stored directly on this row so a single lookup gives both logical
- * and physical addressing. Projects are addressable by `id` (UUID).
+ * One row per logical project in the Control Plane. The project itself is
+ * an identity record; metadata content lives on {@link ProjectBranch} heads
+ * and is snapshotted by {@link ProjectRevision}.
  */
 export const ProjectSchema = lazySchema(() => z.object({
   /** UUID of the project (stable, never reused). */
@@ -68,19 +56,16 @@ export const ProjectSchema = lazySchema(() => z.object({
   organizationId: z.string().describe('Organization that owns this project'),
 
   /** Display name shown in Studio and APIs. */
-  displayName: z.string().describe('Display name shown in Studio and APIs'),
+  displayName: z.string().min(1).describe('Display name shown in Studio and APIs'),
 
-  /** Whether this is the organization's **default** project. Exactly one per org. */
-  isDefault: z.boolean().default(false).describe('Whether this is the default project for the organization'),
-
-  /** Whether this is a system project (platform infrastructure, not user data). */
-  isSystem: z.boolean().default(false).describe('Whether this is a system project (platform infrastructure, not user data)'),
-
-  /** Plan tier applied to this project for quota/billing enforcement. */
-  plan: TenantPlanSchema.default('free').describe('Plan tier for this project'),
+  /**
+   * Optional human description of what this project contains
+   * (rendered as the README on the Studio project page).
+   */
+  description: z.string().optional().describe('Optional human description'),
 
   /** Project lifecycle status. */
-  status: ProjectStatusSchema.default('provisioning').describe('Project lifecycle status'),
+  status: ProjectStatusSchema.default('active').describe('Project lifecycle status'),
 
   /** User ID that created the project. */
   createdBy: z.string().describe('User ID that created the project'),
@@ -91,202 +76,197 @@ export const ProjectSchema = lazySchema(() => z.object({
   /** Last update timestamp (ISO-8601). */
   updatedAt: z.string().datetime().describe('Last update timestamp (ISO-8601)'),
 
-  // ── Physical database addressing ──
-
-  /** Full connection URL (e.g. `libsql://proj-<uuid>.turso.io`, `postgres://…`). Set after provisioning. */
-  databaseUrl: z.string().url().optional().describe('Full connection URL for the project database'),
-
-  /** Data-plane driver key. */
-  databaseDriver: ProjectDriverSchema.optional().describe('Data-plane driver key (turso, libsql, sqlite, memory, postgres)'),
-
-  /** Storage quota in megabytes. */
-  storageLimitMb: z.number().int().positive().optional().describe('Storage quota in megabytes'),
-
-  /** When the physical database was provisioned. */
-  provisionedAt: z.string().datetime().optional().describe('Provisioning timestamp (ISO-8601)'),
-
-  /** Free-form metadata (feature flags, tags, …). */
+  /** Free-form metadata (tags, feature flags, …). */
   metadata: z.record(z.string(), z.unknown()).optional().describe('Free-form metadata'),
-
-  /**
-   * Canonical hostname for this project (e.g. acme-dev.objectstack.app or api.acme.com).
-   * UNIQUE. Auto-set on creation; can be overridden for custom domains.
-   * Used for project resolution via hostname matching.
-   */
-  hostname: z
-    .string()
-    .optional()
-    .describe('Canonical hostname for this project (e.g. acme-dev.objectstack.app or api.acme.com). UNIQUE. Auto-set on creation; can be overridden for custom domains.'),
-
-  /**
-   * Public exposure of this project's compiled artifacts.
-   * - `private`  (default) — every read requires authentication
-   * - `unlisted` — `/pub/v1/projects/:id/artifact?commit=<id>` works (no enumeration)
-   * - `public`   — full listing + download via `/pub/v1/projects/:id/*`
-   */
-  visibility: z.enum(['private', 'unlisted', 'public']).optional().default('private')
-    .describe('Public exposure of this project artifacts (private | unlisted | public).'),
 }));
 
 export type Project = z.infer<typeof ProjectSchema>;
 
 // ---------------------------------------------------------------------------
-// Credential (rotatable)
+// ProjectBranch — long-lived branch/environment of a project
 // ---------------------------------------------------------------------------
 
 /**
- * Credential lifecycle status — used during rotation.
+ * Kind of a long-lived project branch — promotion target / preview / sandbox.
  */
-export const ProjectCredentialStatusSchema = lazySchema(() => z
-  .enum(['active', 'rotating', 'revoked'])
-  .describe('Credential lifecycle status'));
+export const ProjectBranchKindSchema = lazySchema(() => z
+  .enum(['production', 'staging', 'preview', 'sandbox'])
+  .describe('Project branch kind'));
 
-export type ProjectCredentialStatus = z.infer<typeof ProjectCredentialStatusSchema>;
+export type ProjectBranchKind = z.infer<typeof ProjectBranchKindSchema>;
 
 /**
- * Encrypted credential for a project's database.
+ * Project branch lifecycle status.
  */
-export const ProjectCredentialSchema = lazySchema(() => z.object({
-  /** UUID of the credential. */
-  id: z.string().uuid().describe('UUID of the credential'),
+export const ProjectBranchStatusSchema = lazySchema(() => z
+  .enum(['active', 'provisioning', 'paused', 'archived', 'failed'])
+  .describe('Project branch lifecycle status'));
 
-  /** Project this credential authorizes. */
-  projectId: z.string().uuid().describe('Project this credential authorizes'),
-
-  /** Encrypted auth token or secret (ciphertext). */
-  secretCiphertext: z.string().describe('Encrypted auth token or secret (ciphertext)'),
-
-  /** KMS/encryption key ID that produced `secretCiphertext`. */
-  encryptionKeyId: z.string().describe('Encryption key ID used to encrypt the secret'),
-
-  /** Authorization scope (e.g. `full_access`, `read_only`). */
-  authorization: z
-    .enum(['full_access', 'read_only'])
-    .default('full_access')
-    .describe('Authorization scope for this credential'),
-
-  /** Credential lifecycle status. */
-  status: ProjectCredentialStatusSchema.default('active').describe('Credential lifecycle status'),
-
-  /** Credential creation timestamp. */
-  createdAt: z.string().datetime().describe('Creation timestamp (ISO-8601)'),
-
-  /** Optional expiry — after this timestamp the credential must be rotated. */
-  expiresAt: z.string().datetime().optional().describe('Optional expiry timestamp'),
-
-  /** Timestamp when the credential was revoked (null while active). */
-  revokedAt: z.string().datetime().optional().describe('Revocation timestamp (if revoked)'),
-}));
-
-export type ProjectCredential = z.infer<typeof ProjectCredentialSchema>;
-
-// ---------------------------------------------------------------------------
-// Project-scoped RBAC
-// ---------------------------------------------------------------------------
+export type ProjectBranchStatus = z.infer<typeof ProjectBranchStatusSchema>;
 
 /**
- * Per-project role assigned to a user/service principal.
- */
-export const ProjectRoleSchema = lazySchema(() => z
-  .enum(['owner', 'admin', 'maker', 'reader', 'guest'])
-  .describe('Per-project role'));
-
-export type ProjectRole = z.infer<typeof ProjectRoleSchema>;
-
-/**
- * Project membership — grants a user access to a specific project.
+ * Long-lived branch of a project.
  *
- * Unique by `(projectId, userId)`.
+ * Each branch carries its own metadata head and may bind to its own
+ * physical database (for branch-isolated previews). Branches share
+ * ownership / billing / access control with the parent project.
+ *
+ * Unique by `(projectId, name)`.
  */
-export const ProjectMemberSchema = lazySchema(() => z.object({
-  /** UUID of the membership. */
-  id: z.string().uuid().describe('UUID of the membership'),
+export const ProjectBranchSchema = lazySchema(() => z.object({
+  /** UUID of the branch (stable, never reused). */
+  id: z.string().uuid().describe('UUID of the branch'),
 
-  /** Project this membership grants access to. */
-  projectId: z.string().uuid().describe('Project this membership grants access to'),
+  /** Parent project this branch belongs to. */
+  projectId: z.string().uuid().describe('Parent project this branch belongs to'),
 
-  /** User ID (references `user` in the control plane). */
-  userId: z.string().describe('User ID'),
+  /** Machine name (snake_case). Unique within project. */
+  name: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9][a-z0-9._/-]{0,99}$/)
+    .describe('Machine name (snake_case-ish slug, unique within project)'),
 
-  /** Per-project role. */
-  role: ProjectRoleSchema.describe('Per-project role'),
+  /** Display name shown in Studio and APIs. */
+  displayName: z.string().min(1).max(255).describe('Display name'),
 
-  /** User ID of the member who invited / granted this membership. */
-  invitedBy: z.string().describe('User ID that granted this membership'),
+  /** Branch kind. */
+  kind: ProjectBranchKindSchema.default('preview').describe('Branch kind'),
 
-  /** Creation timestamp. */
+  /** Whether this is the project's default branch (typically the production branch). */
+  isDefault: z.boolean().default(false).describe('Whether this is the default branch'),
+
+  /** Branch lifecycle status. */
+  status: ProjectBranchStatusSchema.default('active').describe('Branch lifecycle status'),
+
+  /**
+   * Optional data-plane driver key. Inherits from the parent project (or the
+   * provisioning service default) when blank.
+   */
+  databaseDriver: z.string().optional().describe('Data-plane driver key (inherits when blank)'),
+
+  /**
+   * Optional connection URL for the branch's own physical database.
+   * Used to give preview branches an isolated DB.
+   * Sensitive — admin-only field.
+   */
+  databaseUrl: z.string().optional().describe('Physical connection URL for this branch (sensitive)'),
+
+  /**
+   * For `kind = 'preview'`: the git ref / PR identifier this branch shadows
+   * (used by GitHub/GitLab preview integrations).
+   */
+  sourceRef: z.string().optional().describe('Git ref / PR identifier this preview branch shadows'),
+
+  /** Creation timestamp (ISO-8601). */
   createdAt: z.string().datetime().describe('Creation timestamp (ISO-8601)'),
 
-  /** Last update timestamp. */
+  /** Last update timestamp (ISO-8601). */
   updatedAt: z.string().datetime().describe('Last update timestamp (ISO-8601)'),
 }));
 
-export type ProjectMember = z.infer<typeof ProjectMemberSchema>;
+export type ProjectBranch = z.infer<typeof ProjectBranchSchema>;
 
 // ---------------------------------------------------------------------------
-// Provisioning requests / responses
+// ProjectRevision — immutable per-publish history
 // ---------------------------------------------------------------------------
 
 /**
- * Request to provision a new project for an organization.
+ * One row per `objectstack publish`. Records a content-addressable pointer
+ * to the compiled artifact stored in `IStorageService` plus provenance.
+ *
+ * Lifecycle:
+ * - `isCurrent = true` for at most one row per project. Activating a
+ *   historical revision flips the flag atomically.
+ * - Rows are immutable apart from `isCurrent` and `note`.
+ * - `storageKey` is content-addressable (`artifacts/<projectId>/<commitId>.json`
+ *   by default), so re-publishing identical content is a no-op upload.
+ *
+ * Unique by `(projectId, commitId)`.
  */
-export const ProvisionProjectRequestSchema = lazySchema(() => z.object({
-  organizationId: z.string().describe('Organization that will own the new project'),
-  displayName: z.string().min(1).describe('Display name shown in Studio and APIs'),
-  driver: ProjectDriverSchema.optional().describe('Driver key (defaults to provisioning service config)'),
-  plan: TenantPlanSchema.optional().describe('Plan tier'),
-  storageLimitMb: z.number().int().positive().optional().describe('Storage quota in megabytes'),
-  isDefault: z.boolean().optional().describe('Mark as the organization default project'),
-  createdBy: z.string().describe('User ID that initiated the provisioning'),
-  metadata: z.record(z.string(), z.unknown()).optional().describe('Free-form metadata'),
-  hostname: z.string().optional().describe('Canonical hostname for this project (auto-generated if omitted)'),
-  templateId: z.string().optional().describe('Template to seed into the project on first provisioning (e.g. "crm", "todo"). Defaults to "blank".'),
-  visibility: z.enum(['private', 'unlisted', 'public']).optional().default('private').describe(
-    'Public exposure of this project artifacts. private = auth required for every read (default); unlisted = downloadable when commit id is known; public = listed and freely downloadable via /pub/v1/projects/:id/*.',
-  ),
-}));
+export const ProjectRevisionSchema = lazySchema(() => z.object({
+  /** UUID of the revision row. */
+  id: z.string().uuid().describe('UUID of the revision row'),
 
-export type ProvisionProjectRequest = z.infer<typeof ProvisionProjectRequestSchema>;
+  /** Parent project. */
+  projectId: z.string().uuid().describe('Parent project'),
 
-/**
- * Response of a successful project provisioning call.
- */
-export const ProvisionProjectResponseSchema = lazySchema(() => z.object({
-  project: ProjectSchema.describe('Provisioned project (includes database addressing)'),
-  credential: ProjectCredentialSchema.describe('Freshly-minted credential for the project DB'),
-  durationMs: z.number().describe('Total provisioning duration in milliseconds'),
-  warnings: z.array(z.string()).optional().describe('Non-fatal warnings emitted during provisioning'),
-}));
+  /**
+   * Short content hash of the artifact (sha256 prefix of the canonical body).
+   * Unique per project. Twelve-hex prefix by convention; do not collide with
+   * branch names (which are slugs).
+   */
+  commitId: z.string().min(1).max(64).describe('Content-addressable commit id (sha256 prefix)'),
 
-export type ProvisionProjectResponse = z.infer<typeof ProvisionProjectResponseSchema>;
+  /** Full sha256 hex digest of the artifact body. */
+  checksum: z.string().regex(/^[a-f0-9]{64}$/).optional().describe('Full sha256 digest'),
 
-/**
- * Request to bootstrap a brand-new organization — allocates the default
- * project (and its DB) in one atomic call.
- */
-export const ProvisionOrganizationRequestSchema = lazySchema(() => z.object({
-  organizationId: z.string().describe('Organization being bootstrapped'),
-  defaultProjectDisplayName: z
+  /** Key within `IStorageService` (e.g. `artifacts/<projectId>/<commitId>.json`). */
+  storageKey: z.string().min(1).max(512).describe('Storage key in IStorageService'),
+
+  /**
+   * Adapter id that wrote this artifact (`"local-fs"` | `"file-storage:<service>"`).
+   * Diagnostic only.
+   */
+  storageAdapter: z.string().optional().describe('Storage adapter id (diagnostic)'),
+
+  /** Uncompressed size of the artifact body. */
+  sizeBytes: z.number().int().nonnegative().optional().describe('Uncompressed artifact size in bytes'),
+
+  /** Wall-clock time the artifact was produced by `objectstack compile`. */
+  builtAt: z.string().datetime().optional().describe('Compile timestamp (ISO-8601)'),
+
+  /** JSON-serialized builder metadata copied from the artifact (cli version, engines, …). */
+  builtWith: z.string().optional().describe('Builder metadata (JSON string)'),
+
+  /** User who issued the publish call (when known). */
+  publishedBy: z.string().optional().describe('User id who published this revision'),
+
+  /** When the row was created (publish timestamp). */
+  publishedAt: z.string().datetime().optional().describe('Publish timestamp (ISO-8601)'),
+
+  /** Optional human note (release name / changelog blurb). */
+  note: z.string().max(1024).optional().describe('Optional human note'),
+
+  /** Whether this revision is the active one for the project. */
+  isCurrent: z.boolean().default(false).describe('Whether this is the current revision for the project'),
+
+  /**
+   * Logical branch this revision belongs to. Default `main`. Slug-shaped.
+   * Must not look like a 12-hex commit prefix (would collide with preview URL parsing).
+   */
+  branch: z
     .string()
-    .min(1)
-    .default('Production')
-    .describe('Display name for the default project'),
-  driver: ProjectDriverSchema.optional().describe('Driver key'),
-  plan: TenantPlanSchema.optional().describe('Plan tier'),
-  storageLimitMb: z.number().int().positive().optional().describe('Storage quota in megabytes'),
-  createdBy: z.string().describe('User ID that initiated provisioning'),
-  metadata: z.record(z.string(), z.unknown()).optional().describe('Free-form metadata'),
+    .max(63)
+    .regex(/^[a-z0-9][a-z0-9._/-]{0,62}$/)
+    .default('main')
+    .describe('Logical branch this revision belongs to'),
+
+  /**
+   * Whether this revision is the latest published commit on its branch.
+   * At most one row per `(projectId, branch)` carries `true`.
+   */
+  isBranchHead: z.boolean().default(false).describe('Whether this is the head of its branch'),
+
+  /** Creation timestamp (ISO-8601, typically = publishedAt). */
+  createdAt: z.string().datetime().describe('Creation timestamp (ISO-8601)'),
+
+  /** Last update timestamp (only `isCurrent` / `note` mutate after creation). */
+  updatedAt: z.string().datetime().describe('Last update timestamp (ISO-8601)'),
 }));
 
-export type ProvisionOrganizationRequest = z.infer<typeof ProvisionOrganizationRequestSchema>;
+export type ProjectRevision = z.infer<typeof ProjectRevisionSchema>;
 
-/**
- * Response of a successful organization bootstrap.
- */
-export const ProvisionOrganizationResponseSchema = lazySchema(() => z.object({
-  defaultProject: ProvisionProjectResponseSchema.describe('Default project that was created'),
-  durationMs: z.number().describe('Total bootstrap duration in milliseconds'),
-  warnings: z.array(z.string()).optional().describe('Non-fatal warnings'),
-}));
-
-export type ProvisionOrganizationResponse = z.infer<typeof ProvisionOrganizationResponseSchema>;
+// ---------------------------------------------------------------------------
+// Note on migration
+// ---------------------------------------------------------------------------
+//
+// Prior to ADR-0006 v3 this module also exported `ProjectSchema`,
+// `ProvisionProjectRequestSchema`, `ProjectCredentialSchema`,
+// `ProjectMemberSchema`, `ProjectTypeSchema`, `ProjectStatusSchema` etc.
+// All of those have been renamed to `Environment*` and moved to
+// `./environment.zod.ts`. There are no deprecated aliases — the dev-workspace
+// `Project*` names defined above own this module now, and runtime-container
+// consumers must import from `./environment.zod.ts` (or via
+// `@objectstack/spec/cloud`, which re-exports both).

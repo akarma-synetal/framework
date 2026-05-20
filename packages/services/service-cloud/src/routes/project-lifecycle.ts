@@ -190,8 +190,8 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: Packag
             // NOT abort the env-create flow.
             try {
                 const baseSecret = (process.env.OS_AUTH_SECRET ?? process.env.AUTH_SECRET ?? '').trim();
-                const newProjectId = (result.project as AnyRow)?.id;
-                const newHostname = (result.project as AnyRow)?.hostname;
+                const newProjectId = (result.environment as AnyRow)?.id;
+                const newHostname = (result.environment as AnyRow)?.hostname;
                 if (baseSecret && newProjectId) {
                     const driver = await getDriver();
                     if (driver) {
@@ -230,7 +230,7 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: Packag
             }
 
             return res.status(201).json(ok({
-                project: result.project,
+                project: result.environment,
                 warnings: result.warnings,
                 durationMs: result.durationMs,
             }));

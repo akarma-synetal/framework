@@ -15,7 +15,7 @@
  */
 
 import { cn } from '@/lib/utils';
-import type { ProjectType } from '@objectstack/spec/cloud';
+import type { EnvironmentType as ProjectType } from '@objectstack/spec/cloud';
 
 const VARIANT: Record<ProjectType, string> = {
   production:

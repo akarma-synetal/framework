@@ -85,7 +85,7 @@ export function resolveStorage(
  * Falls back to the legacy `${keyPrefix}/${projectId}/${commitId}.json`
  * shape when the project has no organization_id (single-tenant installs /
  * very old data). The GET path always reads the exact key from
- * `sys_project_revision.storage_key`, so historical rows keep working
+ * `sys_environment_revision.storage_key`, so historical rows keep working
  * regardless of which layout was active when they were written.
  */
 export function buildStorageKey(

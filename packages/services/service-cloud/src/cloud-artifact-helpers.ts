@@ -146,12 +146,12 @@ export async function readProjectCredentials(driver: IDataDriver, projectId: str
 // ---------------------------------------------------------------------------
 // Publish helper — shared by POST /cloud/projects/:id/metadata and the
 // MultiProjectPlugin template seeder. Uploads the artifact bundle to the
-// configured storage adapter and inserts/refreshes a sys_project_revision
+// configured storage adapter and inserts/refreshes a sys_environment_revision
 // row so the next GET /cloud/projects/:id/artifact resolves it.
 // ---------------------------------------------------------------------------
 
 export interface PublishProjectRevisionParams {
-    /** Control-plane data driver (sys_project / sys_project_revision). */
+    /** Control-plane data driver (sys_environment / sys_environment_revision). */
     driver: IDataDriver;
     /** Storage adapter (R2, S3, local FS) — must implement upload/exists. */
     storage: { upload: (key: string, data: Buffer) => Promise<void>; exists: (key: string) => Promise<boolean> };
@@ -204,34 +204,34 @@ export async function publishProjectRevision(
 
     let created = false;
     let revisionId: string;
-    const existing = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+    const existing = await (driver.findOne as any)('sys_environment_revision', {
         where: { environment_id: project.id, commit_id: commitId },
     });
     if (existing) {
         revisionId = existing.id;
         if (!existing.is_current) {
             try {
-                const oldCurrent = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+                const oldCurrent = await (driver.findOne as any)('sys_environment_revision', {
                     where: { environment_id: project.id, is_current: true },
                 });
                 if (oldCurrent && oldCurrent.id !== existing.id) {
-                    await (driver.update as any)('sys_project_revision_DEPRECATED', oldCurrent.id, { is_current: false });
+                    await (driver.update as any)('sys_environment_revision', oldCurrent.id, { is_current: false });
                 }
             } catch { /* table may not exist yet */ }
-            await (driver.update as any)('sys_project_revision_DEPRECATED', existing.id, { is_current: true });
+            await (driver.update as any)('sys_environment_revision', existing.id, { is_current: true });
         }
     } else {
         try {
-            const oldCurrent = await (driver.findOne as any)('sys_project_revision_DEPRECATED', {
+            const oldCurrent = await (driver.findOne as any)('sys_environment_revision', {
                 where: { environment_id: project.id, is_current: true },
             });
             if (oldCurrent) {
-                await (driver.update as any)('sys_project_revision_DEPRECATED', oldCurrent.id, { is_current: false });
+                await (driver.update as any)('sys_environment_revision', oldCurrent.id, { is_current: false });
             }
         } catch { /* ok */ }
         const { randomUUID } = await import('node:crypto');
         revisionId = randomUUID();
-        await (driver.create as any)('sys_project_revision_DEPRECATED', {
+        await (driver.create as any)('sys_environment_revision', {
             id: revisionId,
             project_id: project.id,
             commit_id: commitId,

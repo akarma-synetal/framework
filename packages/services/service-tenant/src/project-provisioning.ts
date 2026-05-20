@@ -4,15 +4,18 @@ import { randomUUID } from 'node:crypto';
 import type * as Contracts from '@objectstack/spec/contracts';
 type IDataDriver = Contracts.IDataDriver;
 import type {
-  ProjectCredential,
-  ProjectDriver,
-  Project,
-  ProvisionProjectRequest,
-  ProvisionProjectResponse,
+  EnvironmentCredential as ProjectCredential,
+  EnvironmentDriver as ProjectDriver,
+  Environment as Project,
+  ProvisionEnvironmentRequest as ProvisionProjectRequest,
+  ProvisionEnvironmentResponse as ProvisionProjectResponse,
   ProvisionOrganizationRequest,
   ProvisionOrganizationResponse,
 } from '@objectstack/spec/cloud';
-import { ProvisionProjectRequestSchema, ProvisionOrganizationRequestSchema } from '@objectstack/spec/cloud';
+import {
+  ProvisionEnvironmentRequestSchema as ProvisionProjectRequestSchema,
+  ProvisionOrganizationRequestSchema,
+} from '@objectstack/spec/cloud';
 import { TursoPlatformClient } from './turso-platform-client.js';
 
 /**
@@ -320,7 +323,7 @@ export class ProjectProvisioningService {
 
     const defaultProject = await this.provisionProject({
       organizationId: parsed.organizationId,
-      displayName: parsed.defaultProjectDisplayName,
+      displayName: parsed.defaultEnvironmentDisplayName,
       driver: parsed.driver,
       plan: parsed.plan,
       storageLimitMb: parsed.storageLimitMb,
@@ -330,7 +333,7 @@ export class ProjectProvisioningService {
     });
 
     return {
-      defaultProject,
+      defaultEnvironment: defaultProject,
       durationMs: Date.now() - startedAt,
       warnings: defaultProject.warnings,
     };
@@ -467,7 +470,7 @@ export class ProjectProvisioningService {
 
     const credential: ProjectCredential = {
       id: credentialId,
-      projectId,
+      environmentId: projectId,
       secretCiphertext: await Promise.resolve(this.encryptor.encrypt(plaintextSecret)),
       encryptionKeyId: this.encryptor.keyId,
       authorization: 'full_access',
@@ -502,7 +505,7 @@ export class ProjectProvisioningService {
 
         await this.config.controlPlaneDriver.create('sys_environment_credential', {
           id: credential.id,
-          environment_id: credential.projectId,
+          environment_id: credential.environmentId,
           secret_ciphertext: credential.secretCiphertext,
           encryption_key_id: credential.encryptionKeyId,
           authorization: credential.authorization,
@@ -548,7 +551,7 @@ export class ProjectProvisioningService {
     }
 
     return {
-      project,
+      environment: project,
       credential,
       durationMs: Date.now() - startedAt,
       warnings: warnings.length > 0 ? warnings : undefined,
@@ -571,7 +574,7 @@ export class ProjectProvisioningService {
 
     const credential: ProjectCredential = {
       id: newCredentialId,
-      projectId,
+      environmentId: projectId,
       secretCiphertext: await Promise.resolve(this.encryptor.encrypt(plaintextSecret)),
       encryptionKeyId: this.encryptor.keyId,
       authorization: 'full_access',
@@ -594,7 +597,7 @@ export class ProjectProvisioningService {
 
     await this.config.controlPlaneDriver.create('sys_environment_credential', {
       id: credential.id,
-      environment_id: credential.projectId,
+      environment_id: credential.environmentId,
       secret_ciphertext: credential.secretCiphertext,
       encryption_key_id: credential.encryptionKeyId,
       authorization: credential.authorization,
@@ -631,7 +634,7 @@ export class ProjectProvisioningService {
           const nowIso = new Date().toISOString();
 
           return {
-            project: {
+            environment: {
               id: existing.id,
               organizationId: existing.organization_id,
               displayName: existing.display_name,
@@ -651,7 +654,7 @@ export class ProjectProvisioningService {
             },
             credential: {
               id: credentialId,
-              projectId: SYSTEM_PROJECT_ID,
+              environmentId: SYSTEM_PROJECT_ID,
               secretCiphertext: '',
               encryptionKeyId: this.encryptor.keyId,
               authorization: 'full_access',
@@ -695,7 +698,7 @@ export class ProjectProvisioningService {
 
     const credential: ProjectCredential = {
       id: credentialId,
-      projectId: SYSTEM_PROJECT_ID,
+      environmentId: SYSTEM_PROJECT_ID,
       secretCiphertext: '',
       encryptionKeyId: this.encryptor.keyId,
       authorization: 'full_access',
@@ -736,7 +739,7 @@ export class ProjectProvisioningService {
       }
     }
 
-    return { project, credential, durationMs: Date.now() - startedAt, warnings };
+    return { environment: project, credential, durationMs: Date.now() - startedAt, warnings };
   }
 
   registerAdapter(adapter: ProjectDatabaseAdapter): void {
