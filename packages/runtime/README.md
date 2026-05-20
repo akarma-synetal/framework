@@ -574,6 +574,68 @@ export class HealthCheckPlugin implements Plugin {
 }
 ```
 
+## Production Hardening
+
+The runtime ships zero-dependency primitives for production HTTP deployments.
+All defaults are safe / no-op so opting in is gradual.
+
+### Security headers (on by default)
+
+`createDispatcherPlugin` adds CSP / X-Content-Type-Options / X-Frame-Options /
+Referrer-Policy / Permissions-Policy / Cross-Origin-Resource-Policy to every
+response. HSTS is opt-in (only enable once TLS is confirmed). See
+[`docs/HARDENING.md`](../../docs/HARDENING.md).
+
+```ts
+createDispatcherPlugin({
+  securityHeaders: {
+    hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+    csp: "default-src 'self'",
+  },
+});
+```
+
+### Rate limiting (primitive — wire per-adapter)
+
+Token-bucket `RateLimiter` with pluggable `RateLimitStore` (in-memory default,
+Redis-friendly contract). Curated `DEFAULT_RATE_LIMITS` for auth / write / read
+buckets. Fastify / Hono / Express recipes in
+[`docs/HARDENING.md`](../../docs/HARDENING.md#rate-limiting).
+
+```ts
+import { RateLimiter, DEFAULT_RATE_LIMITS } from '@objectstack/runtime';
+
+const limiter = new RateLimiter(DEFAULT_RATE_LIMITS.auth);
+const decision = limiter.consume(`ip:${ip}`);
+if (!decision.allowed) reply.code(429).send({ retryAfterMs: decision.retryAfterMs });
+```
+
+### Observability (opt-in adapters)
+
+`createDispatcherPlugin` instruments every route with request-id propagation,
+`http_requests_total{method,route,status}`, `http_request_duration_ms`,
+`http_request_errors_total`, and 5xx error reporting. Plug your own
+`MetricsRegistry` (Prometheus / OTel) and `ErrorReporter` (Sentry / Datadog).
+Adapter recipes + go-live checklist in
+[`docs/OBSERVABILITY.md`](../../docs/OBSERVABILITY.md).
+
+```ts
+import {
+  createDispatcherPlugin,
+  type MetricsRegistry,
+  type ErrorReporter,
+} from '@objectstack/runtime';
+
+createDispatcherPlugin({
+  observability: {
+    metrics: promMetrics,           // your MetricsRegistry adapter
+    errorReporter: sentryReporter,  // your ErrorReporter adapter
+  },
+});
+```
+
+Defaults are noop — zero overhead until you plug an adapter.
+
 ## Documentation
 
 - [MiniKernel Guide](../../MINI_KERNEL_GUIDE.md) - Complete API documentation and patterns

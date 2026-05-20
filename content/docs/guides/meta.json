@@ -29,6 +29,7 @@
     "---Operations---",
     "deployment-vercel",
     "cloud-deployment",
+    "production-readiness",
     "publish-and-preview",
     "single-project-mode",
     "objectql-migration",

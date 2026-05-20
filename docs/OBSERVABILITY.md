@@ -1,6 +1,8 @@
 # Observability
 
 > `@objectstack/runtime` ships pluggable observability primitives so production deployments can wire Prometheus / OpenTelemetry / Sentry without the framework taking a hard dependency on any of them.
+>
+> **See also:** [Production HTTP Hardening](./HARDENING.md) — security headers, rate limiting, CSRF, JWT/session lifecycle.
 
 ## TL;DR
 

@@ -4,6 +4,9 @@ This guide covers the HTTP-layer defences ObjectStack ships out of the
 box, what's opt-in vs on by default, and what you must wire at the
 adapter layer for a production deployment.
 
+> **See also:** [Observability](./OBSERVABILITY.md) — metrics, request
+> ids, and error reporting for the same dispatcher plugin.
+
 ## TL;DR
 
 | Concern                                | Default               | Where                          |
@@ -15,6 +18,7 @@ adapter layer for a production deployment.
 | Auth (better-auth)                     | On                    | `@objectstack/plugin-auth`     |
 | Project membership (RBAC)              | On when scoped        | dispatcher plugin              |
 | Field- and row-level perms             | On                    | SecurityPlugin                 |
+| Request id / metrics / 5xx reporting   | Noop default          | see [Observability](./OBSERVABILITY.md) |
 
 ## Security response headers
 
