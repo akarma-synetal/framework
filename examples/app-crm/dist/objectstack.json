@@ -17015,7 +17015,7 @@
         }
       ],
       "object": "lead",
-      "template": "header-sidebar-main",
+      "template": "full-width",
       "regions": [
         {
           "name": "header",
@@ -17062,6 +17062,21 @@
               }
             },
             {
+              "type": "record:highlights",
+              "id": "lead_highlights",
+              "label": "Key Information",
+              "properties": {
+                "fields": [
+                  "status",
+                  "rating",
+                  "lead_source",
+                  "owner",
+                  "email",
+                  "phone"
+                ]
+              }
+            },
+            {
               "type": "record:path",
               "id": "lead_path",
               "label": "Lead Status Path",
@@ -17090,28 +17105,6 @@
           ]
         },
         {
-          "name": "sidebar",
-          "width": "medium",
-          "components": [
-            {
-              "type": "record:highlights",
-              "id": "lead_highlights",
-              "label": "Key Information",
-              "properties": {
-                "fields": [
-                  "status",
-                  "rating",
-                  "lead_source",
-                  "owner",
-                  "email",
-                  "phone"
-                ],
-                "layout": "vertical"
-              }
-            }
-          ]
-        },
-        {
           "name": "main",
           "width": "large",
           "components": [
@@ -17133,7 +17126,53 @@
                         "label": "Lead Details",
                         "properties": {
                           "columns": "2",
-                          "layout": "auto"
+                          "layout": "auto",
+                          "sections": [
+                            {
+                              "label": "Lead Information",
+                              "fields": [
+                                "salutation",
+                                "first_name",
+                                "last_name",
+                                "title",
+                                "company",
+                                "industry"
+                              ]
+                            },
+                            {
+                              "label": "Contact",
+                              "fields": [
+                                "email",
+                                "phone",
+                                "mobile",
+                                "website"
+                              ]
+                            },
+                            {
+                              "label": "Lead Detail",
+                              "fields": [
+                                "status",
+                                "rating",
+                                "lead_source",
+                                "owner",
+                                "annual_revenue",
+                                "number_of_employees"
+                              ]
+                            },
+                            {
+                              "label": "Address",
+                              "fields": [
+                                "address"
+                              ]
+                            },
+                            {
+                              "label": "Description",
+                              "fields": [
+                                "description"
+                              ],
+                              "columns": 1
+                            }
+                          ]
                         }
                       }
                     ]
@@ -17406,7 +17445,7 @@
         }
       ],
       "object": "opportunity",
-      "template": "header-sidebar-main",
+      "template": "full-width",
       "regions": [
         {
           "name": "header",
@@ -17420,12 +17459,53 @@
                 "title": "{name}",
                 "subtitle": "{account}",
                 "icon": "briefcase",
-                "breadcrumb": true,
+                "breadcrumb": true
+              }
+            },
+            {
+              "type": "record:quick_actions",
+              "id": "opp_header_actions",
+              "properties": {
                 "actions": [
-                  "edit",
-                  "delete",
-                  "clone",
-                  "share"
+                  {
+                    "name": "clone_opportunity",
+                    "label": "Clone Opportunity",
+                    "objectName": "opportunity",
+                    "icon": "copy",
+                    "type": "script",
+                    "body": {
+                      "language": "js",
+                      "source": "\n      const id = ctx.recordId;\n      if (!id) throw new Error('clone_opportunity requires a recordId');\n      // NOTE: The previous implementation read the source record via find()\n      // and copied selected fields. Under the QuickJS WASM sandbox this\n      // pattern triggers an emscripten 'memory access out of bounds' fault\n      // when marshalling certain row shapes. As a workaround we clone the\n      // minimal field set required to seed a new opportunity, copying only\n      // the source id reference; downstream owners can hydrate the rest.\n      const inserted = await ctx.api.object('opportunity').insert({\n        name: 'Copy of opportunity ' + id,\n        stage: 'prospecting',\n      });\n      return { id: inserted?.id ?? null };\n    ",
+                      "capabilities": [
+                        "api.read",
+                        "api.write"
+                      ],
+                      "timeoutMs": 5000
+                    },
+                    "locations": [
+                      "record_header",
+                      "record_more"
+                    ],
+                    "successMessage": "Opportunity cloned successfully!",
+                    "refreshAfter": true
+                  }
+                ],
+                "location": "record_header",
+                "align": "end"
+              }
+            },
+            {
+              "type": "record:highlights",
+              "id": "opp_highlights",
+              "label": "Key Information",
+              "properties": {
+                "fields": [
+                  "amount",
+                  "close_date",
+                  "probability",
+                  "expected_revenue",
+                  "owner",
+                  "account"
                 ]
               }
             },
@@ -17485,37 +17565,29 @@
                         "id": "opp_details",
                         "label": "Opportunity Details",
                         "properties": {
+                          "columns": 2,
+                          "layout": "auto",
                           "sections": [
                             {
                               "label": "Opportunity Information",
-                              "columns": 2,
                               "fields": [
-                                {
-                                  "field": "name",
-                                  "required": true,
-                                  "colSpan": 2
-                                },
-                                {
-                                  "field": "account",
-                                  "required": true
-                                },
-                                {
-                                  "field": "owner"
-                                },
-                                {
-                                  "field": "stage",
-                                  "required": true
-                                },
-                                {
-                                  "field": "probability"
-                                },
-                                {
-                                  "field": "amount"
-                                },
-                                {
-                                  "field": "close_date",
-                                  "required": true
-                                }
+                                "name",
+                                "account",
+                                "owner",
+                                "type",
+                                "lead_source",
+                                "campaign"
+                              ]
+                            },
+                            {
+                              "label": "Stage & Forecast",
+                              "fields": [
+                                "stage",
+                                "probability",
+                                "amount",
+                                "expected_revenue",
+                                "close_date",
+                                "forecast_category"
                               ]
                             },
                             {
@@ -17523,14 +17595,8 @@
                               "columns": 1,
                               "collapsible": true,
                               "fields": [
-                                {
-                                  "field": "description",
-                                  "colSpan": 1
-                                },
-                                {
-                                  "field": "next_step",
-                                  "colSpan": 1
-                                }
+                                "description",
+                                "next_step"
                               ]
                             }
                           ]
@@ -17643,60 +17709,6 @@
                     ]
                   }
                 ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "sidebar",
-          "width": "medium",
-          "components": [
-            {
-              "type": "record:highlights",
-              "id": "opp_highlights",
-              "label": "Key Information",
-              "properties": {
-                "fields": [
-                  "amount",
-                  "close_date",
-                  "probability",
-                  "expected_revenue",
-                  "owner",
-                  "account"
-                ],
-                "layout": "vertical"
-              }
-            },
-            {
-              "type": "page:card",
-              "id": "opp_quick_actions",
-              "label": "Quick Actions",
-              "properties": {
-                "title": "Quick Actions",
-                "bordered": true,
-                "actions": [
-                  "log_call",
-                  "create_task",
-                  "schedule_meeting",
-                  "send_email"
-                ]
-              }
-            },
-            {
-              "type": "ai:chat_window",
-              "id": "opp_ai_assistant",
-              "label": "AI Assistant",
-              "properties": {
-                "mode": "sidebar",
-                "agentId": "sales_assistant",
-                "context": {
-                  "recordType": "opportunity",
-                  "recordId": "{record.id}"
-                }
-              },
-              "visibility": {
-                "dialect": "cel",
-                "source": "record.stage == \"negotiation\" || record.stage == \"proposal\""
               }
             }
           ]
