@@ -172,32 +172,6 @@ export const SysProject = ObjectSchema.create({
     },
 
     // ────────────────────────────────────────────────────────────────────
-    // Quick-access actions — primary "how do I open this project?" CTAs
-    // rendered at the top of the record header. Use ${data.hostname} CEL
-    // templating so each project resolves to its own URL.
-    // ────────────────────────────────────────────────────────────────────
-    {
-      name: 'open_project_console',
-      label: 'Open Console',
-      icon: 'external-link',
-      variant: 'primary',
-      type: 'url',
-      locations: ['record_header'],
-      target: 'https://${data.hostname}/_console',
-      description: 'Open this project\'s admin Console in a new tab.',
-    },
-    {
-      name: 'open_project_api',
-      label: 'API Reference',
-      icon: 'code',
-      variant: 'secondary',
-      type: 'url',
-      locations: ['record_header'],
-      target: 'https://${data.hostname}/api/v1',
-      description: 'Open this project\'s REST API root in a new tab.',
-    },
-
-    // ────────────────────────────────────────────────────────────────────
     // Status-machine row actions (replace direct status field edits).
     // ────────────────────────────────────────────────────────────────────
     {
@@ -343,13 +317,34 @@ export const SysProject = ObjectSchema.create({
     // API Reference actions at the top of the page are shortcuts to this
     // URL, derived from the hostname value below.
     hostname: Field.text({
-      label: 'Public URL (Hostname)',
+      label: 'Public Hostname',
       required: false,
       maxLength: 255,
       unique: true,
       readonly: true,
       description:
-        'The canonical hostname where this project is served. Open `https://<hostname>/_console` for the admin UI, or `https://<hostname>/api/v1/...` for the REST API. Use the Change Hostname action to update.',
+        'The canonical hostname where this project is served. Use the Change Hostname action to update.',
+      group: 'Access',
+    }),
+
+    // Clickable console URL — pre-computed at provisioning time so the
+    // detail page renders a real `<a>` link (Field.url widget) without
+    // needing template substitution at view-render time.
+    console_url: Field.url({
+      label: 'Open Console',
+      required: false,
+      readonly: true,
+      description:
+        'Click to open this project\'s admin Console in a new tab. Auto-derived from hostname.',
+      group: 'Access',
+    }),
+
+    api_base_url: Field.url({
+      label: 'API Base URL',
+      required: false,
+      readonly: true,
+      description:
+        'Root of this project\'s REST API. Append `/sys_user`, `/data/<object>`, etc. Auto-derived from hostname.',
       group: 'Access',
     }),
 

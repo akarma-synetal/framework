@@ -453,6 +453,8 @@ export class ProjectProvisioningService {
           provisioned_at: project.provisionedAt,
           metadata: project.metadata ? JSON.stringify(project.metadata) : null,
           hostname: project.hostname,
+          console_url: project.hostname ? `https://${project.hostname}/_console` : null,
+          api_base_url: project.hostname ? `https://${project.hostname}/api/v1` : null,
           visibility: project.visibility ?? 'private',
         });
 
@@ -679,6 +681,8 @@ export class ProjectProvisioningService {
           provisioned_at: project.provisionedAt,
           metadata: project.metadata ? JSON.stringify(project.metadata) : null,
           hostname: project.hostname,
+          console_url: project.hostname ? `https://${project.hostname}/_console` : null,
+          api_base_url: project.hostname ? `https://${project.hostname}/api/v1` : null,
           visibility: project.visibility ?? 'private',
         });
 

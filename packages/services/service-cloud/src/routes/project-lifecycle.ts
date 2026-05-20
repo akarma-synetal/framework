@@ -272,7 +272,7 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: RouteD
             } catch { /* ignore */ }
         }
 
-        const success = await patchProject(projectId, { hostname });
+        const success = await patchProject(projectId, { hostname, console_url: `https://${hostname}/_console`, api_base_url: `https://${hostname}/api/v1` });
         if (!success) return res.status(500).json(fail('Failed to persist update', 500));
         return res.json(ok({ projectId, hostname }));
     });
@@ -391,7 +391,7 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: RouteD
                 }
             } catch { /* ignore */ }
         }
-        const success = await patchProject(projectId, { hostname });
+        const success = await patchProject(projectId, { hostname, console_url: `https://${hostname}/_console`, api_base_url: `https://${hostname}/api/v1` });
         if (!success) return res.status(500).json(fail('Failed to persist update', 500));
         return res.json(ok({ projectId, hostname }));
     };
