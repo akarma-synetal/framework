@@ -27,6 +27,8 @@ import { registerCloudRoutes } from './routes/cloud.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerBranchRoutes } from './routes/branches.js';
 import { registerProjectLifecycleRoutes } from './routes/project-lifecycle.js';
+import { registerPackageInstallRoutes } from './routes/package-install.js';
+import type { ProjectTemplate } from './multi-project-plugin.js';
 import type { RouteDeps } from './routes/types.js';
 
 type AnyContext = any;
@@ -45,6 +47,13 @@ export interface CloudArtifactApiPluginOptions {
         service?: 'file-storage' | IStorageService;
         keyPrefix?: string;
     };
+    /**
+     * Template registry — used by the package-install route to lazy-snapshot
+     * a starter template into `sys_package_version.manifest_json` on first
+     * install. When omitted, install of un-snapshotted starter packages
+     * will return 409.
+     */
+    templates?: Record<string, ProjectTemplate>;
 }
 
 export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOptions): any {
@@ -108,6 +117,7 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
             registerPublicRoutes(server, deps);
             registerBranchRoutes(server, deps);
             registerProjectLifecycleRoutes(server, deps);
+            registerPackageInstallRoutes(server, { ...deps, templates: options.templates });
         },
         stop: async (_ctx: AnyContext) => {},
     };

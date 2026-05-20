@@ -166,6 +166,21 @@ export class SqlDriver implements IDataDriver {
   /** In-flight ensure promise; deduplicates concurrent first calls. */
   protected sequencesTableEnsurePromise: Promise<void> | null = null;
 
+  /**
+   * Per-table tenant-isolation column. Populated during `initObjects` by
+   * detecting an `organization_id` field. When set and the caller passes
+   * `DriverOptions.tenantId`, the driver automatically:
+   *
+   *   - scopes reads/updates/deletes/aggregates to that tenant
+   *   - injects `organization_id` on inserts that omit it
+   *
+   * If `tenantId` is absent (admin / seed / system path) no scope is
+   * applied — preserves backward compatibility for tools that legitimately
+   * need cross-tenant access. Tenant enforcement is therefore opt-in by
+   * the caller, not by the driver.
+   */
+  protected tenantFieldByTable: Record<string, string | null> = {};
+
   /** Whether the underlying database is a SQLite variant (sqlite3 or better-sqlite3). */
   protected get isSqlite(): boolean {
     const c = (this.config as any).client;
@@ -294,6 +309,7 @@ export class SqlDriver implements IDataDriver {
 
   async find(object: string, query: QueryAST, options?: DriverOptions): Promise<any[]> {
     const builder = this.getBuilder(object, options);
+    this.applyTenantScope(builder, object, options);
 
     // SELECT
     if (query.fields) {
@@ -349,7 +365,9 @@ export class SqlDriver implements IDataDriver {
   async findOne(object: string, query: QueryAST, options?: DriverOptions): Promise<any> {
     // When called with a string/number id fall back gracefully
     if (typeof query === 'string' || typeof query === 'number') {
-      const res = await this.getBuilder(object, options).where('id', query).first();
+      const builder = this.getBuilder(object, options).where('id', query);
+      this.applyTenantScope(builder, object, options);
+      const res = await builder.first();
       return this.formatOutput(object, res) || null;
     }
 
@@ -383,6 +401,7 @@ export class SqlDriver implements IDataDriver {
       toInsert.id = nanoid(DEFAULT_ID_LENGTH);
     }
 
+    this.injectTenantOnInsert(object, toInsert, options);
     await this.fillAutoNumberFields(object, toInsert, options);
 
     const builder = this.getBuilder(object, options);
@@ -569,7 +588,8 @@ export class SqlDriver implements IDataDriver {
   }
 
   async update(object: string, id: string | number, data: Record<string, any>, options?: DriverOptions): Promise<any> {
-    const builder = this.getBuilder(object, options);
+    const builder = this.getBuilder(object, options).where('id', id);
+    this.applyTenantScope(builder, object, options);
     const formatted = this.formatInput(object, data);
 
     if (this.tablesWithTimestamps.has(object)) {
@@ -581,9 +601,11 @@ export class SqlDriver implements IDataDriver {
       }
     }
 
-    await builder.where('id', id).update(formatted);
+    await builder.update(formatted);
 
-    const updated = await this.getBuilder(object, options).where('id', id).first();
+    const readback = this.getBuilder(object, options).where('id', id);
+    this.applyTenantScope(readback, object, options);
+    const updated = await readback.first();
     return this.formatOutput(object, updated) || null;
   }
 
@@ -597,6 +619,7 @@ export class SqlDriver implements IDataDriver {
       toUpsert.id = nanoid(DEFAULT_ID_LENGTH);
     }
 
+    this.injectTenantOnInsert(object, toUpsert, options);
     await this.fillAutoNumberFields(object, toUpsert, options);
 
     const formatted = this.formatInput(object, toUpsert);
@@ -605,13 +628,16 @@ export class SqlDriver implements IDataDriver {
     const builder = this.getBuilder(object, options);
     await builder.insert(formatted).onConflict(mergeKeys).merge();
 
-    const result = await this.getBuilder(object, options).where('id', toUpsert.id).first();
+    const readback = this.getBuilder(object, options).where('id', toUpsert.id);
+    this.applyTenantScope(readback, object, options);
+    const result = await readback.first();
     return this.formatOutput(object, result) || toUpsert;
   }
 
   async delete(object: string, id: string | number, options?: DriverOptions): Promise<boolean> {
-    const builder = this.getBuilder(object, options);
-    const count = await builder.where('id', id).delete();
+    const builder = this.getBuilder(object, options).where('id', id);
+    this.applyTenantScope(builder, object, options);
+    const count = await builder.delete();
     return count > 0;
   }
 
@@ -620,6 +646,9 @@ export class SqlDriver implements IDataDriver {
   // ===================================
 
   async bulkCreate(object: string, data: any[], options?: DriverOptions): Promise<any> {
+    for (const row of data) {
+      if (row && typeof row === 'object') this.injectTenantOnInsert(object, row, options);
+    }
     const builder = this.getBuilder(object, options);
     return await builder.insert(data).returning('*');
   }
@@ -639,12 +668,14 @@ export class SqlDriver implements IDataDriver {
   }
 
   async bulkDelete(object: string, ids: Array<string | number>, options?: DriverOptions): Promise<void> {
-    const builder = this.getBuilder(object, options);
-    await builder.whereIn('id', ids).delete();
+    const builder = this.getBuilder(object, options).whereIn('id', ids);
+    this.applyTenantScope(builder, object, options);
+    await builder.delete();
   }
 
   async updateMany(object: string, query: QueryAST, data: any, options?: DriverOptions): Promise<number> {
     const builder = this.getBuilder(object, options);
+    this.applyTenantScope(builder, object, options);
     if (query.where) this.applyFilters(builder, query.where);
     const count = await builder.update(data);
     return count || 0;
@@ -652,6 +683,7 @@ export class SqlDriver implements IDataDriver {
 
   async deleteMany(object: string, query: QueryAST, options?: DriverOptions): Promise<number> {
     const builder = this.getBuilder(object, options);
+    this.applyTenantScope(builder, object, options);
     if (query.where) this.applyFilters(builder, query.where);
     const count = await builder.delete();
     return count || 0;
@@ -659,6 +691,7 @@ export class SqlDriver implements IDataDriver {
 
   async count(object: string, query?: QueryAST, options?: DriverOptions): Promise<number> {
     const builder = this.getBuilder(object, options);
+    this.applyTenantScope(builder, object, options);
 
     if (query?.where) {
       this.applyFilters(builder, query.where);
@@ -723,6 +756,7 @@ export class SqlDriver implements IDataDriver {
 
   async aggregate(object: string, query: any, options?: DriverOptions): Promise<any> {
     const builder = this.getBuilder(object, options);
+    this.applyTenantScope(builder, object, options);
 
     if (query.where) {
       this.applyFilters(builder, query.where);
@@ -949,6 +983,7 @@ export class SqlDriver implements IDataDriver {
       this.jsonFields[tableName] = jsonCols;
       this.booleanFields[tableName] = booleanCols;
       this.autoNumberFields[tableName] = autoNumberCols;
+      this.tenantFieldByTable[tableName] = tenantField;
 
       let exists = await this.knex.schema.hasTable(tableName);
 
@@ -1067,6 +1102,67 @@ export class SqlDriver implements IDataDriver {
       builder = builder.transacting(options.transaction as Knex.Transaction);
     }
     return builder;
+  }
+
+  /**
+   * Resolve the tenant column for the given object, if any.
+   *
+   * Lookup falls back to both the storage-mapped table name and the raw
+   * object name so callers that pass either form get the same answer.
+   * Returns `null` when the object has no tenant-isolation field.
+   */
+  protected resolveTenantField(object: string): string | null {
+    const tableName = StorageNameMapping.resolveTableName({ name: object } as any);
+    const cached =
+      this.tenantFieldByTable[tableName] ?? this.tenantFieldByTable[object];
+    return cached ?? null;
+  }
+
+  /**
+   * Apply a `WHERE tenant_field = ?` clause to the given query builder
+   * when:
+   *   1. `options.tenantId` is provided by the caller, AND
+   *   2. the object actually has a tenant-isolation field
+   *      (`organization_id` by convention).
+   *
+   * Without a tenantId the call is treated as an unscoped/admin path —
+   * keeps legacy callers, seed scripts, and cross-org tooling working.
+   * This is the single chokepoint for read-side tenant isolation in the
+   * SQL driver; every CRUD method routes through it.
+   */
+  protected applyTenantScope(
+    builder: Knex.QueryBuilder,
+    object: string,
+    options?: DriverOptions,
+  ): Knex.QueryBuilder {
+    const tenantId = (options as any)?.tenantId;
+    if (tenantId === undefined || tenantId === null || tenantId === '') return builder;
+    const field = this.resolveTenantField(object);
+    if (!field) return builder;
+    return builder.where(field, String(tenantId));
+  }
+
+  /**
+   * Auto-inject the tenant column on insert rows when:
+   *   1. `options.tenantId` is provided, AND
+   *   2. the object has a tenant-isolation field, AND
+   *   3. the row does not already set that field.
+   *
+   * Explicit values are never overwritten — admins writing to a specific
+   * tenant via raw row data keep that authority.
+   */
+  protected injectTenantOnInsert(
+    object: string,
+    row: Record<string, any>,
+    options?: DriverOptions,
+  ): void {
+    const tenantId = (options as any)?.tenantId;
+    if (tenantId === undefined || tenantId === null || tenantId === '') return;
+    const field = this.resolveTenantField(object);
+    if (!field) return;
+    if (row[field] === undefined || row[field] === null || row[field] === '') {
+      row[field] = String(tenantId);
+    }
   }
 
   // ── Filter helpers ──────────────────────────────────────────────────────────

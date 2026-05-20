@@ -296,6 +296,7 @@ describe('ObjectQL Engine', () => {
                     object: 'user',
                     where: { id: { $in: ['u1', 'u2'] } },
                 }),
+                undefined,
             );
         });
 
@@ -457,6 +458,7 @@ describe('ObjectQL Engine', () => {
                 expect.objectContaining({
                     where: { id: { $in: ['u1', 'u2'] } },
                 }),
+                undefined,
             );
             expect(result[0].assignee).toEqual({ id: 'u1', name: 'Alice' });
             expect(result[1].assignee).toEqual({ id: 'u1', name: 'Alice' });

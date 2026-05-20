@@ -136,8 +136,8 @@ export const SysPackageVersion = ObjectSchema.create({
 
     created_by: Field.lookup('sys_user', {
       label: 'Created By',
-      required: true,
-      description: 'User that created this version row.',
+      required: false,
+      description: 'User that created this version row. Null for platform-snapshot versions.',
     }),
   },
 

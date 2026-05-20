@@ -18,6 +18,7 @@ import type { ProjectTemplate } from './multi-project-plugin.js';
 import { createControlPlanePlugins } from './control-plane-preset.js';
 import { createTemplatesRoutePlugin } from './multi-project-plugins.js';
 import { createCloudArtifactApiPlugin } from './cloud-artifact-api-plugin.js';
+import { createStarterSeederPlugin } from './starter-seeder-plugin.js';
 import { resolveDefaultDataDir } from './data-dir.js';
 import { resolveStoragePluginFromEnv, resolveStorageFromEnv } from './storage-env.js';
 
@@ -162,7 +163,8 @@ export async function createCloudStack(config: CloudStackConfig): Promise<{
         }),
         ...(storageEnv.plugin ? [storageEnv.plugin] : []),
         createTemplatesRoutePlugin(templateList, { apiPrefix }),
-        createCloudArtifactApiPlugin({ controlDriverPromise, apiPrefix }),
+        createStarterSeederPlugin({ templates, controlDriverPromise }),
+        createCloudArtifactApiPlugin({ controlDriverPromise, apiPrefix, templates }),
     ];
 
     return {

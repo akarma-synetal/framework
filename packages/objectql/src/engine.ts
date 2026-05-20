@@ -578,6 +578,33 @@ export class ObjectQL implements IDataEngine {
   }
 
   /**
+   * Build the DriverOptions blob passed to every IDataDriver call.
+   *
+   * Always carries `tenantId` from the active ExecutionContext so the
+   * driver can enforce per-tenant isolation (SQL driver auto-scopes reads
+   * and auto-injects the tenant column on writes). Existing user-supplied
+   * shapes (transactions, AST extras) are preserved by spreading them
+   * first.
+   *
+   * System / isSystem callers may still cross tenants by clearing
+   * `tenantId` themselves on the resulting object; this helper does not
+   * mask the system path.
+   */
+  private buildDriverOptions(execCtx?: ExecutionContext, base?: any): any {
+    const hasTx = execCtx?.transaction !== undefined;
+    const hasTenant = execCtx?.tenantId !== undefined;
+    if (!hasTx && !hasTenant) return base;
+    const opts: any = base && typeof base === 'object' ? { ...base } : {};
+    if (hasTx && opts.transaction === undefined) {
+      opts.transaction = execCtx!.transaction;
+    }
+    if (hasTenant && opts.tenantId === undefined) {
+      opts.tenantId = execCtx!.tenantId;
+    }
+    return opts;
+  }
+
+  /**
    * Build a HookContext.api: a ScopedContext that hooks can use to
    * read/write other objects within the same execution context.
    * Falls back to a system-elevated empty context when no execCtx
@@ -1153,6 +1180,7 @@ export class ObjectQL implements IDataEngine {
     records: any[],
     expand: Record<string, QueryAST>,
     depth: number = 0,
+    execCtx?: ExecutionContext,
   ): Promise<any[]> {
     if (!records || records.length === 0) return records;
     if (depth >= ObjectQL.MAX_EXPAND_DEPTH) return records;
@@ -1199,7 +1227,12 @@ export class ObjectQL implements IDataEngine {
         };
 
         const driver = this.getDriver(referenceObject);
-        const relatedRecords = await driver.find(referenceObject, relatedQuery) ?? [];
+        // Propagate tenantId so cross-object expansion respects isolation —
+        // e.g. a contact expansion only resolves IDs visible to the caller's
+        // tenant. Without this the driver returns the raw FK target which
+        // would let a maliciously crafted FK reach across tenants.
+        const expandOpts = this.buildDriverOptions(execCtx);
+        const relatedRecords = await driver.find(referenceObject, relatedQuery, expandOpts) ?? [];
 
         // Build a lookup map: id → record
         const recordMap = new Map<string, any>();
@@ -1215,6 +1248,7 @@ export class ObjectQL implements IDataEngine {
             relatedRecords,
             nestedAST.expand,
             depth + 1,
+            execCtx,
           );
           // Rebuild map with expanded records
           recordMap.clear();
@@ -1320,12 +1354,7 @@ export class ObjectQL implements IDataEngine {
           ql: this
       };
       await this.triggerHooks('beforeFind', hookContext);
-      if (opCtx.context?.transaction) {
-        hookContext.input.options = {
-          ...(hookContext.input.options as any),
-          transaction: opCtx.context.transaction,
-        };
-      }
+      hookContext.input.options = this.buildDriverOptions(opCtx.context, hookContext.input.options as any);
 
       try {
           let result = await driver.find(object, hookContext.input.ast as QueryAST, hookContext.input.options as any);
@@ -1335,7 +1364,7 @@ export class ObjectQL implements IDataEngine {
 
           // Post-process: expand related records if expand is requested
           if (ast.expand && Object.keys(ast.expand).length > 0 && Array.isArray(result)) {
-            result = await this.expandRelatedRecords(object, result, ast.expand, 0);
+            result = await this.expandRelatedRecords(object, result, ast.expand, 0, opCtx.context);
           }
           
           hookContext.event = 'afterFind';
@@ -1388,9 +1417,7 @@ export class ObjectQL implements IDataEngine {
     };
 
     await this.executeWithMiddleware(opCtx, async () => {
-      const findOneOpts = opCtx.context?.transaction
-        ? ({ transaction: opCtx.context.transaction } as any)
-        : undefined;
+      const findOneOpts = this.buildDriverOptions(opCtx.context);
       let result = await driver.findOne(objectName, opCtx.ast as QueryAST, findOneOpts);
 
       // Post-process: evaluate formula virtual fields against the raw row
@@ -1398,7 +1425,7 @@ export class ObjectQL implements IDataEngine {
 
       // Post-process: expand related records if expand is requested
       if (ast.expand && Object.keys(ast.expand).length > 0 && result != null) {
-        const expanded = await this.expandRelatedRecords(objectName, [result], ast.expand, 0);
+        const expanded = await this.expandRelatedRecords(objectName, [result], ast.expand, 0, opCtx.context);
         result = expanded[0];
       }
 
@@ -1435,13 +1462,9 @@ export class ObjectQL implements IDataEngine {
       // Thread the open transaction (if any) into the driver-facing
       // options so that knex's `.transacting(trx)` is honoured. Without
       // this, calls inside a `engine.transaction(...)` block would deadlock
-      // on SQLite's single-connection pool.
-      if (opCtx.context?.transaction) {
-        hookContext.input.options = {
-          ...(hookContext.input.options as any),
-          transaction: opCtx.context.transaction,
-        };
-      }
+      // on SQLite's single-connection pool. Also propagates tenantId so
+      // the driver can enforce per-tenant isolation.
+      hookContext.input.options = this.buildDriverOptions(opCtx.context, hookContext.input.options as any);
 
       try {
         let result;
@@ -1550,12 +1573,7 @@ export class ObjectQL implements IDataEngine {
           ql: this
        };
        await this.triggerHooks('beforeUpdate', hookContext);
-       if (opCtx.context?.transaction) {
-         hookContext.input.options = {
-           ...(hookContext.input.options as any),
-           transaction: opCtx.context.transaction,
-         };
-       }
+       hookContext.input.options = this.buildDriverOptions(opCtx.context, hookContext.input.options as any);
 
        try {
            let result;
@@ -1635,12 +1653,7 @@ export class ObjectQL implements IDataEngine {
           ql: this
       };
       await this.triggerHooks('beforeDelete', hookContext);
-      if (opCtx.context?.transaction) {
-        hookContext.input.options = {
-          ...(hookContext.input.options as any),
-          transaction: opCtx.context.transaction,
-        };
-      }
+      hookContext.input.options = this.buildDriverOptions(opCtx.context, hookContext.input.options as any);
 
       try {
           let result;
@@ -1699,12 +1712,13 @@ export class ObjectQL implements IDataEngine {
      };
 
      await this.executeWithMiddleware(opCtx, async () => {
+       const countOpts = this.buildDriverOptions(opCtx.context);
        if (driver.count) {
            const ast: QueryAST = { object, where: query?.where };
-           return driver.count(object, ast);
+           return driver.count(object, ast, countOpts);
        }
        // Fallback to find().length
-       const res = await this.find(object, { where: query?.where, fields: ['id'] });
+       const res = await this.find(object, { where: query?.where, fields: ['id'], context: opCtx.context });
        return res.length;
      });
 
@@ -1751,14 +1765,14 @@ export class ObjectQL implements IDataEngine {
             return granularityCaps?.[g.dateGranularity] === true;
         });
         if (typeof drv.aggregate === 'function' && allStructuredSupported) {
-            return drv.aggregate(object, ast);
+            return drv.aggregate(object, ast, this.buildDriverOptions(opCtx.context));
         }
         // In-memory fallback path: ask the driver for raw rows, then bucket +
         // aggregate here. This guarantees `groupBy` (incl. structured items
         // carrying `dateGranularity`) and `aggregations` always work even on
         // drivers that have no native aggregation support (driver-rest,
         // driver-memory, partial SQL drivers).
-        const raw = await driver.find(object, ast);
+        const raw = await driver.find(object, ast, this.buildDriverOptions(opCtx.context));
         return applyInMemoryAggregation(raw, ast);
       });
 
