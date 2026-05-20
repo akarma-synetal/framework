@@ -160,6 +160,39 @@ export class AuthProxyPlugin implements Plugin {
                     const isCallback = subPath.startsWith('oauth2/callback');
                     const startAt = Date.now();
                     const resp = await fn(c.req.raw);
+
+                    // ── Cookie-leak cleanup ─────────────────────────────────
+                    // Cloud previously set OS_COOKIE_DOMAIN=.objectos.app,
+                    // which made cloud's better-auth session cookies leak
+                    // into every *.objectos.app project subdomain and
+                    // collide with each project's own session_token.
+                    // The setting has been removed from cloud, but existing
+                    // browsers still carry the wide-scoped cookies. Append
+                    // delete instructions (Max-Age=0 + matching Domain) on
+                    // every per-project auth response so the leaked cookies
+                    // get drained on the next auth round-trip. Safe to keep
+                    // long-term: it only deletes cookies on a parent domain
+                    // that project containers never legitimately set.
+                    const rootDomain = process.env.OS_ROOT_DOMAIN || '';
+                    if (rootDomain) {
+                        const leakyDomain = rootDomain.startsWith('.') ? rootDomain : `.${rootDomain}`;
+                        const leakyNames = [
+                            '__Secure-better-auth.session_token',
+                            'better-auth.session_token',
+                            '__Secure-better-auth.state',
+                            'better-auth.state',
+                            '__Secure-better-auth.csrf_token',
+                            'better-auth.csrf_token',
+                        ];
+                        try {
+                            for (const n of leakyNames) {
+                                const isSecure = n.startsWith('__Secure-');
+                                const attrs = `Max-Age=0; Path=/; Domain=${leakyDomain}; SameSite=Lax${isSecure ? '; Secure' : ''}`;
+                                (resp as any).headers?.append?.('Set-Cookie', `${n}=; ${attrs}`);
+                            }
+                        } catch { /* best-effort cleanup */ }
+                    }
+
                     // Plan-A diag: capture last oauth2/callback for debug.
                     // TODO(plan-a): remove once SSO is green.
                     if (isCallback) {
