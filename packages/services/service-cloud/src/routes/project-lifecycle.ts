@@ -40,6 +40,65 @@ function readActorIdFromHeaders(req: any): string | undefined {
 function nowIso() { return new Date().toISOString(); }
 
 /**
+ * Best-effort re-seed of the per-project SSO client's `redirect_uris`.
+ *
+ * Called whenever a project's hostname changes (initial provision or
+ * subsequent `change_hostname`) so that the cloud OAuth2 provider accepts
+ * the new `https://<hostname>/api/v1/auth/oauth2/callback/<provider>`
+ * callback. Without this, OAuth flows from a renamed environment fail
+ * with `INVALID_CALLBACK_URL` because the client's stored whitelist
+ * still references the OLD hostname.
+ *
+ * Failures are logged but never thrown — a missing SSO row should NOT
+ * block hostname changes (the user can always re-run the action).
+ */
+async function reseedPlatformSsoForHostname(
+    getDriver: () => Promise<any>,
+    projectId: string,
+    hostname: string,
+): Promise<void> {
+    try {
+        const baseSecret = (process.env.OS_AUTH_SECRET ?? process.env.AUTH_SECRET ?? '').trim();
+        if (!baseSecret) {
+            console.warn('[ProjectLifecycle] OS_AUTH_SECRET not set — skipping SSO re-seed', { projectId });
+            return;
+        }
+        const driver = await getDriver();
+        if (!driver) return;
+        const qlAdapter = {
+            find: async (object: string, q: any, _opts?: any) => {
+                return await (driver.find as any)(object, q);
+            },
+            insert: async (object: string, data: any, _opts?: any) => {
+                return await (driver.create as any)(object, data);
+            },
+            update: async (object: string, data: any, where: any, _opts?: any) => {
+                const id = where?.id;
+                if (id) {
+                    return await (driver.update as any)(object, id, data);
+                }
+                const rows = await (driver.find as any)(object, { where, limit: 1 });
+                const list = Array.isArray(rows) ? rows : Array.isArray((rows as any)?.records) ? (rows as any).records : [];
+                const row = list[0];
+                if (row?.id) {
+                    return await (driver.update as any)(object, row.id, data);
+                }
+            },
+        };
+        const { seedPlatformSsoClient } = await import('@objectstack/runtime');
+        await seedPlatformSsoClient({
+            ql: qlAdapter as any,
+            projectId,
+            hostname,
+            baseSecret,
+            logger: console,
+        });
+    } catch (ssoErr: any) {
+        console.warn('[ProjectLifecycle] platform SSO re-seed failed (non-fatal):', ssoErr?.message ?? ssoErr);
+    }
+}
+
+/**
  * Resolve the new hostname for a change-hostname call.
  *
  * Users (and the Cloud Control UI) typically pass just a subdomain label
@@ -360,6 +419,9 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: Packag
 
         const success = await patchProject(projectId, { hostname, console_url: `https://${hostname}/_console`, api_base_url: `https://${hostname}/api/v1` });
         if (!success) return res.status(500).json(fail('Failed to persist update', 500));
+        // Re-seed SSO client so OAuth callbacks at the new hostname pass
+        // the cloud OAuth2 provider's redirect-URI whitelist.
+        await reseedPlatformSsoForHostname(getDriver, projectId, hostname);
         return res.json(ok({ projectId, hostname }));
     });
 
@@ -477,6 +539,10 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: Packag
         }
         const success = await patchProject(projectId, { hostname, console_url: `https://${hostname}/_console`, api_base_url: `https://${hostname}/api/v1` });
         if (!success) return res.status(500).json(fail('Failed to persist update', 500));
+        // Re-seed the project's SSO client so the cloud OAuth2 provider
+        // accepts callbacks at the new hostname (otherwise the per-env
+        // runtime gets `INVALID_CALLBACK_URL` on the next login).
+        await reseedPlatformSsoForHostname(getDriver, projectId, hostname);
         return res.json(ok({ projectId, hostname }));
     };
 
