@@ -183,7 +183,7 @@ export const SysPackage = ObjectSchema.create({
   actions: [
     {
       name: 'install_package',
-      label: 'Install into Environment',
+      label: 'Install into Project',
       icon: 'download-cloud',
       variant: 'primary',
       type: 'api',
@@ -191,16 +191,18 @@ export const SysPackage = ObjectSchema.create({
       target: '/api/v1/cloud/packages/{id}/install',
       method: 'POST',
       recordIdParam: 'id',
-      successMessage: 'Package installed. Environment will reload on next request.',
+      successMessage: 'Package installed. Project will reload on next request.',
       refreshAfter: true,
       params: [
         {
           name: 'environment_id',
-          label: 'Target Environment',
+          label: 'Target Project',
           type: 'text',
           required: true,
-          placeholder: 'env_xxx (paste from Environments)',
-          description: 'ID of the environment to install this package into.',
+          placeholder: 'proj_xxx (paste from Projects)',
+          description: 'ID of the project to install this package into. ' +
+            '(Param name `environment_id` is retained for backwards compat; will be renamed when ' +
+            'sys_environment lands per ADR-0006 Phase 1.)',
         },
       ],
     },

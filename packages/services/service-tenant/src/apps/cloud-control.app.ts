@@ -46,18 +46,18 @@ export const CLOUD_CONTROL_APP: App = {
   // hidden from the navigation to keep the App focused on real user tasks.
   //
   // Branches are a Builder-persona concept (per ADR-0006). For the default
-  // Consumer flow — create an Environment, install from Marketplace — branches
-  // add navigation noise. They re-surface only when a Project authoring
-  // workspace is introduced (deferred until Builder need shows up).
+  // Consumer flow — create a Project, install from Marketplace — branches
+  // add navigation noise. They re-surface when a real Project/Environment
+  // split lands (sys_environment table) — see ADR-0006 Phase 1.
   navigation: [
     {
-      id: 'group_environments',
+      id: 'group_projects',
       type: 'group',
-      label: 'Environments',
-      icon: 'globe',
+      label: 'Projects',
+      icon: 'briefcase',
       children: [
-        { id: 'nav_environments', type: 'object', label: 'Environments', objectName: 'sys_project', icon: 'globe' },
-        { id: 'nav_env_members', type: 'object', label: 'Members', objectName: 'sys_project_member', icon: 'user-cog' },
+        { id: 'nav_projects', type: 'object', label: 'Projects', objectName: 'sys_project', icon: 'briefcase' },
+        { id: 'nav_project_members', type: 'object', label: 'Members', objectName: 'sys_project_member', icon: 'user-cog' },
       ],
     },
     {

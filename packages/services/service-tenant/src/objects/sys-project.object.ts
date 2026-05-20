@@ -40,15 +40,15 @@ const ROOT_DOMAIN_HINT = getRootDomainForUiHints();
  */
 export const SysProject = ObjectSchema.create({
   name: 'sys_project',
-  label: 'Environment',
-  pluralLabel: 'Environments',
-  icon: 'globe',
+  label: 'Project',
+  pluralLabel: 'Projects',
+  icon: 'briefcase',
   isSystem: true,
   managedBy: 'config',
-  description: 'Control-plane registry of runtime environments (prod/test/dev/sandbox). ' +
-    'Each row owns a hostname, a dedicated database, and a plan/quota envelope. ' +
-    'Note: the underlying table is still named `sys_project` for backwards compatibility; ' +
-    'the conceptual rename to "Environment" matches ADR-0006 (3-layer tenancy).',
+  description: 'Control-plane registry of cloud projects. Each project owns a hostname, ' +
+    'a dedicated database, and a plan/quota envelope. ' +
+    'Note: a true Project/Environment split (separate sys_environment table for runtime ' +
+    'instances bound to a project branch) is planned — see ADR-0006 Phase 1.',
   titleFormat: '{display_name}',
   compactLayout: ['display_name', 'plan', 'status', 'hostname', 'is_default'],
 
@@ -128,7 +128,7 @@ export const SysProject = ObjectSchema.create({
     // ────────────────────────────────────────────────────────────────────
     {
       name: 'create_project',
-      label: 'Create Environment',
+      label: 'Create Project',
       icon: 'plus',
       variant: 'primary',
       type: 'api',
@@ -137,9 +137,9 @@ export const SysProject = ObjectSchema.create({
       method: 'POST',
       mode: 'create',
       refreshAfter: true,
-      successMessage: 'Environment provisioned.',
+      successMessage: 'Project provisioned.',
       params: [
-        { name: 'displayName', label: 'Display Name', type: 'text', required: true, placeholder: 'My new environment' },
+        { name: 'displayName', label: 'Display Name', type: 'text', required: true, placeholder: 'My new project' },
         {
           name: 'driver',
           label: 'Database Driver',
@@ -205,8 +205,8 @@ export const SysProject = ObjectSchema.create({
       variant: 'secondary',
       type: 'script',
       locations: ['list_item', 'record_header'],
-      confirmText: 'Suspend this environment? All runtime traffic to it will be blocked until you resume.',
-      successMessage: 'Environment suspended.',
+      confirmText: 'Suspend this project? All runtime traffic to it will be blocked until you resume.',
+      successMessage: 'Project suspended.',
       refreshAfter: true,
     },
     {
@@ -216,7 +216,7 @@ export const SysProject = ObjectSchema.create({
       variant: 'secondary',
       type: 'script',
       locations: ['list_item', 'record_header'],
-      successMessage: 'Environment resumed.',
+      successMessage: 'Project resumed.',
       refreshAfter: true,
     },
     {
@@ -226,8 +226,8 @@ export const SysProject = ObjectSchema.create({
       variant: 'danger',
       type: 'script',
       locations: ['list_item', 'record_header'],
-      confirmText: 'Archive this environment? It will be removed from active views. Data is retained for 30 days before deletion.',
-      successMessage: 'Environment archived.',
+      confirmText: 'Archive this project? It will be removed from active views. Data is retained for 30 days before deletion.',
+      successMessage: 'Project archived.',
       refreshAfter: true,
       params: [
         { name: 'reason', label: 'Reason (optional)', type: 'text', required: false },
@@ -240,7 +240,7 @@ export const SysProject = ObjectSchema.create({
       variant: 'secondary',
       type: 'script',
       locations: ['list_item', 'record_header'],
-      successMessage: 'Default environment updated.',
+      successMessage: 'Default project updated.',
       refreshAfter: true,
     },
     {
