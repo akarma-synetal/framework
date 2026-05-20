@@ -356,3 +356,70 @@ describe('SettingsService — Phase 2 cascade chain + lock', () => {
     });
   });
 });
+
+describe('SettingsService — Phase 3 sys_secret + crypto provider + audit', () => {
+  it('routes encrypted writes through sys_secret when wired', async () => {
+    const { InMemoryCryptoProvider } = await import('./in-memory-crypto-provider.js');
+    const secretRows = new Map<string, any>();
+    const auditRows: any[] = [];
+
+    const svc = new SettingsService({
+      env: {},
+      cryptoProvider: new InMemoryCryptoProvider(),
+      secretStore: {
+        async insert(row) { secretRows.set(row.id, row); return { id: row.id }; },
+        async get(id) { return secretRows.get(id) ?? null; },
+        async update(id, patch) { secretRows.set(id, { ...secretRows.get(id), ...patch }); },
+      },
+      auditWriter: { write: (e) => { auditRows.push(e); } },
+    });
+    svc.registerManifest(mailSettingsManifest);
+
+    await svc.set('mail', 'api_key', 'super-secret-key', { tenantId: 't1' });
+
+    // sys_secret got the cipher; sys_setting only holds the handle id.
+    expect(secretRows.size).toBe(1);
+    const [secret] = [...secretRows.values()];
+    expect(secret.namespace).toBe('mail');
+    expect(secret.key).toBe('api_key');
+    expect(secret.alg).toBe('aes-256-gcm');
+    expect(secret.ciphertext).not.toContain('super-secret-key');
+
+    // Round-trip read returns the plaintext.
+    const r = await svc.get<string>('mail', 'api_key', { tenantId: 't1' });
+    expect(r.value).toBe('super-secret-key');
+
+    // Audit writer received the set event with a non-leaking digest.
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0]).toMatchObject({
+      namespace: 'mail',
+      key: 'api_key',
+      action: 'set',
+      encrypted: true,
+    });
+    expect(auditRows[0].newHash).toMatch(/^sha256:/);
+    expect(auditRows[0].newHash).not.toContain('super-secret-key');
+  });
+
+  it('AAD binding rejects ciphertexts swapped across (namespace,key)', async () => {
+    const { InMemoryCryptoProvider } = await import('./in-memory-crypto-provider.js');
+    const provider = new InMemoryCryptoProvider();
+    const handle = await provider.encrypt('value', { namespace: 'mail', key: 'api_key' });
+    // Same handle, wrong context → must throw.
+    await expect(
+      provider.decrypt(handle, { namespace: 'mail', key: 'smtp_password' }),
+    ).rejects.toThrow();
+  });
+
+  it('rotateKey bumps version while preserving plaintext + handle id', async () => {
+    const { InMemoryCryptoProvider } = await import('./in-memory-crypto-provider.js');
+    const provider = new InMemoryCryptoProvider();
+    const ctx = { namespace: 'mail', key: 'api_key' };
+    const h1 = await provider.encrypt('hello', ctx);
+    const h2 = await provider.rotateKey(h1, ctx);
+    expect(h2.id).toBe(h1.id);
+    expect(h2.version).toBe(h1.version + 1);
+    expect(h2.ciphertext).not.toBe(h1.ciphertext);
+    expect(await provider.decrypt(h2, ctx)).toBe('hello');
+  });
+});

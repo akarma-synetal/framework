@@ -101,6 +101,65 @@ export interface SettingsAuditSink {
   }): Promise<void> | void;
 }
 
+/**
+ * Persistence hook for the `sys_secret` object — used by the secret
+ * split introduced in Phase 3. When provided, `SettingsService` writes
+ * encrypted specifier values via `ICryptoProvider` into `sys_secret`
+ * and stores only the handle id in `sys_setting.value_enc`. When
+ * absent, the legacy inline `crypto.encrypt → value_enc` path is used.
+ */
+export interface SettingsSecretStore {
+  /** Insert a new secret row; returns the row id (handle id). */
+  insert(row: {
+    id: string;
+    namespace: string;
+    key: string;
+    kms_key_id: string;
+    alg: string;
+    version: number;
+    ciphertext: string;
+  }): Promise<{ id: string }>;
+  /** Look up the latest ciphertext for a handle id; null when missing. */
+  get(id: string): Promise<{
+    id: string;
+    namespace: string;
+    key: string;
+    kms_key_id: string;
+    alg: string;
+    version: number;
+    ciphertext: string;
+  } | null>;
+  /** Replace an existing secret row (used by rotateKey). */
+  update(id: string, patch: {
+    kms_key_id?: string;
+    alg?: string;
+    version?: number;
+    ciphertext?: string;
+  }): Promise<void>;
+}
+
+/**
+ * Append-only writer for the `sys_setting_audit` object — Phase 3
+ * audit trail. Distinct from `SettingsAuditSink` (which still writes
+ * to the generic `sys_audit_log`) so audit consumers can subscribe
+ * to settings activity without scanning the firehose.
+ */
+export interface SettingsAuditWriter {
+  write(entry: {
+    namespace: string;
+    key: string;
+    scope: SpecifierScope;
+    action: 'set' | 'reset' | 'lock' | 'unlock' | 'rotate';
+    source?: 'ui' | 'api' | 'migration' | 'import' | 'system';
+    actorId?: string;
+    oldHash?: string | null;
+    newHash?: string | null;
+    encrypted: boolean;
+    requestId?: string;
+    reason?: string;
+  }): Promise<void> | void;
+}
+
 /** Action handler signature for `Specifier.type === 'action_button'`. */
 export type SettingsActionHandler = (input: {
   namespace: string;
@@ -115,8 +174,19 @@ export interface SettingsServiceOptions {
   engine?: SettingsEngine;
   /** Crypto adapter for `encrypted` values. Defaults to NoopCryptoAdapter. */
   crypto?: CryptoAdapter;
+  /**
+   * Phase 3 ICryptoProvider used together with `secretStore`. When both
+   * are wired, encrypted writes flow to `sys_secret` and `value_enc`
+   * holds the handle id. When omitted, the legacy inline `crypto`
+   * adapter path remains in effect (back-compat).
+   */
+  cryptoProvider?: import('@objectstack/spec/contracts').ICryptoProvider;
+  /** Phase 3 secret store backing the `sys_secret` object. */
+  secretStore?: SettingsSecretStore;
   /** Audit sink. When undefined, writes still succeed but are not logged. */
   audit?: SettingsAuditSink;
+  /** Phase 3 dedicated writer for `sys_setting_audit`. */
+  auditWriter?: SettingsAuditWriter;
   /**
    * `process.env`-like map. Defaults to `process.env`. Injected so
    * unit tests can simulate locked values without polluting the host

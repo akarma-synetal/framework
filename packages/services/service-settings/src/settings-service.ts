@@ -61,7 +61,10 @@ interface RegisteredManifest {
 export class SettingsService {
   private engine?: SettingsEngine;
   private readonly crypto: CryptoAdapter;
+  private cryptoProvider?: import('@objectstack/spec/contracts').ICryptoProvider;
+  private secretStore?: import('./settings-service.types.js').SettingsSecretStore;
   private audit?: SettingsAuditSink;
+  private auditWriter?: import('./settings-service.types.js').SettingsAuditWriter;
   private readonly env: Record<string, string | undefined>;
   private readonly objectName: string;
   private readonly registry = new Map<string, RegisteredManifest>();
@@ -76,7 +79,10 @@ export class SettingsService {
   constructor(opts: SettingsServiceOptions = {}) {
     this.engine = opts.engine;
     this.crypto = opts.crypto ?? new NoopCryptoAdapter();
+    this.cryptoProvider = opts.cryptoProvider;
+    this.secretStore = opts.secretStore;
     this.audit = opts.audit;
+    this.auditWriter = opts.auditWriter;
     this.env = opts.env ?? (typeof process !== 'undefined' ? process.env : {});
     this.objectName = opts.objectName ?? DEFAULT_OBJECT;
   }
@@ -87,9 +93,20 @@ export class SettingsService {
    * SettingsService swaps from its in-memory fallback to the real
    * `sys_setting` table without re-registering the service.
    */
-  bindEngine(engine: SettingsEngine, audit?: SettingsAuditSink): void {
+  bindEngine(
+    engine: SettingsEngine,
+    audit?: SettingsAuditSink,
+    extras?: {
+      secretStore?: import('./settings-service.types.js').SettingsSecretStore;
+      auditWriter?: import('./settings-service.types.js').SettingsAuditWriter;
+      cryptoProvider?: import('@objectstack/spec/contracts').ICryptoProvider;
+    },
+  ): void {
     this.engine = engine;
     if (audit) this.audit = audit;
+    if (extras?.secretStore) this.secretStore = extras.secretStore;
+    if (extras?.auditWriter) this.auditWriter = extras.auditWriter;
+    if (extras?.cryptoProvider) this.cryptoProvider = extras.cryptoProvider;
   }
 
   /**
@@ -430,8 +447,31 @@ export class SettingsService {
       if (!isNull) {
         if (isEncrypted) {
           const plain = typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue);
-          storedEnc = await this.crypto.encrypt(plain, { namespace, key });
-          digest = this.crypto.digest(plain);
+          // Phase 3 split: when a sys_secret store + ICryptoProvider are
+          // wired, persist the ciphertext in sys_secret and keep the
+          // handle id in sys_setting.value_enc. Otherwise fall back to
+          // the legacy inline crypto adapter path for back-compat.
+          if (this.cryptoProvider && this.secretStore) {
+            const handle = await this.cryptoProvider.encrypt(plain, {
+              namespace,
+              key,
+              tenantId: ctx.tenantId,
+            });
+            await this.secretStore.insert({
+              id: handle.id,
+              namespace,
+              key,
+              kms_key_id: handle.kmsKeyId,
+              alg: handle.alg,
+              version: handle.version,
+              ciphertext: handle.ciphertext,
+            });
+            storedEnc = handle.id;
+            digest = this.cryptoProvider.digest(plain);
+          } else {
+            storedEnc = await this.crypto.encrypt(plain, { namespace, key });
+            digest = this.crypto.digest(plain);
+          }
         } else {
           storedValue = rawValue;
           digest = this.crypto.digest(stableStringify(rawValue));
@@ -461,6 +501,25 @@ export class SettingsService {
           encrypted: isEncrypted,
           requestId: ctx.requestId,
         });
+      }
+
+      if (this.auditWriter) {
+        try {
+          await this.auditWriter.write({
+            namespace,
+            key,
+            scope,
+            action: isNull ? 'reset' : 'set',
+            source: 'api',
+            actorId: ctx.userId,
+            oldHash: null,
+            newHash: isNull ? null : digest,
+            encrypted: isEncrypted,
+            requestId: ctx.requestId,
+          });
+        } catch {
+          // never fail a write because the audit table is unhappy.
+        }
       }
 
       this.emitChange({
@@ -592,10 +651,35 @@ export class SettingsService {
   private async materialiseRow(row: SettingsRow): Promise<unknown> {
     if (row.encrypted) {
       if (!row.value_enc) return null;
-      const plain = await this.crypto.decrypt(row.value_enc, {
-        namespace: row.namespace,
-        key: row.key,
-      });
+      let plain: string;
+      // Phase 3: when the value_enc looks like a sys_secret handle and
+      // both the secretStore + cryptoProvider are wired, dereference
+      // through sys_secret. Otherwise (legacy rows or in-memory tests)
+      // fall back to inline crypto-adapter decryption.
+      if (
+        this.cryptoProvider &&
+        this.secretStore &&
+        typeof row.value_enc === 'string' &&
+        row.value_enc.startsWith('sec_')
+      ) {
+        const secret = await this.secretStore.get(row.value_enc);
+        if (!secret) return null;
+        plain = await this.cryptoProvider.decrypt(
+          {
+            id: secret.id,
+            kmsKeyId: secret.kms_key_id,
+            alg: secret.alg,
+            version: secret.version,
+            ciphertext: secret.ciphertext,
+          },
+          { namespace: row.namespace, key: row.key },
+        );
+      } else {
+        plain = await this.crypto.decrypt(row.value_enc, {
+          namespace: row.namespace,
+          key: row.key,
+        });
+      }
       // Try JSON parse so non-string secrets round-trip.
       try {
         return JSON.parse(plain);

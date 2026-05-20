@@ -4,8 +4,10 @@ import type { Plugin, PluginContext } from '@objectstack/core';
 import type { IHttpServer, IDataEngine } from '@objectstack/spec/contracts';
 import type { SettingsManifest } from '@objectstack/spec/system';
 import { SettingsService } from './settings-service.js';
-import type { SettingsAuditSink, SettingsEngine } from './settings-service.types.js';
+import type { ICryptoProvider } from '@objectstack/spec/contracts';
+import type { SettingsAuditSink, SettingsAuditWriter, SettingsEngine, SettingsSecretStore } from './settings-service.types.js';
 import type { CryptoAdapter } from './crypto-adapter.js';
+import { InMemoryCryptoProvider } from './in-memory-crypto-provider.js';
 import { registerSettingsRoutes } from './settings-routes.js';
 import {
   settingsObjects,
@@ -30,6 +32,15 @@ export interface SettingsServicePluginOptions {
   manifests?: SettingsManifest[];
   /** Override the default crypto adapter. */
   crypto?: CryptoAdapter;
+
+  /**
+   * Phase 3 KMS hook. When provided, encrypted specifier values are
+   * routed through this provider into `sys_secret`; `sys_setting.value_enc`
+   * holds the handle id only. Defaults to `InMemoryCryptoProvider`
+   * (NOT suitable for production secrets — replace with an AWS / GCP
+   * KMS-backed implementation).
+   */
+  cryptoProvider?: ICryptoProvider;
   /** Override the default base path (`/api/settings`). */
   basePath?: string;
   /** Disable REST route registration. */
@@ -147,6 +158,11 @@ export class SettingsServicePlugin implements Plugin {
         this.service!.bindEngine(
           engine as unknown as SettingsEngine,
           this.buildAuditSink(ctx, engine),
+          {
+            secretStore: this.buildSecretStore(engine),
+            auditWriter: this.buildAuditWriter(ctx, engine),
+            cryptoProvider: this.opts.cryptoProvider ?? new InMemoryCryptoProvider(),
+          },
         );
       }
 
@@ -194,6 +210,69 @@ export class SettingsServicePlugin implements Plugin {
           });
         } catch (err: any) {
           ctx.logger?.warn?.('SettingsServicePlugin: audit record failed: ' + (err?.message ?? err));
+        }
+      },
+    };
+  }
+
+  /**
+   * Phase 3: build a `sys_secret`-backed implementation of
+   * `SettingsSecretStore`. The store bypasses the tenant audit
+   * warning because secrets are scoped through their owning
+   * `sys_setting` row (which already carries the tenant context).
+   */
+  private buildSecretStore(engine: IDataEngine): SettingsSecretStore {
+    const eng: any = engine;
+    return {
+      async insert(row) {
+        await eng.insert('sys_secret', row, { bypassTenantAudit: true });
+        return { id: row.id };
+      },
+      async get(id) {
+        const rows = await eng.find('sys_secret', {
+          where: { id },
+          limit: 1,
+          bypassTenantAudit: true,
+        });
+        const row = Array.isArray(rows) ? rows[0] : rows?.data?.[0];
+        return row ?? null;
+      },
+      async update(id, patch) {
+        await eng.update('sys_secret', {
+          where: { id },
+          data: patch,
+          bypassTenantAudit: true,
+        });
+      },
+    };
+  }
+
+  /**
+   * Phase 3: append-only writer for `sys_setting_audit`. Failures here
+   * MUST NOT abort the settings write, so all calls are wrapped in a
+   * try/catch and reported through the plugin logger.
+   */
+  private buildAuditWriter(ctx: PluginContext, engine: IDataEngine): SettingsAuditWriter {
+    const eng: any = engine;
+    return {
+      write: async (entry) => {
+        try {
+          await eng.insert('sys_setting_audit', {
+            namespace: entry.namespace,
+            key: entry.key,
+            scope: entry.scope,
+            action: entry.action,
+            source: entry.source ?? 'api',
+            actor_id: entry.actorId ?? null,
+            old_hash: entry.oldHash ?? null,
+            new_hash: entry.newHash ?? null,
+            encrypted: !!entry.encrypted,
+            request_id: entry.requestId ?? null,
+            reason: entry.reason ?? null,
+            created_at: new Date().toISOString(),
+          }, { bypassTenantAudit: true });
+        } catch (err: any) {
+          ctx.logger?.warn?.('SettingsServicePlugin: setting-audit write failed: ' + (err?.message ?? err));
         }
       },
     };
