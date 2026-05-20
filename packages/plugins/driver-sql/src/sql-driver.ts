@@ -181,6 +181,18 @@ export class SqlDriver implements IDataDriver {
    */
   protected tenantFieldByTable: Record<string, string | null> = {};
 
+  /** Throttle table for missing-tenantId warnings ({object}:{op}). */
+  protected tenantAuditWarned: Set<string> = new Set();
+
+  /**
+   * Optional logger sink for security-audit warnings. Tests inject a spy;
+   * production callers wire in their preferred logger. Defaults to
+   * `console.warn` so warnings surface even without setup.
+   */
+  protected logger: { warn: (msg: string, meta?: any) => void } = {
+    warn: (msg, meta) => console.warn(msg, meta ?? ''),
+  };
+
   /** Whether the underlying database is a SQLite variant (sqlite3 or better-sqlite3). */
   protected get isSqlite(): boolean {
     const c = (this.config as any).client;
@@ -401,6 +413,7 @@ export class SqlDriver implements IDataDriver {
       toInsert.id = nanoid(DEFAULT_ID_LENGTH);
     }
 
+    this.auditMissingTenant(object, 'create', options);
     this.injectTenantOnInsert(object, toInsert, options);
     await this.fillAutoNumberFields(object, toInsert, options);
 
@@ -588,6 +601,7 @@ export class SqlDriver implements IDataDriver {
   }
 
   async update(object: string, id: string | number, data: Record<string, any>, options?: DriverOptions): Promise<any> {
+    this.auditMissingTenant(object, 'update', options);
     const builder = this.getBuilder(object, options).where('id', id);
     this.applyTenantScope(builder, object, options);
     const formatted = this.formatInput(object, data);
@@ -619,6 +633,7 @@ export class SqlDriver implements IDataDriver {
       toUpsert.id = nanoid(DEFAULT_ID_LENGTH);
     }
 
+    this.auditMissingTenant(object, 'upsert', options);
     this.injectTenantOnInsert(object, toUpsert, options);
     await this.fillAutoNumberFields(object, toUpsert, options);
 
@@ -635,6 +650,7 @@ export class SqlDriver implements IDataDriver {
   }
 
   async delete(object: string, id: string | number, options?: DriverOptions): Promise<boolean> {
+    this.auditMissingTenant(object, 'delete', options);
     const builder = this.getBuilder(object, options).where('id', id);
     this.applyTenantScope(builder, object, options);
     const count = await builder.delete();
@@ -646,6 +662,7 @@ export class SqlDriver implements IDataDriver {
   // ===================================
 
   async bulkCreate(object: string, data: any[], options?: DriverOptions): Promise<any> {
+    this.auditMissingTenant(object, 'bulkCreate', options);
     for (const row of data) {
       if (row && typeof row === 'object') this.injectTenantOnInsert(object, row, options);
     }
@@ -668,12 +685,14 @@ export class SqlDriver implements IDataDriver {
   }
 
   async bulkDelete(object: string, ids: Array<string | number>, options?: DriverOptions): Promise<void> {
+    this.auditMissingTenant(object, 'bulkDelete', options);
     const builder = this.getBuilder(object, options).whereIn('id', ids);
     this.applyTenantScope(builder, object, options);
     await builder.delete();
   }
 
   async updateMany(object: string, query: QueryAST, data: any, options?: DriverOptions): Promise<number> {
+    this.auditMissingTenant(object, 'updateMany', options);
     const builder = this.getBuilder(object, options);
     this.applyTenantScope(builder, object, options);
     if (query.where) this.applyFilters(builder, query.where);
@@ -682,6 +701,7 @@ export class SqlDriver implements IDataDriver {
   }
 
   async deleteMany(object: string, query: QueryAST, options?: DriverOptions): Promise<number> {
+    this.auditMissingTenant(object, 'deleteMany', options);
     const builder = this.getBuilder(object, options);
     this.applyTenantScope(builder, object, options);
     if (query.where) this.applyFilters(builder, query.where);
@@ -957,9 +977,23 @@ export class SqlDriver implements IDataDriver {
       const autoNumberCols: Array<{ name: string; format: string; prefix: string; padWidth: number; tenantField: string | null }> = [];
       // Auto-detect tenant field. Convention: the field named
       // `organization_id` (matching tenantPolicy default) scopes the
-      // record to a tenant. Objects without it get a global sequence.
-      const hasOrgField = !!(obj.fields && Object.prototype.hasOwnProperty.call(obj.fields, 'organization_id'));
-      const tenantField: string | null = hasOrgField ? 'organization_id' : null;
+      // Resolve tenant scope declaratively first (obj.tenancy.{enabled,
+      // tenantField}) — that's the user's explicit intent. Fall back to the
+      // implicit "has an organization_id field" detection so legacy objects
+      // (whose multi-tenant column was injected by the kernel implicitly)
+      // keep working without a spec migration.
+      const tenancyDecl = (obj as any)?.tenancy;
+      let tenantField: string | null = null;
+      if (tenancyDecl && tenancyDecl.enabled !== false && tenancyDecl.tenantField) {
+        const declared = String(tenancyDecl.tenantField);
+        if (obj.fields && Object.prototype.hasOwnProperty.call(obj.fields, declared)) {
+          tenantField = declared;
+        }
+      }
+      if (!tenantField) {
+        const hasOrgField = !!(obj.fields && Object.prototype.hasOwnProperty.call(obj.fields, 'organization_id'));
+        tenantField = hasOrgField ? 'organization_id' : null;
+      }
       if (obj.fields) {
         for (const [name, field] of Object.entries<any>(obj.fields)) {
           const type = field.type || 'string';
@@ -1163,6 +1197,36 @@ export class SqlDriver implements IDataDriver {
     if (row[field] === undefined || row[field] === null || row[field] === '') {
       row[field] = String(tenantId);
     }
+  }
+
+  /**
+   * Surface writes that target a tenant-scoped object but don't carry a
+   * `tenantId`. These are almost always system / seed / admin paths that
+   * forgot to thread the active session context — easy to miss in code
+   * review and impossible to find after a breach.
+   *
+   * Throttled to one warning per `${object}:${op}` so background workers
+   * don't spam the log. Set `options.bypassTenantAudit = true` (or env
+   * `OS_TENANT_AUDIT=0`) to silence intentionally.
+   */
+  protected auditMissingTenant(
+    object: string,
+    op: 'create' | 'update' | 'delete' | 'bulkCreate' | 'bulkDelete' | 'updateMany' | 'deleteMany' | 'upsert',
+    options?: DriverOptions,
+  ): void {
+    if (process.env.OS_TENANT_AUDIT === '0') return;
+    if ((options as any)?.bypassTenantAudit === true) return;
+    const tenantId = (options as any)?.tenantId;
+    if (tenantId !== undefined && tenantId !== null && tenantId !== '') return;
+    const field = this.resolveTenantField(object);
+    if (!field) return;
+    const key = `${object}:${op}`;
+    if (this.tenantAuditWarned.has(key)) return;
+    this.tenantAuditWarned.add(key);
+    this.logger.warn(
+      `[tenant-audit] ${op} on tenant-scoped object "${object}" without options.tenantId — writes will not be tenant-isolated. Pass tenantId via ExecutionContext or set bypassTenantAudit:true to silence.`,
+      { object, op, tenantField: field },
+    );
   }
 
   // ── Filter helpers ──────────────────────────────────────────────────────────

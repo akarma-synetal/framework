@@ -276,6 +276,63 @@ const results = await driver.raw(
 );
 ```
 
+> ⚠️ **Raw SQL bypasses driver-level tenant isolation.** The `WHERE
+> organization_id = ?` predicate that `find` / `update` / `delete`
+> auto-apply is **not** added to `driver.raw()` or `engine.execute()`
+> output. Always include the tenant predicate yourself when running raw
+> queries against tenant-scoped tables.
+
+## Tenant Isolation (Row-Level)
+
+When an object declares a tenant field (either explicitly via
+`tenancy.tenantField`, or implicitly by having an `organization_id`
+field), the driver auto-scopes every CRUD call by the caller's
+`options.tenantId`:
+
+| Operation | Scope behavior |
+|---|---|
+| `find`, `findOne`, `count`, `aggregate` | `WHERE <tenantField> = :tenantId` injected |
+| `update`, `delete`, `updateMany`, `deleteMany`, `bulkDelete` | Same `WHERE` injected — cross-tenant writes silently no-op |
+| `create`, `upsert`, `bulkCreate` | `<tenantField>` auto-injected on each row if absent |
+
+The engine (`@objectstack/objectql`) threads `ExecutionContext.tenantId`
+into options for you; manual `driver.find(...)` calls can pass
+`{ tenantId: '...' }` directly.
+
+### Declaring the tenant field
+
+```ts
+// Custom tenant column (default is 'organization_id')
+{
+  name: 'workspace_item',
+  tenancy: { enabled: true, strategy: 'shared', tenantField: 'workspace_id' },
+  fields: {
+    workspace_id: { type: 'string' },
+    /* ... */
+  },
+}
+```
+
+### Bypasses (intentional, documented)
+
+| Path | Tenant-scoped? | Why |
+|---|---|---|
+| Callers that omit `options.tenantId` | No | Seed scripts, boot-time installers, admin tooling |
+| `ExecutionContext.isSystem === true` | No (auto-`bypassTenantAudit`) | Kernel-internal mirrors, scheduled hooks |
+| Explicit `organization_id` on insert row | Wins | Admin tooling can target a specific tenant |
+| `driver.raw()` / `engine.execute(sql)` | No | Raw SQL is on you |
+| `driver.bulkUpdate` | Yes (it loops `update`) | Same scope as `update` |
+
+### Audit warning
+
+The driver logs **one warning per `{object}:{op}`** when a write hits a
+tenant-scoped object without `options.tenantId`. Genuine system writes
+(`ExecutionContext.isSystem === true`) auto-silence; everything else
+surfaces as `[tenant-audit] ...` so missing-context bugs are visible.
+
+Override per call: `options.bypassTenantAudit = true`.
+Override globally: `OS_TENANT_AUDIT=0`.
+
 ## Database-Specific Features
 
 ### PostgreSQL Features

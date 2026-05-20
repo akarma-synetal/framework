@@ -593,13 +593,20 @@ export class ObjectQL implements IDataEngine {
   private buildDriverOptions(execCtx?: ExecutionContext, base?: any): any {
     const hasTx = execCtx?.transaction !== undefined;
     const hasTenant = execCtx?.tenantId !== undefined;
-    if (!hasTx && !hasTenant) return base;
+    const isSystem = execCtx?.isSystem === true;
+    if (!hasTx && !hasTenant && !isSystem) return base;
     const opts: any = base && typeof base === 'object' ? { ...base } : {};
     if (hasTx && opts.transaction === undefined) {
       opts.transaction = execCtx!.transaction;
     }
     if (hasTenant && opts.tenantId === undefined) {
       opts.tenantId = execCtx!.tenantId;
+    }
+    if (isSystem && opts.bypassTenantAudit === undefined) {
+      // System-elevated writes (boot-time seeds, internal mirrors, scheduled
+      // hooks) are unscoped by design — silence the audit warn for them but
+      // still flag genuine user-path bugs.
+      opts.bypassTenantAudit = true;
     }
     return opts;
   }

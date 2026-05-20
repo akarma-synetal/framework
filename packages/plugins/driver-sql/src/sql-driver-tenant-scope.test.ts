@@ -171,7 +171,7 @@ describe('SqlDriver tenant scope (organization_id)', () => {
     });
   });
 
-  describe('object without organization_id', () => {
+  describe('object without tenant field', () => {
     it('is unscoped even when tenantId is passed', async () => {
       // Re-init with a global object.
       await driver.disconnect();
@@ -189,6 +189,71 @@ describe('SqlDriver tenant scope (organization_id)', () => {
       await driver.create('global_flag', { id: 'g1', name: 'G1' });
       const rows = await driver.find('global_flag', { object: 'global_flag' }, { tenantId: 'org_a' });
       expect(rows).toHaveLength(1);
+    });
+  });
+
+  describe('declared tenancy.tenantField (custom column)', () => {
+    it('honors obj.tenancy.tenantField when set', async () => {
+      await driver.disconnect();
+      driver = new SqlDriver({
+        client: 'better-sqlite3',
+        connection: { filename: ':memory:' },
+        useNullAsDefault: true,
+      });
+      await driver.initObjects([
+        {
+          name: 'workspace_item',
+          // Custom tenant column name — not the conventional organization_id.
+          tenancy: { enabled: true, strategy: 'shared', tenantField: 'workspace_id', crossTenantAccess: false },
+          fields: {
+            workspace_id: { type: 'string' },
+            name: { type: 'string' },
+          },
+        },
+      ]);
+      await driver.create('workspace_item', { id: 'w1', name: 'W1' }, { tenantId: 'ws_a' });
+      await driver.create('workspace_item', { id: 'w2', name: 'W2' }, { tenantId: 'ws_b' });
+      const rowsA = await driver.find('workspace_item', { object: 'workspace_item' }, { tenantId: 'ws_a' });
+      expect(rowsA.map(r => r.id)).toEqual(['w1']);
+      expect(rowsA[0].workspace_id).toBe('ws_a');
+    });
+  });
+
+  describe('audit warn on missing tenantId', () => {
+    it('logs once per object:op when writing without tenantId', async () => {
+      await driver.disconnect();
+      const warnSpy: any[] = [];
+      driver = new SqlDriver({
+        client: 'better-sqlite3',
+        connection: { filename: ':memory:' },
+        useNullAsDefault: true,
+      });
+      // Swap logger to capture warns.
+      (driver as any).logger = { warn: (msg: string, meta: any) => warnSpy.push({ msg, meta }) };
+      await driver.initObjects(objects);
+
+      await driver.create('account', { id: 'x1', organization_id: 'org_a', name: 'X1' });
+      await driver.create('account', { id: 'x2', organization_id: 'org_a', name: 'X2' });
+      // Second create on same object:op should NOT add another warn (throttle).
+      expect(warnSpy.filter(w => w.meta?.op === 'create')).toHaveLength(1);
+    });
+
+    it('does not warn when bypassTenantAudit is set', async () => {
+      await driver.disconnect();
+      const warnSpy: any[] = [];
+      driver = new SqlDriver({
+        client: 'better-sqlite3',
+        connection: { filename: ':memory:' },
+        useNullAsDefault: true,
+      });
+      (driver as any).logger = { warn: (msg: string, meta: any) => warnSpy.push({ msg, meta }) };
+      await driver.initObjects(objects);
+      await driver.create(
+        'account',
+        { id: 'x1', organization_id: 'org_a', name: 'X1' },
+        { bypassTenantAudit: true } as any,
+      );
+      expect(warnSpy).toHaveLength(0);
     });
   });
 });
