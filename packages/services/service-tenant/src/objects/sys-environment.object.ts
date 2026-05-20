@@ -301,11 +301,9 @@ export const SysEnvironment = ObjectSchema.create({
       label: 'Install Application',
       icon: 'download-cloud',
       variant: 'primary',
-      type: 'api',
+      type: 'script',
       locations: ['list_item', 'record_header'],
-      target: '/api/v1/cloud/environments/{id}/install-package',
-      method: 'POST',
-      recordIdParam: 'id',
+      target: 'install_application',
       successMessage: 'Application installed. Open your environment to see it.',
       refreshAfter: true,
       params: [

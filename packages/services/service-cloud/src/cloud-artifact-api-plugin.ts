@@ -116,7 +116,7 @@ export function createCloudArtifactApiPlugin(options: CloudArtifactApiPluginOpti
             registerCloudRoutes(server, deps);
             registerPublicRoutes(server, deps);
             registerBranchRoutes(server, deps);
-            registerProjectLifecycleRoutes(server, deps);
+            registerProjectLifecycleRoutes(server, { ...deps, templates: options.templates });
             registerPackageInstallRoutes(server, { ...deps, templates: options.templates });
         },
         stop: async (_ctx: AnyContext) => {},

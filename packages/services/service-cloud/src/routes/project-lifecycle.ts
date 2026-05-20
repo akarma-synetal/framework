@@ -79,7 +79,7 @@ function resolveNewHostname(body: AnyRow): { ok: true; hostname: string } | { ok
     return { ok: true, hostname };
 }
 
-export function registerProjectLifecycleRoutes(server: IHttpServer, deps: RouteDeps): void {
+export function registerProjectLifecycleRoutes(server: IHttpServer, deps: PackageInstallDeps): void {
     const { prefix, requiredKey, controlDriverPromise, getCallerUserId, getCallerActiveOrgId } = deps;
     const checkAuth = makeCheckAuth(requiredKey, getCallerUserId);
     const getDriver = makeGetDriver(controlDriverPromise);
@@ -478,6 +478,34 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: RouteD
         const success = await patchProject(projectId, { hostname, console_url: `https://${hostname}/_console`, api_base_url: `https://${hostname}/api/v1` });
         if (!success) return res.status(500).json(fail('Failed to persist update', 500));
         return res.json(ok({ projectId, hostname }));
+    };
+
+    // Install an application from the Marketplace into this environment.
+    // Triggered by the `install_application` action on sys_environment
+    // (type: 'script') via app-shell's RecordDetailView serverActionHandler.
+    // We can't use type:'api' because RecordDetailView ignores action.target
+    // and falls back to dataSource.update — see RecordDetailView.js apiHandler.
+    actionDispatch.install_application = async (req, res) => {
+        const environmentId = String(req.params?.id ?? '').trim();
+        if (!environmentId) return res.status(400).json(fail('environment id required'));
+        const body = (req.body ?? {}) as AnyRow;
+        const packageId = String(body.package_id ?? body.packageId ?? '').trim();
+        if (!packageId) return res.status(400).json(fail('package_id is required'));
+        const seedSampleData = body.seed_sample_data === true
+            || body.seed_sample_data === 'true'
+            || body.seedSampleData === true
+            || body.seedSampleData === 'true';
+        const callerUserId = (await resolveActorId(req)) ?? null;
+        const callerActiveOrgId = (await resolveActiveOrgId(req)) ?? null;
+        const result = await installPackageIntoEnvironment({
+            deps,
+            packageId,
+            environmentId,
+            seedSampleData,
+            callerUserId,
+            callerActiveOrgId,
+        });
+        return res.status(result.status).json(result.body);
     };
 
     // Both new and legacy action paths are accepted so the Console renderer
