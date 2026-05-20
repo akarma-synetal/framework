@@ -284,7 +284,10 @@ export class CloudContainer extends Container<Env> {
         OS_MODE: 'cloud',
         PORT: '4000',
         HOST: '0.0.0.0',
-        OS_DISABLE_CONSOLE: '1',
+        // Console IS mounted on the cloud control plane — it provides the
+        // Org/Project management UI and claims the root '/' redirect.
+        // Studio is disabled (no per-project tenant kernels in this process).
+        OS_DISABLE_STUDIO: '1',
         OS_KERNEL_CACHE_SIZE: '50',
         OS_KERNEL_TTL_MS: '1800000',
         OS_ENV_CACHE_TTL_MS: '300000',
