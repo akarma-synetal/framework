@@ -310,9 +310,14 @@ export class AuthManager {
           });
         }
         // When CORS allows all origins (default) and no explicit trustedOrigins,
-        // trust all localhost ports in development for convenience.
+        // trust all localhost ports in development for convenience. Also trust
+        // `*.localhost` subdomains so per-project tenant subdomains (the dev
+        // default root domain — see project-provisioning.ts) pass CSRF checks
+        // without operators having to configure trustedOrigins manually.
         if (!origins.length && (!corsOrigin || corsOrigin === '*')) {
           origins.push('http://localhost:*');
+          origins.push('http://*.localhost:*');
+          origins.push('https://*.localhost:*');
         }
         return origins.length ? { trustedOrigins: origins } : {};
       })(),

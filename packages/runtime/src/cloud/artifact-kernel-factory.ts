@@ -171,6 +171,25 @@ export class ArtifactKernelFactory implements ProjectKernelFactory {
                     ? (project.hostname.startsWith('http') ? project.hostname : `https://${project.hostname}`)
                     : undefined;
 
+                // Build the list of trusted origins for CSRF.
+                // - Production: just the project's https baseUrl.
+                // - Dev (*.localhost): also trust http variants on any port so
+                //   the local objectos dev server (PORT=4100 or any user-chosen
+                //   port) can complete sign-in from the browser. baseUrl alone
+                //   is `https://*.localhost` (no port, https) which the
+                //   browser's Origin (`http://*.localhost:4100`) does NOT
+                //   match — leading to better-auth "Invalid origin" 403.
+                const trustedOriginsList: string[] = [];
+                if (baseUrl) trustedOriginsList.push(baseUrl);
+                if (project.hostname) {
+                    const bareHost = project.hostname.replace(/^https?:\/\//, '');
+                    if (bareHost.endsWith('.localhost') || bareHost === 'localhost') {
+                        trustedOriginsList.push(`http://${bareHost}`);
+                        trustedOriginsList.push(`http://${bareHost}:*`);
+                        trustedOriginsList.push(`https://${bareHost}:*`);
+                    }
+                }
+
                 // Platform SSO ("Airtable-style unified login"): when the
                 // cloud control-plane is reachable AND the master secret is
                 // shared between the two containers, wire better-auth's
@@ -211,7 +230,7 @@ export class ArtifactKernelFactory implements ProjectKernelFactory {
                     // Cookie scope: default to the project's own host. We
                     // intentionally do NOT pass crossSubDomainCookies here
                     // so cookies stay isolated per project subdomain.
-                    trustedOrigins: baseUrl ? [baseUrl] : undefined,
+                    trustedOrigins: trustedOriginsList.length ? trustedOriginsList : undefined,
                     ...(oidcProviders ? { oidcProviders } : {}),
                 } as any));
                 if (oidcProviders) {

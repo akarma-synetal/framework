@@ -471,7 +471,11 @@ describe('AuthManager', () => {
       await manager.getAuthInstance();
       warnSpy.mockRestore();
 
-      expect(capturedConfig.trustedOrigins).toEqual(['http://localhost:*']);
+      expect(capturedConfig.trustedOrigins).toEqual([
+        'http://localhost:*',
+        'http://*.localhost:*',
+        'https://*.localhost:*',
+      ]);
     });
 
     it('should default to localhost wildcard when trustedOrigins array is empty', async () => {
@@ -490,7 +494,11 @@ describe('AuthManager', () => {
       await manager.getAuthInstance();
       warnSpy.mockRestore();
 
-      expect(capturedConfig.trustedOrigins).toEqual(['http://localhost:*']);
+      expect(capturedConfig.trustedOrigins).toEqual([
+        'http://localhost:*',
+        'http://*.localhost:*',
+        'https://*.localhost:*',
+      ]);
     });
   });
 
