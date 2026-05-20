@@ -23,4 +23,5 @@ export * from './security/index.js';
 export * from './audit/index.js';
 export * from './integration/index.js';
 export * from './metadata/index.js';
+export * from './system/index.js';
 export * from './apps/index.js';

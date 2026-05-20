@@ -36,6 +36,11 @@
       "import": "./dist/metadata/index.mjs",
       "require": "./dist/metadata/index.js"
     },
+    "./system": {
+      "types": "./dist/system/index.d.ts",
+      "import": "./dist/system/index.mjs",
+      "require": "./dist/system/index.js"
+    },
     "./apps": {
       "types": "./dist/apps/index.d.ts",
       "import": "./dist/apps/index.mjs",

@@ -38,6 +38,9 @@ export * from './incident-response.zod';
 export * from './supplier-security.zod';
 export * from './training.zod';
 
+// Settings (ADR-0007: Manifest + K/V Store + Resolver)
+export * from './settings-manifest.zod';
+
 // Runtime Services
 export * from './job.zod';
 export * from './worker.zod';

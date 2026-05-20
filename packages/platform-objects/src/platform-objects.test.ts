@@ -28,6 +28,7 @@ import {
   SysMetadata,
   SysMetadataHistoryObject,
 } from './metadata/index.js';
+import { SysSetting } from './system/index.js';
 
 const systemObjects = [
   ['SysUser', SysUser, 'sys_user'],
@@ -51,6 +52,7 @@ const systemObjects = [
   ['SysWebhook', SysWebhook, 'sys_webhook'],
   ['SysMetadata', SysMetadata, 'sys_metadata'],
   ['SysMetadataHistoryObject', SysMetadataHistoryObject, 'sys_metadata_history'],
+  ['SysSetting', SysSetting, 'sys_setting'],
 ] as const;
 
 describe('@objectstack/platform-objects', () => {
