@@ -1742,7 +1742,10 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     type: request.type,
                     // `scope` is informational; `project_id` is the authoritative
                     // isolation key (see sys-metadata schema unique index).
-                    scope: this.projectId !== undefined ? 'project' : 'platform',
+                    // We always write 'platform' here — per-project overlays
+                    // are distinguished by `project_id`, not by a separate
+                    // scope value (the enum is ['system','platform','user']).
+                    scope: 'platform',
                     metadata: JSON.stringify(request.item),
                     state: 'active',
                     version: 1,
