@@ -45,8 +45,13 @@ export const ActionParamSchema = lazySchema(() => z.object({
   label: I18nLabelSchema.optional(),
   /** Overrides the resolved field type (or sets it for inline params). */
   type: FieldType.optional(),
-  /** Required override; when omitted falls back to the resolved field's `required`. */
-  required: z.boolean().optional(),
+  /**
+   * Required override; when omitted defaults to `false`. Consumers that wish
+   * to inherit the underlying field's `required` flag should leave this
+   * undefined in the source schema and resolve at runtime (the dialog
+   * renderers check truthiness, so `false === undefined` for UI purposes).
+   */
+  required: z.boolean().optional().default(false),
   /** Select/picklist options override. */
   options: z.array(z.object({ label: I18nLabelSchema, value: z.string() })).optional(),
   /** Placeholder override. */
