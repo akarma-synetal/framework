@@ -125,25 +125,29 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Cloudflare container registry
-        uses: docker/login-action@v3
-        with:
-          registry: registry.cloudflare.com
-          username: ${{ env.ACCOUNT_ID }}
-          password: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Build + push cloud image
+      - name: Build cloud image (local)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/cloud/Dockerfile
           platforms: linux/amd64
-          push: true
+          # Load to the local daemon — `wrangler containers push` reads from
+          # the local daemon and re-pushes with Cloudflare-issued temporary
+          # registry credentials (the registry rejects plain docker login).
+          load: true
           tags: registry.cloudflare.com/${{ env.ACCOUNT_ID }}/${{ env.IMAGE_NAME }}:${{ env.SHA8 }}
           # GitHub Actions cache — drops cloud rebuild from ~20m to ~3-6m
           # after the first run.
           cache-from: type=gha,scope=cloud
           cache-to:   type=gha,scope=cloud,mode=max
+
+      - name: Push image via wrangler (handles CF registry auth)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 containers push \
+            "registry.cloudflare.com/${ACCOUNT_ID}/${IMAGE_NAME}:${SHA8}"
 
       - name: Pin image tag in wrangler.toml
         run: |
@@ -210,23 +214,24 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Cloudflare container registry
-        uses: docker/login-action@v3
-        with:
-          registry: registry.cloudflare.com
-          username: ${{ env.ACCOUNT_ID }}
-          password: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Build + push objectos image
+      - name: Build objectos image (local)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/objectos/Dockerfile
           platforms: linux/amd64
-          push: true
+          load: true
           tags: registry.cloudflare.com/${{ env.ACCOUNT_ID }}/${{ env.IMAGE_NAME }}:${{ env.SHA8 }}
           cache-from: type=gha,scope=objectos
           cache-to:   type=gha,scope=objectos,mode=max
+
+      - name: Push image via wrangler (handles CF registry auth)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 containers push \
+            "registry.cloudflare.com/${ACCOUNT_ID}/${IMAGE_NAME}:${SHA8}"
 
       - name: Pin image tag in wrangler.toml
         run: |
