@@ -68,6 +68,7 @@
     "@objectstack/service-package": "workspace:*",
     "@objectstack/service-queue": "workspace:*",
     "@objectstack/service-realtime": "workspace:*",
+    "@objectstack/service-settings": "workspace:*",
     "@objectstack/service-storage": "workspace:*",
     "@objectstack/spec": "workspace:*",
     "@oclif/core": "^4.11.3",

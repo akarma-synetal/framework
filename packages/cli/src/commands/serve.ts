@@ -987,6 +987,11 @@ export default class Serve extends Command {
           export: 'ApprovalsServicePlugin',
           nameMatch: ['plugin-approvals', 'ApprovalsServicePlugin'],
         },
+        settings: {
+          pkg: '@objectstack/service-settings',
+          export: 'SettingsServicePlugin',
+          nameMatch: ['service-settings', 'SettingsServicePlugin'],
+        },
       };
 
       const hasPluginMatching = (fragments: string[]) =>

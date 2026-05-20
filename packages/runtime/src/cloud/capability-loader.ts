@@ -93,6 +93,10 @@ export const CAPABILITY_PROVIDERS: Record<string, CapabilitySpec> = {
         pkg: '@objectstack/service-feed',
         export: 'FeedServicePlugin',
     },
+    settings: {
+        pkg: '@objectstack/service-settings',
+        export: 'SettingsServicePlugin',
+    },
 };
 
 type Logger = { info?: (...a: any[]) => void; warn?: (...a: any[]) => void; error?: (...a: any[]) => void };

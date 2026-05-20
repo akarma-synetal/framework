@@ -56,9 +56,9 @@ interface RegisteredManifest {
  * the supporting types and `README.md` for the high-level contract.
  */
 export class SettingsService {
-  private readonly engine?: SettingsEngine;
+  private engine?: SettingsEngine;
   private readonly crypto: CryptoAdapter;
-  private readonly audit?: SettingsAuditSink;
+  private audit?: SettingsAuditSink;
   private readonly env: Record<string, string | undefined>;
   private readonly objectName: string;
   private readonly registry = new Map<string, RegisteredManifest>();
@@ -71,6 +71,17 @@ export class SettingsService {
     this.audit = opts.audit;
     this.env = opts.env ?? (typeof process !== 'undefined' ? process.env : {});
     this.objectName = opts.objectName ?? DEFAULT_OBJECT;
+  }
+
+  /**
+   * Late-bind a data engine and (optionally) an audit sink. Plugins
+   * call this from `kernel:ready` once `objectql` is wired so the
+   * SettingsService swaps from its in-memory fallback to the real
+   * `sys_setting` table without re-registering the service.
+   */
+  bindEngine(engine: SettingsEngine, audit?: SettingsAuditSink): void {
+    this.engine = engine;
+    if (audit) this.audit = audit;
   }
 
   // ---------------------------------------------------------------------

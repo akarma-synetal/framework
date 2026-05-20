@@ -1,9 +1,14 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
-import type { SettingsManifest, SettingsActionHandler } from '@objectstack/spec/system';
+import type { SettingsManifest } from '@objectstack/spec/system';
+import type { SettingsActionHandler } from '../settings-service.types.js';
 
-/** Mail Delivery — SMTP / API provider configuration. */
-export const mailSettingsManifest: SettingsManifest = {
+// Visibility expressions are written as inline strings here for
+// readability. The spec's ExpressionInputSchema accepts a bare string
+// and normalises it at parse time, but the inferred TypeScript output
+// type expects `{ dialect, source }` objects. Build the manifest as
+// `unknown` first, then cast — keeps the manifest source compact.
+const manifest = {
   namespace: 'mail',
   version: 1,
   label: 'Mail Delivery',
@@ -52,6 +57,9 @@ export const mailSettingsManifest: SettingsManifest = {
       handler: { kind: 'http', method: 'POST', url: '/api/settings/mail/test' } },
   ],
 };
+
+/** Mail Delivery — SMTP / API provider configuration. */
+export const mailSettingsManifest = manifest as unknown as SettingsManifest;
 
 /** Built-in action handler stub for `mail/test`. */
 export const mailTestActionHandler: SettingsActionHandler = async ({ values }) => {

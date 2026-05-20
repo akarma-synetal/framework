@@ -13,10 +13,19 @@ import {
   SETTINGS_PLUGIN_ID,
   SETTINGS_PLUGIN_VERSION,
 } from './manifest.js';
+import {
+  builtinSettingsManifests,
+  mailTestActionHandler,
+} from './manifests/index.js';
 
 /** Configuration options for the SettingsServicePlugin. */
 export interface SettingsServicePluginOptions {
-  /** Pre-register these manifests at boot. */
+  /**
+   * Pre-register these manifests at boot. When omitted, the bundled
+   * builtin manifests (mail / branding / feature_flags) are loaded so
+   * a host gets a working Settings hub out of the box. Pass an empty
+   * array to opt out entirely.
+   */
   manifests?: SettingsManifest[];
   /** Override the default crypto adapter. */
   crypto?: CryptoAdapter;
@@ -26,6 +35,12 @@ export interface SettingsServicePluginOptions {
   registerRoutes?: boolean;
   /** Override the env source. Defaults to `process.env`. */
   env?: Record<string, string | undefined>;
+  /**
+   * Action handlers to register at boot, keyed by namespace and action
+   * id. The bundled `mail.test` handler is registered automatically
+   * unless this object is provided.
+   */
+  actionHandlers?: Record<string, Record<string, import('./settings-service.types.js').SettingsActionHandler>>;
 }
 
 /**
@@ -46,7 +61,13 @@ export class SettingsServicePlugin implements Plugin {
   private service: SettingsService | null = null;
 
   constructor(opts: SettingsServicePluginOptions = {}) {
-    this.opts = opts;
+    this.opts = {
+      ...opts,
+      manifests: opts.manifests ?? builtinSettingsManifests,
+      actionHandlers: opts.actionHandlers ?? {
+        mail: { test: mailTestActionHandler },
+      },
+    };
   }
 
   async init(ctx: PluginContext): Promise<void> {
@@ -55,6 +76,11 @@ export class SettingsServicePlugin implements Plugin {
       env: this.opts.env,
     });
     for (const m of this.opts.manifests ?? []) this.service.registerManifest(m);
+    for (const [ns, handlers] of Object.entries(this.opts.actionHandlers ?? {})) {
+      for (const [id, fn] of Object.entries(handlers)) {
+        this.service.registerAction(ns, id, fn);
+      }
+    }
 
     ctx.registerService('settings', this.service);
     ctx.logger?.info?.(
@@ -84,21 +110,14 @@ export class SettingsServicePlugin implements Plugin {
         // ok — fall back to in-memory.
       }
       if (engine) {
-        // Stash the engine on the service via a thin re-init. The
-        // SettingsService keeps the engine ref private, so we
-        // construct a fresh instance preserving registered manifests +
-        // crypto + env.
-        const fresh = new SettingsService({
-          engine: engine as unknown as SettingsEngine,
-          crypto: this.opts.crypto,
-          env: this.opts.env,
-          audit: this.buildAuditSink(ctx, engine),
-        });
-        for (const m of this.opts.manifests ?? []) fresh.registerManifest(m);
-        // Re-register any manifests that were added between init and start.
-        for (const m of this.service!.listManifests()) fresh.registerManifest(m);
-        this.service = fresh;
-        ctx.registerService('settings', fresh);
+        // Late-bind the engine + audit sink on the existing service
+        // instance. We avoid re-registering the service because the
+        // kernel disallows `registerService` for an already-registered
+        // name.
+        this.service!.bindEngine(
+          engine as unknown as SettingsEngine,
+          this.buildAuditSink(ctx, engine),
+        );
       }
 
       if (this.opts.registerRoutes === false) return;
