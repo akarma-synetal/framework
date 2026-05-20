@@ -44,7 +44,11 @@ export const SysEnvironment = ObjectSchema.create({
   pluralLabel: 'Environments',
   icon: 'globe',
   isSystem: true,
-  managedBy: 'config',
+  // `platform` — these are user-owned resources (their cloud environments).
+  // Previously `config`, which surfaced an "Admin config" badge in the
+  // detail header and made the page feel like an internal admin tool.
+  // Affordances (no New button) are still enforced via userActions below.
+  managedBy: 'platform',
   description: 'Your cloud environments. Each environment has its own URL, database, and plan.',
   titleFormat: '{display_name}',
   compactLayout: ['display_name', 'plan', 'status', 'hostname', 'is_default'],
@@ -193,104 +197,14 @@ export const SysEnvironment = ObjectSchema.create({
     },
 
     // ────────────────────────────────────────────────────────────────────
-    // Status-machine row actions (replace direct status field edits).
-    // ────────────────────────────────────────────────────────────────────
-    {
-      name: 'suspend_environment',
-      label: 'Suspend',
-      icon: 'pause-circle',
-      variant: 'secondary',
-      type: 'script',
-      locations: ['list_item', 'record_header'],
-      confirmText: 'Suspend this environment? All runtime traffic to it will be blocked until you resume.',
-      successMessage: 'Environment suspended.',
-      refreshAfter: true,
-    },
-    {
-      name: 'resume_environment',
-      label: 'Resume',
-      icon: 'play-circle',
-      variant: 'secondary',
-      type: 'script',
-      locations: ['list_item', 'record_header'],
-      successMessage: 'Environment resumed.',
-      refreshAfter: true,
-    },
-    {
-      name: 'archive_environment',
-      label: 'Archive',
-      icon: 'archive',
-      variant: 'danger',
-      type: 'script',
-      locations: ['list_item', 'record_header'],
-      confirmText: 'Archive this environment? It will be removed from active views. Data is retained for 30 days before deletion.',
-      successMessage: 'Environment archived.',
-      refreshAfter: true,
-      params: [
-        { name: 'reason', label: 'Reason (optional)', type: 'text', required: false },
-      ],
-    },
-    {
-      name: 'set_default_environment',
-      label: 'Set as Default',
-      icon: 'star',
-      variant: 'secondary',
-      type: 'script',
-      locations: ['list_item', 'record_header'],
-      successMessage: 'Default environment updated.',
-      refreshAfter: true,
-    },
-    {
-      name: 'change_plan',
-      label: 'Change Plan',
-      icon: 'sliders',
-      variant: 'secondary',
-      type: 'script',
-      locations: ['list_item', 'record_header'],
-      successMessage: 'Plan updated.',
-      refreshAfter: true,
-      params: [
-        {
-          name: 'plan',
-          label: 'New Plan',
-          type: 'select',
-          required: true,
-          options: [
-            { label: 'Free', value: 'free' },
-            { label: 'Starter', value: 'starter' },
-            { label: 'Pro', value: 'pro' },
-            { label: 'Enterprise', value: 'enterprise' },
-            { label: 'Custom', value: 'custom' },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'change_hostname',
-      label: 'Change Hostname',
-      icon: 'globe',
-      variant: 'secondary',
-      type: 'script',
-      locations: ['list_item', 'record_header'],
-      successMessage: 'Hostname updated.',
-      refreshAfter: true,
-      params: [
-        {
-          name: 'subdomain',
-          label: 'New Subdomain',
-          type: 'text',
-          required: true,
-          placeholder: 'my-environment',
-          helpText:
-            `Just the subdomain — the root domain (.${ROOT_DOMAIN_HINT}) is appended automatically. Allowed: lowercase letters, digits, hyphens.`,
-        },
-      ],
-    },
-    // ────────────────────────────────────────────────────────────────────
     // Install Application — primary CTA on an environment detail page.
     // Solves "I just created an env, now what?": user picks a package
     // (with a record-picker if the renderer supports it; otherwise paste
     // its ID) and the package is installed into the current env.
+    //
+    // Listed FIRST so renderers that surface only the top N actions in the
+    // record header (and put the rest under "更多操作 / More") promote this
+    // CTA into the visible toolbar instead of burying it in a dropdown.
     //
     // The endpoint is env-keyed (recordIdParam: 'id' → /:id/install-package)
     // so a record-header click already knows the target env and only needs
@@ -304,6 +218,10 @@ export const SysEnvironment = ObjectSchema.create({
       type: 'script',
       locations: ['list_item', 'record_header'],
       target: 'install_application',
+      // Only meaningful for an env you can actually deploy to. Hide while the
+      // environment is being provisioned, has failed, or has been archived.
+      // (Forward-compat: evaluated when the renderer supports `visible` CEL.)
+      visible: 'status == "active" || status == "suspended"',
       successMessage: 'Application installed. Open your environment to see it.',
       refreshAfter: true,
       params: [
@@ -330,6 +248,110 @@ export const SysEnvironment = ObjectSchema.create({
             '(e.g. example Accounts, Contacts, Leads) so you can explore the app immediately. ' +
             'Recommended for first-time users; leave unchecked for a clean production environment.',
         },
+      ],
+    },
+
+    // ────────────────────────────────────────────────────────────────────
+    // Status-machine row actions (replace direct status field edits).
+    // Each carries a `visible` CEL predicate so renderers that honour it
+    // hide the action when it would be a no-op (Suspend on a suspended
+    // env, Resume on an active env, Set-as-Default on the default env).
+    // ────────────────────────────────────────────────────────────────────
+    {
+      name: 'suspend_environment',
+      label: 'Suspend',
+      icon: 'pause-circle',
+      variant: 'secondary',
+      type: 'script',
+      locations: ['list_item', 'record_header'],
+      visible: 'status == "active"',
+      confirmText: 'Suspend this environment? All runtime traffic to it will be blocked until you resume.',
+      successMessage: 'Environment suspended.',
+      refreshAfter: true,
+    },
+    {
+      name: 'resume_environment',
+      label: 'Resume',
+      icon: 'play-circle',
+      variant: 'secondary',
+      type: 'script',
+      locations: ['list_item', 'record_header'],
+      visible: 'status == "suspended"',
+      successMessage: 'Environment resumed.',
+      refreshAfter: true,
+    },
+    {
+      name: 'set_default_environment',
+      label: 'Set as Default',
+      icon: 'star',
+      variant: 'secondary',
+      type: 'script',
+      locations: ['list_item', 'record_header'],
+      visible: 'is_default != true',
+      successMessage: 'Default environment updated.',
+      refreshAfter: true,
+    },
+    {
+      name: 'change_plan',
+      label: 'Change Plan',
+      icon: 'sliders',
+      variant: 'secondary',
+      type: 'script',
+      locations: ['list_item', 'record_header'],
+      visible: 'status != "archived"',
+      successMessage: 'Plan updated.',
+      refreshAfter: true,
+      params: [
+        {
+          name: 'plan',
+          label: 'New Plan',
+          type: 'select',
+          required: true,
+          options: [
+            { label: 'Free', value: 'free' },
+            { label: 'Starter', value: 'starter' },
+            { label: 'Pro', value: 'pro' },
+            { label: 'Enterprise', value: 'enterprise' },
+            { label: 'Custom', value: 'custom' },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'change_hostname',
+      label: 'Change Hostname',
+      icon: 'globe',
+      variant: 'secondary',
+      type: 'script',
+      locations: ['list_item', 'record_header'],
+      visible: 'status != "archived"',
+      successMessage: 'Hostname updated.',
+      refreshAfter: true,
+      params: [
+        {
+          name: 'subdomain',
+          label: 'New Subdomain',
+          type: 'text',
+          required: true,
+          placeholder: 'my-environment',
+          helpText:
+            `Just the subdomain — the root domain (.${ROOT_DOMAIN_HINT}) is appended automatically. Allowed: lowercase letters, digits, hyphens.`,
+        },
+      ],
+    },
+    {
+      name: 'archive_environment',
+      label: 'Archive',
+      icon: 'archive',
+      variant: 'danger',
+      type: 'script',
+      locations: ['list_item', 'record_header'],
+      visible: 'status != "archived"',
+      confirmText: 'Archive this environment? It will be removed from active views. Data is retained for 30 days before deletion.',
+      successMessage: 'Environment archived.',
+      refreshAfter: true,
+      params: [
+        { name: 'reason', label: 'Reason (optional)', type: 'text', required: false },
       ],
     },
   ],
