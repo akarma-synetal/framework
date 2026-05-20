@@ -22,8 +22,12 @@ export const LeadDetailPage: Page = {
   type: 'record',
   object: 'lead',
 
-  // Template defines the overall layout structure
-  template: 'header-sidebar-main',
+  // Template defines the overall layout structure. We use `full-width`
+  // (single column) because the previous `header-sidebar-main` layout
+  // sandwiched the highlights strip into a cramped sidebar with no other
+  // meaningful sidebar content — Salesforce Lightning record pages
+  // similarly default to a stacked column for medium-density objects.
+  template: 'full-width',
 
   // Page-level state variables
   variables: [
@@ -45,6 +49,10 @@ export const LeadDetailPage: Page = {
       name: 'header',
       width: 'full',
       components: [
+        // Title + subtitle + icon. Convert Lead and other record-level
+        // actions render as a sibling immediately below (record:quick_actions)
+        // — the spec's Page schema does not propagate ad-hoc `children` on
+        // a component, so the cleanest portable form is a sibling node.
         {
           type: 'page:header',
           id: 'lead_header',
@@ -56,12 +64,6 @@ export const LeadDetailPage: Page = {
             breadcrumb: true,
           },
         },
-        // Sibling quick-actions strip in the header region. The previous
-        // `page:header.actions: string[]` form was inert — PageHeaderRenderer
-        // only paints a `<div data-page-actions-slot />` and does not
-        // resolve action names. `record:quick_actions` consumes real
-        // `ActionDef`s and goes through `useActionEngine` for execution,
-        // permissions, location filtering, and condition evaluation.
         {
           type: 'record:quick_actions',
           id: 'lead_header_actions',
@@ -69,6 +71,17 @@ export const LeadDetailPage: Page = {
             actions: [ConvertLeadAction],
             location: 'record_header',
             align: 'end',
+          },
+        },
+        // Salesforce-style Highlights Panel: a horizontal strip of the
+        // most-important key facts directly under the header. Pulled out
+        // of the sidebar so it can use the full page width.
+        {
+          type: 'record:highlights',
+          id: 'lead_highlights',
+          label: 'Key Information',
+          properties: {
+            fields: ['status', 'rating', 'lead_source', 'owner', 'email', 'phone'],
           },
         },
         {
@@ -85,31 +98,6 @@ export const LeadDetailPage: Page = {
             ],
           },
         },
-      ],
-    },
-
-    {
-      name: 'sidebar',
-      width: 'medium',
-      components: [
-        {
-          type: 'record:highlights',
-          id: 'lead_highlights',
-          label: 'Key Information',
-          properties: {
-            fields: ['status', 'rating', 'lead_source', 'owner', 'email', 'phone'],
-            layout: 'vertical',
-          },
-        },
-        // NOTE: the previous sidebar contents have been removed:
-        //   1. `page:card "Quick Actions"` — its `actions: string[]` payload
-        //      was never rendered (page:card has no action runtime); the
-        //      header-level `record:quick_actions` above is the canonical
-        //      surface for per-record actions.
-        //   2. `ai:chat_window` — the AI assistant is exposed as a global
-        //      floating widget (see plugin-chatbot); an inline sidebar
-        //      window duplicated entry points and produced an unknown-
-        //      component error since `ai:chat_window` has no renderer.
       ],
     },
 
@@ -136,6 +124,33 @@ export const LeadDetailPage: Page = {
                     properties: {
                       columns: '2',
                       layout: 'auto',
+                      // Salesforce-style grouped sections so the Details
+                      // tab actually presents a structured field grid
+                      // instead of falling back to the bare auto-detected
+                      // header chip. Field names map to lead.object.ts.
+                      sections: [
+                        {
+                          label: 'Lead Information',
+                          fields: ['salutation', 'first_name', 'last_name', 'title', 'company', 'industry'],
+                        },
+                        {
+                          label: 'Contact',
+                          fields: ['email', 'phone', 'mobile', 'website'],
+                        },
+                        {
+                          label: 'Lead Detail',
+                          fields: ['status', 'rating', 'lead_source', 'owner', 'annual_revenue', 'number_of_employees'],
+                        },
+                        {
+                          label: 'Address',
+                          fields: ['address'],
+                        },
+                        {
+                          label: 'Description',
+                          fields: ['description'],
+                          columns: 1,
+                        },
+                      ],
                     },
                   },
                 ],
