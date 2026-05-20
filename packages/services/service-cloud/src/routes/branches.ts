@@ -157,8 +157,8 @@ export function groupByBranch(rows: BranchHeadRow[]): Array<{
 }
 
 export function registerBranchRoutes(server: IHttpServer, deps: RouteDeps): void {
-    const { prefix, requiredKey, controlDriverPromise } = deps;
-    const checkAuth = makeCheckAuth(requiredKey);
+    const { prefix, requiredKey, controlDriverPromise, getCallerUserId } = deps;
+    const checkAuth = makeCheckAuth(requiredKey, getCallerUserId);
     const getDriver = makeGetDriver(controlDriverPromise);
 
     // ─────────────────────────────────────────────────────────────────
@@ -166,7 +166,7 @@ export function registerBranchRoutes(server: IHttpServer, deps: RouteDeps): void
     // List every distinct branch on this project + its head commit + count.
     // ─────────────────────────────────────────────────────────────────
     server.get(`${prefix}/cloud/projects/:id/branches`, async (req: any, res: any) => {
-        const auth = checkAuth(req);
+        const auth = await checkAuth(req);
         if (!auth.ok) return res.status(auth.status).json(auth.body);
         const projectId = String(req.params?.id ?? '').trim();
         if (!projectId) return res.status(400).json(fail('project id required'));
@@ -195,7 +195,7 @@ export function registerBranchRoutes(server: IHttpServer, deps: RouteDeps): void
     // 409 if `newName` already has rows.
     // ─────────────────────────────────────────────────────────────────
     server.post(`${prefix}/cloud/projects/:id/branches/:name/rename`, async (req: any, res: any) => {
-        const auth = checkAuth(req);
+        const auth = await checkAuth(req);
         if (!auth.ok) return res.status(auth.status).json(auth.body);
         const projectId = String(req.params?.id ?? '').trim();
         const oldName = String(req.params?.name ?? '').trim();
@@ -246,7 +246,7 @@ export function registerBranchRoutes(server: IHttpServer, deps: RouteDeps): void
     // The current revision's branch cannot be deleted.
     // ─────────────────────────────────────────────────────────────────
     server.delete(`${prefix}/cloud/projects/:id/branches/:name`, async (req: any, res: any) => {
-        const auth = checkAuth(req);
+        const auth = await checkAuth(req);
         if (!auth.ok) return res.status(auth.status).json(auth.body);
         const projectId = String(req.params?.id ?? '').trim();
         const name = String(req.params?.name ?? '').trim().toLowerCase();

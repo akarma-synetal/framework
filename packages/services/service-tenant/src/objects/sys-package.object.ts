@@ -134,6 +134,32 @@ export const SysPackage = ObjectSchema.create({
       description: 'SPDX license identifier (e.g. MIT, Apache-2.0, proprietary).',
     }),
 
+    publisher: Field.select({
+      label: 'Publisher Tier',
+      required: false,
+      defaultValue: 'private',
+      description:
+        'Publisher provenance tier — surfaced as a trust badge in Marketplace and Studio. ' +
+        'objectstack = first-party core team; partner = verified third-party; ' +
+        'community = unverified public submission; private = internal to owner org.',
+      options: [
+        { value: 'objectstack', label: 'ObjectStack' },
+        { value: 'partner', label: 'Partner' },
+        { value: 'community', label: 'Community' },
+        { value: 'private', label: 'Private' },
+      ],
+    }),
+
+    is_starter: Field.boolean({
+      label: 'Starter Template',
+      required: false,
+      defaultValue: false,
+      description:
+        'If true, this package is offered as a starting blueprint in the Create Project ' +
+        'wizard. Starter packages are regular packages — there is no separate "template" ' +
+        'concept. CI promotes examples/app-* packages by setting this flag during publish.',
+    }),
+
     created_by: Field.lookup('sys_user', {
       label: 'Created By',
       required: true,
@@ -146,6 +172,7 @@ export const SysPackage = ObjectSchema.create({
     { fields: ['owner_org_id'] },
     { fields: ['visibility'] },
     { fields: ['owner_org_id', 'visibility'] },
+    { fields: ['is_starter'] },
   ],
 
   enable: {

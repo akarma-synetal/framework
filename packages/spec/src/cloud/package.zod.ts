@@ -45,6 +45,22 @@ export const PackageCategorySchema = lazySchema(() => z
 
 export type PackageCategory = z.infer<typeof PackageCategorySchema>;
 
+/**
+ * Provenance tier of a package publisher.
+ * Used by Studio/Console UI to display trust badges and by the Marketplace
+ * to gate listing privileges.
+ *
+ * - `objectstack` — first-party, maintained by the ObjectStack core team
+ * - `partner`     — verified third-party (signed publisher agreement)
+ * - `community`   — public open submission, unverified
+ * - `private`     — internal to the owner organization
+ */
+export const PackagePublisherSchema = lazySchema(() => z
+  .enum(['objectstack', 'partner', 'community', 'private'])
+  .describe('Package publisher provenance tier'));
+
+export type PackagePublisher = z.infer<typeof PackagePublisherSchema>;
+
 // ---------------------------------------------------------------------------
 // sys_package — Package identity
 // ---------------------------------------------------------------------------
@@ -105,6 +121,24 @@ export const PackageSchema = lazySchema(() => z.object({
   /** SPDX license identifier (e.g. "MIT", "Apache-2.0"). */
   license: z.string().optional().describe('SPDX license identifier (e.g. MIT, Apache-2.0)'),
 
+  /**
+   * Publisher provenance tier — surfaced as a trust badge in the Marketplace
+   * and Studio. Defaults to `private` for org-scoped packages; the
+   * `objectstack publish` CLI sets it explicitly when promoting first-party
+   * or partner content.
+   */
+  publisher: PackagePublisherSchema.default('private'),
+
+  /**
+   * If true, this package is offered as a starting blueprint when creating a
+   * new project (the "Choose a template" picker in Console). Starters are
+   * regular packages — there is no separate `template` concept. CI promotes
+   * `examples/app-*` packages by setting this flag during publish.
+   */
+  isStarter: z.boolean().default(false).describe(
+    'If true, surfaces in the Create Project blueprint picker as a starter template'
+  ),
+
   /** Creation timestamp (ISO-8601). */
   createdAt: z.string().datetime().describe('Creation timestamp (ISO-8601)'),
 
@@ -135,6 +169,8 @@ export const CreatePackageRequestSchema = lazySchema(() => z.object({
   iconUrl: z.string().url().optional(),
   homepageUrl: z.string().url().optional(),
   license: z.string().optional(),
+  publisher: PackagePublisherSchema.optional(),
+  isStarter: z.boolean().optional(),
   createdBy: z.string().describe('User ID creating the package'),
 }).describe('Register a new package in the Control Plane'));
 
@@ -154,6 +190,8 @@ export const UpdatePackageRequestSchema = lazySchema(() => z.object({
   iconUrl: z.string().url().optional(),
   homepageUrl: z.string().url().optional(),
   license: z.string().optional(),
+  publisher: PackagePublisherSchema.optional(),
+  isStarter: z.boolean().optional(),
 }).describe('Update mutable package metadata'));
 
 export type UpdatePackageRequest = z.infer<typeof UpdatePackageRequestSchema>;

@@ -80,7 +80,7 @@ function resolveNewHostname(body: AnyRow): { ok: true; hostname: string } | { ok
 
 export function registerProjectLifecycleRoutes(server: IHttpServer, deps: RouteDeps): void {
     const { prefix, requiredKey, controlDriverPromise, getCallerUserId, getCallerActiveOrgId } = deps;
-    const checkAuth = makeCheckAuth(requiredKey);
+    const checkAuth = makeCheckAuth(requiredKey, getCallerUserId);
     const getDriver = makeGetDriver(controlDriverPromise);
 
     const resolveActorId = async (req: any): Promise<string | undefined> => {
@@ -132,7 +132,7 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: RouteD
 
     // ── POST /cloud/projects ─────────────────────────────────────────
     server.post(`${prefix}/cloud/projects`, async (req: any, res: any) => {
-        const auth = checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
+        const auth = await checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
         const svc = await getProvisioningService();
         if (!svc) return controlPlaneUnavailable(res);
 
@@ -200,7 +200,7 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: RouteD
         patch: (req: any, project: AnyRow) => AnyRow | Promise<AnyRow>,
     ) => {
         server.post(`${prefix}/cloud/projects/:id/${urlSuffix}`, async (req: any, res: any) => {
-            const auth = checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
+            const auth = await checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
             const projectId = String(req.params?.id ?? '').trim();
             if (!projectId) return res.status(400).json(fail('project id required'));
 
@@ -242,7 +242,7 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: RouteD
 
     // ── set-default: clears other defaults in same org ──
     server.post(`${prefix}/cloud/projects/:id/set-default`, async (req: any, res: any) => {
-        const auth = checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
+        const auth = await checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
         const projectId = String(req.params?.id ?? '').trim();
         if (!projectId) return res.status(400).json(fail('project id required'));
 
@@ -271,7 +271,7 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: RouteD
 
     // ── change-plan ──
     server.post(`${prefix}/cloud/projects/:id/change-plan`, async (req: any, res: any) => {
-        const auth = checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
+        const auth = await checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
         const projectId = String(req.params?.id ?? '').trim();
         if (!projectId) return res.status(400).json(fail('project id required'));
         const plan = String(req.body?.plan ?? '').trim();
@@ -290,7 +290,7 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: RouteD
 
     // ── change-hostname ──
     server.post(`${prefix}/cloud/projects/:id/change-hostname`, async (req: any, res: any) => {
-        const auth = checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
+        const auth = await checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
         const projectId = String(req.params?.id ?? '').trim();
         if (!projectId) return res.status(400).json(fail('project id required'));
         const resolved = resolveNewHostname(req.body ?? {});
@@ -433,7 +433,7 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: RouteD
     };
 
     server.post(`${prefix}/actions/sys_project/:actionName`, async (req: any, res: any) => {
-        const auth = checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
+        const auth = await checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
         const actionName = String(req.params?.actionName ?? '').trim();
         const impl = actionDispatch[actionName];
         if (!impl) return res.status(404).json(fail(`Unknown sys_project action '${actionName}'`, 404));

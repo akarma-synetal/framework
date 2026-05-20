@@ -30,10 +30,10 @@ import { normalizeBranch, setBranchHead, DEFAULT_BRANCH } from './branches.js';
 export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void {
     const {
         prefix, artifactRoot, keyPrefix, storage, storageAdapterName,
-        requiredKey, controlDriverPromise,
+        requiredKey, controlDriverPromise, getCallerUserId,
     } = deps;
 
-    const checkAuth = makeCheckAuth(requiredKey);
+    const checkAuth = makeCheckAuth(requiredKey, getCallerUserId);
     const getDriver = makeGetDriver(controlDriverPromise);
     const keyFor = (orgId: string | null | undefined, projectId: string, commitId: string) =>
         buildStorageKey(keyPrefix, orgId, projectId, commitId);
@@ -42,7 +42,7 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
     // GET /cloud/resolve-hostname?host=...
     // ================================================================
     server.get(`${prefix}/cloud/resolve-hostname`, async (req: any, res: any) => {
-        const auth = checkAuth(req);
+        const auth = await checkAuth(req);
         if (!auth.ok) return res.status(auth.status).json(auth.body);
         const host = String(req.query?.host ?? req.query?.hostname ?? '').trim();
         if (!host) return res.status(400).json(fail('host query parameter is required'));
@@ -70,7 +70,7 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
     // shadow this one in registration-order matchers.
     // ================================================================
     server.get(`${prefix}/cloud/projects-by-short-id/:short`, async (req: any, res: any) => {
-        const auth = checkAuth(req);
+        const auth = await checkAuth(req);
         if (!auth.ok) return res.status(auth.status).json(auth.body);
         const raw = String(req.params?.short ?? '').trim().toLowerCase();
         if (!/^[0-9a-f]{8,32}$/.test(raw)) {
@@ -115,7 +115,7 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
     // GET /cloud/projects/:id/artifact[?commit=...]
     // ================================================================
     server.get(`${prefix}/cloud/projects/:id/artifact`, async (req: any, res: any) => {
-        const auth = checkAuth(req);
+        const auth = await checkAuth(req);
         if (!auth.ok) return res.status(auth.status).json(auth.body);
         const projectId = String(req.params?.id ?? '').trim();
         if (!projectId) return res.status(400).json(fail('project id required'));
@@ -208,7 +208,7 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
     // POST /cloud/projects/:id/metadata
     // ================================================================
     server.post(`${prefix}/cloud/projects/:id/metadata`, async (req: any, res: any) => {
-        const auth = checkAuth(req);
+        const auth = await checkAuth(req);
         if (!auth.ok) return res.status(auth.status).json(auth.body);
         const projectId = String(req.params?.id ?? '').trim();
         if (!projectId) return res.status(400).json(fail('project id required'));
@@ -339,7 +339,7 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
     // GET /cloud/projects/:id/revisions?limit=&cursor=
     // ================================================================
     server.get(`${prefix}/cloud/projects/:id/revisions`, async (req: any, res: any) => {
-        const auth = checkAuth(req);
+        const auth = await checkAuth(req);
         if (!auth.ok) return res.status(auth.status).json(auth.body);
         const projectId = String(req.params?.id ?? '').trim();
         if (!projectId) return res.status(400).json(fail('project id required'));
@@ -408,7 +408,7 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
     // POST /cloud/projects/:id/revisions/:commit/activate
     // ================================================================
     server.post(`${prefix}/cloud/projects/:id/revisions/:commit/activate`, async (req: any, res: any) => {
-        const auth = checkAuth(req);
+        const auth = await checkAuth(req);
         if (!auth.ok) return res.status(auth.status).json(auth.body);
         const projectId = String(req.params?.id ?? '').trim();
         const commitId = String(req.params?.commit ?? '').trim();
@@ -472,7 +472,7 @@ export function registerCloudRoutes(server: IHttpServer, deps: RouteDeps): void 
     // The current revision is ALWAYS preserved.
     // ================================================================
     server.post(`${prefix}/cloud/projects/:id/revisions/prune`, async (req: any, res: any) => {
-        const auth = checkAuth(req);
+        const auth = await checkAuth(req);
         if (!auth.ok) return res.status(auth.status).json(auth.body);
         const projectId = String(req.params?.id ?? '').trim();
         if (!projectId) return res.status(400).json(fail('project id required'));
