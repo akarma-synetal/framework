@@ -729,6 +729,22 @@ export class SqlDriver implements IDataDriver {
   // Raw Execution
   // ===================================
 
+  /**
+   * Run a raw SQL string or knex builder through the underlying knex
+   * connection.
+   *
+   * ⚠️ **Tenant isolation bypass.** Unlike `find`/`update`/`delete` etc.,
+   * raw `execute()` does NOT inject the `organization_id` predicate. The
+   * caller is responsible for either:
+   *   - inlining the tenant filter into the SQL (`WHERE organization_id = ?`),
+   *   - or restricting `execute()` to genuinely global queries
+   *     (schema introspection, sys_* tables that opt out of tenancy).
+   *
+   * Prefer the typed CRUD APIs whenever the operation can be expressed
+   * through them — they handle tenancy, soft-delete, and audit warnings
+   * automatically. See `README.md > Tenant Isolation` for the full bypass
+   * matrix.
+   */
   async execute(command: any, params?: any[], options?: DriverOptions): Promise<any> {
     if (typeof command !== 'string') {
       return command;

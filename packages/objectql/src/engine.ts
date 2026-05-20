@@ -1786,6 +1786,18 @@ export class ObjectQL implements IDataEngine {
       return opCtx.result as any[];
   }
   
+  /**
+   * Run raw driver-specific commands (SQL for SqlDriver, REST for RestDriver, …).
+   *
+   * ⚠️ **Tenant isolation bypass.** Raw `execute()` does NOT thread the
+   * caller's `ExecutionContext.tenantId` into a `WHERE organization_id`
+   * predicate — drivers see the command verbatim. Callers MUST inline the
+   * tenant filter themselves, or restrict raw execution to genuinely global
+   * statements (schema migrations, sys_* / control-plane tables).
+   *
+   * Prefer the typed entry points (`find`, `update`, `delete`, `count`, …)
+   * whenever feasible — they auto-apply tenancy + soft-delete + audit warnings.
+   */
   async execute(command: any, options?: Record<string, any>): Promise<any> {
       // Driver selection priority:
       //   1. options.object  → route via getDriver(objectName)
