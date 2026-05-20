@@ -96,6 +96,23 @@ export const SETUP_APP: App = {
       ],
     },
     {
+      id: 'group_configuration',
+      type: 'group',
+      label: 'Configuration',
+      icon: 'sliders-horizontal',
+      children: [
+        // Metadata-driven settings hub. Each entry maps to a SettingsManifest
+        // namespace exposed by @objectstack/service-settings. URL navigation
+        // is used (not `object`) because settings are stored in a generic
+        // K/V table (`sys_setting`) rather than per-namespace objects, and
+        // the renderer is a dedicated <SettingsView> page in objectui.
+        { id: 'nav_settings_hub', type: 'url', label: 'All Settings', url: '/apps/setup/system/settings', icon: 'settings-2' },
+        { id: 'nav_settings_mail', type: 'url', label: 'Email', url: '/apps/setup/system/settings/mail', icon: 'mail' },
+        { id: 'nav_settings_branding', type: 'url', label: 'Branding', url: '/apps/setup/system/settings/branding', icon: 'palette' },
+        { id: 'nav_settings_feature_flags', type: 'url', label: 'Feature Flags', url: '/apps/setup/system/settings/feature_flags', icon: 'flag' },
+      ],
+    },
+    {
       id: 'group_diagnostics',
       type: 'group',
       label: 'Diagnostics',

@@ -13,7 +13,7 @@
  * `SettingsService`.
  */
 
-import type { IHttpServer, IHttpRequest, IHttpResponse } from '@objectstack/spec/contracts/http-server';
+import type { IHttpServer, IHttpRequest, IHttpResponse, RouteHandler } from '@objectstack/spec/contracts';
 import { SettingsService } from './settings-service.js';
 import {
   SettingsLockedError,
@@ -60,7 +60,7 @@ export function registerSettingsRoutes(
   const base = opts.basePath ?? '/api/settings';
   const ctxOf = opts.contextFromRequest ?? defaultContext;
 
-  http.get(base, async (req, res) => {
+  http.get(base, (async (req, res) => {
     try {
       const ctx = ctxOf(req);
       const manifests = service.listManifests(ctx);
@@ -68,9 +68,9 @@ export function registerSettingsRoutes(
     } catch (err: any) {
       sendError(res, 500, 'INTERNAL', err?.message ?? 'Failed to list manifests');
     }
-  });
+  }) satisfies RouteHandler);
 
-  http.get(`${base}/:namespace`, async (req, res) => {
+  http.get(`${base}/:namespace`, (async (req, res) => {
     const ns = req.params.namespace;
     try {
       const ctx = ctxOf(req);
@@ -83,9 +83,9 @@ export function registerSettingsRoutes(
         sendError(res, 500, 'INTERNAL', err?.message ?? 'Failed to read namespace');
       }
     }
-  });
+  }) satisfies RouteHandler);
 
-  http.put(`${base}/:namespace`, async (req, res) => {
+  http.put(`${base}/:namespace`, (async (req, res) => {
     const ns = req.params.namespace;
     const body = (req.body ?? {}) as Record<string, unknown>;
     try {
@@ -107,9 +107,9 @@ export function registerSettingsRoutes(
         sendError(res, 500, 'INTERNAL', err?.message ?? 'Failed to write namespace');
       }
     }
-  });
+  }) satisfies RouteHandler);
 
-  http.post(`${base}/:namespace/:actionId`, async (req, res) => {
+  http.post(`${base}/:namespace/:actionId`, (async (req, res) => {
     const { namespace, actionId } = req.params;
     try {
       const ctx = ctxOf(req);
@@ -123,5 +123,5 @@ export function registerSettingsRoutes(
         sendError(res, 500, 'INTERNAL', err?.message ?? 'Action failed');
       }
     }
-  });
+  }) satisfies RouteHandler);
 }

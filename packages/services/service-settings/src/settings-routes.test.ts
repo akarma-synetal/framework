@@ -1,7 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { describe, expect, it, vi } from 'vitest';
-import type { IHttpServer, IHttpRequest, IHttpResponse, RouteHandler } from '@objectstack/spec/contracts/http-server';
+import type { IHttpServer, IHttpRequest, IHttpResponse, RouteHandler } from '@objectstack/spec/contracts';
 import { SettingsService } from './settings-service';
 import { registerSettingsRoutes } from './settings-routes';
 import { brandingSettingsManifest } from './manifests/branding.manifest';

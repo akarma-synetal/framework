@@ -23,14 +23,8 @@
  * plugin wires those pieces up.
  */
 
-import type {
-  SettingsManifest,
-  ResolvedSettingValue,
-  SettingsNamespacePayload,
-  SettingsActionResult,
-  SpecifierScope,
-} from '@objectstack/spec/system';
-import { CryptoAdapter, NoopCryptoAdapter } from './crypto-adapter.js';
+import type { SettingsActionResult, SpecifierScope } from '@objectstack/spec/system';
+import { type CryptoAdapter } from './crypto-adapter.js';
 
 /** Caller identity used by the resolver and audit log. */
 export interface SettingsContext {
@@ -110,8 +104,6 @@ export interface SettingsServiceOptions {
   objectName?: string;
 }
 
-const DEFAULT_OBJECT = 'sys_setting';
-
 /**
  * Convert `(namespace, key)` to the env var convention defined in
  * ADR-0007: uppercase, dots → underscores, hyphens → underscores.
@@ -119,23 +111,6 @@ const DEFAULT_OBJECT = 'sys_setting';
 export function envKeyOf(namespace: string, key: string): string {
   const slug = `${namespace}_${key}`.replace(/[.-]/g, '_').toUpperCase();
   return slug;
-}
-
-/** Cast an env string to the type hinted by the manifest default. */
-function coerceEnvValue(raw: string, hint: unknown): unknown {
-  if (typeof hint === 'boolean') return raw === 'true' || raw === '1' || raw === 'yes';
-  if (typeof hint === 'number') {
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : raw;
-  }
-  if (Array.isArray(hint) || (hint && typeof hint === 'object')) {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return raw;
-    }
-  }
-  return raw;
 }
 
 /** Thrown when a caller tries to write a value pinned by env. */

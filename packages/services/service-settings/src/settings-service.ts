@@ -331,9 +331,9 @@ export class SettingsService {
       };
       const existing = await this.engine.find(this.objectName, { where, limit: 1 });
       if (existing[0]) {
-        await this.engine.update(this.objectName, { where, data: row });
+        await this.engine.update(this.objectName, { where, data: { ...row } });
       } else {
-        await this.engine.insert(this.objectName, row);
+        await this.engine.insert(this.objectName, { ...row });
       }
       return;
     }
