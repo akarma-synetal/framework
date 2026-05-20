@@ -27,7 +27,7 @@ export const SysPackage = ObjectSchema.create({
   icon: 'package',
   isSystem: true,
   managedBy: 'config',
-  description: 'Control-plane registry of installable packages / solutions (sys_package).',
+  description: 'Browse and install apps from the Marketplace.',
   titleFormat: '{display_name}',
   compactLayout: ['display_name', 'manifest_id', 'visibility', 'created_at'],
   // sys_package is a global catalog (Marketplace). Visibility/access is
@@ -183,7 +183,7 @@ export const SysPackage = ObjectSchema.create({
   actions: [
     {
       name: 'install_package',
-      label: 'Install into Project',
+      label: 'Install into Environment',
       icon: 'download-cloud',
       variant: 'primary',
       type: 'api',
@@ -191,18 +191,17 @@ export const SysPackage = ObjectSchema.create({
       target: '/api/v1/cloud/packages/{id}/install',
       method: 'POST',
       recordIdParam: 'id',
-      successMessage: 'Package installed. Project will reload on next request.',
+      successMessage: 'Package installed. Open your environment to see it.',
       refreshAfter: true,
       params: [
         {
           name: 'environment_id',
-          label: 'Target Project',
+          label: 'Target Environment',
           type: 'text',
           required: true,
-          placeholder: 'proj_xxx (paste from Projects)',
-          description: 'ID of the project to install this package into. ' +
-            '(Param name `environment_id` is retained for backwards compat; will be renamed when ' +
-            'sys_environment lands per ADR-0006 Phase 1.)',
+          placeholder: 'Paste the Environment ID from the Environments list',
+          helpText: 'ID of the environment to install this package into. ' +
+            'Open Environments → click your environment → copy the Environment ID.',
         },
       ],
     },

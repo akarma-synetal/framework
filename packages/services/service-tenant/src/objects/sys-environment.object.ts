@@ -45,10 +45,7 @@ export const SysEnvironment = ObjectSchema.create({
   icon: 'globe',
   isSystem: true,
   managedBy: 'config',
-  description: 'Control-plane registry of cloud environments. Each environment owns a hostname, ' +
-    'a dedicated database, and a plan/quota envelope. ' +
-    'Note: a true Project/Environment split (separate sys_environment table for runtime ' +
-    'instances bound to a project branch) is planned — see ADR-0006 Phase 1.',
+  description: 'Your cloud environments. Each environment has its own URL, database, and plan.',
   titleFormat: '{display_name}',
   compactLayout: ['display_name', 'plan', 'status', 'hostname', 'is_default'],
 
@@ -312,7 +309,7 @@ export const SysEnvironment = ObjectSchema.create({
       label: 'Plan',
       required: true,
       defaultValue: 'free',
-      description: 'Plan tier applied to this environment for quota and billing. Change via  action.',
+      description: 'Plan tier applied to this environment for quota and billing. Change via the change_plan action.',
       readonly: true,
       group: 'Basics',
       options: [
@@ -334,8 +331,8 @@ export const SysEnvironment = ObjectSchema.create({
       options: [
         { value: 'provisioning', label: 'Provisioning' },
         { value: 'active', label: 'Active' },
-        { value: 'suspended', label: 'ed' },
-        { value: 'archived', label: 'd' },
+        { value: 'suspended', label: 'Suspended' },
+        { value: 'archived', label: 'Archived' },
         { value: 'failed', label: 'Failed' },
         { value: 'migrating', label: 'Migrating' },
       ],
@@ -355,7 +352,7 @@ export const SysEnvironment = ObjectSchema.create({
       unique: true,
       readonly: true,
       description:
-        'The canonical hostname where this project is served. Use the  action to update.',
+        'The canonical hostname where this project is served. Use the rename_hostname action to update.',
       group: 'Access',
     }),
 
@@ -398,7 +395,7 @@ export const SysEnvironment = ObjectSchema.create({
       required: true,
       defaultValue: false,
       readonly: true,
-      description: 'Exactly one default environment per organization. Set via  action.',
+      description: 'Exactly one default environment per organization. Set via the set_default action.',
       group: 'Access',
     }),
 
@@ -417,7 +414,8 @@ export const SysEnvironment = ObjectSchema.create({
       required: false,
       maxLength: 50,
       readonly: true,
-      description: 'Data-plane driver key (turso, libsql, sqlite, memory, postgres).',
+      hidden: true,
+      description: 'Data-plane driver key (turso, libsql, sqlite, memory, postgres). Admin only.',
       group: 'Connection',
     }),
 
