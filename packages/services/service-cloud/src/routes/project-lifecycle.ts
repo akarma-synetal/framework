@@ -615,6 +615,55 @@ export function registerProjectLifecycleRoutes(server: IHttpServer, deps: Packag
     server.post(`${prefix}/actions/sys_environment/:actionName`, actionHandler);
     server.post(`${prefix}/actions/sys_project/:actionName`, actionHandler); // legacy alias
 
+    // ── sys_package action dispatcher ──────────────────────────────────────
+    // The Marketplace "Install into Environment" action on sys_package is
+    // declared as `type: 'script'` (not 'api') because @object-ui's
+    // RecordDetailView.apiHandler ignores action.target for unknown action
+    // names and falls back to `dataSource.update(object, id, params)`, which
+    // tries to PATCH the sys_package row with non-existent fields
+    // (environment_id, seed_sample_data) and surfaces a misleading
+    // `Object 'sys_package' is not registered` error. Routing through
+    // `serverActionHandler` instead gives us this dedicated endpoint.
+    //
+    // Body shape from app-shell: `{ recordId, params: { environment_id, seed_sample_data } }`
+    server.post(`${prefix}/actions/sys_package/:actionName`, async (req: any, res: any) => {
+        const auth = await checkAuth(req); if (!auth.ok) return res.status(auth.status).json(auth.body);
+        const actionName = String(req.params?.actionName ?? '').trim();
+        if (actionName !== 'install_package') {
+            return res.status(404).json(fail(`Unknown sys_package action '${actionName}'`, 404));
+        }
+        const body = (req.body ?? {}) as AnyRow;
+        const params = (body.params && typeof body.params === 'object') ? (body.params as AnyRow) : {};
+        const rowRecord = (params._rowRecord && typeof params._rowRecord === 'object')
+            ? (params._rowRecord as AnyRow) : null;
+        const packageId = String(
+            body.recordId
+            ?? body.record_id
+            ?? params.recordId
+            ?? params.record_id
+            ?? rowRecord?.id
+            ?? ''
+        ).trim();
+        if (!packageId) return res.status(400).json(fail('recordId (package_id) is required', 400));
+        const environmentId = String(params.environment_id ?? params.environmentId ?? '').trim();
+        if (!environmentId) return res.status(400).json(fail('environment_id is required', 400));
+        const seedSampleData = params.seed_sample_data === true
+            || params.seed_sample_data === 'true'
+            || params.seedSampleData === true
+            || params.seedSampleData === 'true';
+        const callerUserId = (await resolveActorId(req)) ?? null;
+        const callerActiveOrgId = (await resolveActiveOrgId(req)) ?? null;
+        const result = await installPackageIntoEnvironment({
+            deps,
+            packageId,
+            environmentId,
+            seedSampleData,
+            callerUserId,
+            callerActiveOrgId,
+        });
+        return res.status(result.status).json(result.body);
+    });
+
     // Reference the randomUUID import (silences unused warnings) — used by
     // adapter fallbacks elsewhere in the file in the future.
     void randomUUID;

@@ -186,11 +186,17 @@ export const SysPackage = ObjectSchema.create({
       label: 'Install into Environment',
       icon: 'download-cloud',
       variant: 'primary',
-      type: 'api',
+      // MUST be 'script' (not 'api'): app-shell's RecordDetailView apiHandler
+      // ignores `action.target` for unknown action names and falls back to
+      // `dataSource.update(object, id, params)` — which tries to PATCH the
+      // sys_package row with non-existent fields (environment_id, etc.) and
+      // surfaces as `Object 'sys_package' is not registered` on the
+      // project-scoped data route. 'script' routes through serverActionHandler
+      // → POST /api/v1/actions/sys_package/install_package, which we handle
+      // server-side in service-cloud's project-lifecycle routes.
+      type: 'script',
       locations: ['list_item', 'record_header'],
-      target: '/api/v1/cloud/packages/{id}/install',
-      method: 'POST',
-      recordIdParam: 'id',
+      target: 'install_package',
       successMessage: 'Package installed. Open your environment to see it.',
       refreshAfter: true,
       params: [
