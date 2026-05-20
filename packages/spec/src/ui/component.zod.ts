@@ -88,8 +88,18 @@ export const RecordRelatedListProps = z.object({
   aria: AriaPropsSchema.optional().describe('ARIA accessibility attributes'),
 });
 
+export const RecordHighlightsField = z.union([
+  z.string(),
+  z.object({
+    name: z.string().describe('Field name on the record'),
+    label: z.string().optional().describe('Display label (overrides schema label)'),
+    icon: z.string().optional().describe('Icon name (lucide icon key)'),
+    type: z.string().optional().describe('Override cell renderer type (rare)'),
+  }),
+]).describe('Highlight field: bare name, or {name,label?,icon?,type?}');
+
 export const RecordHighlightsProps = z.object({
-  fields: z.array(z.string()).min(1).max(7).describe('Key fields to highlight (1-7 fields max, typically displayed as prominent cards)'),
+  fields: z.array(RecordHighlightsField).min(1).max(7).describe('Key fields to highlight (1-7 fields max, typically displayed as prominent cards). Each item may be a bare field name or {name, label?, icon?, type?} for inline overrides.'),
   layout: z.enum(['horizontal', 'vertical']).default('horizontal').describe('Layout orientation for highlight fields'),
   /** ARIA accessibility */
   aria: AriaPropsSchema.optional().describe('ARIA accessibility attributes'),
