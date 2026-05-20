@@ -4,7 +4,7 @@
 // when shipping a hotfix that lives inside the Container image. The
 // DO only reloads when worker code changes, so a no-op edit here
 // guarantees the container restarts with the freshly-pushed image.
-// build: 2026-05-19T18:50Z plan-a-seed-after-bootstrap
+// build: 2026-05-20T11:30Z full-wipe-redeploy-2f115ab6
 
 /**
  * Cloudflare Containers entrypoint for ObjectOS.
