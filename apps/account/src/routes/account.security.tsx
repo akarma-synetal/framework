@@ -4,7 +4,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useObjectTranslation } from '@object-ui/i18n';
 import { useClient } from '@objectstack/client-react';
-import { AlertTriangle, Mail, Trash2 } from 'lucide-react';
+import { AlertTriangle, Mail, Shield, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHeader } from '@/components/page-header';
 import { toast } from '@/hooks/use-toast';
 import { useSession } from '@/hooks/useSession';
 
@@ -128,10 +129,23 @@ function SecurityPage() {
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        icon={Shield}
+        title={t('security.title')}
+        description={t('security.description')}
+      />
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t('security.title')}</CardTitle>
-          <CardDescription>{t('security.description')}</CardDescription>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Shield className="h-4 w-4 text-primary" />
+            {t('security.changePasswordTitle', { defaultValue: 'Change password' })}
+          </CardTitle>
+          <CardDescription>
+            {t('security.changePasswordDescription', {
+              defaultValue: 'Use at least 8 characters. Mix letters, numbers and symbols for strength.',
+            })}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleChangePassword} className="space-y-4">
@@ -188,7 +202,7 @@ function SecurityPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Mail className="h-4 w-4" />
+            <Mail className="h-4 w-4 text-primary" />
             {t('security.email.title')}
           </CardTitle>
           <CardDescription>{t('security.email.description')}</CardDescription>
@@ -217,7 +231,7 @@ function SecurityPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-destructive/40">
+      <Card className="border-destructive/40 bg-destructive/5">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2 text-destructive">
             <AlertTriangle className="h-4 w-4" />

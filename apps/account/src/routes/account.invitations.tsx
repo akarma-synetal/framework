@@ -11,6 +11,7 @@ import { useObjectTranslation } from '@object-ui/i18n';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
 import { useMyInvitations } from '@/hooks/useOrganizationMembers';
@@ -52,11 +53,34 @@ function InvitationsPage() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{t('invitations.title')}</CardTitle>
-        <CardDescription>{t('invitations.description')}</CardDescription>
-      </CardHeader>
+    <div className="space-y-6">
+      <PageHeader
+        icon={Inbox}
+        title={t('invitations.title')}
+        description={t('invitations.description')}
+        actions={
+          pending.length > 0 ? (
+            <Badge variant="outline" className="font-medium">
+              {t('invitations.pendingCount', {
+                count: pending.length,
+                defaultValue: '{{count}} pending',
+              })}
+            </Badge>
+          ) : null
+        }
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            {t('invitations.pendingTitle', { defaultValue: 'Pending invitations' })}
+          </CardTitle>
+          <CardDescription>
+            {t('invitations.pendingDescription', {
+              defaultValue: 'Accept to join an organization, or reject to remove it from your inbox.',
+            })}
+          </CardDescription>
+        </CardHeader>
       <CardContent>
         {loading && (
           <div className="space-y-3">
@@ -105,5 +129,6 @@ function InvitationsPage() {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }

@@ -4,12 +4,13 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { useObjectTranslation } from '@object-ui/i18n';
 import { useClient } from '@objectstack/client-react';
-import { Copy, KeyRound, RefreshCw } from 'lucide-react';
+import { Copy, KeyRound, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHeader } from '@/components/page-header';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
@@ -133,26 +134,49 @@ function TwoFactorPage() {
     }
   };
 
+  const header = (
+    <PageHeader
+      icon={ShieldCheck}
+      title={t('twoFactor.title')}
+      description={t('twoFactor.notEnabledDescription')}
+      actions={
+        enabled === true ? (
+          <Badge className="border-transparent bg-emerald-500/15 font-medium text-emerald-600 dark:text-emerald-400">
+            {t('twoFactor.enabled')}
+          </Badge>
+        ) : enabled === false ? (
+          <Badge variant="outline" className="font-medium">
+            {t('twoFactor.notEnabled')}
+          </Badge>
+        ) : null
+      }
+    />
+  );
+
   if (enabled === null) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('twoFactor.title')}</CardTitle>
-          <CardDescription>{t('twoFactor.loadingStatus')}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Skeleton className="h-4 w-48" />
-          <Skeleton className="h-9 w-full" />
-          <Skeleton className="h-9 w-32" />
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {header}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('twoFactor.loadingStatus')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-32" />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   if (totpUri) {
     const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpUri)}`;
     return (
-      <Card>
+      <div className="space-y-6">
+        {header}
+        <Card>
         <CardHeader>
           <CardTitle className="text-base">{t('twoFactor.setupTitle')}</CardTitle>
           <CardDescription>{t('twoFactor.setupDescription')}</CardDescription>
@@ -229,20 +253,17 @@ function TwoFactorPage() {
           </form>
         </CardContent>
       </Card>
+      </div>
     );
   }
 
   if (enabled === true) {
     return (
       <div className="space-y-6">
+        {header}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-base">{t('twoFactor.title')}</CardTitle>
-              <Badge variant="outline" className="border-green-600 text-green-600">
-                {t('twoFactor.enabled')}
-              </Badge>
-            </div>
+            <CardTitle className="text-base">{t('twoFactor.enabledTitle', { defaultValue: 'Authenticator app' })}</CardTitle>
             <CardDescription>{t('twoFactor.enabledDescription')}</CardDescription>
           </CardHeader>
           <CardContent>
@@ -322,33 +343,37 @@ function TwoFactorPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-base">{t('twoFactor.title')}</CardTitle>
-          <Badge variant="outline">{t('twoFactor.notEnabled')}</Badge>
-        </div>
-        <CardDescription>{t('twoFactor.notEnabledDescription')}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleEnable} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="enable-password">{t('twoFactor.password')}</Label>
-            <Input
-              id="enable-password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={enablePassword}
-              onChange={(e) => setEnablePassword(e.target.value)}
-              placeholder={t('twoFactor.passwordPlaceholder')}
-            />
-          </div>
-          <Button type="submit" disabled={loading}>
-            {loading ? t('twoFactor.loading') : t('twoFactor.enable')}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+      {header}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t('twoFactor.enable')}</CardTitle>
+          <CardDescription>{t('twoFactor.notEnabledDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleEnable} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="enable-password">{t('twoFactor.password')}</Label>
+              <Input
+                id="enable-password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={enablePassword}
+                onChange={(e) => setEnablePassword(e.target.value)}
+                placeholder={t('twoFactor.passwordPlaceholder')}
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:opacity-95 hover:shadow-md hover:shadow-primary/30"
+            >
+              {loading ? t('twoFactor.loading') : t('twoFactor.enable')}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -13,6 +13,7 @@ import { useClient } from '@objectstack/client-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
 
@@ -111,10 +112,16 @@ function LinkedAccountsPage() {
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        icon={Link2}
+        title={t('linkedAccounts.title')}
+        description={t('linkedAccounts.description')}
+      />
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t('linkedAccounts.title')}</CardTitle>
-          <CardDescription>{t('linkedAccounts.description')}</CardDescription>
+          <CardTitle className="text-base">{t('linkedAccounts.connectedTitle', { defaultValue: 'Connected providers' })}</CardTitle>
+          <CardDescription>{t('linkedAccounts.connectedDescription', { defaultValue: 'Sign-in providers currently linked to this account.' })}</CardDescription>
         </CardHeader>
         <CardContent>
           {loading && (

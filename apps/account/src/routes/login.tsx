@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { useSession } from '@/hooks/useSession';
 import { SocialSignInButtons } from '@/components/auth/social-sign-in-buttons';
-import { GalleryVerticalEnd } from 'lucide-react';
+import { AuthShell } from '@/components/auth/auth-shell';
 
 export const Route = createFileRoute('/login')({
   validateSearch: (
@@ -269,29 +269,25 @@ function LoginPage() {
     }
   };
 
+  if (ssoAutoRedirecting || sessionLoading || !!user) {
+    return (
+      <AuthShell>
+        <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted-foreground">
+          <div className="size-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+          <span>
+            {user
+              ? t('auth.login.signingIn', { defaultValue: 'Signing you in…' })
+              : t('auth.login.redirecting', { defaultValue: 'Redirecting to ObjectStack…' })}
+          </span>
+        </div>
+      </AuthShell>
+    );
+  }
+
   return (
-    <div className="relative grid min-h-svh w-full lg:grid-cols-2">
-      {/* Left: form column */}
-      <div className="flex flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
-        {ssoAutoRedirecting || sessionLoading || !!user ? (
-          <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
-            <div className="size-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-            <span>
-              {user
-                ? t('auth.login.signingIn', { defaultValue: 'Signing you in…' })
-                : t('auth.login.redirecting', { defaultValue: 'Redirecting to ObjectStack…' })}
-            </span>
-          </div>
-        ) : (
-        <div className="flex w-full max-w-sm flex-col gap-6">
-          <a href="#" className="flex items-center gap-2 self-center font-semibold tracking-tight">
-            <div className="flex size-7 items-center justify-center rounded-md bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/30">
-              <GalleryVerticalEnd className="size-4" />
-            </div>
-            <span>ObjectStack</span>
-          </a>
-          <div className="flex flex-col gap-6">
-            <Card className="border-border/60 shadow-sm shadow-primary/5 backdrop-blur supports-[backdrop-filter]:bg-card/95">
+    <AuthShell>
+      <div className="flex flex-col gap-6">
+        <Card className="border-border/60 shadow-sm shadow-primary/5 backdrop-blur supports-[backdrop-filter]:bg-card/95">
               <CardHeader className="text-center">
                 <CardTitle className="text-xl tracking-tight">{t('auth.login.title')}</CardTitle>
                 <CardDescription>{t('auth.login.description')}</CardDescription>
@@ -351,60 +347,12 @@ function LoginPage() {
                   </div>
                 </form>
               </CardContent>
-            </Card>
-            <p className="px-6 text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a]:hover:text-primary">
-              {t('legal.agreementPrefix')}{' '}
-              <a href="#">{t('legal.termsOfService')}</a> {t('legal.and')} <a href="#">{t('legal.privacyPolicy')}</a>.
-            </p>
-          </div>
-        </div>
-        )}
+        </Card>
+        <p className="px-6 text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a]:hover:text-primary">
+          {t('legal.agreementPrefix')}{' '}
+          <a href="#">{t('legal.termsOfService')}</a> {t('legal.and')} <a href="#">{t('legal.privacyPolicy')}</a>.
+        </p>
       </div>
-
-      {/* Right: brand panel (≥ lg) */}
-      <aside
-        aria-hidden
-        className="relative hidden overflow-hidden bg-brand-mesh text-white lg:flex lg:flex-col lg:justify-between lg:p-12"
-      >
-        {/* Subtle grid overlay */}
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.12]"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-            maskImage: 'radial-gradient(ellipse at center, black 40%, transparent 75%)',
-          }}
-        />
-        {/* Soft glow */}
-        <div className="pointer-events-none absolute -left-24 top-1/3 size-[28rem] rounded-full bg-white/15 blur-3xl" />
-        <div className="pointer-events-none absolute -right-20 -bottom-20 size-[24rem] rounded-full bg-white/10 blur-3xl" />
-
-        <div className="relative flex items-center gap-2 text-sm font-semibold tracking-tight">
-          <div className="flex size-7 items-center justify-center rounded-md bg-white/15 ring-1 ring-white/30 backdrop-blur">
-            <GalleryVerticalEnd className="size-4" />
-          </div>
-          ObjectStack
-        </div>
-
-        <div className="relative max-w-md space-y-5">
-          <h2 className="text-balance text-3xl font-semibold leading-tight tracking-tight md:text-4xl">
-            {t('auth.login.brandHeadline', {
-              defaultValue: 'The post-SaaS operating system for your team.',
-            })}
-          </h2>
-          <p className="text-balance text-base/relaxed text-white/80">
-            {t('auth.login.brandSubline', {
-              defaultValue:
-                'One identity, every workspace. Sign in to manage your account, organizations and connected apps.',
-            })}
-          </p>
-        </div>
-
-        <div className="relative text-xs text-white/60">
-          © {new Date().getFullYear()} ObjectStack
-        </div>
-      </aside>
-    </div>
+    </AuthShell>
   );
 }

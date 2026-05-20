@@ -27,6 +27,7 @@
 import { Link, useLocation } from '@tanstack/react-router';
 import {
   Building2,
+  Home,
   Inbox,
   KeyRound,
   Link2,
@@ -57,6 +58,7 @@ import { useOrganizations } from '@/hooks/useSession';
 
 interface NavItem {
   to:
+    | '/account'
     | '/account/profile'
     | '/account/security'
     | '/account/sessions'
@@ -67,9 +69,11 @@ interface NavItem {
     | '/organizations';
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  exact?: boolean;
 }
 
 const ACCOUNT_ITEMS: NavItem[] = [
+  { to: '/account', label: 'home', icon: Home, exact: true },
   { to: '/account/profile', label: 'profile', icon: User },
   { to: '/account/security', label: 'security', icon: Shield },
   { to: '/account/sessions', label: 'sessions', icon: Monitor },
@@ -78,14 +82,30 @@ const ACCOUNT_ITEMS: NavItem[] = [
   { to: '/account/linked-accounts', label: 'linkedAccounts', icon: Link2 },
 ];
 
+/**
+ * Shared classes added to every SidebarMenuButton in the Account portal:
+ *   - left accent bar that fades in on active
+ *   - icon scale-up on hover (and gradient tint on active)
+ *   - smoother transition
+ */
+const NAV_BUTTON_CLASSES = [
+  'group/nav relative transition-all duration-150',
+  'before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-brand-gradient before:opacity-0 before:transition-opacity',
+  'data-[active=true]:before:opacity-100',
+  'data-[active=true]:bg-sidebar-accent/80 data-[active=true]:text-sidebar-accent-foreground',
+  '[&>svg]:transition-transform [&>svg]:duration-150 hover:[&>svg]:scale-110',
+  'data-[active=true]:[&>svg]:text-primary',
+].join(' ');
+
 export function AccountSidebar() {
   const { t } = useObjectTranslation();
   const { pathname } = useLocation();
   const { organizations } = useOrganizations();
 
-  // /account on its own redirects to /account/profile, so treat the bare
-  // path as the profile page for active-state purposes.
-  const normalised = pathname === '/account' ? '/account/profile' : pathname;
+  // /account is the home dashboard now; sub-routes match by prefix and the
+  // `exact` flag is honoured for the Home item so it doesn't light up on
+  // every sub-route.
+  const normalised = pathname;
 
   // Detect /organizations/<orgId>/* — used to surface the org-scoped sub-items.
   const orgMatch = pathname.match(/^\/organizations\/([^/]+)(?:\/.*)?$/);
@@ -101,10 +121,12 @@ export function AccountSidebar() {
             <SidebarMenu>
               {ACCOUNT_ITEMS.map((item) => {
                 const Icon = item.icon;
-                const isActive = normalised === item.to || normalised.startsWith(`${item.to}/`);
+                const isActive = item.exact
+                  ? normalised === item.to || normalised === `${item.to}/`
+                  : normalised === item.to || normalised.startsWith(`${item.to}/`);
                 return (
                   <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={t(`sidebar.items.${item.label}`)}>
+                    <SidebarMenuButton asChild isActive={isActive} tooltip={t(`sidebar.items.${item.label}`)} className={NAV_BUTTON_CLASSES}>
                       <Link to={item.to}>
                         <Icon className="size-4" />
                         <span>{t(`sidebar.items.${item.label}`)}</span>
@@ -128,6 +150,7 @@ export function AccountSidebar() {
                   asChild
                   isActive={pathname === '/organizations'}
                   tooltip={t('sidebar.items.overview')}
+                  className={NAV_BUTTON_CLASSES}
                 >
                   <Link to="/organizations">
                     <Building2 className="size-4" />
@@ -142,6 +165,7 @@ export function AccountSidebar() {
                       asChild
                       isActive={pathname === `/organizations/${activeOrgId}/general`}
                       tooltip={t('sidebar.items.general')}
+                      className={NAV_BUTTON_CLASSES}
                     >
                       <Link to="/organizations/$orgId/general" params={{ orgId: activeOrgId }}>
                         <Settings className="size-4" />
@@ -154,6 +178,7 @@ export function AccountSidebar() {
                       asChild
                       isActive={pathname === `/organizations/${activeOrgId}/members`}
                       tooltip={t('sidebar.items.members')}
+                      className={NAV_BUTTON_CLASSES}
                     >
                       <Link to="/organizations/$orgId/members" params={{ orgId: activeOrgId }}>
                         <Users className="size-4" />
@@ -166,6 +191,7 @@ export function AccountSidebar() {
                       asChild
                       isActive={pathname === `/organizations/${activeOrgId}/teams`}
                       tooltip={t('sidebar.items.teams')}
+                      className={NAV_BUTTON_CLASSES}
                     >
                       <Link to="/organizations/$orgId/teams" params={{ orgId: activeOrgId }}>
                         <Users2 className="size-4" />
@@ -190,6 +216,7 @@ export function AccountSidebar() {
                   asChild
                   isActive={pathname.startsWith('/account/oauth-applications')}
                   tooltip={t('sidebar.items.oauthApps')}
+                  className={NAV_BUTTON_CLASSES}
                 >
                   <Link to="/account/oauth-applications">
                     <KeyRound className="size-4" />

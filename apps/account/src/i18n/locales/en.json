@@ -53,6 +53,7 @@
       "developer": "Developer"
     },
     "items": {
+      "home": "Home",
       "profile": "Profile",
       "security": "Security",
       "sessions": "Sessions",
@@ -79,6 +80,47 @@
     "account": "Account",
     "organizations": "Organizations",
     "signOut": "Sign out"
+  },
+  "home": {
+    "welcome": "Welcome back",
+    "verified": "Verified",
+    "quickAccess": "Quick access",
+    "stats": {
+      "score": "Security score",
+      "orgs": "Organizations",
+      "twoFactor": "Two-factor auth",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "manage": "Manage",
+      "review": "Review",
+      "enable": "Enable now"
+    },
+    "tiles": {
+      "profile": {
+        "title": "Profile",
+        "description": "Display name, avatar and contact info."
+      },
+      "security": {
+        "title": "Security",
+        "description": "Change your password and review activity."
+      },
+      "twoFactor": {
+        "title": "Two-factor auth",
+        "description": "Add an authenticator app for stronger sign-in."
+      },
+      "sessions": {
+        "title": "Active sessions",
+        "description": "See and revoke devices that are signed in."
+      },
+      "linked": {
+        "title": "Linked accounts",
+        "description": "Manage your social and SSO providers."
+      },
+      "oauth": {
+        "title": "OAuth applications",
+        "description": "Apps you have authorised to access your account."
+      }
+    }
   },
   "profile": {
     "title": "Profile",
@@ -205,7 +247,9 @@
       "noAccount": "Don't have an account?",
       "signUp": "Sign up",
       "welcomeToast": "Welcome back",
-      "failed": "Sign in failed"
+      "failed": "Sign in failed",
+      "brandHeadline": "The post-SaaS operating system for your team.",
+      "brandSubline": "One identity, every workspace. Sign in to manage your account, organizations and connected apps."
     },
     "register": {
       "title": "Create an account",

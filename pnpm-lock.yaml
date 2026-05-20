@@ -33,8 +33,8 @@ importers:
   apps/account:
     dependencies:
       '@object-ui/i18n':
-        specifier: ^4.5.0
-        version: 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
       '@objectstack/client':
         specifier: workspace:*
         version: link:../../packages/client
@@ -269,89 +269,89 @@ importers:
   apps/console:
     dependencies:
       '@object-ui/app-shell':
-        specifier: ^4.5.0
-        version: 4.5.0(3231d128c85040bdda9e72014b61c3ff)
+        specifier: ^4.6.0
+        version: 4.6.0(d1e2e7792e864870ddce75eeb95494a1)
       '@object-ui/auth':
-        specifier: ^4.5.0
-        version: 4.5.0(@opentelemetry/api@1.9.1)(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(svelte@5.55.3)(typescript@6.0.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(ai@6.0.185(zod@4.4.3))(better-sqlite3@12.10.0)(mongodb@6.21.0)(next@16.2.6(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(pg@8.21.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(svelte@5.55.3)(vitest@4.1.7)
+        specifier: ^4.6.0
+        version: 4.6.0(@cloudflare/workers-types@4.20260520.1)(@opentelemetry/api@1.9.1)(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(svelte@5.55.3)(typescript@6.0.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(ai@6.0.185(zod@4.4.3))(better-sqlite3@12.10.0)(mongodb@6.21.0)(next@16.2.6(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(pg@8.21.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(svelte@5.55.3)(vitest@4.1.7)
       '@object-ui/collaboration':
-        specifier: ^4.5.0
-        version: 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+        specifier: ^4.6.0
+        version: 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
       '@object-ui/components':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/core':
-        specifier: ^4.5.0
-        version: 4.5.0(ai@6.0.185(zod@4.4.3))
+        specifier: ^4.6.0
+        version: 4.6.0(ai@6.0.185(zod@4.4.3))
       '@object-ui/data-objectstack':
-        specifier: ^4.5.0
-        version: 4.5.0(ai@6.0.185(zod@4.4.3))
+        specifier: ^4.6.0
+        version: 4.6.0(ai@6.0.185(zod@4.4.3))
       '@object-ui/fields':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/i18n':
-        specifier: ^4.5.0
-        version: 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
       '@object-ui/layout':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/mobile':
-        specifier: ^4.5.0
-        version: 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+        specifier: ^4.6.0
+        version: 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
       '@object-ui/permissions':
-        specifier: ^4.5.0
-        version: 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+        specifier: ^4.6.0
+        version: 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
       '@object-ui/plugin-calendar':
-        specifier: ^4.5.0
-        version: 4.5.0(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-charts':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-chatbot':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)(zod@4.4.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)(zod@4.4.3)
       '@object-ui/plugin-dashboard':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-grid-layout@2.2.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-grid-layout@2.2.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-designer':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-detail':
-        specifier: ^4.5.0
-        version: 4.5.0(@object-ui/components@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.5.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.5.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        specifier: ^4.6.0
+        version: 4.6.0(@object-ui/components@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.6.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.6.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@object-ui/plugin-form':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-gantt':
-        specifier: ^4.5.0
-        version: 4.5.0(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-grid':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-kanban':
-        specifier: ^4.5.0
-        version: 4.5.0(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-list':
-        specifier: ^4.5.0
-        version: 4.5.0(@object-ui/components@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.5.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/i18n@4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/mobile@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.5.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        specifier: ^4.6.0
+        version: 4.6.0(@object-ui/components@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.6.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/i18n@4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/mobile@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.6.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@object-ui/plugin-map':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-report':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-timeline':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-view':
-        specifier: ^4.5.0
-        version: 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/react':
-        specifier: ^4.5.0
-        version: 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+        specifier: ^4.6.0
+        version: 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
       '@object-ui/types':
-        specifier: ^4.5.0
-        version: 4.5.0(ai@6.0.185(zod@4.4.3))
+        specifier: ^4.6.0
+        version: 4.6.0(ai@6.0.185(zod@4.4.3))
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -3812,196 +3812,196 @@ packages:
     engines: {node: ^14.18.0 || >=16.10.0, npm: '>=5.10.0'}
     hasBin: true
 
-  '@object-ui/app-shell@4.5.0':
-    resolution: {integrity: sha512-V00ZcoJPiWaXg6xEFMR0UGSroZd0zxAmQVXBYk+fV6JpEIOPcP0pJTnhKnLr1Lf2mKJMSlnc+tltzjmeL8/X8w==}
+  '@object-ui/app-shell@4.6.0':
+    resolution: {integrity: sha512-ST07/yKj7ZSjyjRF7GNluV/O1ij50t79Qt5uCb/SHGDEdoRPZ+OnXxNL36MIZuZu4S706cVxp7umV/c99x1SNg==}
     peerDependencies:
-      '@object-ui/plugin-calendar': ^4.5.0
-      '@object-ui/plugin-charts': ^4.5.0
-      '@object-ui/plugin-chatbot': ^4.5.0
-      '@object-ui/plugin-dashboard': ^4.5.0
-      '@object-ui/plugin-designer': ^4.5.0
-      '@object-ui/plugin-detail': ^4.5.0
-      '@object-ui/plugin-form': ^4.5.0
-      '@object-ui/plugin-grid': ^4.5.0
-      '@object-ui/plugin-kanban': ^4.5.0
-      '@object-ui/plugin-list': ^4.5.0
-      '@object-ui/plugin-report': ^4.5.0
-      '@object-ui/plugin-view': ^4.5.0
+      '@object-ui/plugin-calendar': ^4.6.0
+      '@object-ui/plugin-charts': ^4.6.0
+      '@object-ui/plugin-chatbot': ^4.6.0
+      '@object-ui/plugin-dashboard': ^4.6.0
+      '@object-ui/plugin-designer': ^4.6.0
+      '@object-ui/plugin-detail': ^4.6.0
+      '@object-ui/plugin-form': ^4.6.0
+      '@object-ui/plugin-grid': ^4.6.0
+      '@object-ui/plugin-kanban': ^4.6.0
+      '@object-ui/plugin-list': ^4.6.0
+      '@object-ui/plugin-report': ^4.6.0
+      '@object-ui/plugin-view': ^4.6.0
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
       react-router-dom: ^6.0.0 || ^7.0.0
 
-  '@object-ui/auth@4.5.0':
-    resolution: {integrity: sha512-WyUu7FiBEHkCBavUMzSjOD/IcuZFojNODFj390tvq7dqezH2fb9BDus677nInuAe0Hr5duVyp9qcrD60OxCtlg==}
+  '@object-ui/auth@4.6.0':
+    resolution: {integrity: sha512-uaMk8/4jcqcYzee1oO+JHeIrRVAslMXjR8+5csSDtmzoTPh89rurA7dmEWBxpltSD45xChZRDe5/pB4eKxFwyw==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
-  '@object-ui/collaboration@4.5.0':
-    resolution: {integrity: sha512-oTHfIxAb1qCks3EGK6zOIGYo1aNbzUNPk4G5zSGrUY5zO0Al/D+/map7jOfbNj+dcYpmlbptSDvghsc343NGmA==}
+  '@object-ui/collaboration@4.6.0':
+    resolution: {integrity: sha512-dzco1d1Pk4//6pDKVnDP0iYKBckp4Cyj0a0zgEsUCd6DD8Kkav90rzsQvEFFjff3awJuin3xEKvAf2luGSgbcw==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
-  '@object-ui/components@4.5.0':
-    resolution: {integrity: sha512-pcIWLnsjBStFdhsNspgua0zGB1nrCsYHxwwToL3Xq8qOveFhwzCxCqbRVWuCY+E89GTfJzesSx8PgbWwEjhbwg==}
+  '@object-ui/components@4.6.0':
+    resolution: {integrity: sha512-OoqYD+ASyChFGqUqHm1G4gfhS+7zNe0vE7tGcf3TRnr8dBo6dllvIJ3RcdxB6sH+rKCwV/vEX6GdeybozrxasQ==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
       tailwindcss: ^4.2.1
 
-  '@object-ui/core@4.5.0':
-    resolution: {integrity: sha512-yMXt7ImO41S258Q79KaNC41N3bZKw3xtn5FALB//D/32vNaSRlw3BztUnAALhZvMWDqTkdTye/qgLJB//RGQLw==}
+  '@object-ui/core@4.6.0':
+    resolution: {integrity: sha512-9VLxp3Azt0OKwjVcBBAa8DFHgswkizkYL6qCqg+HEaIaTKPQEfNjt/K4Cr0FgsiBcSqIPDZ6FREiTtxeGv8sVQ==}
 
-  '@object-ui/data-objectstack@4.5.0':
-    resolution: {integrity: sha512-mzlvgp47Dleyvl2d912uIl/8zehPpz7IfFSaOG19nx3dVKAcJhvMaXN1G7eRJMIB8RyMpm3OAa1mzVjEfBleuQ==}
+  '@object-ui/data-objectstack@4.6.0':
+    resolution: {integrity: sha512-KFOwsj/U+5lVF+QsDIXbcQOZiIlszskAVpnYYq9+pfDEFKG+4cO7lCEtWG1sb3zQkZk0/qLypJJnl3cV8xtsjw==}
 
-  '@object-ui/fields@4.5.0':
-    resolution: {integrity: sha512-TO92mUtJ9WVqY2Zr5tBbFd/NEN0DkinZxDbVh73ktmotra/tqR6Tdo+X70tXsU7nCG/yzZxsZmP3K6mcAbbeAw==}
+  '@object-ui/fields@4.6.0':
+    resolution: {integrity: sha512-jk0wuvRgt/xru69k/tfGu0QA6RVBaueHRjyAgz8YuhHGfnF6783894lcjXS48bGlbZDAmitejXZLYDW5tbv+dg==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/i18n@4.5.0':
-    resolution: {integrity: sha512-GSsi973DMq9i0vQjQhXu+gpK352Dc2j7EH5G9pkLXgCyBazybb8p+Sxh0OSplg6Dfr4tUm27suR5rMUIQSkF3Q==}
+  '@object-ui/i18n@4.6.0':
+    resolution: {integrity: sha512-zIhFPFTi0fwaE6+4q7zPilIGFzz9oBMVU9EcbJe8/cF88O3uy821qWGbQVcMgRcn0crPH7DinPCIp95MHyHlLw==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
-  '@object-ui/layout@4.5.0':
-    resolution: {integrity: sha512-IvdWN+9iAD72SKZ+5U6na+q1+na9z/YxmxEAkyObXe2IWolzAJdMwMYFzWnwB/msMEZF5kxyoJO0I1ED3Sahow==}
+  '@object-ui/layout@4.6.0':
+    resolution: {integrity: sha512-8egZnjRmKLkf595A5oV5KjuCY1qsZ5op2ra/J5BNJpLhMAuMVqdWlY1rYjGK4RjURGKvIWrYlsugZYqTnRbipQ==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
       react-router-dom: ^6.0.0 || ^7.0.0
 
-  '@object-ui/mobile@4.5.0':
-    resolution: {integrity: sha512-2mZ5xTV+/ujqPc9AAIPJ8M49a4ePzjeZmJBVFLyIhY9B15VZ2VRWBGQzIaN71e6yxXNVrZXxtM7Ft5AsaanVTw==}
+  '@object-ui/mobile@4.6.0':
+    resolution: {integrity: sha512-/wAY2CFlp3duzNcTVhYuzA8XUyAS5axoRqHFMc+UYuzxBr5D2uMdQ2+SY6xed6MO7csLssJjyoeXOFP6WMNe5w==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
-  '@object-ui/permissions@4.5.0':
-    resolution: {integrity: sha512-IIhf5CGMJMOL+UbBqQcH9yUCeEYeBwsJNPdLYrHiPy3JgslWV/0f/swuahTmrO0nAlBMKoCpHGVKF3ddHdxl5Q==}
+  '@object-ui/permissions@4.6.0':
+    resolution: {integrity: sha512-smZRbjK/2bkVdC11VIh4EiH0Zd1zQsfCGOImEd7awjv6+lPwx3PTgn/rc4B2rMRwpEhPE8XYJWEEDYweU3XWuQ==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
-  '@object-ui/plugin-calendar@4.5.0':
-    resolution: {integrity: sha512-Foj/duv+nwjobYHcGPEh1yOcFHkcZlStrqEJEvMah6YCZR5hIEaaNC5sTxqiMjOwgMjDmN+aT9bIH8xndMkCiA==}
-    peerDependencies:
-      react: ^18.0.0 || ^19.0.0
-      react-dom: ^18.0.0 || ^19.0.0
-
-  '@object-ui/plugin-charts@4.5.0':
-    resolution: {integrity: sha512-FPanoE5P/ip3DTEs9bmANG7iAgqenJtQ9TWT4QkKzBlGBHHClSxRU12PdzD+VOLaMxP0ZwrV7f0vijk0Mwfjtg==}
+  '@object-ui/plugin-calendar@4.6.0':
+    resolution: {integrity: sha512-FS1gnr7nKQ1DnPMizonJ/DymdRkAJbg69O9GNvf5qBV5n9Q//z9WHMf7KHequsNBaEVw7p4V/gY0X6DPQvHFog==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/plugin-chatbot@4.5.0':
-    resolution: {integrity: sha512-iJyEqjOT4wnzI+FNW3vYaiNXYMNPnFN8rttrrJke427T/Ou6g5S/NqzgWdMiEy1DZvdzf7idZmutGGkfPsDBAw==}
+  '@object-ui/plugin-charts@4.6.0':
+    resolution: {integrity: sha512-Dq2NKvx59C3cO+LPsy2D6aDLcUSEC7UcGIJX1N1BCRrJDf4s0EFFeyDbcLW2EgicVipQG9GsZZKXT3dEnceBxQ==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/plugin-dashboard@4.5.0':
-    resolution: {integrity: sha512-HzwweG3pS+h5n8uDcX03kblR1QGDELS3UuxF1gTpJZ/crogmVX2Y2eUSbrIdpVmljY7Zdqx4Z1I8IX4Z6cC8Yw==}
+  '@object-ui/plugin-chatbot@4.6.0':
+    resolution: {integrity: sha512-UomSuD1NJ5wicpdhHGFvVpIAax+t2chfAo3KjHZyxpOgmxb7DMvZDnqcHDTHFcbvz1dExgBGPj92JJaxbfUrGg==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
+      react-dom: ^18.0.0 || ^19.0.0
+
+  '@object-ui/plugin-dashboard@4.6.0':
+    resolution: {integrity: sha512-Sh0FAz9kT+oVl5Kl3Qm36IspzKBAa9Ksewo8fiEvK1o0vujPuYh3ipWwxjk5E6ofTXTi833ncaGOPnNkUog7sA==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
       react-grid-layout: ^2.2.0 || ^1.4.0
 
-  '@object-ui/plugin-designer@4.5.0':
-    resolution: {integrity: sha512-BjvEdNT8G983mS5KxTIsDREY+huaejJ/URJKk/wvY9TBTgaZXwmrngrE+CRLn/efAsiaRo1gyAuDSI0Q6GmDug==}
+  '@object-ui/plugin-designer@4.6.0':
+    resolution: {integrity: sha512-10OPdTd0eXJZdfAzB7r0Qm2QoeXjFFWViMj4dZaTNGkO6u2ia1eEzqL4tDup/JDUBfUW8J+V2cMW83UJ/l3jXg==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
       react-router-dom: ^6.0.0 || ^7.0.0
 
-  '@object-ui/plugin-detail@4.5.0':
-    resolution: {integrity: sha512-M0HaG396AmN1A2BtWNJxt6tKDUQvC1jd4uh9dCYPA4p/T3wFbbo5tkWIP20lislBC1Rtn1xYKtomlbdHhHrKEw==}
+  '@object-ui/plugin-detail@4.6.0':
+    resolution: {integrity: sha512-yZML1FHOsYWAZmBgvBiifVNhwn3IX5lSc/Jig9X3mCGI4j7+NbH//OgPNznORYiVVTVUEUt5f+7fu/OaX9KY3A==}
     peerDependencies:
-      '@object-ui/components': ^4.5.0
-      '@object-ui/core': ^4.5.0
-      '@object-ui/fields': ^4.5.0
-      '@object-ui/permissions': ^4.5.0
-      '@object-ui/react': ^4.5.0
-      '@object-ui/types': ^4.5.0
+      '@object-ui/components': ^4.6.0
+      '@object-ui/core': ^4.6.0
+      '@object-ui/fields': ^4.6.0
+      '@object-ui/permissions': ^4.6.0
+      '@object-ui/react': ^4.6.0
+      '@object-ui/types': ^4.6.0
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/plugin-form@4.5.0':
-    resolution: {integrity: sha512-eu7hBmaK3GKwy/eTAdXOEsmobGJPQh4f+kRn9vwMv7p5iJk4KN4JgvTCJDbpAl5jMBdoVGIhmfoOnBbmF6pzKg==}
-    peerDependencies:
-      react: ^18.0.0 || ^19.0.0
-      react-dom: ^18.0.0 || ^19.0.0
-
-  '@object-ui/plugin-gantt@4.5.0':
-    resolution: {integrity: sha512-6pfoiWAsB3Hh770v8gG8b8AjbfHvBDgvdmN7hGU1HTuXnqxXlQW3q2SnoCDjanLc6VfrgW7LCgNwAH0rVSytVg==}
+  '@object-ui/plugin-form@4.6.0':
+    resolution: {integrity: sha512-t42PliJuLeWsVYbfWllB8HV4ReCEjAllaHPzI55DUI5K0252AX1Hh6xrc3IAmRfLjtEYNPhVsA9lQFWs0IFKsg==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/plugin-grid@4.5.0':
-    resolution: {integrity: sha512-CTfq/7Kepuoj0h3viIiv3EXLrFrdFaXB3/HbX6UBwpnx+WdvrdUwZ5l1JcepH3exhtykOt1uX0QOdHnxzUZhSA==}
+  '@object-ui/plugin-gantt@4.6.0':
+    resolution: {integrity: sha512-AadA4yGOD3E82a0fW3g21j7KyiHEAWPDqq5uGtlqPIVA3+4qYFQ2vsu8CNMgXpnagGtW+OwTTpRD3+XLBP2jTg==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/plugin-kanban@4.5.0':
-    resolution: {integrity: sha512-tEmqrE/+HkzYfxHSzM9oNlP4XJV/5IwnuBZgI0Rqpg++R7DKWtDQR2Rjn68mUDgpOd0OqJPTkxeX81gw3o4NRg==}
+  '@object-ui/plugin-grid@4.6.0':
+    resolution: {integrity: sha512-C07279UqIVe+vf8EiDclPkXI0KcqJPkG4LEz3QITRp4CfO3jHU7BoddCAcJRrjmGy8LctfM6LGPLGf7P77YMGg==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/plugin-list@4.5.0':
-    resolution: {integrity: sha512-RW4BsekVgsZKka6XRSD9uHqT1ZaFWU5DrPE61gFnWvFEFx1zPLMt6rzrL3JHpp5ALoTWWSsLlbj1Lzq2e6E5rg==}
-    peerDependencies:
-      '@object-ui/components': ^4.5.0
-      '@object-ui/core': ^4.5.0
-      '@object-ui/fields': ^4.5.0
-      '@object-ui/i18n': ^4.5.0
-      '@object-ui/mobile': ^4.5.0
-      '@object-ui/permissions': ^4.5.0
-      '@object-ui/react': ^4.5.0
-      '@object-ui/types': ^4.5.0
-      react: ^18.0.0 || ^19.0.0
-      react-dom: ^18.0.0 || ^19.0.0
-
-  '@object-ui/plugin-map@4.5.0':
-    resolution: {integrity: sha512-SdgO4Buxz0HzIdl+vGy3VrcQ4J/BwUDy2VN1XxIEll6d8a1kc2RbqmCpsjY8HtMTmuSYmlsevjcKKAUV7jZlCA==}
+  '@object-ui/plugin-kanban@4.6.0':
+    resolution: {integrity: sha512-P+AzlxWyeL97mDEQQ44vGAUJtZL/AdKKgakaw4VByYPshU8hap83S/HOLZZY1KoRtWpCWEm/m3i05suMr/hwwQ==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/plugin-report@4.5.0':
-    resolution: {integrity: sha512-NZmtXpS+1ls28oeioXms4XaddC4BTdn6uikEdhJxEnN9v2IxEuEThIVKsNVp2Z+JO4MCTLzaBzs5j+hxnJgoSg==}
+  '@object-ui/plugin-list@4.6.0':
+    resolution: {integrity: sha512-vZ1j36QvVqSHLU3VpzCuemJRXC5NgWwSYMbVXkpYFp8fIDne2MCIaNrjJ3vP43mzz76zJ/ryKOzQF40bVv7wXA==}
+    peerDependencies:
+      '@object-ui/components': ^4.6.0
+      '@object-ui/core': ^4.6.0
+      '@object-ui/fields': ^4.6.0
+      '@object-ui/i18n': ^4.6.0
+      '@object-ui/mobile': ^4.6.0
+      '@object-ui/permissions': ^4.6.0
+      '@object-ui/react': ^4.6.0
+      '@object-ui/types': ^4.6.0
+      react: ^18.0.0 || ^19.0.0
+      react-dom: ^18.0.0 || ^19.0.0
+
+  '@object-ui/plugin-map@4.6.0':
+    resolution: {integrity: sha512-oH+ob+iAWW350RY9+PJtmaQBkiCoK5TOQFI/Zrynrsr5mUhnvb9nPDtMxkteosMqc8v1JeJcKDyt5/fLokV8vg==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
+      react-dom: ^18.0.0 || ^19.0.0
+
+  '@object-ui/plugin-report@4.6.0':
+    resolution: {integrity: sha512-rdw5JcKAIO8iqlhonGjUEypDr1pqXrX723eo69houi8sxqxyZvN1EsRbGICv0bdoafD0WL30hdWRJGdZWZTdsQ==}
     peerDependencies:
       react: ^18.0.0
       react-dom: ^18.0.0
 
-  '@object-ui/plugin-timeline@4.5.0':
-    resolution: {integrity: sha512-oDYSrSmmGSjlGjyCZK3Kj/T8YreaQ180iANqYoFeJ30r1ESaELNDg4Ggg36X4Sa4D86y5/RtluPGrzuQ+vb2qA==}
+  '@object-ui/plugin-timeline@4.6.0':
+    resolution: {integrity: sha512-Bs/ZJTMgHEL4XNndRmFGfAnowkFIn7UFTgul20tq61boo2IpMOubIo6A86Rl7a1mWxbmIUDeagqq3pa4uYgo8A==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/plugin-view@4.5.0':
-    resolution: {integrity: sha512-Inlq8XqJLzAAjamzz/N63tLIXO+JPykP2h/3Is3Jp+h5r+du64hRy43PemKPmY4x2Z8qmxaioD8ZBXSRKYBhYw==}
+  '@object-ui/plugin-view@4.6.0':
+    resolution: {integrity: sha512-gp/iRp3MI6MHX5qfxJao2+FHW4c99zGL5UcUSlbz9zwSipo7z3HlyksybmmScmKKu5uqyiWJIoWIpbpE1ijEJA==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/providers@4.5.0':
-    resolution: {integrity: sha512-1aU0tHNlo6XHaayG/Liimw84rR+lr2YNfIlFwjM23f5tpqTs3QBikRCCzZ5wzg7H2PaE7YXOM5JdGwj9If1d6Q==}
+  '@object-ui/providers@4.6.0':
+    resolution: {integrity: sha512-aNZS8BgnqBZBaY45JsOFTo9TUVAydgzHmmsSIvr/JpTMI8PO/ftbkK77/3ZE8F4i1QPd/WbObfbFusyvLVZX7g==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/react@4.5.0':
-    resolution: {integrity: sha512-NKFBjACXHsmpczluQxiAK7JABmr5wbDBgbYJL2Z43suwOMSRzttliuXOb8OCAy2pYDYajcY1T5PObZ7r2z7n8A==}
+  '@object-ui/react@4.6.0':
+    resolution: {integrity: sha512-swPUuQivxLIR/2cpFZ9cs9MSewLe9NpBYoiUZySEEq5PKD5uCxWXaFJNIfqKEFzhWs0Z9ltD9herz3ElRTt8Gg==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@object-ui/types@4.5.0':
-    resolution: {integrity: sha512-v//Po264sFq+5e606F2eO8dvcjqgcwOXDmKUCMbuZYeeYLWKdFMV3G9mr2JE0q193xkILHcX9Nf6O8ZHEnDI6g==}
+  '@object-ui/types@4.6.0':
+    resolution: {integrity: sha512-d23AflqlWdhumg3ggvMjlhSlWhCPQpjP4QPf418/NDEs8rG5s4DbwGh+PVjmk46zSUNudCsoX+XgK1ZKNrLvkw==}
 
   '@objectstack/client@4.0.5':
     resolution: {integrity: sha512-/LTDcsC83nU8ByzS0+ZlUrEtGvonliFsWBc5poEkHsgJAG0EfG4pvSwtRl8o2o4WOhWz81GmbHvFFao24+8tGQ==}
@@ -11565,31 +11565,31 @@ snapshots:
     dependencies:
       consola: 3.4.2
 
-  '@object-ui/app-shell@4.5.0(3231d128c85040bdda9e72014b61c3ff)':
+  '@object-ui/app-shell@4.6.0(d1e2e7792e864870ddce75eeb95494a1)':
     dependencies:
-      '@object-ui/auth': 4.5.0(@opentelemetry/api@1.9.1)(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(svelte@5.55.3)(typescript@6.0.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(ai@6.0.185(zod@4.4.3))(better-sqlite3@12.10.0)(mongodb@6.21.0)(next@16.2.6(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(pg@8.21.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(svelte@5.55.3)(vitest@4.1.7)
-      '@object-ui/collaboration': 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/data-objectstack': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/fields': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/i18n': 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/layout': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/permissions': 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
-      '@object-ui/plugin-calendar': 4.5.0(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/plugin-charts': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/plugin-chatbot': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)(zod@4.4.3)
-      '@object-ui/plugin-dashboard': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-grid-layout@2.2.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/plugin-designer': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/plugin-detail': 4.5.0(@object-ui/components@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.5.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.5.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      '@object-ui/plugin-form': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/plugin-grid': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/plugin-kanban': 4.5.0(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/plugin-list': 4.5.0(@object-ui/components@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.5.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/i18n@4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/mobile@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.5.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      '@object-ui/plugin-report': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/plugin-view': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/auth': 4.6.0(@cloudflare/workers-types@4.20260520.1)(@opentelemetry/api@1.9.1)(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(svelte@5.55.3)(typescript@6.0.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(ai@6.0.185(zod@4.4.3))(better-sqlite3@12.10.0)(mongodb@6.21.0)(next@16.2.6(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(pg@8.21.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(svelte@5.55.3)(vitest@4.1.7)
+      '@object-ui/collaboration': 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/data-objectstack': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/fields': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/i18n': 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/layout': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/permissions': 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+      '@object-ui/plugin-calendar': 4.6.0(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-charts': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-chatbot': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)(zod@4.4.3)
+      '@object-ui/plugin-dashboard': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-grid-layout@2.2.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-designer': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-detail': 4.6.0(@object-ui/components@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.6.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.6.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@object-ui/plugin-form': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-grid': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-kanban': 4.6.0(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-list': 4.6.0(@object-ui/components@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.6.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/i18n@4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/mobile@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.6.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@object-ui/plugin-report': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-view': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
@@ -11624,9 +11624,9 @@ snapshots:
       - vitest
       - vue
 
-  '@object-ui/auth@4.5.0(@opentelemetry/api@1.9.1)(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(svelte@5.55.3)(typescript@6.0.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(ai@6.0.185(zod@4.4.3))(better-sqlite3@12.10.0)(mongodb@6.21.0)(next@16.2.6(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(pg@8.21.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(svelte@5.55.3)(vitest@4.1.7)':
+  '@object-ui/auth@4.6.0(@cloudflare/workers-types@4.20260520.1)(@opentelemetry/api@1.9.1)(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(svelte@5.55.3)(typescript@6.0.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(ai@6.0.185(zod@4.4.3))(better-sqlite3@12.10.0)(mongodb@6.21.0)(next@16.2.6(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(pg@8.21.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(svelte@5.55.3)(vitest@4.1.7)':
     dependencies:
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       better-auth: 1.6.11(@cloudflare/workers-types@4.20260520.1)(@opentelemetry/api@1.9.1)(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(svelte@5.55.3)(typescript@6.0.3)(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)))(better-sqlite3@12.10.0)(mongodb@6.21.0)(next@16.2.6(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(pg@8.21.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(svelte@5.55.3)(vitest@4.1.7)
       react: 19.2.6
     transitivePeerDependencies:
@@ -11652,19 +11652,19 @@ snapshots:
       - vitest
       - vue
 
-  '@object-ui/collaboration@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)':
+  '@object-ui/collaboration@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)':
     dependencies:
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       react: 19.2.6
     transitivePeerDependencies:
       - ai
 
-  '@object-ui/components@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/components@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/i18n': 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/i18n': 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       '@radix-ui/react-accordion': 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@radix-ui/react-alert-dialog': 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@radix-ui/react-aspect-ratio': 1.1.8(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -11720,31 +11720,31 @@ snapshots:
       - redux
       - typescript
 
-  '@object-ui/core@4.5.0(ai@6.0.185(zod@4.4.3))':
+  '@object-ui/core@4.6.0(ai@6.0.185(zod@4.4.3))':
     dependencies:
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       '@objectstack/spec': 4.0.5(ai@6.0.185(zod@4.4.3))
       lodash: 4.18.1
       zod: 4.4.3
     transitivePeerDependencies:
       - ai
 
-  '@object-ui/data-objectstack@4.5.0(ai@6.0.185(zod@4.4.3))':
+  '@object-ui/data-objectstack@4.6.0(ai@6.0.185(zod@4.4.3))':
     dependencies:
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       '@objectstack/client': 4.0.5(ai@6.0.185(zod@4.4.3))
     transitivePeerDependencies:
       - ai
 
-  '@object-ui/fields@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/fields@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/i18n': 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/providers': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/i18n': 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/providers': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       clsx: 2.1.1
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
@@ -11760,7 +11760,7 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/i18n@4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)':
+  '@object-ui/i18n@4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)':
     dependencies:
       i18next: 26.2.0(typescript@6.0.3)
       react: 19.2.6
@@ -11770,15 +11770,15 @@ snapshots:
       - react-native
       - typescript
 
-  '@object-ui/layout@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/layout@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
       '@dnd-kit/core': 6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@dnd-kit/sortable': 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)
       '@dnd-kit/utilities': 3.2.2(react@19.2.6)
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       clsx: 2.1.1
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
@@ -11795,30 +11795,30 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/mobile@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)':
+  '@object-ui/mobile@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)':
     dependencies:
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       react: 19.2.6
     transitivePeerDependencies:
       - ai
 
-  '@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)':
+  '@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)':
     dependencies:
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       react: 19.2.6
     transitivePeerDependencies:
       - ai
 
-  '@object-ui/plugin-calendar@4.5.0(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-calendar@4.6.0(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/fields': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/i18n': 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/mobile': 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
-      '@object-ui/plugin-detail': 4.5.0(@object-ui/components@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.5.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.5.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/fields': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/i18n': 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/mobile': 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+      '@object-ui/plugin-detail': 4.6.0(@object-ui/components@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.6.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.6.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
@@ -11833,13 +11833,13 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/plugin-charts@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-charts@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/i18n': 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/i18n': 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
@@ -11854,13 +11854,13 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/plugin-chatbot@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)(zod@4.4.3)':
+  '@object-ui/plugin-chatbot@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)(zod@4.4.3)':
     dependencies:
       '@ai-sdk/react': 3.0.187(react@19.2.6)(zod@4.4.3)
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       ai: 6.0.185(zod@4.4.3)
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
@@ -11879,17 +11879,17 @@ snapshots:
       - typescript
       - zod
 
-  '@object-ui/plugin-dashboard@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-grid-layout@2.2.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-dashboard@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-grid-layout@2.2.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
       '@dnd-kit/core': 6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@dnd-kit/sortable': 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)
       '@dnd-kit/utilities': 3.2.2(react@19.2.6)
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/fields': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/i18n': 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/fields': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/i18n': 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       clsx: 2.1.1
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
@@ -11906,19 +11906,19 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/plugin-designer@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-designer@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react-router-dom@7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
       '@dnd-kit/core': 6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@dnd-kit/sortable': 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)
       '@dnd-kit/utilities': 3.2.2(react@19.2.6)
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/fields': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/i18n': 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/plugin-form': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/plugin-grid': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/fields': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/i18n': 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/plugin-form': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-grid': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       clsx: 2.1.1
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
@@ -11936,26 +11936,26 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/plugin-detail@4.5.0(@object-ui/components@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.5.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.5.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+  '@object-ui/plugin-detail@4.6.0(@object-ui/components@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.6.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.6.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
     dependencies:
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/fields': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/permissions': 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/fields': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/permissions': 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
 
-  '@object-ui/plugin-form@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-form@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/fields': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/permissions': 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/fields': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/permissions': 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
@@ -11969,14 +11969,14 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/plugin-gantt@4.5.0(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-gantt@4.6.0(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/fields': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/plugin-detail': 4.5.0(@object-ui/components@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.5.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.5.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/fields': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-detail': 4.6.0(@object-ui/components@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.6.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.6.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       '@objectstack/spec': 4.0.5(ai@6.0.185(zod@4.4.3))
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
@@ -11992,14 +11992,14 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/plugin-grid@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-grid@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/fields': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/mobile': 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/fields': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/mobile': 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       '@tanstack/react-virtual': 3.13.24(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
@@ -12014,18 +12014,18 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/plugin-kanban@4.5.0(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-kanban@4.6.0(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
       '@dnd-kit/core': 6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@dnd-kit/sortable': 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)
       '@dnd-kit/utilities': 3.2.2(react@19.2.6)
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/fields': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/i18n': 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/plugin-detail': 4.5.0(@object-ui/components@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.5.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.5.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/fields': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/i18n': 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/plugin-detail': 4.6.0(@object-ui/components@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.6.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.6.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       '@tanstack/react-virtual': 3.13.24(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
@@ -12041,26 +12041,26 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/plugin-list@4.5.0(@object-ui/components@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.5.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/i18n@4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/mobile@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/permissions@4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.5.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+  '@object-ui/plugin-list@4.6.0(@object-ui/components@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@4.6.0(ai@6.0.185(zod@4.4.3)))(@object-ui/fields@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/i18n@4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/mobile@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/permissions@4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6))(@object-ui/react@4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@4.6.0(ai@6.0.185(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
     dependencies:
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/fields': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/i18n': 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/mobile': 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
-      '@object-ui/permissions': 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/fields': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/i18n': 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/mobile': 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+      '@object-ui/permissions': 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
 
-  '@object-ui/plugin-map@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-map@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       '@objectstack/spec': 4.0.5(ai@6.0.185(zod@4.4.3))
       lucide-react: 1.16.0(react@19.2.6)
       maplibre-gl: 5.24.0
@@ -12079,15 +12079,15 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/plugin-report@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-report@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/fields': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/i18n': 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/plugin-grid': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/fields': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/i18n': 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/plugin-grid': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       clsx: 2.1.1
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
@@ -12105,13 +12105,13 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/plugin-timeline@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-timeline@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/mobile': 4.5.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/mobile': 4.6.0(ai@6.0.185(zod@4.4.3))(react@19.2.6)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       '@objectstack/spec': 4.0.5(ai@6.0.185(zod@4.4.3))
       class-variance-authority: 0.7.1
       react: 19.2.6
@@ -12127,17 +12127,17 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/plugin-view@4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@object-ui/plugin-view@4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
       '@dnd-kit/core': 6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@dnd-kit/sortable': 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)
       '@dnd-kit/utilities': 3.2.2(react@19.2.6)
-      '@object-ui/components': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/plugin-form': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/plugin-grid': 4.5.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
-      '@object-ui/react': 4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/components': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/plugin-form': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-grid': 4.6.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/react': 4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       class-variance-authority: 0.7.1
       lucide-react: 1.16.0(react@19.2.6)
       react: 19.2.6
@@ -12152,20 +12152,20 @@ snapshots:
       - tailwindcss
       - typescript
 
-  '@object-ui/providers@4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+  '@object-ui/providers@4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
     dependencies:
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
     transitivePeerDependencies:
       - ai
 
-  '@object-ui/react@4.5.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)':
+  '@object-ui/react@4.6.0(ai@6.0.185(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)':
     dependencies:
-      '@object-ui/core': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/data-objectstack': 4.5.0(ai@6.0.185(zod@4.4.3))
-      '@object-ui/i18n': 4.5.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      '@object-ui/types': 4.5.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/core': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/data-objectstack': 4.6.0(ai@6.0.185(zod@4.4.3))
+      '@object-ui/i18n': 4.6.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      '@object-ui/types': 4.6.0(ai@6.0.185(zod@4.4.3))
       '@objectstack/spec': 4.0.5(ai@6.0.185(zod@4.4.3))
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
@@ -12175,7 +12175,7 @@ snapshots:
       - react-native
       - typescript
 
-  '@object-ui/types@4.5.0(ai@6.0.185(zod@4.4.3))':
+  '@object-ui/types@4.6.0(ai@6.0.185(zod@4.4.3))':
     dependencies:
       '@objectstack/spec': 4.0.5(ai@6.0.185(zod@4.4.3))
       zod: 4.4.3

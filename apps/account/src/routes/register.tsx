@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { useSession } from '@/hooks/useSession';
 import { SocialSignInButtons } from '@/components/auth/social-sign-in-buttons';
-import { GalleryVerticalEnd } from 'lucide-react';
+import { AuthShell } from '@/components/auth/auth-shell';
 
 export const Route = createFileRoute('/register')({
   validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
@@ -134,9 +134,17 @@ function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-svh w-full flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
+    <AuthShell
+      headline={t('auth.register.brandHeadline', {
+        defaultValue: 'Create your ObjectStack account.',
+      })}
+      subline={t('auth.register.brandSubline', {
+        defaultValue:
+          'One identity for every workspace, app and integration in your stack.',
+      })}
+    >
       {sessionLoading || !!user ? (
-        <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+        <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted-foreground">
           <div className="size-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
           <span>
             {user
@@ -145,17 +153,10 @@ function RegisterPage() {
           </span>
         </div>
       ) : (
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <a href="#" className="flex items-center gap-2 self-center font-medium">
-          <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <GalleryVerticalEnd className="size-4" />
-          </div>
-          ObjectStack
-        </a>
         <div className="flex flex-col gap-6">
-          <Card>
+          <Card className="border-border/60 shadow-sm shadow-primary/5 backdrop-blur supports-[backdrop-filter]:bg-card/95">
             <CardHeader className="text-center">
-              <CardTitle className="text-xl">{t('auth.register.title')}</CardTitle>
+              <CardTitle className="text-xl tracking-tight">{t('auth.register.title')}</CardTitle>
               <CardDescription>{t('auth.register.description')}</CardDescription>
             </CardHeader>
             <CardContent>
@@ -196,7 +197,11 @@ function RegisterPage() {
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={submitting}>
+                  <Button
+                    type="submit"
+                    className="w-full bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:opacity-95 hover:shadow-md hover:shadow-primary/30"
+                    disabled={submitting}
+                  >
                     {submitting ? t('auth.register.submitting') : t('auth.register.submit')}
                   </Button>
                   <p className="text-center text-sm text-muted-foreground">
@@ -204,7 +209,7 @@ function RegisterPage() {
                     <Link
                       to="/login"
                       search={redirect ? { redirect } : undefined}
-                      className="underline underline-offset-4 hover:text-primary"
+                      className="font-medium text-primary underline-offset-4 hover:underline"
                     >
                       {t('auth.register.signIn')}
                     </Link>
@@ -219,8 +224,7 @@ function RegisterPage() {
             <a href="#">{t('legal.privacyPolicy')}</a>.
           </p>
         </div>
-      </div>
       )}
-    </div>
+    </AuthShell>
   );
 }

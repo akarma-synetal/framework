@@ -12,6 +12,8 @@ import { useObjectTranslation } from '@object-ui/i18n';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/page-header';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -56,36 +58,51 @@ function OAuthApplicationsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{t('oauth.applications.title')}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t('oauth.applications.description')}
-          </p>
-        </div>
-        <Button onClick={() => navigate({ to: '/account/oauth-applications/new' })}>
-          <Plus className="mr-2 h-4 w-4" />
-          {t('oauth.applications.new')}
-        </Button>
-      </div>
+      <PageHeader
+        icon={KeyRound}
+        title={t('oauth.applications.title')}
+        description={t('oauth.applications.description')}
+        actions={
+          <Button
+            onClick={() => navigate({ to: '/account/oauth-applications/new' })}
+            className="bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:opacity-95 hover:shadow-md hover:shadow-primary/30"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            {t('oauth.applications.new')}
+          </Button>
+        }
+      />
 
       {loading ? (
-        <Card>
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            {t('common.loading')}
-          </CardContent>
-        </Card>
+        <div className="space-y-3">
+          {[0, 1, 2].map((i) => (
+            <Card key={i}>
+              <CardContent className="flex items-center gap-3 p-4">
+                <Skeleton className="size-10 rounded-md" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : applications.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
-            <KeyRound className="h-10 w-10 text-muted-foreground" />
+            <div className="flex size-12 items-center justify-center rounded-lg bg-brand-gradient-subtle text-primary ring-1 ring-primary/15">
+              <KeyRound className="h-6 w-6" />
+            </div>
             <div>
               <p className="font-medium">{t('oauth.applications.emptyTitle')}</p>
               <p className="text-sm text-muted-foreground">
                 {t('oauth.applications.emptyDescription')}
               </p>
             </div>
-            <Button onClick={() => navigate({ to: '/account/oauth-applications/new' })}>
+            <Button
+              onClick={() => navigate({ to: '/account/oauth-applications/new' })}
+              className="bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/20"
+            >
               <Plus className="mr-2 h-4 w-4" />
               {t('oauth.applications.register')}
             </Button>
@@ -94,7 +111,10 @@ function OAuthApplicationsListPage() {
       ) : (
         <div className="grid gap-3">
           {applications.map((app) => (
-            <Card key={app.id} className="cursor-pointer hover:bg-accent/30">
+            <Card
+              key={app.id}
+              className="group transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md hover:shadow-primary/5"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between gap-3">
                   <Link
@@ -102,8 +122,8 @@ function OAuthApplicationsListPage() {
                     params={{ clientId: app.client_id }}
                     className="flex flex-1 items-center gap-3"
                   >
-                    <div className="rounded-md border bg-background p-2">
-                      <KeyRound className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-brand-gradient-subtle text-primary ring-1 ring-primary/15 transition-transform group-hover:scale-105">
+                      <KeyRound className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <CardTitle className="text-base">{app.name}</CardTitle>
@@ -119,6 +139,7 @@ function OAuthApplicationsListPage() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="text-muted-foreground hover:text-destructive"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();

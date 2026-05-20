@@ -85,57 +85,86 @@ function ProfilePage() {
     .split(/\s+/).map((s) => s[0]).join('').slice(0, 2).toUpperCase();
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{t('profile.title')}</CardTitle>
-        <CardDescription>{t('profile.description')}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
+    <div className="space-y-6">
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-xl border bg-card">
+        <div className="absolute inset-x-0 top-0 h-24 bg-brand-gradient" aria-hidden />
+        <div
+          className="absolute inset-x-0 top-0 h-24 opacity-30"
+          style={{
+            backgroundImage:
+              'radial-gradient(ellipse at 20% 0%, rgba(255,255,255,0.4), transparent 60%)',
+          }}
+          aria-hidden
+        />
+        <div className="relative px-5 pb-5 pt-12 sm:px-6 sm:pb-6 sm:pt-16">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-5">
+            <Avatar className="size-20 shrink-0 ring-4 ring-card shadow-md">
               {image ? <AvatarImage src={image} alt={user?.name ?? ''} /> : null}
-              <AvatarFallback>{initials}</AvatarFallback>
+              <AvatarFallback className="bg-brand-gradient text-base font-semibold text-primary-foreground">
+                {initials}
+              </AvatarFallback>
             </Avatar>
-            <div className="space-y-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handlePickAvatar}
-                disabled={uploading}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                {uploading ? t('profile.avatarUploading') : t('profile.changeAvatar')}
-              </Button>
-              <p className="text-xs text-muted-foreground">{t('profile.avatarHint')}</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarChange}
-              />
+            <div className="min-w-0 flex-1 space-y-1">
+              <h2 className="truncate text-xl font-semibold tracking-tight">
+                {user?.name || t('profile.namePlaceholder')}
+              </h2>
+              <p className="truncate text-sm text-muted-foreground">{user?.email}</p>
             </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="profile-email">{t('profile.email')}</Label>
-            <Input id="profile-email" value={user?.email ?? ''} disabled />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="profile-name">{t('profile.name')}</Label>
-            <Input
-              id="profile-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('profile.namePlaceholder')}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handlePickAvatar}
+              disabled={uploading}
+              className="self-start sm:self-auto"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {uploading ? t('profile.avatarUploading') : t('profile.changeAvatar')}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarChange}
             />
           </div>
-          <Button type="submit" disabled={saving}>
-            {saving ? t('common.saving') : t('profile.save')}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      </div>
+
+      {/* ── Form ─────────────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t('profile.title')}</CardTitle>
+          <CardDescription>{t('profile.description')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSave} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="profile-email">{t('profile.email')}</Label>
+              <Input id="profile-email" value={user?.email ?? ''} disabled />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="profile-name">{t('profile.name')}</Label>
+              <Input
+                id="profile-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('profile.namePlaceholder')}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">{t('profile.avatarHint')}</p>
+            <Button
+              type="submit"
+              disabled={saving}
+              className="bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:opacity-95 hover:shadow-md hover:shadow-primary/30"
+            >
+              {saving ? t('common.saving') : t('profile.save')}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -53,6 +53,7 @@
       "developer": "开发者"
     },
     "items": {
+      "home": "首页",
       "profile": "个人资料",
       "security": "安全",
       "sessions": "会话",
@@ -79,6 +80,47 @@
     "account": "账户",
     "organizations": "组织",
     "signOut": "退出登录"
+  },
+  "home": {
+    "welcome": "欢迎回来",
+    "verified": "已验证",
+    "quickAccess": "快速访问",
+    "stats": {
+      "score": "安全评分",
+      "orgs": "组织数",
+      "twoFactor": "双因素认证",
+      "enabled": "已启用",
+      "disabled": "未启用",
+      "manage": "管理",
+      "review": "查看",
+      "enable": "立即启用"
+    },
+    "tiles": {
+      "profile": {
+        "title": "个人资料",
+        "description": "显示名称、头像与联系方式。"
+      },
+      "security": {
+        "title": "安全",
+        "description": "修改密码并查看登录活动。"
+      },
+      "twoFactor": {
+        "title": "双因素认证",
+        "description": "启用 Authenticator 让登录更安全。"
+      },
+      "sessions": {
+        "title": "活跃会话",
+        "description": "查看并注销已登录的设备。"
+      },
+      "linked": {
+        "title": "关联账号",
+        "description": "管理社交与 SSO 登录提供方。"
+      },
+      "oauth": {
+        "title": "OAuth 应用",
+        "description": "你已授权访问账户的应用列表。"
+      }
+    }
   },
   "profile": {
     "title": "个人资料",
@@ -205,7 +247,9 @@
       "noAccount": "还没有账户？",
       "signUp": "注册",
       "welcomeToast": "欢迎回来",
-      "failed": "登录失败"
+      "failed": "登录失败",
+      "brandHeadline": "面向团队的后 SaaS 操作系统。",
+      "brandSubline": "一个身份，连接所有工作区。登录即可管理账户、组织与已授权应用。"
     },
     "register": {
       "title": "创建账户",

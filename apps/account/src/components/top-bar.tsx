@@ -10,7 +10,7 @@
 
 import { Link, useLocation, useParams } from '@tanstack/react-router';
 import { useMemo } from 'react';
-import { UserCircle2 } from 'lucide-react';
+import { ChevronRight, UserCircle2 } from 'lucide-react';
 import { useObjectTranslation } from '@object-ui/i18n';
 import {
   Breadcrumb,
@@ -30,7 +30,7 @@ function AccountBrand({ label }: { label: string }) {
   return (
     <Link
       to="/account"
-      className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90"
+      className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/30 ring-1 ring-white/15 transition-transform hover:scale-105"
       aria-label={label}
     >
       <UserCircle2 className="h-4 w-4" />
@@ -39,7 +39,12 @@ function AccountBrand({ label }: { label: string }) {
 }
 
 function SlashDivider() {
-  return <span aria-hidden className="select-none text-muted-foreground/50">/</span>;
+  return (
+    <ChevronRight
+      aria-hidden
+      className="size-3.5 shrink-0 text-muted-foreground/50"
+    />
+  );
 }
 
 export function TopBar() {
@@ -80,19 +85,20 @@ export function TopBar() {
   }, [location.pathname, params.orgId, t]);
 
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-2 sm:px-4">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/80 px-2 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:px-4">
       {/* Left: brand + mobile trigger + breadcrumb */}
-      <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+      <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
         <div className="sm:hidden">
           <SidebarTrigger className="h-9 w-9" />
         </div>
         <AccountBrand label={t('topBar.accountHome')} />
-        <SlashDivider />
-        <span className="hidden text-sm font-medium sm:inline">{t('topBar.brand')}</span>
-        <div className="hidden items-center gap-1 sm:flex">
-          <Separator orientation="vertical" className="mx-2 h-4" />
+        <span className="hidden text-sm font-semibold tracking-tight sm:inline">
+          {t('topBar.brand')}
+        </span>
+        <div className="hidden items-center gap-1.5 sm:flex">
+          <Separator orientation="vertical" className="mx-1 h-4" />
           <OrganizationSwitcher />
-          <Separator orientation="vertical" className="mx-2 h-4" />
+          <SlashDivider />
           <Breadcrumb>
             <BreadcrumbList>
               {breadcrumbs.map((item, index) => (
