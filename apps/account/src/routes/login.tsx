@@ -58,6 +58,7 @@ function LoginPage() {
   const {
     session,
     user,
+    loading: sessionLoading,
     refresh,
     organizations,
     organizationsLoading,
@@ -270,10 +271,14 @@ function LoginPage() {
 
   return (
     <div className="flex min-h-svh w-full flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
-      {ssoAutoRedirecting ? (
+      {ssoAutoRedirecting || sessionLoading || !!user ? (
         <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
           <div className="size-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-          <span>{t('auth.login.redirecting', { defaultValue: 'Redirecting to ObjectStack…' })}</span>
+          <span>
+            {user
+              ? t('auth.login.signingIn', { defaultValue: 'Signing you in…' })
+              : t('auth.login.redirecting', { defaultValue: 'Redirecting to ObjectStack…' })}
+          </span>
         </div>
       ) : (
       <div className="flex w-full max-w-sm flex-col gap-6">

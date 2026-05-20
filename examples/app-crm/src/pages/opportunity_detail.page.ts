@@ -40,15 +40,7 @@ export const OpportunityDetailPage: Page = {
             subtitle: '{account}',
             icon: 'briefcase',
             breadcrumb: true,
-          },
-        },
-        {
-          type: 'record:quick_actions',
-          id: 'opp_header_actions',
-          properties: {
             actions: [CloneOpportunityAction],
-            location: 'record_header',
-            align: 'end',
           },
         },
         {

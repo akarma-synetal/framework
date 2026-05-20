@@ -17029,13 +17029,7 @@
                 "title": "{first_name} {last_name}",
                 "subtitle": "{company}",
                 "icon": "user-plus",
-                "breadcrumb": true
-              }
-            },
-            {
-              "type": "record:quick_actions",
-              "id": "lead_header_actions",
-              "properties": {
+                "breadcrumb": true,
                 "actions": [
                   {
                     "name": "convert_lead",
@@ -17056,9 +17050,7 @@
                     "successMessage": "Lead converted successfully!",
                     "refreshAfter": true
                   }
-                ],
-                "location": "record_header",
-                "align": "end"
+                ]
               }
             },
             {
@@ -17459,13 +17451,7 @@
                 "title": "{name}",
                 "subtitle": "{account}",
                 "icon": "briefcase",
-                "breadcrumb": true
-              }
-            },
-            {
-              "type": "record:quick_actions",
-              "id": "opp_header_actions",
-              "properties": {
+                "breadcrumb": true,
                 "actions": [
                   {
                     "name": "clone_opportunity",
@@ -17489,9 +17475,7 @@
                     "successMessage": "Opportunity cloned successfully!",
                     "refreshAfter": true
                   }
-                ],
-                "location": "record_header",
-                "align": "end"
+                ]
               }
             },
             {
@@ -17559,7 +17543,7 @@
                   {
                     "key": "details",
                     "label": "Details",
-                    "components": [
+                    "children": [
                       {
                         "type": "record:details",
                         "id": "opp_details",
@@ -17607,7 +17591,7 @@
                   {
                     "key": "related",
                     "label": "Related",
-                    "components": [
+                    "children": [
                       {
                         "type": "page:accordion",
                         "id": "opp_related_accordion",
@@ -17616,7 +17600,7 @@
                             {
                               "key": "quotes",
                               "label": "Quotes",
-                              "components": [
+                              "children": [
                                 {
                                   "type": "record:related_list",
                                   "id": "opp_quotes",
@@ -17637,7 +17621,7 @@
                             {
                               "key": "contacts",
                               "label": "Contacts",
-                              "components": [
+                              "children": [
                                 {
                                   "type": "record:related_list",
                                   "id": "opp_contacts",
@@ -17658,7 +17642,7 @@
                             {
                               "key": "tasks",
                               "label": "Open Tasks",
-                              "components": [
+                              "children": [
                                 {
                                   "type": "record:related_list",
                                   "id": "opp_tasks",
@@ -17691,7 +17675,7 @@
                   {
                     "key": "activity",
                     "label": "Activity",
-                    "components": [
+                    "children": [
                       {
                         "type": "record:activity",
                         "id": "opp_activity",

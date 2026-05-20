@@ -49,10 +49,9 @@ export const LeadDetailPage: Page = {
       name: 'header',
       width: 'full',
       components: [
-        // Title + subtitle + icon. Convert Lead and other record-level
-        // actions render as a sibling immediately below (record:quick_actions)
-        // — the spec's Page schema does not propagate ad-hoc `children` on
-        // a component, so the cleanest portable form is a sibling node.
+        // Title + subtitle + icon, with record-level actions rendered
+        // inline in the header's action slot via the first-class
+        // `actions` property (no sibling node, no visual offset hack).
         {
           type: 'page:header',
           id: 'lead_header',
@@ -62,15 +61,7 @@ export const LeadDetailPage: Page = {
             subtitle: '{company}',
             icon: 'user-plus',
             breadcrumb: true,
-          },
-        },
-        {
-          type: 'record:quick_actions',
-          id: 'lead_header_actions',
-          properties: {
             actions: [ConvertLeadAction],
-            location: 'record_header',
-            align: 'end',
           },
         },
         // Salesforce-style Highlights Panel: a horizontal strip of the
