@@ -14,7 +14,6 @@ import {
   SysUser,
   SysUserPreference,
   SysVerification,
-  UserAppState,
 } from './identity/index.js';
 import {
   SysPermissionSet,
@@ -44,7 +43,6 @@ const systemObjects = [
   ['SysApiKey', SysApiKey, 'sys_api_key'],
   ['SysTwoFactor', SysTwoFactor, 'sys_two_factor'],
   ['SysUserPreference', SysUserPreference, 'sys_user_preference'],
-  ['UserAppState', UserAppState, 'user_app_state'],
   ['SysRole', SysRole, 'sys_role'],
   ['SysPermissionSet', SysPermissionSet, 'sys_permission_set'],
   ['SysUserPermissionSet', SysUserPermissionSet, 'sys_user_permission_set'],
@@ -108,7 +106,6 @@ describe('@objectstack/platform-objects', () => {
         'sys_user_preference_self',
         'sys_user_self',
         'tenant_isolation',
-        'user_app_state_self',
       ]);
       const tenantPolicy = (member.rowLevelSecurity ?? []).find((p) => p.name === 'tenant_isolation')!;
       expect(tenantPolicy.using).toBe('organization_id = current_user.organization_id');
