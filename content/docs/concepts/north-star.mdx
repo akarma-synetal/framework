@@ -1,6 +1,6 @@
 ---
 title: North Star
-description: The product shape of ObjectStack - code-first metadata authoring, control-plane artifacts, Studio observability, and stateless ObjectOS runtimes.
+description: The product shape of ObjectStack - AI-native business backend, code-first metadata authoring, control-plane artifacts, Studio observability, and stateless ObjectOS runtimes.
 ---
 
 import { AlertTriangle, Cloud, Cpu, Globe, Layers, Terminal } from 'lucide-react';
@@ -14,12 +14,13 @@ import { AlertTriangle, Cloud, Cpu, Globe, Layers, Terminal } from 'lucide-react
 
 ## 1. Mission
 
-ObjectStack is a **metadata-driven Post-SaaS Operating System**. Users author
-data shape, business logic, and UI as **declarative metadata** in a local
-TypeScript workspace. The platform compiles that metadata into JSON artifacts,
-publishes each artifact as an immutable Project Version in the control plane,
-and serves running applications from the Project's current Version - no glue
-code, no hand-written CRUD, no separate frontend/backend codebases.
+ObjectStack is an **AI-native business backend**. Users author data shape,
+business logic, permissions, UI metadata, and agent-facing tools as
+**declarative metadata** in a local TypeScript workspace. The platform compiles
+that metadata into JSON artifacts, publishes each artifact as an immutable
+Project Version in the control plane, and serves running applications from the
+Project's current Version - no glue code, no hand-written CRUD, no separate
+frontend/backend codebases, and no manually duplicated agent tool definitions.
 
 Phase 1 is deliberately **code-first**:
 
@@ -32,18 +33,20 @@ Phase 1 is deliberately **code-first**:
 
 Five non-negotiable tenets:
 
-- **Data as Code** - objects, fields, functions, views, flows are all metadata artifacts
+- **Agent-Ready Business Metadata** - objects, fields, functions, views, flows, permissions, and tools are all explicit metadata artifacts
 - **Versioned Artifacts, Stateless Runtime** - every publish creates an immutable Project Version; ObjectOS runtimes pull the current Version artifact and serve it
 - **TS-Authored, JSON-Stored** - TypeScript is the authoring form (type safety, IDE intelligence, AI-assisted editing); JSON is the wire and storage form (Project Version artifact payload, Artifact API response body, local artifact cache). Zod schemas are the only bridge between the two.
 - **Local-First** - every project can run against local drivers; cloud is an enhancement, not a dependency
-- **Open Core** - the runtime and protocols are MIT-licensed; only hosted cloud features are proprietary
+- **Open Core** - the runtime and protocols are Apache-2.0 licensed; hosted cloud features and official advanced Studio plugins may be proprietary
 
 ## 2. Product Shape
 
-ObjectStack's first production shape is **code-first metadata deployment**:
+ObjectStack's first production shape is **code-first AI-native metadata deployment**:
 developers author a TypeScript metadata tree locally, compile it to JSON, publish
 it as an immutable Project Version in the control plane, inspect the version and
-artifact in Studio, and run the Project's current Version through ObjectOS.
+artifact in Studio, and run the Project's current Version through ObjectOS. The
+same artifact is the source for APIs, UI metadata, permission checks, workflows,
+and agent tool surfaces.
 
 Branching, visual metadata editing, and pull/merge workflows are future phases.
 The Phase 1 goal is smaller and more important: make the artifact boundary real
@@ -72,8 +75,9 @@ and make every publish a durable, rollback-capable Version.
 
 The deliberate simplification is that Phase 1 has **one writer** for user
 metadata: the CLI publishing from the local TypeScript workspace. Studio can show
-version history, artifact payloads, and runtime state, but it cannot edit
-metadata. This keeps the core loop tight:
+version history, artifact payloads, generated tool surfaces, permission
+boundaries, and runtime state, but it cannot edit metadata. This keeps the core
+loop tight:
 
 ```
 TS authoring -> compile -> publish Project Version -> current artifact -> ObjectOS runtime

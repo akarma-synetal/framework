@@ -112,8 +112,8 @@ ObjectStack is governed by four unshakable principles:
   />
   <Card
     icon={<ScrollText />}
-    title="IV. Local-First by Default"
-    description="The Cloud is a sync peer, not a master."
+    title="IV. Agent-Ready Boundaries"
+    description="Agents may act only through typed, permission-aware, auditable surfaces."
   />
 </Cards>
 
@@ -143,16 +143,17 @@ In ObjectStack, **the Object Protocol is the only truth:**
 - The Database is a *derivative* of the Protocol
 - The UI is a *projection* of the Protocol
 - The API is a *consequence* of the Protocol
+- The Agent tool surface is a *bounded capability set* derived from the Protocol
 
 Change the Protocol → the entire system adapts automatically.
 
-### Local-First by Default
+### Agent-Ready Boundaries
 
-All interactions should be instant (0ms latency). The user's data lives on their device; the server is a sync hub.
+AI agents should not bypass the application model by calling raw SQL, scraping UI state, or executing arbitrary glue code. They should act through typed, permission-aware capabilities derived from the same metadata artifact that powers the application.
 
 ```
-Traditional: Click → Wi-Fi → ISP → Cloud → DB → Response
-Local-First: Click → Local DB → UI Update (0ms)
+Traditional AI app: Database schema -> App code -> Custom query -> Hand-written MCP tool
+ObjectStack: Zod metadata -> Project Artifact -> ObjectOS runtime -> API / UI / MCP tools
 ```
 
 ---
@@ -177,6 +178,7 @@ ObjectStack enforces strict naming rules for consistency:
 | **Type Safety** | Manual synchronization | Automatic from Zod |
 | **Flexibility** | Locked to tech stack | Technology agnostic |
 | **Boilerplate** | High (300+ lines) | Low (30 lines) |
+| **Agent Tools** | Hand-written and drift-prone | Generated from metadata and permissions |
 
 ## Next Steps
 

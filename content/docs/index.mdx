@@ -1,18 +1,18 @@
 ---
 title: ObjectStack Protocol
-description: The Metadata-Driven Protocol for the Post-SaaS Era.
+description: The AI-native business backend protocol for structured, auditable agent execution.
 ---
 
 import { Rocket, BookOpen, FileCode, Layers, Database, Layout, Cpu, Bot, Workflow, Shield, Globe, Terminal, FolderOpen, Lightbulb, Wrench, BookMarked, Brain } from 'lucide-react';
 
-**ObjectStack** is a **Metadata-Driven Protocol** for building enterprise applications.
-Define Data, UI, Automation, and AI as structured metadata — ObjectStack handles the rest.
+**ObjectStack** is the **AI-native business backend** for building enterprise applications that agents can understand, operate, and audit safely.
+Define business objects, permissions, workflows, APIs, UI metadata, and agent tools once as structured Zod metadata — ObjectStack handles the runtime surface.
 
 ```bash
 npx @objectstack/cli init my-app && cd my-app && os studio
 ```
 
-Open [http://localhost:3000/_studio/](http://localhost:3000/_studio/) to browse objects, test APIs, and inspect metadata.
+Open [http://localhost:3000/_studio/](http://localhost:3000/_studio/) to browse objects, test APIs, inspect metadata, and review the agent-ready tool surface.
 
 ---
 
@@ -31,7 +31,7 @@ New to ObjectStack? Start here.
     icon={<Lightbulb />}
     title="Core Concepts"
     href="/docs/getting-started/core-concepts"
-    description="Metadata-driven development, design principles, and naming conventions."
+    description="AI-native metadata, design principles, and naming conventions."
   />
   <Card
     icon={<Layers />}
@@ -80,7 +80,7 @@ Task-oriented guides for building real applications.
     icon={<Bot />}
     title="AI Capabilities"
     href="/docs/guides/ai-capabilities"
-    description="AI agents, RAG pipelines, and natural language queries."
+    description="AI agents, generated tools, RAG pipelines, and natural language queries."
   />
   <Card
     icon={<Brain />}
@@ -164,7 +164,7 @@ Auto-generated schema reference and quick-lookup cheatsheets.
 
 | Audience | Use Case |
 | :--- | :--- |
-| **Platform Architects** | Build internal developer platforms (IDP) that scale |
+| **AI Agent Developers** | Give agents a structured, permission-aware backend for real business actions |
+| **Platform Architects** | Build internal developer platforms (IDP) that expose safe business capabilities |
 | **Protocol Implementers** | Write new Drivers for ObjectQL or Renderers for ObjectUI |
-| **AI Agent Developers** | Use a structured, deterministic language for AI-generated software |
-| **Low-Code Builders** | Rapid application development with metadata-driven workflows |
+| **Internal Tool Builders** | Ship CRUD-heavy business apps with generated APIs, UI metadata, and workflows |

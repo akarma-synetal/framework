@@ -1,13 +1,13 @@
 ---
 title: Design Principles
-description: The unshakable core principles that govern the ObjectStack ecosystem - The Constitution of the Post-SaaS Era
+description: The unshakable core principles that govern ObjectStack as an AI-native business backend
 ---
 
 import { Scale, Code2, Database, ScrollText } from 'lucide-react';
 
 # Design Principles
 
-ObjectStack exists to return enterprise application development to its essence: **Data**.
+ObjectStack exists to make enterprise application development explicit enough for both humans and AI agents to operate safely: **structured business metadata**.
 
 To maintain a healthy, decoupled, and future-proof ecosystem, we uphold the following core principles. These are not suggestions; they are the constraints that enable our freedom.
 
@@ -29,8 +29,8 @@ To maintain a healthy, decoupled, and future-proof ecosystem, we uphold the foll
   />
   <Card
     icon={<ScrollText />}
-    title="IV. Local-First by Default"
-    description="The Cloud is a sync peer, not a master."
+    title="IV. Agent-Ready Boundaries"
+    description="Agents may act only through typed, permission-aware, auditable surfaces."
   />
 </Cards>
 
@@ -99,45 +99,45 @@ In ObjectStack, **The Object Protocol is the only truth.**
 - The Database is a *derivative* of the Protocol.
 - The UI is a *projection* of the Protocol.
 - The API is a *consequence* of the Protocol.
+- The Agent tool surface is a *bounded capability set* derived from the Protocol.
 
-If you change the Protocol, the entire system (DB, API, UI) must adapt automatically.
+If you change the Protocol, the entire system (DB, API, UI, tools, and audit context) must adapt automatically.
 
 ---
 
-## Principle IV: Local-First by Default
+## Principle IV: Agent-Ready Boundaries
 
-**"The Cloud is a sync peer, not a master."**
+**"Agents are powerful only when their boundaries are explicit."**
 
-We reject the notion that software must stop working when the internet connection drops.
+AI agents should not bypass the application model by calling raw SQL, scraping UI state, or executing arbitrary glue code. They should act through typed, permission-aware capabilities derived from the same metadata artifact that powers the application.
 
-- **Latency is the enemy:** All interactions should be optimistic and instant (0ms).
-- **Ownership is the goal:** The user's data essentially lives on their device. The server is just a hub for backup and collaboration.
+- **Typed inputs:** Tool schemas derive from object fields, action contracts, and validation rules.
+- **Permission-aware execution:** RBAC, RLS, and FLS apply to agent actions exactly as they apply to users.
+- **Auditable outcomes:** Every agent action should be traceable to the artifact version, user/org context, tool, input, and result.
 
-### The "Seven Hops" Problem
+### The Hidden Tool Problem
 
-In a traditional Cloud app, a simple button click travels through:
-
-```
-Click → Wi-Fi → ISP → Cloud Load Balancer → Web Server → Database → Query Execution
-```
-
-...and then all the way back.
-
-### The Local-First Solution
-
-ObjectStack apps are designed to read and write to a **Local Database** (embedded within the client environment) first.
+In many AI-enabled apps, the agent sees a set of hand-written tools that drift from the real business system:
 
 ```
-Click → Local DB → UI Update (0ms Latency)
+Database schema -> App code -> UI state -> Custom query -> Hand-written MCP tool
 ```
 
-The synchronization with the cloud happens in the background, asynchronously.
+Each translation layer can lose validation, authorization, or business meaning.
+
+### The ObjectStack Solution
+
+ObjectStack derives agent capabilities from the protocol itself:
+
+```
+Zod metadata -> Project Artifact -> ObjectOS runtime -> API / UI / MCP tools
+```
 
 **Benefits:**
 
-1. **Instant Response:** The UI reacts immediately (optimistic UI)
-2. **Offline Capability:** Field workers, airplanes, or spotty connections are no longer blockers
-3. **Data Sovereignty:** The data physically resides on the user's device
+1. **No tool drift:** Generated tools stay aligned with object schemas and permissions.
+2. **Safer autonomy:** Agents act inside explicit business boundaries.
+3. **Auditability:** Runtime decisions can be traced to versioned metadata.
 
 ---
 
@@ -150,9 +150,9 @@ These principles guide every design decision in ObjectStack:
 | **Protocol Neutrality** | The spec is separate from implementation. ObjectStack can run anywhere. |
 | **Mechanism over Policy** | We provide the tools, you define the rules. |
 | **Single Source of Truth** | The schema is the application. Everything else derives from it. |
-| **Local-First** | Users own their data. The cloud is just for sync. |
+| **Agent-Ready Boundaries** | Agents act through typed, permission-aware, auditable capabilities. |
 
-By adhering to these values, we build software that is **resilient to change**, **respectful of user time**, and **technically sovereign**.
+By adhering to these values, we build software that is **resilient to change**, **safe for automation**, and **explicit enough for AI-native business execution**.
 
 ## Next Steps
 

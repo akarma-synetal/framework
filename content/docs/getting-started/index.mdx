@@ -1,11 +1,11 @@
 ---
 title: What is ObjectStack?
-description: ObjectStack is What? A Full-Stack Metadata Protocol for Building Enterprise Applications
+description: ObjectStack is the AI-native business backend for structured, auditable business applications
 ---
 
 import { Database, Layout, Cog } from 'lucide-react';
 
-**ObjectStack** is not just a framework; it is a **Protocol** for building enterprise software. It decouples the *Business Intent* (defined in JSON/YAML) from the *Technical Execution* (handled by the Kernel).
+**ObjectStack** is not just a framework; it is an **AI-native business backend protocol** for building enterprise software. It decouples the *Business Intent* (defined as typed metadata) from the *Technical Execution* (handled by the Kernel), so APIs, UI metadata, workflows, and agent tools can all derive from the same source of truth.
 
 ## The Problem
 
@@ -15,28 +15,29 @@ In traditional development, application logic is scattered:
 2. **Backend Models** (`User.ts`)
 3. **Frontend Validation** (`schema.zod.ts`)
 4. **API Documentation** (`swagger.json`)
+5. **Agent Tools** (MCP definitions, function calls, prompts)
 
-When requirements change, you update code in multiple places. This is **Implementation Coupling**.
+When requirements change, you update code in multiple places. When AI agents need to act, they usually see only brittle glue code or manually curated tools. This is **Implementation Coupling**.
 
 ## The Solution
 
-We centralize the "Intent" into a single Protocol Definition (JSON/YAML). The implementation layers (React, Node.js, SQL) act merely as **Runtime Engines** that interpret this protocol.
+We centralize the "Intent" into a single TypeScript-authored, Zod-validated protocol definition. The implementation layers (React, Node.js, SQL, MCP tools) act as **Runtime Engines** that interpret this protocol.
 
 <Cards>
   <Card
     icon={<Database />}
     title="Data Protocol"
-    description="Define data structures, queries, and business logic. Database-agnostic abstraction layer."
+    description="Define business objects, fields, queries, and constraints. Database-agnostic abstraction layer."
   />
   <Card
     icon={<Layout />}
     title="UI Protocol"
-    description="Server-driven UI definitions. Express interfaces as JSON, not code."
+    description="Presentation metadata for apps, views, dashboards, and actions."
   />
   <Card
     icon={<Cog />}
     title="System Protocol"
-    description="Runtime kernel, plugins, security, and integration. The platform foundation."
+    description="Runtime kernel, plugins, security, automation, audit, and agent boundaries."
   />
 </Cards>
 
@@ -47,6 +48,7 @@ Think of ObjectStack as:
 - **Kubernetes** for business applications - Declarative configuration over imperative code
 - **Terraform** for data modeling - Infrastructure as code, but for data
 - **GraphQL + React Server Components** - Schema-driven data + UI rendering combined
+- **MCP for business systems** - Structured, permission-aware tools generated from metadata
 
 ## Key Features
 
@@ -55,15 +57,15 @@ Think of ObjectStack as:
 **The UI is a Projection. The API is a Consequence.**
 
 - ObjectUI does not "build" a form; it *projects* the ObjectQL schema into a visual representation
-- You do not write endpoints; ObjectOS *generates* the secure graph based on the access control protocol
+- You do not write endpoints or hand-author every agent tool; ObjectOS *generates* the secure graph based on the access control protocol
 
-### 2. Local-First by Default
+### 2. Agent-Ready Boundaries
 
-**"The Cloud is a sync peer, not a master."**
+**Agents act through typed, permission-aware, auditable surfaces.**
 
-- All interactions are optimistic and instant (0ms latency)
-- Data lives on the user's device
-- The server is just a hub for backup and collaboration
+- Tool schemas derive from business object metadata
+- RBAC, RLS, and FLS apply to agent actions
+- Executions are traceable to versioned artifacts, user/org context, inputs, and results
 
 ### 3. Database Agnostic
 
@@ -80,20 +82,24 @@ Think of ObjectStack as:
 | :--- | :--- |
 | Write SQL migrations manually | Schema changes sync automatically |
 | Build CRUD APIs by hand | REST/GraphQL generated from schema |
+| Manually define agent tools | MCP/tool surfaces generated from metadata |
 | Duplicate validation logic 3x | Define once, enforce everywhere |
 | Lock into one database vendor | Swap databases without code changes |
-| Offline = broken app | Offline-first with background sync |
+| Agent tools drift from app logic | Tools derive from the same metadata and permissions |
 
 ## Who Should Use ObjectStack?
 
 ### Enterprise Developers
-Building internal tools, CRMs, ERPs, or admin panels? ObjectStack eliminates 80% of the boilerplate.
+Building internal tools, CRMs, ERPs, or admin panels? ObjectStack eliminates boilerplate while making the business model explicit for AI agents.
 
 ### Platform Builders
 Creating a SaaS product or multi-tenant application? ObjectStack provides enterprise-grade security and isolation.
 
 ### Integration Engineers
 Connecting multiple systems? ObjectStack's protocol-driven approach makes it easy to map and transform data.
+
+### AI Agent Builders
+Need agents to operate real business data? ObjectStack gives them typed schemas, generated tools, permission boundaries, and audit trails instead of brittle query glue.
 
 ## Prerequisites
 
