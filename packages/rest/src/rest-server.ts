@@ -2144,11 +2144,47 @@ export class RestServer {
                         });
                         return;
                     }
+                    // Embed the target object's schema (limited to fields
+                    // referenced by the form) so anonymous front-ends can
+                    // render the form without a separate, auth-protected
+                    // meta lookup. The submit handler still enforces the
+                    // field whitelist server-side.
+                    let objectSchema: any = null;
+                    try {
+                        const p = await this.resolveProtocol(projectId, req);
+                        if (typeof (p as any).getMetaItems === 'function') {
+                            const r: any = await (p as any).getMetaItems({
+                                type: 'object',
+                                ...(projectId ? { projectId } : {}),
+                            });
+                            const items: any[] = Array.isArray(r?.items) ? r.items : Array.isArray(r) ? r : [];
+                            const obj = items.find((o: any) => o?.name === match.object);
+                            if (obj && obj.fields && typeof obj.fields === 'object') {
+                                const allowed = new Set<string>();
+                                for (const sec of match.form?.sections ?? []) {
+                                    for (const f of sec?.fields ?? []) {
+                                        if (typeof f === 'string') allowed.add(f);
+                                        else if (f?.field) allowed.add(f.field);
+                                    }
+                                }
+                                const fields: Record<string, any> = {};
+                                for (const [name, def] of Object.entries(obj.fields)) {
+                                    if (allowed.size === 0 || allowed.has(name)) {
+                                        fields[name] = def;
+                                    }
+                                }
+                                objectSchema = { name: obj.name, label: obj.label, fields };
+                            }
+                        }
+                    } catch (e: any) {
+                        logError('[REST] Public form schema load failed:', e);
+                    }
                     res.json({
                         slug,
                         object: match.object,
                         label: match.view?.label ?? match.form?.label,
                         form: match.form,
+                        objectSchema,
                     });
                 } catch (error: any) {
                     logError('[REST] Public form resolve error:', error);
