@@ -640,6 +640,15 @@ export default class Serve extends Command {
                 if (p.startsWith('/_admin/') || p === '/_admin' || p.startsWith('/.well-known/')) {
                   return next();
                 }
+                // Health and readiness endpoints must always answer 200
+                // regardless of whether the requested hostname maps to
+                // an env — Cloudflare's container probe (and any
+                // upstream load balancer) hits whatever Host header is
+                // currently bound to the worker. Returning 404 here on
+                // an unmapped hostname would kill the container.
+                if (p === '/api/v1/health' || p === '/api/v1/ready' || p === '/health') {
+                  return next();
+                }
                 // Resolve env-registry lazily on each request — it may
                 // not be registered yet at init() time (registered by
                 // ObjectOSProjectPlugin's init which runs in plugin
