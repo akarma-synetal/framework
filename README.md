@@ -28,7 +28,7 @@ ObjectStack is built around three protocol layers:
 
 All core definitions start with **Zod schemas** (1,600+ exported schemas across 200 schema files). TypeScript types, JSON Schemas, REST routes, UI metadata, and agent tools are derived from the same source of truth.
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full microkernel and layer architecture documentation.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full microkernel and layer architecture documentation, and [content/docs/concepts/north-star.mdx](./content/docs/concepts/north-star.mdx) for the product north star (Studio · Org/Project/Branch · per-project ObjectOS · compiled app artifacts).
 
 ## Key Features
 
@@ -70,17 +70,16 @@ This makes ObjectStack a backend substrate for AI-native business applications: 
 
 ```bash
 # Create a new project
-npx @objectstack/cli init my-app
+npx create-objectstack my-app
 cd my-app
 
-# Start development server
-os dev
-
-# Open Studio IDE
-os studio
+# Start dev server (REST API + Studio IDE)
+pnpm dev
 # → API:    http://localhost:3000/api/v1/
 # → Studio: http://localhost:3000/_studio/
 ```
+
+Alternatively, with the CLI installed: `os init my-app && cd my-app && os dev`.
 
 ### For Framework Contributors
 
@@ -106,27 +105,37 @@ pnpm docs:dev
 | Script | Description |
 | :--- | :--- |
 | `pnpm build` | Build all packages (excludes docs) |
-| `pnpm dev` | Start development server |
-| `pnpm studio` | Launch Studio IDE with dev server |
-| `pnpm test` | Run all tests |
+| `pnpm dev` | Run the reference `@objectstack/objectos` host in dev mode |
+| `pnpm dev:cloud` | Run `@objectstack/cloud` (multi-project, control-plane mode) |
+| `pnpm dev:crm` | Run the CRM example end-to-end (`@example/app-crm`) |
+| `pnpm studio:start` | Start the prebuilt Studio IDE |
+| `pnpm test` | Run all tests (Turborepo) |
 | `pnpm doctor` | Check environment health |
-| `pnpm setup` | Install dependencies and build spec |
-| `pnpm docs:dev` | Start documentation site locally |
+| `pnpm setup` | Install dependencies and build the spec package |
+| `pnpm docs:dev` | Start the documentation site locally |
 | `pnpm docs:build` | Build documentation for production |
 
 ## CLI Commands
 
+The CLI binary ships as both `os` and `objectstack`.
+
 ```bash
 os init [name]    # Scaffold a new project
-os dev            # Start dev server with hot-reload
-os studio         # Start dev server + Studio IDE
-os serve          # Start production server
-os compile        # Build deployable JSON artifact
-os validate       # Validate configuration against protocol
-os info           # Display metadata summary
-os generate       # Scaffold objects, views, and flows
+os create         # Interactive project / object scaffolder
+os dev            # Start dev server with hot-reload (REST + Studio)
+os studio         # Open the Studio IDE
+os start          # Start the production server
+os serve          # Serve a compiled artifact
+os compile        # Build a deployable JSON Project Artifact
+os validate       # Validate metadata against the protocol
+os lint           # Lint metadata for best-practice violations
+os info           # Display project metadata summary
+os generate       # Scaffold objects, views, flows, agents, migrations
 os doctor         # Check environment health
+os explain        # Explain protocol concepts on the command line
 ```
+
+Cloud, package registry, and project management subcommands (`os projects`, `os publish`, `os login`, `os whoami`, `os cloud …`) are available when targeting an ObjectStack Cloud control plane.
 
 ## Package Directory
 
@@ -137,6 +146,8 @@ os doctor         # Check environment health
 | [`@objectstack/spec`](packages/spec) | Protocol definitions — Zod schemas, TypeScript types, JSON Schemas, constants |
 | [`@objectstack/core`](packages/core) | Microkernel runtime — Plugin system, DI container, EventBus, Logger |
 | [`@objectstack/types`](packages/types) | Shared TypeScript type utilities |
+| [`@objectstack/formula`](packages/formula) | Canonical expression engine — CEL (cel-js) + ObjectStack stdlib for formula fields, predicates, conditions, dynamic defaults |
+| [`@objectstack/platform-objects`](packages/platform-objects) | Built-in platform object schemas — identity, security, audit, tenant |
 
 ### Engine
 
@@ -153,7 +164,8 @@ os doctor         # Check environment health
 | :--- | :--- |
 | [`@objectstack/driver-memory`](packages/plugins/driver-memory) | In-memory driver (development and testing) |
 | [`@objectstack/driver-sql`](packages/plugins/driver-sql) | SQL driver — PostgreSQL, MySQL, SQLite (production) |
-| [`@objectstack/driver-turso`](packages/plugins/driver-turso) | Turso/libSQL driver |
+| [`@objectstack/driver-turso`](packages/plugins/driver-turso) | Turso / libSQL driver |
+| [`@objectstack/driver-mongodb`](packages/plugins/driver-mongodb) | MongoDB driver (native document database) |
 
 ### Client
 
@@ -168,12 +180,16 @@ os doctor         # Check environment health
 | :--- | :--- |
 | [`@objectstack/plugin-hono-server`](packages/plugins/plugin-hono-server) | Hono-based HTTP server plugin |
 | [`@objectstack/plugin-mcp-server`](packages/plugins/plugin-mcp-server) | Model Context Protocol server — exposes ObjectStack to AI agents |
-| [`@objectstack/plugin-msw`](packages/plugins/plugin-msw) | Mock Service Worker plugin for browser testing |
 | [`@objectstack/plugin-auth`](packages/plugins/plugin-auth) | Authentication plugin (better-auth) |
 | [`@objectstack/plugin-security`](packages/plugins/plugin-security) | RBAC, Row-Level Security, Field-Level Security |
-| [`@objectstack/plugin-dev`](packages/plugins/plugin-dev) | Developer mode — in-memory stubs for all services |
+| [`@objectstack/plugin-sharing`](packages/plugins/plugin-sharing) | Record-level sharing — `sys_record_share` + enforcement middleware |
+| [`@objectstack/plugin-approvals`](packages/plugins/plugin-approvals) | Multi-step approval engine — `sys_approval_process` + `sys_approval_request` |
 | [`@objectstack/plugin-audit`](packages/plugins/plugin-audit) | Audit logging plugin |
-| [`@objectstack/plugin-setup`](packages/plugins/plugin-setup) | First-run setup wizard |
+| [`@objectstack/plugin-email`](packages/plugins/plugin-email) | Pluggable outbound email transport |
+| [`@objectstack/plugin-webhooks`](packages/plugins/plugin-webhooks) | Outbound webhook delivery — fan-out `data.record.*` events |
+| [`@objectstack/plugin-reports`](packages/plugins/plugin-reports) | Saved reports + scheduled email digests |
+| [`@objectstack/plugin-dev`](packages/plugins/plugin-dev) | Developer mode — in-memory stubs for all services |
+| [`@objectstack/plugin-msw`](packages/plugins/plugin-msw) | Mock Service Worker plugin for browser testing |
 
 ### Services
 
@@ -183,12 +199,14 @@ os doctor         # Check environment health
 | [`@objectstack/service-analytics`](packages/services/service-analytics) | Analytics — aggregations, time series, funnels, dashboards |
 | [`@objectstack/service-automation`](packages/services/service-automation) | Automation engine — flows, triggers, DAG-based workflows |
 | [`@objectstack/service-cache`](packages/services/service-cache) | Cache — in-memory, Redis, multi-tier |
+| [`@objectstack/service-cloud`](packages/services/service-cloud) | Cloud orchestration — multi-project, control-plane, deployment |
 | [`@objectstack/service-feed`](packages/services/service-feed) | Activity feed / chatter |
 | [`@objectstack/service-i18n`](packages/services/service-i18n) | Internationalization service |
 | [`@objectstack/service-job`](packages/services/service-job) | Cron & interval job scheduler |
 | [`@objectstack/service-package`](packages/services/service-package) | Package registry — publish, version, retrieve metadata packages |
 | [`@objectstack/service-queue`](packages/services/service-queue) | Background job queue (in-memory, BullMQ) |
 | [`@objectstack/service-realtime`](packages/services/service-realtime) | Real-time events and subscriptions |
+| [`@objectstack/service-settings`](packages/services/service-settings) | Settings — manifest registry + K/V resolver (Env > Tenant > User) |
 | [`@objectstack/service-storage`](packages/services/service-storage) | File storage (local, S3, R2, GCS) |
 | [`@objectstack/service-tenant`](packages/services/service-tenant) | Multi-tenant context and routing |
 
@@ -206,12 +224,16 @@ os doctor         # Check environment health
 
 ### Tools & Apps
 
-| Package | Description |
+| Package / App | Description |
 | :--- | :--- |
-| [`@objectstack/cli`](packages/cli) | CLI — `init`, `dev`, `serve`, `studio`, `compile`, `validate`, `generate` |
+| [`@objectstack/cli`](packages/cli) | CLI binary (`os` / `objectstack`) — `init`, `dev`, `serve`, `studio`, `compile`, `validate`, `generate`, `lint`, `doctor` |
 | [`create-objectstack`](packages/create-objectstack) | Project scaffolder (`npx create-objectstack`) |
 | [`objectstack-vscode`](packages/vscode-objectstack) | VS Code extension — autocomplete, validation, diagnostics |
+| [`@objectstack/objectos`](apps/objectos) | Reference host — local and self-contained ObjectOS runtime |
+| [`@objectstack/cloud`](apps/cloud) | Cloud host — multi-project, control-plane connected, deployable to Vercel / Workers |
 | [`@objectstack/studio`](apps/studio) | Studio IDE — metadata explorer, schema inspector, AI assistant |
+| [`@objectstack/console`](apps/console) | Cloud console — org / project / branch management UI |
+| [`@objectstack/account`](apps/account) | Account & identity portal — sign in, organizations, connected apps |
 | [`@objectstack/docs`](apps/docs) | Documentation site (Fumadocs + Next.js) |
 
 ### Examples
@@ -220,13 +242,15 @@ os doctor         # Check environment health
 | :--- | :--- | :--- |
 | [`@example/app-todo`](examples/app-todo) | Task management app — objects, views, dashboards, flows | Beginner |
 | [`@example/app-crm`](examples/app-crm) | Enterprise CRM — accounts, contacts, opportunities, leads | Intermediate |
-| [`@objectstack/objectos`](apps/objectos) | ObjectOS Runtime — multi-app orchestration with plugins | Advanced |
 
 ## Codebase Metrics
 
 | Metric | Value |
 | :--- | :--- |
-| Packages | 42 |
+| Source packages | 51 |
+| Apps | 6 (objectos, cloud, studio, console, account, docs) |
+| Framework adapters | 7 (Express, Fastify, Hono, NestJS, Next.js, Nuxt, SvelteKit) |
+| Database drivers | 4 (Memory, SQL, Turso/libSQL, MongoDB) |
 | Zod schema files | 200 |
 | Exported schemas | 1,600+ |
 | `.describe()` annotations | 8,750+ |
