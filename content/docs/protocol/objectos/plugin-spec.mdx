@@ -7,6 +7,17 @@ import { Package, FileCode, Folder, Box, Link2, Shield, Settings } from 'lucide-
 
 # Plugin Package Specification
 
+<Callout type="warn">
+**Protocol spec.** This page describes the **target** plugin packaging
+specification — `plugin.manifest.ts`, semantic-version dependency resolution,
+provider/consumer contracts, lifecycle hooks. The current runtime implements
+plugins as classes/objects matching the `Plugin` interface from
+`@objectstack/core`, and manifests as plain objects matching
+`ManifestSchema` from `@objectstack/spec/kernel`. There is no `definePlugin()`
+helper today — that wrapper is the proposed ergonomic shape. Treat the
+snippets below as design intent for the manifest spec, not paste-ready code.
+</Callout>
+
 A **plugin** is the unit of distribution in ObjectStack. It packages ObjectQL schemas, ObjectUI layouts, business logic, and configuration into a **self-contained module** that can be installed, upgraded, and removed independently.
 
 ## Plugin Manifest

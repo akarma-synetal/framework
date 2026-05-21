@@ -114,23 +114,20 @@ export const DATA_ENGINE = Symbol('IDataEngine');
 Plugins declare which contracts they implement and which they consume:
 
 ```typescript
-import { definePlugin } from '@objectstack/core';
+import type { Plugin } from '@objectstack/core';
 import type { IDataEngine, ICacheService } from '@objectstack/spec';
 
-export default definePlugin({
+export const myPlugin: Plugin = {
   name: 'my-plugin',
 
-  // This plugin provides an IDataEngine implementation
-  provides: {
-    dataEngine: {
-      contract: 'IDataEngine',
-      factory: (deps) => new MyDataEngine(deps),
-    },
-  },
-
-  // This plugin needs ICacheService
+  // Declare which contracts this plugin requires
   requires: ['ICacheService'],
-});
+
+  async onEnable(ctx) {
+    // Plugins provide implementations via the DI container
+    ctx.di.register<IDataEngine>('dataEngine', () => new MyDataEngine(ctx));
+  },
+};
 ```
 
 ---

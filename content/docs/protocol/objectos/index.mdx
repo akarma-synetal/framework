@@ -247,31 +247,33 @@ ObjectOS is the **runtime coordinator** that makes ObjectQL and ObjectUI work to
 
 ### 1. Boot Sequence
 ```typescript
-// Startup flow
-ObjectOS.boot({
-  // Step 1: Load configuration
-  config: await ConfigResolver.merge(['environment', 'file', 'default']),
-  
-  // Step 2: Initialize plugins
-  plugins: await PluginRegistry.loadAll({
-    enabled: ['@objectstack/core', '@mycompany/crm'],
-    // ObjectOS resolves dependencies and loads in correct order
-  }),
-  
-  // Step 3: Register ObjectQL objects
-  objects: await ObjectQL.loadSchemas(plugins.flatMap(p => p.objects)),
-  
-  // Step 4: Register ObjectUI views
-  views: await ObjectUI.loadLayouts(plugins.flatMap(p => p.views)),
-  
-  // Step 5: Start services
-  services: {
-    eventBus: EventBus.start(),
-    scheduler: JobScheduler.start(),
-    audit: AuditLogger.start(),
-  }
-});
+// Real boot — packages/runtime/src/runtime.ts
+import { ObjectKernel } from '@objectstack/core';
+import { AppPlugin, DriverPlugin } from '@objectstack/runtime';
+import { ObjectQLPlugin } from '@objectstack/objectql';
+import { SqlDriver } from '@objectstack/driver-sql';
+import stack from './objectstack.config';
+
+const kernel = new ObjectKernel();
+
+// Phase 1 — driver (storage backend)
+await kernel.use(new DriverPlugin(new SqlDriver({ /* ... */ }), 'default'));
+
+// Phase 2 — ObjectQL data layer
+await kernel.use(new ObjectQLPlugin());
+
+// Phase 3 — application metadata (objects, views, apps, flows, agents…)
+await kernel.use(new AppPlugin(stack));
+
+// Phase 4 — host (HTTP / Studio / MCP server, optional)
+// await kernel.use(new HonoServerPlugin({ port: 3000 }));
+
+// Phase 5 — start everything
+await kernel.bootstrap();
 ```
+
+The kernel resolves plugin dependencies, calls each plugin's `onInstall` / `onEnable`
+hooks in order, and exposes the resulting services through DI.
 
 ### 2. Request Handling
 ```typescript

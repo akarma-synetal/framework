@@ -7,6 +7,16 @@ import { Globe, Languages, Calendar, Hash, FileText, MapPin } from 'lucide-react
 
 # Internationalization (i18n) Standard
 
+<Callout type="warn">
+**Protocol spec, partial implementation.** The runtime i18n service
+(`@objectstack/service-i18n`) implements translation bundles, locale resolution,
+ICU MessageFormat, and number/date formatting — see the
+[service README](/packages/services/service-i18n/README.md) for the current API.
+The nested config shapes shown below (e.g. `i18n.translationService.provider`,
+auto-translate hooks) describe target behaviour and are not yet codified as
+top-level `defineStack` keys. Treat the snippets as design intent.
+</Callout>
+
 ObjectOS provides **built-in internationalization** that enables applications to support multiple languages, locales, and regional formats without external libraries or complex configuration.
 
 ## The i18n Problem
@@ -747,7 +757,7 @@ ObjectOS integrates with professional translation services:
 
 ```typescript
 // objectstack.config.ts
-export default defineConfig({
+export default defineStack({
   i18n: {
     translationService: {
       provider: 'google-translate',
@@ -849,7 +859,7 @@ describe('Account View', () => {
 
 ```typescript
 // objectstack.config.ts
-export default defineConfig({
+export default defineStack({
   i18n: {
     // Default locale
     defaultLocale: 'en',

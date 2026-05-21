@@ -7,6 +7,16 @@ import { Settings, Layers, Lock, Users, FileCode, Shield } from 'lucide-react';
 
 # Configuration Resolution
 
+<Callout type="warn">
+**Protocol spec, partial implementation.** This page describes ObjectOS's target
+configuration model: hierarchical sources, tenant isolation, secret stores.
+The merge / precedence logic is implemented; the richer nested shapes shown in
+code samples below (e.g. `database`, `http`, `secrets.provider`) are
+illustrative of intent — today they live as env-vars, service-level options,
+and the `datasources` / `plugins` keys on `defineStack`. Treat the snippets
+as design intent, not paste-ready code.
+</Callout>
+
 ObjectOS uses a **hierarchical configuration system** that merges settings from multiple sources with clear **precedence rules**. This enables environment-specific overrides, tenant isolation, and user preferences—all from a single unified API.
 
 ## The Configuration Problem
@@ -257,9 +267,9 @@ ObjectOS loads config files in this order:
 
 ```typescript
 // objectstack.config.ts
-import { defineConfig } from '@objectstack/core';
+import { defineStack } from '@objectstack/spec';
 
-export default defineConfig({
+export default defineStack({
   // Database
   database: {
     url: 'postgresql://localhost:5432/objectstack',
@@ -303,9 +313,9 @@ export default defineConfig({
 
 ```typescript
 // objectstack.config.production.ts
-import { defineConfig } from '@objectstack/core';
+import { defineStack } from '@objectstack/spec';
 
-export default defineConfig({
+export default defineStack({
   database: {
     url: process.env.DATABASE_URL,
     pool: {
@@ -574,7 +584,7 @@ ObjectOS integrates with external secret managers:
 
 ```typescript
 // objectstack.config.ts
-export default defineConfig({
+export default defineStack({
   secrets: {
     provider: 'aws-secrets-manager',
     

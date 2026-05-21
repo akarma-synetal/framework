@@ -109,22 +109,20 @@ import { ObjectKernel } from '@objectstack/core';
 import { AuthPlugin } from '@objectstack/plugin-auth';
 import { HonoServerPlugin } from '@objectstack/plugin-hono-server';
 
-const kernel = new ObjectKernel({
-  plugins: [
-    // HTTP server (optional — auth works without it in MSW/mock mode)
-    new HonoServerPlugin({
-      port: 3000,
-    }),
-    
-    // Authentication plugin
-    new AuthPlugin({
-      secret: process.env.AUTH_SECRET,
-      baseUrl: 'http://localhost:3000',
-    }),
-  ]
-});
+const kernel = new ObjectKernel();
 
-await kernel.start();
+// HTTP server (optional — auth works without it in MSW/mock mode)
+await kernel.use(new HonoServerPlugin({
+  port: 3000,
+}));
+
+// Authentication plugin
+await kernel.use(new AuthPlugin({
+  secret: process.env.AUTH_SECRET,
+  baseUrl: 'http://localhost:3000',
+}));
+
+await kernel.bootstrap();
 ```
 
 That's it! Your authentication endpoints are now available at `/api/v1/auth/*`.

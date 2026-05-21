@@ -7,6 +7,16 @@ import { Zap, Power, Package, RefreshCw, ArrowLeft, CheckCircle, XCircle, AlertT
 
 # System Lifecycle
 
+<Callout type="warn">
+**Protocol spec.** The boot sequence, schema-evolution model, and graceful
+shutdown described below reflect the current `@objectstack/core` and CLI
+behaviour. The plugin upgrade flow (`objectstack upgrade @vendor/pkg
+--strategy blue-green`, multi-instance rolling upgrades, automatic backup &
+rollback) describes the **target** lifecycle for hosted ObjectOS — today it is
+partially implemented in the control plane and exposed only on hosted plans.
+Treat those command snippets as design intent.
+</Callout>
+
 ObjectOS manages the complete **lifecycle** of the platform runtime—from initial boot to plugin installation, upgrades, and rollbacks. Every operation is **declarative**, **idempotent**, and **auditable**.
 
 ## Boot Sequence
@@ -70,27 +80,35 @@ The ObjectOS boot process follows a **strict order** to ensure dependencies are 
 
 ### Boot Configuration
 
+Boot behaviour is controlled by the host runtime (kernel options + env vars),
+not by metadata. The relevant knobs:
+
+| Concern | Where it lives |
+| :--- | :--- |
+| Plugin startup timeout | `new ObjectKernel({ defaultStartupTimeout: 60_000 })` |
+| Fail-fast on plugin error | `new ObjectKernel({ rollbackOnFailure: true })` |
+| Disable strict requirement checks (tests) | `new ObjectKernel({ skipSystemValidation: true })` |
+| Which services start | Each service is registered with `kernel.use(serviceFactory(...))`; not started → not running |
+| Schema sync on boot | Driver-specific (`SqlDriver` calls `syncSchema()` on `init()`) |
+
+A typical bootstrap looks like this — no `defineConfig`, no metadata-side boot
+options:
+
 ```typescript
-// objectstack.config.ts
-export default defineConfig({
-  boot: {
-    // Maximum time for boot to complete before timeout
-    timeout: 60_000, // 60 seconds
-    
-    // Fail boot if any plugin fails to load?
-    failOnPluginError: true,
-    
-    // Run database migrations on boot?
-    autoMigrate: true,
-    
-    // Services to start
-    services: {
-      eventBus: { enabled: true },
-      scheduler: { enabled: true },
-      audit: { enabled: true },
-    },
-  },
+import { ObjectKernel } from '@objectstack/core';
+import { AppPlugin } from '@objectstack/runtime';
+import { SqlDriver } from '@objectstack/driver-sql';
+import stack from './objectstack.config';
+
+const kernel = new ObjectKernel({
+  defaultStartupTimeout: 60_000,
+  gracefulShutdown: true,
+  shutdownTimeout: 30_000,
 });
+
+kernel.use(new SqlDriver({ /* ... */ }));
+kernel.use(new AppPlugin(stack));
+await kernel.bootstrap();
 ```
 
 ### Boot Logs (Example)
@@ -422,103 +440,80 @@ objectstack upgrade @vendor/salesforce --to 3.3.0 --strategy rolling
 
 **Downtime:** 0 seconds (requires N ≥ 2 instances)
 
-### Schema Migrations
+### Schema Evolution
 
-ObjectOS uses **versioned migrations** to evolve database schema safely.
+ObjectStack treats schema as **metadata, not migrations**. The canonical source
+of truth is your object definitions; the driver's `syncSchema()` reconciles the
+physical database to match. Generated migration files exist as an *escape hatch*
+for explicit DDL when automatic sync isn't enough (e.g. data backfill,
+non-trivial column renames).
 
-#### Migration File Structure
+#### Declarative schema (the default)
 
 ```typescript
-// migrations/001_add_salesforce_account.ts
-export default defineMigration({
-  version: 1,
-  description: 'Add Salesforce Account object',
-  
-  up: async ({ db, objectQL }) => {
-    // Create object schema
-    await objectQL.createObject({
-      name: 'salesforce_account',
-      fields: [
-        { name: 'salesforce_id', type: 'text', required: true },
-        { name: 'account_name', type: 'text' },
-        { name: 'last_sync', type: 'datetime' },
-      ],
-    });
-    
-    // Create indexes
-    await db.schema.createIndex('salesforce_account', 'salesforce_id', {
-      unique: true,
-    });
-  },
-  
-  down: async ({ db, objectQL }) => {
-    // Rollback logic
-    await objectQL.dropObject('salesforce_account');
+// src/objects/salesforce_account.object.ts
+import { ObjectSchema, Field } from '@objectstack/spec/data';
+
+export default ObjectSchema.create({
+  name: 'salesforce_account',
+  label: 'Salesforce Account',
+  fields: {
+    salesforce_id: Field.text({ required: true, unique: true }),
+    account_name: Field.text(),
+    last_sync: Field.datetime(),
   },
 });
 ```
 
-#### Migration Execution
+On boot, the driver's `syncSchema(object, schema)` creates / alters the table to
+match. Add a field → edit the file → restart (or hot-reload in dev). No
+imperative `createObject` / `addField` calls.
+
+#### Generated migration files (escape hatch)
+
+For environments where you want explicit, reviewable DDL — e.g. production
+deployments behind change control — generate a migration file from your current
+config:
 
 ```bash
-# Preview migrations
-objectstack migrate --dry-run
-
-Output:
-  Pending migrations:
-    001_add_salesforce_account.ts
-    002_add_sync_logs.ts
-  
-# Apply migrations
-objectstack migrate
-
-Output:
-  [1/2] Running 001_add_salesforce_account... ✓ (0.15s)
-  [2/2] Running 002_add_sync_logs...          ✓ (0.08s)
-  
-  ✓ Applied 2 migrations in 0.23s
+os generate migration               # → migrations/<timestamp>_migration.ts
+os generate migration --format sql  # → migrations/<timestamp>_migration.sql
+os generate migration --dry-run     # Preview without writing
 ```
 
-#### Migration Safety
+The generated TypeScript file uses plain Knex-style `up(db)` / `down(db)`
+functions — no custom migration DSL:
 
-**Backward-Compatible Migrations:**
 ```typescript
-// ✓ SAFE: Adding optional field
-await objectQL.addField('account', {
-  name: 'new_field',
-  type: 'text',
-  required: false,  // Old code can ignore this
-});
+// migrations/20260101000000_migration.ts — auto-generated
+export async function up(db: any): Promise<void> {
+  await db.schema.createTable('salesforce_account', (t: any) => {
+    t.string('id').primary();
+    t.string('salesforce_id').notNullable().unique();
+    t.string('account_name');
+    t.datetime('last_sync');
+  });
+}
 
-// ✗ UNSAFE: Adding required field without default
-await objectQL.addField('account', {
-  name: 'new_field',
-  type: 'text',
-  required: true,  // Old code will break!
-});
-
-// ✓ SAFE: Adding required field WITH default
-await objectQL.addField('account', {
-  name: 'new_field',
-  type: 'text',
-  required: true,
-  defaultValue: 'N/A',  // Old code works
-});
+export async function down(db: any): Promise<void> {
+  await db.schema.dropTable('salesforce_account');
+}
 ```
 
-**Migration State Tracking:**
+Run migrations through your existing Knex / driver tooling — ObjectOS does not
+ship its own migration runner. The intent of `os generate migration` is to give
+you a hand-off file you can commit, review, and execute via the database tools
+your team already uses.
 
-```sql
--- objectstack_migrations table
-CREATE TABLE objectstack_migrations (
-  id SERIAL PRIMARY KEY,
-  version INTEGER UNIQUE NOT NULL,
-  name TEXT NOT NULL,
-  applied_at TIMESTAMP NOT NULL,
-  execution_time_ms INTEGER,
-  checksum TEXT  -- Detect migration file changes
-);
-```
+#### Schema safety
+
+The same rules apply whether you rely on `syncSchema()` or hand-written
+migrations:
+
+- ✅ Adding optional fields is safe — old code ignores them.
+- ❌ Adding required fields without a default breaks running clients.
+- ✅ Adding required fields **with** `defaultValue` keeps old code happy.
+- ⚠️ Renaming or dropping columns always needs a planned migration window.
 
 ### Upgrade Rollback
 
@@ -548,43 +543,37 @@ If upgrade fails, ObjectOS **automatically rolls back** to previous version.
 
 #### Manual Rollback
 
+`objectstack rollback` activates a previously published artifact revision —
+the cloud equivalent of "switch back to yesterday's build". It does not run
+DDL or undo schema migrations.
+
 ```bash
-# Rollback to previous version
+# Activate the previous artifact revision
 objectstack rollback
 
-# Rollback to specific version
-objectstack rollback --to 3.2.0
-
-# Rollback last N migrations
-objectstack migrate rollback --steps 2
+# Activate a specific revision
+objectstack rollback --to <revision>
 ```
+
+For schema rollback, run the `down()` of your generated migration through
+whatever Knex / driver tooling your team uses to apply the `up()`.
 
 ### Upgrade Configuration
 
-```typescript
-// objectstack.config.ts
-export default defineConfig({
-  upgrades: {
-    // Automatic backups before upgrades
-    autoBackup: true,
-    
-    // Retention period for backups
-    backupRetention: 7, // days
-    
-    // Health check timeout after upgrade
-    healthCheckTimeout: 30_000, // 30 seconds
-    
-    // Automatic rollback on failure
-    autoRollback: true,
-    
-    // Maintenance mode during upgrades
-    maintenanceMode: {
-      enabled: true,
-      message: 'System upgrade in progress. Back in 1 minute.',
-    },
-  },
-});
-```
+The behaviour around backups, rollback, and health checks during an
+`objectstack upgrade` is controlled by the host runtime / hosting platform —
+not by a top-level `defineStack` key today. Hosted ObjectStack and self-hosted
+ObjectOS expose this through environment-specific configuration:
+
+| Concern | Hosted control plane | Self-hosted |
+| :--- | :--- | :--- |
+| Pre-upgrade backups | enabled by default, retention configurable per project | run your own snapshotter (e.g. `pg_dump`, LiteFS snapshot) |
+| Health-check timeout after upgrade | dashboard setting | `OS_HEALTH_TIMEOUT_MS` env var |
+| Automatic rollback on failed health check | dashboard setting | `OS_AUTO_ROLLBACK=true` env var |
+| Maintenance-mode banner | dashboard setting | `OS_MAINTENANCE_MESSAGE` env var consumed by `plugin-hono-server` |
+
+This intentionally lives outside the metadata layer: it's an operational
+policy, not a property of the application.
 
 ## Health Checks
 
@@ -698,20 +687,23 @@ SIGTERM received
 
 ### Shutdown Configuration
 
+Shutdown is configured at kernel construction, not via metadata:
+
 ```typescript
-export default defineConfig({
-  shutdown: {
-    // Wait time for in-flight requests
-    gracePeriod: 30_000, // 30 seconds
-    
-    // Force kill after timeout
-    forceTimeout: 60_000, // 60 seconds
-    
-    // Signals to handle
-    signals: ['SIGTERM', 'SIGINT'],
-  },
+import { ObjectKernel } from '@objectstack/core';
+
+const kernel = new ObjectKernel({
+  // Enable graceful shutdown on SIGTERM / SIGINT
+  gracefulShutdown: true,
+  // Wait this long for in-flight work to drain before force-stopping
+  shutdownTimeout: 30_000,
 });
 ```
+
+The host process is responsible for signal handling. ObjectStack ships the
+listeners only when `gracefulShutdown: true`; otherwise it stays out of the
+process-management business so adapters (Express, Fastify, Hono, Vercel, …)
+can install their own.
 
 ## Best Practices
 
@@ -735,21 +727,17 @@ await step2(); // If this fails, step1 is not reverted!
 ```
 
 ### 2. Version Migrations, Don't Modify Them
-Once a migration is applied in production, **never modify it**. Create a new migration instead.
+Once a migration file is applied in production, **never modify it**. Generate a new one instead.
 
 ```typescript
-// ✗ BAD: Modifying existing migration
-// migrations/001_create_accounts.ts (ALREADY APPLIED)
-// Adding new field here breaks checksum!
+// ✗ BAD: Modifying an existing migration file
+// migrations/20260101000000_migration.ts (ALREADY APPLIED)
+// Editing it here changes history that databases have already seen.
 
-// ✓ GOOD: New migration
-// migrations/002_add_account_field.ts
-export default defineMigration({
-  version: 2,
-  up: async ({ objectQL }) => {
-    await objectQL.addField('account', { name: 'new_field', type: 'text' });
-  },
-});
+// ✓ GOOD: Generate a new migration after updating the object metadata
+//   1. Edit src/objects/account.object.ts — add the new field
+//   2. Run:  os generate migration
+//   3. Commit  migrations/20260201000000_migration.ts
 ```
 
 ### 3. Test Upgrades in Staging First
@@ -788,7 +776,9 @@ Plugin authors must document breaking changes in CHANGELOG.md.
 
 ### Migration Guide
 1. Update code: `sync()` → `syncAccounts()`
-2. Run migration: `objectstack migrate`
+2. Edit the relevant object metadata files
+3. Run `os generate migration` and review the generated DDL
+4. Apply via your usual Knex / driver pipeline
 ```
 
 ## Summary
