@@ -25,13 +25,38 @@ interface Row {
     updated_at: string;
 }
 
-/** In-memory fake honoring just enough of the engine surface. */
+interface HistoryRow {
+    id: string;
+    event_seq: number;
+    metadata_id: string | null;
+    name: string;
+    type: string;
+    version: number;
+    operation_type: string;
+    metadata: string | null;
+    checksum: string | null;
+    previous_checksum: string | null;
+    change_note?: string | null;
+    source?: string | null;
+    organization_id: string | null;
+    recorded_by?: string | null;
+    recorded_at: string;
+}
+
+/**
+ * In-memory fake honoring just enough of the engine surface to drive
+ * the SysMetadataRepository unit tests. Multi-table aware (sys_metadata
+ * + sys_metadata_history) and supports a pass-through `transaction()`
+ * that matches the real engine's behavior on drivers without
+ * `beginTransaction` (cb runs with `undefined` ctx, no rollback).
+ */
 function makeFakeEngine() {
     const rows = new Map<string, Row>();
+    const historyRows: HistoryRow[] = [];
+
     const keyOf = (where: Record<string, unknown>) =>
         `${where.type}|${where.name}|${String(where.organization_id ?? 'null')}`;
 
-    // Locate a row by either its overlay tuple or its primary id.
     const findRow = (where: Record<string, unknown>): { key: string; row: Row } | null => {
         if (where.id !== undefined) {
             for (const [k, r] of rows) {
@@ -44,9 +69,23 @@ function makeFakeEngine() {
         return r ? { key: k, row: r } : null;
     };
 
+    const matchesHistory = (h: HistoryRow, where: Record<string, unknown>): boolean => {
+        if (where.organization_id !== undefined && h.organization_id !== where.organization_id)
+            return false;
+        if (where.type !== undefined && h.type !== where.type) return false;
+        if (where.name !== undefined && h.name !== where.name) return false;
+        if (where.operation_type !== undefined && h.operation_type !== where.operation_type)
+            return false;
+        return true;
+    };
+
     return {
         rows,
-        async find(_t: string, opts: { where: Record<string, unknown> }) {
+        historyRows,
+        async find(table: string, opts: { where: Record<string, unknown> }) {
+            if (table === 'sys_metadata_history') {
+                return historyRows.filter((h) => matchesHistory(h, opts.where));
+            }
             return Array.from(rows.values()).filter((r) => {
                 if (opts.where.type && r.type !== opts.where.type) return false;
                 if (opts.where.organization_id !== undefined
@@ -55,10 +94,19 @@ function makeFakeEngine() {
                 return true;
             });
         },
-        async findOne(_t: string, opts: { where: Record<string, unknown> }) {
+        async findOne(table: string, opts: { where: Record<string, unknown> }) {
+            if (table === 'sys_metadata_history') {
+                return historyRows.find((h) => matchesHistory(h, opts.where)) ?? null;
+            }
             return findRow(opts.where)?.row ?? null;
         },
-        async insert(_t: string, data: Record<string, unknown>) {
+        async insert(table: string, data: Record<string, unknown>) {
+            if (table === 'sys_metadata_history') {
+                const h = { ...(data as any) } as HistoryRow;
+                if (!h.id) h.id = `h_${historyRows.length + 1}`;
+                historyRows.push(h);
+                return { id: h.id };
+            }
             const k = keyOf(data);
             const row: Row = { id: `r_${rows.size + 1}`, ...(data as any) };
             rows.set(k, row);
@@ -75,6 +123,15 @@ function makeFakeEngine() {
             if (!found) return { deleted: 0 };
             rows.delete(found.key);
             return { deleted: 1 };
+        },
+        /**
+         * No-rollback pass-through, matching `ObjectQL.transaction` on
+         * drivers without `beginTransaction`. Sufficient for assertions
+         * about ordering and "no history row on conflict"; not for
+         * testing rollback-on-failure of the history insert itself.
+         */
+        async transaction<T>(cb: (ctx: any) => Promise<T>): Promise<T> {
+            return cb(undefined);
         },
     };
 }
@@ -303,12 +360,139 @@ describe('SysMetadataRepository', () => {
         expect(received[0].ref.type).toBe('dashboard');
     });
 
-    // ── history is a no-op in M0 ────────────────────────────────────
+    // ── durable history (M1) ────────────────────────────────────────
 
-    it('history yields nothing in M0', async () => {
+    it('put writes a history row inside the same transaction', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        await repo.put(ref, sampleView, {
+            parentVersion: null, actor: 'studio', source: 'studio',
+        });
+        expect(engine.historyRows).toHaveLength(1);
+        expect(engine.historyRows[0]).toMatchObject({
+            organization_id: 'org_alpha',
+            type: 'view',
+            name: 'case_grid',
+            operation_type: 'create',
+            version: 1,
+            event_seq: 1,
+            source: 'studio',
+            previous_checksum: null,
+            checksum: hashSpec(sampleView),
+        });
+    });
+
+    it('update writes a history row with previous_checksum chained', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        const first = await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
+        const next = { ...sampleView, label: 'Cases v2' };
+        await repo.put(ref, next, { parentVersion: first.version, actor: 'studio' });
+        expect(engine.historyRows).toHaveLength(2);
+        expect(engine.historyRows[1]).toMatchObject({
+            operation_type: 'update',
+            version: 2,
+            event_seq: 2,
+            previous_checksum: first.version,
+            checksum: hashSpec(next),
+        });
+    });
+
+    it('identical-body no-op put does NOT write a history row', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        const first = await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
+        await repo.put(ref, sampleView, { parentVersion: first.version, actor: 'studio' });
+        expect(engine.historyRows).toHaveLength(1);
+    });
+
+    it('conflict put does NOT write a history row', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
+        await expect(
+            repo.put(ref, { ...sampleView, label: 'X' }, { parentVersion: 'sha256:wrong', actor: 'studio' }),
+        ).rejects.toBeInstanceOf(ConflictError);
+        expect(engine.historyRows).toHaveLength(1); // only the initial create
+    });
+
+    it('delete writes a tombstone history row (op=delete, body=null, checksum=null)', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        const first = await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
+        await repo.delete(ref, { parentVersion: first.version, actor: 'studio', message: 'gone' });
+        expect(engine.historyRows).toHaveLength(2);
+        expect(engine.historyRows[1]).toMatchObject({
+            operation_type: 'delete',
+            version: 2,
+            event_seq: 2,
+            metadata: null,
+            checksum: null,
+            previous_checksum: first.version,
+            change_note: 'gone',
+        });
+    });
+
+    it('delete then recreate continues incrementing version (no restart at 1)', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        const first = await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
+        await repo.delete(ref, { parentVersion: first.version, actor: 'studio' });
+        await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
+        const versions = engine.historyRows.map((h) => h.version);
+        expect(versions).toEqual([1, 2, 3]); // create, delete tombstone, re-create
+    });
+
+    it('event_seq is per-org monotonic across types', async () => {
+        await repo.put(
+            { org: 'org_alpha', type: 'view', name: 'a' },
+            { name: 'a' }, { parentVersion: null, actor: 'studio' },
+        );
+        await repo.put(
+            { org: 'org_alpha', type: 'dashboard', name: 'b' },
+            { name: 'b' }, { parentVersion: null, actor: 'studio' },
+        );
+        await repo.put(
+            { org: 'org_alpha', type: 'view', name: 'c' },
+            { name: 'c' }, { parentVersion: null, actor: 'studio' },
+        );
+        const seqs = engine.historyRows.map((h) => h.event_seq);
+        expect(seqs).toEqual([1, 2, 3]);
+    });
+
+    it('history() yields events in event_seq order with mapped fields', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        const first = await repo.put(ref, sampleView, {
+            parentVersion: null, actor: 'alice', source: 'studio', message: 'init',
+        });
+        await repo.put(ref, { ...sampleView, label: 'X' }, {
+            parentVersion: first.version, actor: 'bob', source: 'studio',
+        });
         const events: any[] = [];
-        for await (const e of repo.history()) events.push(e);
-        expect(events).toEqual([]);
+        for await (const e of repo.history({ org: 'org_alpha', type: 'view', name: 'case_grid' })) {
+            events.push(e);
+        }
+        expect(events).toHaveLength(2);
+        expect(events[0]).toMatchObject({
+            seq: 1,
+            op: 'create',
+            ref: { org: 'org_alpha', type: 'view', name: 'case_grid' },
+            actor: 'alice',
+            source: 'studio',
+            message: 'init',
+            parentHash: null,
+        });
+        expect(events[1].op).toBe('update');
+        expect(events[1].parentHash).toBe(first.version);
+    });
+
+    it('history(since) skips events at or below the cursor', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        const a = await repo.put(ref, sampleView, { parentVersion: null, actor: 'a' });
+        await repo.put(ref, { ...sampleView, label: 'b' }, { parentVersion: a.version, actor: 'a' });
+        const events: any[] = [];
+        for await (const e of repo.history(
+            { org: 'org_alpha', type: 'view', name: 'case_grid' },
+            { sinceSeq: 1 },
+        )) {
+            events.push(e);
+        }
+        expect(events).toHaveLength(1);
+        expect(events[0].seq).toBe(2);
     });
 
     // ── close ───────────────────────────────────────────────────────

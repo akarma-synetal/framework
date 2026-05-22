@@ -73,7 +73,13 @@ export interface DatabaseLoaderOptions {
   /** Organization ID for multi-tenant isolation */
   organizationId?: string;
 
-  /** Project ID — null = platform-global, set = project-scoped */
+  /**
+   * @deprecated since ADR-0008 §0 amendment (branch/project removal).
+   * The metadata layer is keyed by organization only. This option is
+   * accepted for back-compat but ignored — writes do not set
+   * `project_id` and filters do not constrain on it. Will be removed
+   * in the next major release.
+   */
   projectId?: string;
 
   /** Enable history tracking (default: true) */
@@ -111,7 +117,6 @@ export class DatabaseLoader implements MetadataLoader {
   private tableName: string;
   private historyTableName: string;
   private organizationId?: string;
-  private projectId?: string;
   private trackHistory: boolean;
   private schemaReady = false;
   private historySchemaReady = false;
@@ -134,7 +139,8 @@ export class DatabaseLoader implements MetadataLoader {
     this.tableName = options.tableName ?? 'sys_metadata';
     this.historyTableName = options.historyTableName ?? 'sys_metadata_history';
     this.organizationId = options.organizationId;
-    this.projectId = options.projectId;
+    // ADR-0008 §0: `projectId` option is accepted for back-compat but ignored.
+    void options.projectId;
     this.trackHistory = options.trackHistory !== false; // Default to true
 
     // Wire cache. Default: enabled with 500 entries / 60s TTL.
@@ -246,6 +252,30 @@ export class DatabaseLoader implements MetadataLoader {
   }
 
   /**
+   * Compute the next per-org `event_seq` for `sys_metadata_history`.
+   * Reads `MAX(event_seq) + 1` for the configured `organization_id`.
+   * Legacy path — not transactional, so concurrent writes can collide.
+   * The canonical (transactional) producer is `SysMetadataRepository`.
+   */
+  private async nextEventSeq(): Promise<number> {
+    const where: Record<string, unknown> = this.organizationId
+      ? { organization_id: this.organizationId }
+      : {};
+    try {
+      const rows = await this._find(this.historyTableName, { where });
+      let max = 0;
+      for (const row of rows as Array<{ event_seq?: number | null }>) {
+        const v = typeof row.event_seq === 'number' ? row.event_seq : 0;
+        if (v > max) max = v;
+      }
+      return max + 1;
+    } catch {
+      // Table not provisioned yet or driver error — start at 1.
+      return 1;
+    }
+  }
+
+  /**
    * Ensure the metadata table exists.
    * Uses IDataDriver.syncSchema with the SysMetadataObject definition
    * to idempotently create/update the table.
@@ -327,8 +357,9 @@ export class DatabaseLoader implements MetadataLoader {
 
   /**
    * Build base filter conditions for queries.
-   * Filters by organizationId when configured; project_id when projectId is set,
-   * or null (platform-global) when not set.
+   * Filters by organizationId when configured. `projectId` is accepted
+   * for back-compat but no longer constrains the query — see
+   * ADR-0008 §0 (branch/project removal).
    */
   private baseFilter(type: string, name?: string): Record<string, unknown> {
     const filter: Record<string, unknown> = { type };
@@ -338,8 +369,6 @@ export class DatabaseLoader implements MetadataLoader {
     if (this.organizationId) {
       filter.organization_id = this.organizationId;
     }
-    // When projectId is set, scope to that project; otherwise query platform-global (project_id = null).
-    filter.project_id = this.projectId ?? null;
     return filter;
   }
 
@@ -382,6 +411,12 @@ export class DatabaseLoader implements MetadataLoader {
     const historyId = generateId();
     const metadataJson = JSON.stringify(metadata);
 
+    // Compute per-org monotonic event_seq. Legacy path: not inside a
+    // transaction, so concurrent writers can collide. The SysMetadataRepository
+    // path serializes this under engine.transaction(); DatabaseLoader is
+    // deprecated for new writes and tolerates the race.
+    const eventSeq = await this.nextEventSeq();
+
     const historyRecord: Partial<MetadataHistoryRecord> = {
       id: historyId,
       metadataId,
@@ -396,12 +431,12 @@ export class DatabaseLoader implements MetadataLoader {
       recordedBy,
       recordedAt: now,
       ...(this.organizationId ? { organizationId: this.organizationId } : {}),
-      ...(this.projectId !== undefined ? { projectId: this.projectId } : {}),
     };
 
     try {
       await this._create(this.historyTableName, {
         id: historyRecord.id,
+        event_seq: eventSeq,
         metadata_id: historyRecord.metadataId,
         name: historyRecord.name,
         type: historyRecord.type,
@@ -413,8 +448,8 @@ export class DatabaseLoader implements MetadataLoader {
         change_note: historyRecord.changeNote,
         recorded_by: historyRecord.recordedBy,
         recorded_at: historyRecord.recordedAt,
+        source: 'database-loader',
         ...(this.organizationId ? { organization_id: this.organizationId } : {}),
-        ...(this.projectId !== undefined ? { project_id: this.projectId } : {}),
       });
     } catch (error) {
       // Log error but don't fail the main operation
@@ -663,7 +698,6 @@ export class DatabaseLoader implements MetadataLoader {
     if (this.organizationId) {
       filter.organization_id = this.organizationId;
     }
-    filter.project_id = this.projectId ?? null;
 
     const row = await this._findOne(this.historyTableName, {
       where: filter,
@@ -682,7 +716,6 @@ export class DatabaseLoader implements MetadataLoader {
       previousChecksum: row.previous_checksum as string | undefined,
       changeNote: row.change_note as string | undefined,
       organizationId: row.organization_id as string | undefined,
-      projectId: row.project_id as string | undefined,
       recordedBy: row.recorded_by as string | undefined,
       recordedAt: row.recorded_at as string,
     };
@@ -715,7 +748,6 @@ export class DatabaseLoader implements MetadataLoader {
     // Find the metadata record
     const filter: Record<string, unknown> = { type, name };
     if (this.organizationId) filter.organization_id = this.organizationId;
-    filter.project_id = this.projectId ?? null;
 
     const metadataRecord = await this._findOne(this.tableName, { where: filter });
     if (!metadataRecord) {
@@ -727,7 +759,6 @@ export class DatabaseLoader implements MetadataLoader {
       metadata_id: metadataRecord.id,
     };
     if (this.organizationId) historyFilter.organization_id = this.organizationId;
-    historyFilter.project_id = this.projectId ?? null;
     if (options?.operationType) historyFilter.operation_type = options.operationType;
     if (options?.since) historyFilter.recorded_at = { $gte: options.since };
     if (options?.until) {
@@ -774,7 +805,6 @@ export class DatabaseLoader implements MetadataLoader {
         previousChecksum: row.previous_checksum as string | undefined,
         changeNote: row.change_note as string | undefined,
         organizationId: row.organization_id as string | undefined,
-        projectId: row.project_id as string | undefined,
         recordedBy: row.recorded_by as string | undefined,
         recordedAt: row.recorded_at as string,
       };
@@ -920,7 +950,6 @@ export class DatabaseLoader implements MetadataLoader {
           version: 1,
           source: 'database',
           ...(this.organizationId ? { organization_id: this.organizationId } : {}),
-          ...(this.projectId !== undefined ? { project_id: this.projectId } : { project_id: null }),
           created_at: now,
           updated_at: now,
         });

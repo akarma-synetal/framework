@@ -33,6 +33,7 @@ interface Row {
 
 function makeFakeEngine() {
     const rows = new Map<string, Row>();
+    const historyRows: any[] = [];
     const keyOf = (w: Record<string, unknown>) =>
         `${w.type}|${w.name}|${String(w.organization_id ?? 'null')}`;
     const findRow = (w: Record<string, unknown>): { key: string; row: Row } | null => {
@@ -44,9 +45,20 @@ function makeFakeEngine() {
         const r = rows.get(k);
         return r ? { key: k, row: r } : null;
     };
+    const matchesHistory = (h: any, where: Record<string, unknown>): boolean => {
+        if (where.organization_id !== undefined && h.organization_id !== where.organization_id)
+            return false;
+        if (where.type !== undefined && h.type !== where.type) return false;
+        if (where.name !== undefined && h.name !== where.name) return false;
+        return true;
+    };
     return {
         rows,
-        async find(_t: string, opts: { where: Record<string, unknown> }) {
+        historyRows,
+        async find(table: string, opts: { where: Record<string, unknown> }) {
+            if (table === 'sys_metadata_history') {
+                return historyRows.filter((h) => matchesHistory(h, opts.where));
+            }
             return Array.from(rows.values()).filter((r) =>
                 (!opts.where.type || r.type === opts.where.type) &&
                 (opts.where.organization_id === undefined ||
@@ -54,10 +66,19 @@ function makeFakeEngine() {
                 (!opts.where.state || r.state === opts.where.state),
             );
         },
-        async findOne(_t: string, opts: { where: Record<string, unknown> }) {
+        async findOne(table: string, opts: { where: Record<string, unknown> }) {
+            if (table === 'sys_metadata_history') {
+                return historyRows.find((h) => matchesHistory(h, opts.where)) ?? null;
+            }
             return findRow(opts.where)?.row ?? null;
         },
-        async insert(_t: string, data: Record<string, unknown>) {
+        async insert(table: string, data: Record<string, unknown>) {
+            if (table === 'sys_metadata_history') {
+                const h = { ...(data as any) };
+                if (!h.id) h.id = `h_${historyRows.length + 1}`;
+                historyRows.push(h);
+                return { id: h.id };
+            }
             const row: Row = { id: `r_${rows.size + 1}`, ...(data as any) };
             rows.set(keyOf(data), row);
             return { id: row.id };
@@ -73,6 +94,9 @@ function makeFakeEngine() {
             if (!found) return { deleted: 0 };
             rows.delete(found.key);
             return { deleted: 1 };
+        },
+        async transaction<T>(cb: (ctx: any) => Promise<T>): Promise<T> {
+            return cb(undefined);
         },
     };
 }

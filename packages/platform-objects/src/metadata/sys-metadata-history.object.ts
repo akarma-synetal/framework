@@ -3,18 +3,43 @@
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 /**
- * sys_metadata_history — Metadata Version History Object
+ * sys_metadata_history — Metadata Version History / Event Log
  *
- * Stores historical snapshots of metadata changes for version tracking,
- * audit trail, and rollback capabilities.
+ * Append-only durable log of every overlay change made through
+ * `SysMetadataRepository.put` / `delete` (ADR-0008 §10 M1). Each row is a
+ * single event in the per-organisation event log; rows are NEVER
+ * mutated after insertion. The legacy `DatabaseLoader` writes the same
+ * shape from its own put/restore code paths.
  *
- * This is a system object (isSystem: true) — protected from deletion and
- * automatically provisioned when metadata history is enabled.
+ * ─────────────────────────────────────────────────────────────────────
+ *  Key design points (ADR-0008 §0 amendment + M1):
  *
- * Each record represents a single version snapshot of a metadata item,
- * created whenever the metadata is modified, published, or reverted.
+ *  • Keyed by `(organization_id, type, name)` only — `project_id` was
+ *    removed in the branch/project-removal amendment.
  *
- * @see MetadataHistoryRecordSchema in metadata-persistence.zod.ts
+ *  • `event_seq` is the per-org monotonic event-log cursor. Producers
+ *    compute `MAX(event_seq) + 1 WHERE organization_id = X` inside the
+ *    same transaction as the parent `sys_metadata` write.
+ *
+ *  • `version` is the per-(org,type,name) lineage counter. Producers
+ *    compute `MAX(version) + 1 WHERE organization_id = X AND type = T
+ *    AND name = N` so delete + recreate continues incrementing instead
+ *    of restarting at 1.
+ *
+ *  • `metadata_id` is plain `text` (not a `lookup`) so DELETE rows can
+ *    keep the now-orphaned parent id for forensic auditing without a
+ *    foreign-key constraint blocking the hard delete.
+ *
+ *  • `metadata` / `checksum` are nullable — DELETE rows have no body or
+ *    hash. Readers must tolerate null on both columns.
+ *
+ *  • `source` records the producer ('sys-metadata-repo', 'fs',
+ *    'studio', …) and feeds MetadataEvent.source on history() reads.
+ *
+ *  Indexes are purpose-built for the two dominant read patterns:
+ *    1. per-item history view  → `(organization_id, type, name, version)`
+ *    2. org-wide event replay   → `(organization_id, event_seq)`
+ * ─────────────────────────────────────────────────────────────────────
  */
 export const SysMetadataHistoryObject = ObjectSchema.create({
   name: 'sys_metadata_history',
@@ -23,7 +48,7 @@ export const SysMetadataHistoryObject = ObjectSchema.create({
   icon: 'history',
   isSystem: true,
   managedBy: 'system',
-  description: 'Version history and audit trail for metadata changes',
+  description: 'Durable event log of metadata overlay changes (per-org, append-only)',
 
   fields: {
     /** Primary Key (UUID) */
@@ -33,11 +58,25 @@ export const SysMetadataHistoryObject = ObjectSchema.create({
       readonly: true,
     }),
 
-    /** Foreign key to sys_metadata.id */
-    metadata_id: Field.lookup('sys_metadata', {
-      label: 'Metadata',
+    /** Per-org monotonic event sequence (durable cursor for replay). */
+    event_seq: Field.number({
+      label: 'Event Seq',
       required: true,
       readonly: true,
+      description: 'Per-organization monotonic event log cursor.',
+    }),
+
+    /**
+     * Parent `sys_metadata.id` at insertion time (plain text, no FK).
+     * Null for events whose parent row no longer exists (e.g. some
+     * delete records). Forensic only — joins should go through
+     * `(organization_id, type, name)`.
+     */
+    metadata_id: Field.text({
+      label: 'Metadata ID',
+      required: false,
+      readonly: true,
+      maxLength: 64,
     }),
 
     /** Machine name (denormalized for easier querying) */
@@ -58,7 +97,7 @@ export const SysMetadataHistoryObject = ObjectSchema.create({
       maxLength: 100,
     }),
 
-    /** Version number at this snapshot */
+    /** Per-(org,type,name) lineage counter at this snapshot. */
     version: Field.number({
       label: 'Version',
       required: true,
@@ -72,36 +111,51 @@ export const SysMetadataHistoryObject = ObjectSchema.create({
       readonly: true,
     }),
 
-    /** Historical metadata snapshot (JSON payload) */
+    /**
+     * Historical metadata snapshot (JSON payload).
+     * Null for `operation_type = 'delete'` — the row carries no body.
+     */
     metadata: Field.textarea({
       label: 'Metadata',
-      required: true,
+      required: false,
       readonly: true,
-      description: 'JSON-serialized metadata snapshot at this version',
+      description: 'JSON-serialized metadata snapshot at this version (null for deletes).',
     }),
 
-    /** SHA-256 checksum of metadata content */
+    /** SHA-256 checksum of metadata content (null for deletes). */
     checksum: Field.text({
       label: 'Checksum',
-      required: true,
+      required: false,
       readonly: true,
-      maxLength: 64,
+      maxLength: 80,
     }),
 
-    /** Checksum of the previous version */
+    /** Checksum of the previous version (null for the first event). */
     previous_checksum: Field.text({
       label: 'Previous Checksum',
       required: false,
       readonly: true,
-      maxLength: 64,
+      maxLength: 80,
     }),
 
-    /** Human-readable description of changes */
+    /** Human-readable description of changes (= MetadataEvent.message). */
     change_note: Field.textarea({
       label: 'Change Note',
       required: false,
       readonly: true,
-      description: 'Description of what changed in this version',
+      description: 'Description of what changed in this version.',
+    }),
+
+    /**
+     * Producer of the event ('sys-metadata-repo', 'fs', 'studio',
+     * 'api', …). Defaults to 'sys-metadata-repo' on the canonical
+     * write path; preserved on history() reads as MetadataEvent.source.
+     */
+    source: Field.text({
+      label: 'Source',
+      required: false,
+      readonly: true,
+      maxLength: 64,
     }),
 
     /** Organization ID for multi-tenant isolation */
@@ -112,16 +166,7 @@ export const SysMetadataHistoryObject = ObjectSchema.create({
       description: 'Organization for multi-tenant isolation.',
     }),
 
-    /** Environment ID — null = platform-global, set = env-scoped */
-    project_id: Field.text({
-      label: 'Environment ID',
-      required: false,
-      readonly: true,
-      maxLength: 255,
-      description: 'Scopes this history entry to a specific environment.',
-    }),
-
-    /** User who made this change */
+    /** User who made this change (= MetadataEvent.actor). */
     recorded_by: Field.lookup('sys_user', {
       label: 'Recorded By',
       required: false,
@@ -137,20 +182,19 @@ export const SysMetadataHistoryObject = ObjectSchema.create({
   },
 
   indexes: [
-    { fields: ['metadata_id', 'version'], unique: true },
-    { fields: ['metadata_id', 'recorded_at'] },
+    { fields: ['organization_id', 'event_seq'], unique: true },
+    { fields: ['organization_id', 'type', 'name', 'version'], unique: true },
+    { fields: ['organization_id', 'type', 'name', 'recorded_at'] },
     { fields: ['type', 'name'] },
     { fields: ['recorded_at'] },
     { fields: ['operation_type'] },
-    { fields: ['organization_id'] },
-    { fields: ['project_id'] },
   ],
 
   enable: {
-    trackHistory: false, // Don't track history of history records
+    trackHistory: false,
     searchable: false,
     apiEnabled: true,
-    apiMethods: ['get', 'list'], // Read-only via API
+    apiMethods: ['get', 'list'],
     trash: false,
   },
 });

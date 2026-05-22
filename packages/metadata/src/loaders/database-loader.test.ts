@@ -342,7 +342,7 @@ describe('DatabaseLoader', () => {
   });
 
   describe('multi-tenant isolation', () => {
-    it('should filter by organizationId and projectId when configured', async () => {
+    it('should filter by organizationId when configured (projectId accepted but ignored — ADR-0008 §0)', async () => {
       const tenantLoader = new DatabaseLoader({
         driver: mockDriver,
         organizationId: 'org-1',
@@ -351,20 +351,30 @@ describe('DatabaseLoader', () => {
 
       await tenantLoader.save('object', 'account', { name: 'account' });
 
-      // The create call should include organization_id and project_id
+      // The create call should include organization_id but NOT project_id
+      // (project_id was removed from the metadata layer in the ADR-0008 §0
+      // branch/project-removal amendment).
       expect(mockDriver.create).toHaveBeenCalledWith(
         'sys_metadata',
-        expect.objectContaining({ organization_id: 'org-1', project_id: 'env-1' })
+        expect.objectContaining({ organization_id: 'org-1' })
+      );
+      expect(mockDriver.create).not.toHaveBeenCalledWith(
+        'sys_metadata',
+        expect.objectContaining({ project_id: expect.anything() })
       );
 
-      // The find calls should filter by organization_id and project_id
+      // The find calls should filter by organization_id (no project_id).
       await tenantLoader.load('object', 'account');
       expect(mockDriver.findOne).toHaveBeenCalledWith(
         'sys_metadata',
         expect.objectContaining({
-          where: expect.objectContaining({ organization_id: 'org-1', project_id: 'env-1' }),
+          where: expect.objectContaining({ organization_id: 'org-1' }),
         })
       );
+      const findOneCalls = (mockDriver.findOne as any).mock.calls;
+      for (const [, opts] of findOneCalls) {
+        expect((opts?.where ?? {})).not.toHaveProperty('project_id');
+      }
     });
   });
 
