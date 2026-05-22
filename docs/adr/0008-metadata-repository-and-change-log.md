@@ -656,3 +656,34 @@ The M0 milestone is itself decomposed into shippable PRs. Each PR is independent
 
 The Repository / Change Log / Cache / Registry separation is now the canonical mental model for all metadata work in the codebase. Code reviews should reject changes that re-conflate these layers.
 
+---
+
+## 14. Amendments
+
+### 2026-05 — `sys_metadata_history.metadata_id` deprecated (M1 follow-up)
+
+The `metadata_id` column on `sys_metadata_history` was originally
+introduced as a `Field.lookup` foreign key into `sys_metadata.id`, then
+downgraded to plain `text` during M1 so that DELETE tombstones could
+hold an orphaned ref past the parent row's hard delete.
+
+After shipping M1 we revisited the column and concluded it carries no
+business value:
+
+- Every audit-time join in production uses the natural composite key
+  `(organization_id, type, name, version)`, which the UNIQUE index
+  already covers.
+- The physical row id is a database-internal detail that changes if a
+  row is ever recreated; it cannot be used to "follow" a logical
+  identity over time.
+- No code reader was ever added.
+
+**Decision**: deprecate the column in this release cycle (TSDoc +
+schema description), keep populating it for back-compat across the
+current major, and drop it in the next major version's schema migration.
+Joins MUST go through `(organization_id, type, name, version)`.
+
+This amendment supersedes §0's wording about `metadata_id` being
+"plain text for forensic auditing" — that justification no longer
+holds.
+
