@@ -30,6 +30,8 @@ import { useObjectUiDataSource } from '@/hooks/useObjectUiDataSource';
 import { useMetadataHmr } from '@/hooks/useMetadataHmr';
 import { LiveFormPreview } from './LiveFormPreview';
 import { LivePreviewStatusBar } from './LivePreviewStatusBar';
+import { TimelinePreview } from './TimelinePreview';
+import { DashboardPreview } from './DashboardPreview';
 import { AlertCircle, Eye, LayoutGrid, KanbanSquare, Calendar as CalendarIcon, FileText, ListChecks } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -184,6 +186,10 @@ export function MetadataPreview({
       );
     }
 
+    if (type === 'dashboard' && spec) {
+      return <DashboardPreview spec={spec} dataSource={dataSource} className={className} />;
+    }
+
     if (type !== 'view' || !spec) {
       return (
         <UnsupportedPreview type={type} spec={spec} />
@@ -292,6 +298,15 @@ export function MetadataPreview({
           </Suspense>
         );
       }
+      case 'timeline':
+        return (
+          <TimelinePreview
+            objectName={resolvedObject}
+            spec={subSpec}
+            dataSource={dataSource}
+            className={className}
+          />
+        );
       default:
         return <UnsupportedPreview type={`view/${viewType}`} spec={subSpec} />;
     }
