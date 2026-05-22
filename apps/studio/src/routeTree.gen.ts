@@ -9,58 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as RegisterRouteImport } from './routes/register'
-import { Route as PlatformRouteImport } from './routes/platform'
-import { Route as PackagesRouteImport } from './routes/packages'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as ApiConsoleRouteImport } from './routes/api-console'
 import { Route as PackageRouteImport } from './routes/$package'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
-import { Route as OrganizationsIndexRouteImport } from './routes/organizations.index'
 import { Route as PackageIndexRouteImport } from './routes/$package.index'
-import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
-import { Route as OrganizationsNewRouteImport } from './routes/organizations.new'
-import { Route as OrganizationsOrgIdRouteImport } from './routes/organizations.$orgId'
-import { Route as AuthDeviceRouteImport } from './routes/auth.device'
-import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects.$projectId.index'
-import { Route as ProjectsProjectIdSettingsRouteImport } from './routes/projects.$projectId.settings'
-import { Route as ProjectsProjectIdRevisionsRouteImport } from './routes/projects.$projectId.revisions'
-import { Route as ProjectsProjectIdPackagesRouteImport } from './routes/projects.$projectId.packages'
-import { Route as ProjectsProjectIdMembersRouteImport } from './routes/projects.$projectId.members'
-import { Route as ProjectsProjectIdApiConsoleRouteImport } from './routes/projects.$projectId.api-console'
-import { Route as ProjectsProjectIdPackageRouteImport } from './routes/projects.$projectId.$package'
+import { Route as PackagePublicFormsRouteImport } from './routes/$package.public-forms'
 import { Route as PackageObjectsNameRouteImport } from './routes/$package.objects.$name'
-import { Route as ProjectsProjectIdPackageIndexRouteImport } from './routes/projects.$projectId.$package.index'
 import { Route as PackageMetadataTypeNameRouteImport } from './routes/$package.metadata.$type.$name'
-import { Route as ProjectsProjectIdPackageObjectsNameRouteImport } from './routes/projects.$projectId.$package.objects.$name'
-import { Route as ProjectsProjectIdPackageMetadataTypeNameRouteImport } from './routes/projects.$projectId.$package.metadata.$type.$name'
 
-const RegisterRoute = RegisterRouteImport.update({
-  id: '/register',
-  path: '/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlatformRoute = PlatformRouteImport.update({
-  id: '/platform',
-  path: '/platform',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PackagesRoute = PackagesRouteImport.update({
-  id: '/packages',
-  path: '/packages',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiConsoleRoute = ApiConsoleRouteImport.update({
-  id: '/api-console',
-  path: '/api-console',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PackageRoute = PackageRouteImport.update({
   id: '/$package',
   path: '/$package',
@@ -71,330 +26,84 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
-  id: '/projects/',
-  path: '/projects/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OrganizationsIndexRoute = OrganizationsIndexRouteImport.update({
-  id: '/organizations/',
-  path: '/organizations/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PackageIndexRoute = PackageIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => PackageRoute,
 } as any)
-const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
-  id: '/projects/$projectId',
-  path: '/projects/$projectId',
-  getParentRoute: () => rootRouteImport,
+const PackagePublicFormsRoute = PackagePublicFormsRouteImport.update({
+  id: '/public-forms',
+  path: '/public-forms',
+  getParentRoute: () => PackageRoute,
 } as any)
-const OrganizationsNewRoute = OrganizationsNewRouteImport.update({
-  id: '/organizations/new',
-  path: '/organizations/new',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OrganizationsOrgIdRoute = OrganizationsOrgIdRouteImport.update({
-  id: '/organizations/$orgId',
-  path: '/organizations/$orgId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthDeviceRoute = AuthDeviceRouteImport.update({
-  id: '/auth/device',
-  path: '/auth/device',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ProjectsProjectIdRoute,
-} as any)
-const ProjectsProjectIdSettingsRoute =
-  ProjectsProjectIdSettingsRouteImport.update({
-    id: '/settings',
-    path: '/settings',
-    getParentRoute: () => ProjectsProjectIdRoute,
-  } as any)
-const ProjectsProjectIdRevisionsRoute =
-  ProjectsProjectIdRevisionsRouteImport.update({
-    id: '/revisions',
-    path: '/revisions',
-    getParentRoute: () => ProjectsProjectIdRoute,
-  } as any)
-const ProjectsProjectIdPackagesRoute =
-  ProjectsProjectIdPackagesRouteImport.update({
-    id: '/packages',
-    path: '/packages',
-    getParentRoute: () => ProjectsProjectIdRoute,
-  } as any)
-const ProjectsProjectIdMembersRoute =
-  ProjectsProjectIdMembersRouteImport.update({
-    id: '/members',
-    path: '/members',
-    getParentRoute: () => ProjectsProjectIdRoute,
-  } as any)
-const ProjectsProjectIdApiConsoleRoute =
-  ProjectsProjectIdApiConsoleRouteImport.update({
-    id: '/api-console',
-    path: '/api-console',
-    getParentRoute: () => ProjectsProjectIdRoute,
-  } as any)
-const ProjectsProjectIdPackageRoute =
-  ProjectsProjectIdPackageRouteImport.update({
-    id: '/$package',
-    path: '/$package',
-    getParentRoute: () => ProjectsProjectIdRoute,
-  } as any)
 const PackageObjectsNameRoute = PackageObjectsNameRouteImport.update({
   id: '/objects/$name',
   path: '/objects/$name',
   getParentRoute: () => PackageRoute,
 } as any)
-const ProjectsProjectIdPackageIndexRoute =
-  ProjectsProjectIdPackageIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => ProjectsProjectIdPackageRoute,
-  } as any)
 const PackageMetadataTypeNameRoute = PackageMetadataTypeNameRouteImport.update({
   id: '/metadata/$type/$name',
   path: '/metadata/$type/$name',
   getParentRoute: () => PackageRoute,
 } as any)
-const ProjectsProjectIdPackageObjectsNameRoute =
-  ProjectsProjectIdPackageObjectsNameRouteImport.update({
-    id: '/objects/$name',
-    path: '/objects/$name',
-    getParentRoute: () => ProjectsProjectIdPackageRoute,
-  } as any)
-const ProjectsProjectIdPackageMetadataTypeNameRoute =
-  ProjectsProjectIdPackageMetadataTypeNameRouteImport.update({
-    id: '/metadata/$type/$name',
-    path: '/metadata/$type/$name',
-    getParentRoute: () => ProjectsProjectIdPackageRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$package': typeof PackageRouteWithChildren
-  '/api-console': typeof ApiConsoleRoute
-  '/login': typeof LoginRoute
-  '/packages': typeof PackagesRoute
-  '/platform': typeof PlatformRoute
-  '/register': typeof RegisterRoute
-  '/auth/device': typeof AuthDeviceRoute
-  '/organizations/$orgId': typeof OrganizationsOrgIdRoute
-  '/organizations/new': typeof OrganizationsNewRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/$package/public-forms': typeof PackagePublicFormsRoute
   '/$package/': typeof PackageIndexRoute
-  '/organizations/': typeof OrganizationsIndexRoute
-  '/projects/': typeof ProjectsIndexRoute
   '/$package/objects/$name': typeof PackageObjectsNameRoute
-  '/projects/$projectId/$package': typeof ProjectsProjectIdPackageRouteWithChildren
-  '/projects/$projectId/api-console': typeof ProjectsProjectIdApiConsoleRoute
-  '/projects/$projectId/members': typeof ProjectsProjectIdMembersRoute
-  '/projects/$projectId/packages': typeof ProjectsProjectIdPackagesRoute
-  '/projects/$projectId/revisions': typeof ProjectsProjectIdRevisionsRoute
-  '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
-  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/$package/metadata/$type/$name': typeof PackageMetadataTypeNameRoute
-  '/projects/$projectId/$package/': typeof ProjectsProjectIdPackageIndexRoute
-  '/projects/$projectId/$package/objects/$name': typeof ProjectsProjectIdPackageObjectsNameRoute
-  '/projects/$projectId/$package/metadata/$type/$name': typeof ProjectsProjectIdPackageMetadataTypeNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/api-console': typeof ApiConsoleRoute
-  '/login': typeof LoginRoute
-  '/packages': typeof PackagesRoute
-  '/platform': typeof PlatformRoute
-  '/register': typeof RegisterRoute
-  '/auth/device': typeof AuthDeviceRoute
-  '/organizations/$orgId': typeof OrganizationsOrgIdRoute
-  '/organizations/new': typeof OrganizationsNewRoute
+  '/$package/public-forms': typeof PackagePublicFormsRoute
   '/$package': typeof PackageIndexRoute
-  '/organizations': typeof OrganizationsIndexRoute
-  '/projects': typeof ProjectsIndexRoute
   '/$package/objects/$name': typeof PackageObjectsNameRoute
-  '/projects/$projectId/api-console': typeof ProjectsProjectIdApiConsoleRoute
-  '/projects/$projectId/members': typeof ProjectsProjectIdMembersRoute
-  '/projects/$projectId/packages': typeof ProjectsProjectIdPackagesRoute
-  '/projects/$projectId/revisions': typeof ProjectsProjectIdRevisionsRoute
-  '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
-  '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
   '/$package/metadata/$type/$name': typeof PackageMetadataTypeNameRoute
-  '/projects/$projectId/$package': typeof ProjectsProjectIdPackageIndexRoute
-  '/projects/$projectId/$package/objects/$name': typeof ProjectsProjectIdPackageObjectsNameRoute
-  '/projects/$projectId/$package/metadata/$type/$name': typeof ProjectsProjectIdPackageMetadataTypeNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$package': typeof PackageRouteWithChildren
-  '/api-console': typeof ApiConsoleRoute
-  '/login': typeof LoginRoute
-  '/packages': typeof PackagesRoute
-  '/platform': typeof PlatformRoute
-  '/register': typeof RegisterRoute
-  '/auth/device': typeof AuthDeviceRoute
-  '/organizations/$orgId': typeof OrganizationsOrgIdRoute
-  '/organizations/new': typeof OrganizationsNewRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/$package/public-forms': typeof PackagePublicFormsRoute
   '/$package/': typeof PackageIndexRoute
-  '/organizations/': typeof OrganizationsIndexRoute
-  '/projects/': typeof ProjectsIndexRoute
   '/$package/objects/$name': typeof PackageObjectsNameRoute
-  '/projects/$projectId/$package': typeof ProjectsProjectIdPackageRouteWithChildren
-  '/projects/$projectId/api-console': typeof ProjectsProjectIdApiConsoleRoute
-  '/projects/$projectId/members': typeof ProjectsProjectIdMembersRoute
-  '/projects/$projectId/packages': typeof ProjectsProjectIdPackagesRoute
-  '/projects/$projectId/revisions': typeof ProjectsProjectIdRevisionsRoute
-  '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
-  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/$package/metadata/$type/$name': typeof PackageMetadataTypeNameRoute
-  '/projects/$projectId/$package/': typeof ProjectsProjectIdPackageIndexRoute
-  '/projects/$projectId/$package/objects/$name': typeof ProjectsProjectIdPackageObjectsNameRoute
-  '/projects/$projectId/$package/metadata/$type/$name': typeof ProjectsProjectIdPackageMetadataTypeNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/$package'
-    | '/api-console'
-    | '/login'
-    | '/packages'
-    | '/platform'
-    | '/register'
-    | '/auth/device'
-    | '/organizations/$orgId'
-    | '/organizations/new'
-    | '/projects/$projectId'
+    | '/$package/public-forms'
     | '/$package/'
-    | '/organizations/'
-    | '/projects/'
     | '/$package/objects/$name'
-    | '/projects/$projectId/$package'
-    | '/projects/$projectId/api-console'
-    | '/projects/$projectId/members'
-    | '/projects/$projectId/packages'
-    | '/projects/$projectId/revisions'
-    | '/projects/$projectId/settings'
-    | '/projects/$projectId/'
     | '/$package/metadata/$type/$name'
-    | '/projects/$projectId/$package/'
-    | '/projects/$projectId/$package/objects/$name'
-    | '/projects/$projectId/$package/metadata/$type/$name'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/api-console'
-    | '/login'
-    | '/packages'
-    | '/platform'
-    | '/register'
-    | '/auth/device'
-    | '/organizations/$orgId'
-    | '/organizations/new'
+    | '/$package/public-forms'
     | '/$package'
-    | '/organizations'
-    | '/projects'
     | '/$package/objects/$name'
-    | '/projects/$projectId/api-console'
-    | '/projects/$projectId/members'
-    | '/projects/$projectId/packages'
-    | '/projects/$projectId/revisions'
-    | '/projects/$projectId/settings'
-    | '/projects/$projectId'
     | '/$package/metadata/$type/$name'
-    | '/projects/$projectId/$package'
-    | '/projects/$projectId/$package/objects/$name'
-    | '/projects/$projectId/$package/metadata/$type/$name'
   id:
     | '__root__'
     | '/'
     | '/$package'
-    | '/api-console'
-    | '/login'
-    | '/packages'
-    | '/platform'
-    | '/register'
-    | '/auth/device'
-    | '/organizations/$orgId'
-    | '/organizations/new'
-    | '/projects/$projectId'
+    | '/$package/public-forms'
     | '/$package/'
-    | '/organizations/'
-    | '/projects/'
     | '/$package/objects/$name'
-    | '/projects/$projectId/$package'
-    | '/projects/$projectId/api-console'
-    | '/projects/$projectId/members'
-    | '/projects/$projectId/packages'
-    | '/projects/$projectId/revisions'
-    | '/projects/$projectId/settings'
-    | '/projects/$projectId/'
     | '/$package/metadata/$type/$name'
-    | '/projects/$projectId/$package/'
-    | '/projects/$projectId/$package/objects/$name'
-    | '/projects/$projectId/$package/metadata/$type/$name'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PackageRoute: typeof PackageRouteWithChildren
-  ApiConsoleRoute: typeof ApiConsoleRoute
-  LoginRoute: typeof LoginRoute
-  PackagesRoute: typeof PackagesRoute
-  PlatformRoute: typeof PlatformRoute
-  RegisterRoute: typeof RegisterRoute
-  AuthDeviceRoute: typeof AuthDeviceRoute
-  OrganizationsOrgIdRoute: typeof OrganizationsOrgIdRoute
-  OrganizationsNewRoute: typeof OrganizationsNewRoute
-  ProjectsProjectIdRoute: typeof ProjectsProjectIdRouteWithChildren
-  OrganizationsIndexRoute: typeof OrganizationsIndexRoute
-  ProjectsIndexRoute: typeof ProjectsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/register': {
-      id: '/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof RegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/platform': {
-      id: '/platform'
-      path: '/platform'
-      fullPath: '/platform'
-      preLoaderRoute: typeof PlatformRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/packages': {
-      id: '/packages'
-      path: '/packages'
-      fullPath: '/packages'
-      preLoaderRoute: typeof PackagesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api-console': {
-      id: '/api-console'
-      path: '/api-console'
-      fullPath: '/api-console'
-      preLoaderRoute: typeof ApiConsoleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/$package': {
       id: '/$package'
       path: '/$package'
@@ -409,20 +118,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/projects/': {
-      id: '/projects/'
-      path: '/projects'
-      fullPath: '/projects/'
-      preLoaderRoute: typeof ProjectsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/organizations/': {
-      id: '/organizations/'
-      path: '/organizations'
-      fullPath: '/organizations/'
-      preLoaderRoute: typeof OrganizationsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/$package/': {
       id: '/$package/'
       path: '/'
@@ -430,82 +125,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PackageIndexRouteImport
       parentRoute: typeof PackageRoute
     }
-    '/projects/$projectId': {
-      id: '/projects/$projectId'
-      path: '/projects/$projectId'
-      fullPath: '/projects/$projectId'
-      preLoaderRoute: typeof ProjectsProjectIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/organizations/new': {
-      id: '/organizations/new'
-      path: '/organizations/new'
-      fullPath: '/organizations/new'
-      preLoaderRoute: typeof OrganizationsNewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/organizations/$orgId': {
-      id: '/organizations/$orgId'
-      path: '/organizations/$orgId'
-      fullPath: '/organizations/$orgId'
-      preLoaderRoute: typeof OrganizationsOrgIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/device': {
-      id: '/auth/device'
-      path: '/auth/device'
-      fullPath: '/auth/device'
-      preLoaderRoute: typeof AuthDeviceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/projects/$projectId/': {
-      id: '/projects/$projectId/'
-      path: '/'
-      fullPath: '/projects/$projectId/'
-      preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
-      parentRoute: typeof ProjectsProjectIdRoute
-    }
-    '/projects/$projectId/settings': {
-      id: '/projects/$projectId/settings'
-      path: '/settings'
-      fullPath: '/projects/$projectId/settings'
-      preLoaderRoute: typeof ProjectsProjectIdSettingsRouteImport
-      parentRoute: typeof ProjectsProjectIdRoute
-    }
-    '/projects/$projectId/revisions': {
-      id: '/projects/$projectId/revisions'
-      path: '/revisions'
-      fullPath: '/projects/$projectId/revisions'
-      preLoaderRoute: typeof ProjectsProjectIdRevisionsRouteImport
-      parentRoute: typeof ProjectsProjectIdRoute
-    }
-    '/projects/$projectId/packages': {
-      id: '/projects/$projectId/packages'
-      path: '/packages'
-      fullPath: '/projects/$projectId/packages'
-      preLoaderRoute: typeof ProjectsProjectIdPackagesRouteImport
-      parentRoute: typeof ProjectsProjectIdRoute
-    }
-    '/projects/$projectId/members': {
-      id: '/projects/$projectId/members'
-      path: '/members'
-      fullPath: '/projects/$projectId/members'
-      preLoaderRoute: typeof ProjectsProjectIdMembersRouteImport
-      parentRoute: typeof ProjectsProjectIdRoute
-    }
-    '/projects/$projectId/api-console': {
-      id: '/projects/$projectId/api-console'
-      path: '/api-console'
-      fullPath: '/projects/$projectId/api-console'
-      preLoaderRoute: typeof ProjectsProjectIdApiConsoleRouteImport
-      parentRoute: typeof ProjectsProjectIdRoute
-    }
-    '/projects/$projectId/$package': {
-      id: '/projects/$projectId/$package'
-      path: '/$package'
-      fullPath: '/projects/$projectId/$package'
-      preLoaderRoute: typeof ProjectsProjectIdPackageRouteImport
-      parentRoute: typeof ProjectsProjectIdRoute
+    '/$package/public-forms': {
+      id: '/$package/public-forms'
+      path: '/public-forms'
+      fullPath: '/$package/public-forms'
+      preLoaderRoute: typeof PackagePublicFormsRouteImport
+      parentRoute: typeof PackageRoute
     }
     '/$package/objects/$name': {
       id: '/$package/objects/$name'
@@ -514,13 +139,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PackageObjectsNameRouteImport
       parentRoute: typeof PackageRoute
     }
-    '/projects/$projectId/$package/': {
-      id: '/projects/$projectId/$package/'
-      path: '/'
-      fullPath: '/projects/$projectId/$package/'
-      preLoaderRoute: typeof ProjectsProjectIdPackageIndexRouteImport
-      parentRoute: typeof ProjectsProjectIdPackageRoute
-    }
     '/$package/metadata/$type/$name': {
       id: '/$package/metadata/$type/$name'
       path: '/metadata/$type/$name'
@@ -528,30 +146,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PackageMetadataTypeNameRouteImport
       parentRoute: typeof PackageRoute
     }
-    '/projects/$projectId/$package/objects/$name': {
-      id: '/projects/$projectId/$package/objects/$name'
-      path: '/objects/$name'
-      fullPath: '/projects/$projectId/$package/objects/$name'
-      preLoaderRoute: typeof ProjectsProjectIdPackageObjectsNameRouteImport
-      parentRoute: typeof ProjectsProjectIdPackageRoute
-    }
-    '/projects/$projectId/$package/metadata/$type/$name': {
-      id: '/projects/$projectId/$package/metadata/$type/$name'
-      path: '/metadata/$type/$name'
-      fullPath: '/projects/$projectId/$package/metadata/$type/$name'
-      preLoaderRoute: typeof ProjectsProjectIdPackageMetadataTypeNameRouteImport
-      parentRoute: typeof ProjectsProjectIdPackageRoute
-    }
   }
 }
 
 interface PackageRouteChildren {
+  PackagePublicFormsRoute: typeof PackagePublicFormsRoute
   PackageIndexRoute: typeof PackageIndexRoute
   PackageObjectsNameRoute: typeof PackageObjectsNameRoute
   PackageMetadataTypeNameRoute: typeof PackageMetadataTypeNameRoute
 }
 
 const PackageRouteChildren: PackageRouteChildren = {
+  PackagePublicFormsRoute: PackagePublicFormsRoute,
   PackageIndexRoute: PackageIndexRoute,
   PackageObjectsNameRoute: PackageObjectsNameRoute,
   PackageMetadataTypeNameRoute: PackageMetadataTypeNameRoute,
@@ -560,63 +166,9 @@ const PackageRouteChildren: PackageRouteChildren = {
 const PackageRouteWithChildren =
   PackageRoute._addFileChildren(PackageRouteChildren)
 
-interface ProjectsProjectIdPackageRouteChildren {
-  ProjectsProjectIdPackageIndexRoute: typeof ProjectsProjectIdPackageIndexRoute
-  ProjectsProjectIdPackageObjectsNameRoute: typeof ProjectsProjectIdPackageObjectsNameRoute
-  ProjectsProjectIdPackageMetadataTypeNameRoute: typeof ProjectsProjectIdPackageMetadataTypeNameRoute
-}
-
-const ProjectsProjectIdPackageRouteChildren: ProjectsProjectIdPackageRouteChildren =
-  {
-    ProjectsProjectIdPackageIndexRoute: ProjectsProjectIdPackageIndexRoute,
-    ProjectsProjectIdPackageObjectsNameRoute:
-      ProjectsProjectIdPackageObjectsNameRoute,
-    ProjectsProjectIdPackageMetadataTypeNameRoute:
-      ProjectsProjectIdPackageMetadataTypeNameRoute,
-  }
-
-const ProjectsProjectIdPackageRouteWithChildren =
-  ProjectsProjectIdPackageRoute._addFileChildren(
-    ProjectsProjectIdPackageRouteChildren,
-  )
-
-interface ProjectsProjectIdRouteChildren {
-  ProjectsProjectIdPackageRoute: typeof ProjectsProjectIdPackageRouteWithChildren
-  ProjectsProjectIdApiConsoleRoute: typeof ProjectsProjectIdApiConsoleRoute
-  ProjectsProjectIdMembersRoute: typeof ProjectsProjectIdMembersRoute
-  ProjectsProjectIdPackagesRoute: typeof ProjectsProjectIdPackagesRoute
-  ProjectsProjectIdRevisionsRoute: typeof ProjectsProjectIdRevisionsRoute
-  ProjectsProjectIdSettingsRoute: typeof ProjectsProjectIdSettingsRoute
-  ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
-}
-
-const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
-  ProjectsProjectIdPackageRoute: ProjectsProjectIdPackageRouteWithChildren,
-  ProjectsProjectIdApiConsoleRoute: ProjectsProjectIdApiConsoleRoute,
-  ProjectsProjectIdMembersRoute: ProjectsProjectIdMembersRoute,
-  ProjectsProjectIdPackagesRoute: ProjectsProjectIdPackagesRoute,
-  ProjectsProjectIdRevisionsRoute: ProjectsProjectIdRevisionsRoute,
-  ProjectsProjectIdSettingsRoute: ProjectsProjectIdSettingsRoute,
-  ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
-}
-
-const ProjectsProjectIdRouteWithChildren =
-  ProjectsProjectIdRoute._addFileChildren(ProjectsProjectIdRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PackageRoute: PackageRouteWithChildren,
-  ApiConsoleRoute: ApiConsoleRoute,
-  LoginRoute: LoginRoute,
-  PackagesRoute: PackagesRoute,
-  PlatformRoute: PlatformRoute,
-  RegisterRoute: RegisterRoute,
-  AuthDeviceRoute: AuthDeviceRoute,
-  OrganizationsOrgIdRoute: OrganizationsOrgIdRoute,
-  OrganizationsNewRoute: OrganizationsNewRoute,
-  ProjectsProjectIdRoute: ProjectsProjectIdRouteWithChildren,
-  OrganizationsIndexRoute: OrganizationsIndexRoute,
-  ProjectsIndexRoute: ProjectsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

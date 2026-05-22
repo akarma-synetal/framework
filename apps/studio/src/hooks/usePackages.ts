@@ -1,57 +1,73 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
-import { useState, useEffect } from 'react';
-import { useClient } from '@objectstack/client-react';
-import type { InstalledPackage } from '@objectstack/spec/kernel';
+/**
+ * usePackages — flat replacement for the deleted useEnvAwarePackages hook.
+ *
+ * Studio is a single-project metadata browser; package discovery is a
+ * straight call to `client.packages.list()` (=> `GET /api/v1/packages`).
+ * No project/env scoping, no last-used localStorage caching, no MSW kernel
+ * fallback — just whatever the connected backend currently has installed.
+ */
 
-export interface UsePackagesOptions {
-  // Reserved for future filtering options. Scope-based filtering has been
-  // intentionally removed — every installed package (system + project) is
-  // visible from every surface so the user can always switch between them.
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { InstalledPackage } from '@objectstack/spec/kernel';
+import { useClient } from '@objectstack/client-react';
+
+export interface UsePackagesResult {
+  packages: InstalledPackage[];
+  loading: boolean;
+  error: Error | null;
+  reload: () => Promise<void>;
+  selectedPackage: InstalledPackage | null;
+  setSelectedPackage: (pkg: InstalledPackage | null) => void;
 }
 
-/**
- * Hook to fetch and manage installed packages
- */
-export function usePackages(_options: UsePackagesOptions = {}) {
-  const client = useClient();
+export function usePackages(activePackageId?: string | null): UsePackagesResult {
+  const client = useClient() as any;
   const [packages, setPackages] = useState<InstalledPackage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<InstalledPackage | null>(null);
 
-  useEffect(() => {
-    if (!client) return;
-    let mounted = true;
-
-    async function loadPackages() {
-      try {
-        const result = await client.packages.list();
-        const all: InstalledPackage[] = result?.packages || [];
-        // Exclude dev-workspace (monorepo aggregator) and unversioned packages;
-        // otherwise return every package regardless of `manifest.scope`.
-        const items = all.filter((p) => {
-          if (p.manifest?.version === '0.0.0') return false;
-          if (p.manifest?.id === 'dev-workspace') return false;
-          return true;
-        });
-        console.log('[App] Fetched packages:', items.map((p) => p.manifest?.name || p.manifest?.id));
-        if (mounted) {
-          setPackages(items);
-          setSelectedPackage((prev) =>
-            items.length === 0
-              ? null
-              : prev && items.some((p) => p.manifest?.id === prev.manifest?.id)
-                ? prev
-                : items[0],
-          );
-        }
-      } catch (err) {
-        console.error('[App] Failed to fetch packages:', err);
-      }
+  const reload = useCallback(async () => {
+    if (!client?.packages?.list) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await client.packages.list();
+      const list: InstalledPackage[] = Array.isArray(result)
+        ? result
+        : (result?.packages ?? result?.items ?? []);
+      setPackages(list);
+    } catch (err) {
+      setError(err as Error);
+      setPackages([]);
+    } finally {
+      setLoading(false);
     }
-
-    loadPackages();
-    return () => { mounted = false; };
   }, [client]);
 
-  return { packages, selectedPackage, setSelectedPackage };
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  // Resolve the URL package segment against the loaded list.
+  useEffect(() => {
+    if (!activePackageId) {
+      if (selectedPackage) setSelectedPackage(null);
+      return;
+    }
+    if (!packages.length) return;
+    const match = packages.find(
+      (p) =>
+        p.manifest?.id === activePackageId ||
+        p.manifest?.id?.split('.').pop() === activePackageId,
+    );
+    if (match && match !== selectedPackage) setSelectedPackage(match);
+  }, [activePackageId, packages, selectedPackage]);
+
+  return useMemo(
+    () => ({ packages, loading, error, reload, selectedPackage, setSelectedPackage }),
+    [packages, loading, error, reload, selectedPackage],
+  );
 }

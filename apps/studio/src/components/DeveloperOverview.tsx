@@ -16,7 +16,8 @@ import type { InstalledPackage } from '@objectstack/spec/kernel';
 interface DeveloperOverviewProps {
   packages: InstalledPackage[];
   selectedPackage?: InstalledPackage | null;
-  onNavigate: (view: string, detail?: string) => void;
+  /** Optional navigation callback; defaults to a no-op. */
+  onNavigate?: (view: string, detail?: string) => void;
 }
 
 interface SystemStats {
@@ -25,7 +26,7 @@ interface SystemStats {
   loading: boolean;
 }
 
-export function DeveloperOverview({ packages, selectedPackage, onNavigate }: DeveloperOverviewProps) {
+export function DeveloperOverview({ packages, selectedPackage, onNavigate = () => {} }: DeveloperOverviewProps) {
   const params = useParams({ strict: false }) as { projectId?: string };
   const client = useScopedClient(params.projectId);
   const [stats, setStats] = useState<SystemStats>({

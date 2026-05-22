@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Studio simplified into a metadata browser
+
+`apps/studio` was collapsed from a multi-tenant project/org/cloud admin
+into a single-tenant **metadata browser + runtime debugger**. The
+"project" and "organization" concepts are gone from the UI; everything
+runs against the single `sys_metadata` table that already underpins the
+runtime.
+
+- Routes flattened to `/`, `/$package`, `/$package/metadata/$type/$name`,
+  `/$package/objects/$name`, plus the new `/$package/public-forms`.
+- Deleted: organization/project/login/register/platform/api-console
+  top-level routes, project switcher, organization switcher, project
+  members panel, and every `useProjects*` / `useOrgApps` / `useProjectAwarePackages`
+  hook.
+- Kept: runtime preview & debug plugins (`agent-playground`,
+  `tool-playground`, `flow-viewer`, `ApiConsolePage`, `QueryBuilder`,
+  `AiChatPanel`) — these stay essential for inspecting the live
+  metadata graph.
+- `useScopedClient(_id?)` is now a back-compat shim that always returns
+  the unscoped client, so the surviving plugins keep working without
+  touch-ups.
+
+### Added — Studio "Public forms" preset
+
+Studio now surfaces every `FormView` with `sharing.allowAnonymous` +
+`sharing.publicLink` as a first-class entry in the sidebar
+(`/$package/public-forms`). The page lists each public form with its
+slug, target object, and the resolved `/console/f/:slug` URL, plus
+one-click copy actions for the raw URL, an `<iframe>` snippet, and a
+React snippet — giving non-developer admins everything they need to
+embed a Web-to-Lead form without touching code.
+
 ### Changed — Bumped `@object-ui/*` to `5.0.1`
 
 All `@object-ui/*` dependencies in `apps/console` and `apps/account` were

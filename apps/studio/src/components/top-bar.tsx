@@ -3,11 +3,11 @@
 /**
  * TopBar
  *
- * Global chrome component in Supabase style.
- * Renders at the top of authenticated Studio layouts with:
- * - Left segment: OrganizationSwitcher + ProjectSwitcher + PackageSwitcher
- * - Center segment: SidebarTrigger + dynamic breadcrumbs (inferred from URL)
- * - Right segment: Global search placeholder, mode badge, ThemeToggle, UserMenu
+ * Slim chrome for single-tenant Studio:
+ *   [hamburger? · Brand · / · PackageSwitcher · / · breadcrumbs] [search · mode · theme · user]
+ *
+ * Organization / project switchers were removed when Studio dropped
+ * multi-tenant routing (see ../routes/__root.tsx).
  */
 
 import { Link, useLocation, useNavigate, useParams } from '@tanstack/react-router';
@@ -27,13 +27,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Boxes, Cpu, Search } from 'lucide-react';
 import { config } from '@/lib/config';
-import { ProjectSwitcher } from '@/components/project-switcher';
-import { OrganizationSwitcher } from '@/components/organization-switcher';
 import { PackageSwitcher } from '@/components/package-switcher';
 import { UserMenu } from '@/components/user-menu';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { useActiveOrganizationId } from '@/hooks/useSession';
-import { useEnvAwarePackages } from '@/hooks/useProjectAwarePackages';
+import { usePackages } from '@/hooks/usePackages';
 
 const META_TYPE_LABELS: Record<string, string> = {
   action: 'Actions',
@@ -66,7 +63,10 @@ const META_TYPE_LABELS: Record<string, string> = {
 
 function StudioBrand() {
   return (
-    <Link to="/" className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90">
+    <Link
+      to="/"
+      className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90"
+    >
       <Boxes className="h-4 w-4" />
     </Link>
   );
@@ -79,132 +79,60 @@ function SlashDivider() {
 export function TopBar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const activeOrgId = useActiveOrganizationId();
   const params = useParams({ strict: false }) as {
     package?: string;
-    projectId?: string;
     name?: string;
     type?: string;
-    orgId?: string;
   };
 
-  // Load packages installed in the current project so users can switch
-  // between them from the top-bar (e.g. while viewing metadata).
-  const { packages } = useEnvAwarePackages(params.projectId);
-
-  // Resolve the current package from the URL segment. Match either the
-  // full reverse-domain id (e.g. com.example.crm) or the last segment (crm).
-  const selectedPackage = useMemo<InstalledPackage | null>(() => {
-    if (!params.package || !packages.length) return null;
-    return (
-      packages.find(
-        (p) =>
-          p.manifest?.id === params.package ||
-          p.manifest?.id?.split('.').pop() === params.package,
-      ) ?? null
-    );
-  }, [packages, params.package]);
+  const { packages, selectedPackage } = usePackages(params.package);
 
   const handleSelectPackage = useCallback(
     (pkg: InstalledPackage | null) => {
-      if (!params.projectId) return;
-      // "全部" — clear the package segment by navigating to the project
-      // overview. Downstream consumers treat the absence of `params.package`
-      // as "show metadata across all packages".
       if (pkg === null) {
-        navigate({
-          to: '/projects/$projectId',
-          params: { projectId: params.projectId },
-        });
+        navigate({ to: '/' });
         return;
       }
       const nextId = pkg.manifest?.id;
       if (!nextId) return;
-      // Switching package invalidates the current metadata path (the same
-      // type/name may not exist in the target package), so land on the
-      // package overview.
-      navigate({
-        to: '/projects/$projectId/$package',
-        params: { projectId: params.projectId, package: nextId },
-      });
+      navigate({ to: '/$package', params: { package: nextId } });
     },
-    [navigate, params.projectId],
+    [navigate],
   );
 
-  // Infer view type from pathname
   const viewType = useMemo(() => {
-    const pathname = location.pathname;
-
-    if (pathname === '/') return 'home';
-    if (pathname === '/api-console' || pathname.startsWith('/api-console/')) return 'api-console';
-    if (pathname === '/projects') return 'projects';
-    if (pathname === '/organizations' || pathname === '/organizations/new' || params.orgId) return 'orgs';
-    if (params.projectId === 'platform') return 'platform';
-    if (params.projectId && pathname.includes('/packages')) return 'packages';
-    if (params.projectId && !params.package) return 'project-overview';
+    if (location.pathname === '/') return 'home';
     if (params.package && params.name && !params.type) return 'object';
     if (params.package && params.type && params.name) return 'metadata';
     if (params.package && !params.name && !params.type) return 'package-overview';
-
     return 'default';
   }, [location.pathname, params]);
 
-  // Compute breadcrumb items based on current route
   const breadcrumbs = useMemo(() => {
     const items: Array<{ label: string; href?: string }> = [];
-
     switch (viewType) {
       case 'home':
         items.push({ label: 'Home' });
-        break;
-      case 'api-console':
-        items.push({ label: 'API Console' });
-        break;
-      case 'projects':
-        items.push({ label: 'Projects' });
-        break;
-      case 'platform':
-        items.push({ label: 'Platform' });
-        break;
-      case 'orgs':
-        if (params.orgId) {
-          items.push({ label: 'Organizations', href: '/organizations' });
-          items.push({ label: 'Settings' });
-        } else {
-          items.push({ label: 'Organizations' });
-        }
-        break;
-      case 'packages':
-        items.push({ label: 'Package Manager' });
-        break;
-      case 'project-overview':
-        items.push({ label: 'Overview' });
         break;
       case 'package-overview':
         items.push({ label: 'Overview' });
         break;
       case 'object':
         items.push({ label: 'Objects' });
-        if (params.name) {
-          items.push({ label: params.name });
-        }
+        if (params.name) items.push({ label: params.name });
         break;
       case 'metadata':
         if (params.type) {
           items.push({ label: META_TYPE_LABELS[params.type] || params.type });
         }
-        if (params.name) {
-          items.push({ label: params.name });
-        }
+        if (params.name) items.push({ label: params.name });
         break;
       default:
         items.push({ label: 'Studio' });
     }
-
     return items;
   }, [viewType, params]);
 
-  // Compute API badge for object/metadata views
   const apiBadge = useMemo(() => {
     if (viewType === 'object' && params.name) {
       return `/api/v1/data/${params.name}`;
@@ -217,30 +145,23 @@ export function TopBar() {
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-2 sm:px-4">
-      {/* Left segment: Brand + Org + Project switchers */}
       <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-        {/* Mobile: Hamburger menu */}
         <div className="sm:hidden">
           <SidebarTrigger className="h-9 w-9" />
         </div>
         <StudioBrand />
-        {!config.singleProject && <SlashDivider />}
-        <div className="hidden sm:flex items-center gap-1.5">
-          {!config.singleProject && <OrganizationSwitcher />}
-          {(!config.singleProject && activeOrgId) && <SlashDivider />}
-          {!config.singleProject && <ProjectSwitcher />}
-          {params.projectId && (
-            <>
-              <SlashDivider />
+        {params.package && (
+          <>
+            <SlashDivider />
+            <div className="hidden sm:flex items-center gap-1.5">
               <PackageSwitcher
                 packages={packages}
                 selectedPackage={selectedPackage}
                 onSelectPackage={handleSelectPackage}
               />
-            </>
-          )}
-        </div>
-        {/* Mobile: Show only current page breadcrumb */}
+            </div>
+          </>
+        )}
         <div className="sm:hidden min-w-0 flex-1">
           {breadcrumbs.length > 0 && (
             <span className="text-sm font-medium truncate">
@@ -248,7 +169,6 @@ export function TopBar() {
             </span>
           )}
         </div>
-        {/* Desktop: Show full navigation */}
         <div className="hidden sm:flex items-center gap-2">
           <Separator orientation="vertical" className="mx-2 h-4" />
           <Breadcrumb>
@@ -270,34 +190,23 @@ export function TopBar() {
         </div>
       </div>
 
-      {/* Right segment: Search + Mode + Theme + User */}
       <div className="flex items-center gap-1 sm:gap-2">
-        {/* Global search placeholder - desktop only */}
         <div className="relative hidden lg:flex items-center">
           <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-          <Input
-            placeholder="Search..."
-            className="h-8 w-[200px] pl-8 pr-10 text-sm"
-            readOnly
-          />
+          <Input placeholder="Search..." className="h-8 w-[200px] pl-8 pr-10 text-sm" readOnly />
           <kbd className="absolute right-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
             <span className="text-xs">⌘</span>K
           </kbd>
         </div>
-
-        {/* API Badge - hide on small screens */}
         {apiBadge && (
           <Badge variant="outline" className="font-mono text-[10px] gap-1 hidden sm:flex">
             {apiBadge}
           </Badge>
         )}
-
-        {/* Mode Badge - hide on mobile */}
         <Badge variant="secondary" className="text-[10px] gap-1 font-mono hidden sm:flex">
           <Cpu className="h-2.5 w-2.5" />
           {config.mode.toUpperCase()}
         </Badge>
-
         <div className="hidden sm:block">
           <ThemeToggle />
         </div>

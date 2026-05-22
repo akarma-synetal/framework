@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useClient } from '@objectstack/client-react';
 import { useScopedClient } from './useObjectStackClient';
-import { isPlatformProject } from '../lib/platform-project';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -199,16 +198,11 @@ export function useApiDiscovery(projectId?: string) {
   const [error, setError] = useState<string | null>(null);
 
   const discover = useCallback(async () => {
-    // When a real projectId is provided but the scoped client hasn't resolved
-    // yet, defer until the next render. The platform pseudo-project intentionally
-    // returns null from useScopedClient and must not be deferred.
-    if (projectId && !isPlatformProject(projectId) && !scopedClient) return;
-
+    // Studio dropped per-project scoping; everything lives at /api/v1.
     setLoading(true);
     setError(null);
 
-    // Scope prefix for system endpoints; discovery already handles its own routes.
-    const scopePrefix = (projectId && !isPlatformProject(projectId)) ? `/api/v1/projects/${projectId}` : '/api/v1';
+    const scopePrefix = '/api/v1';
     const discoveryUrl = `${scopePrefix}/discovery`;
     const systemEndpoints: EndpointDef[] = [
       { method: 'GET', path: discoveryUrl, desc: 'API Discovery', group: 'System' },

@@ -3,59 +3,56 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { useSession } from '@/hooks/useSession';
-import { useProjects } from '@/hooks/useProjects';
-import { config } from '@/lib/config';
-import { PLATFORM_PROJECT_ID } from '@/lib/platform-project';
+import { usePackages } from '@/hooks/usePackages';
 
-function IndexRedirect() {
+/**
+ * Landing route. Studio assumes a signed-in user and at least one
+ * installed package. We redirect to the first package's workspace so the
+ * sidebar and breadcrumbs land on a known state. If no packages are
+ * installed, we stay on this page and tell the user to install one.
+ */
+function IndexLanding() {
   const navigate = useNavigate();
-  const { user, session, loading: sessionLoading } = useSession();
-  const { projects, loading: projectsLoading } = useProjects();
+  const { user, loading: sessionLoading } = useSession();
+  const { packages, loading: packagesLoading } = usePackages();
 
   useEffect(() => {
-    // Single-project (local dev) mode: there is no org/project picker and
-    // no per-project control plane; route straight to the platform metadata
-    // view, which renders the unified registry of every loaded package.
-    if (config.singleProject) {
+    if (sessionLoading || !user) return;
+    if (packagesLoading) return;
+    const first = packages[0];
+    if (first?.manifest?.id) {
       navigate({
-        to: '/projects/$projectId',
-        params: { projectId: PLATFORM_PROJECT_ID },
+        to: '/$package',
+        params: { package: first.manifest.id },
         replace: true,
       });
-      return;
     }
+  }, [user, sessionLoading, packages, packagesLoading, navigate]);
 
-    if (sessionLoading || !user) return; // RequireAuth sends to /login
+  if (sessionLoading || packagesLoading) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
+      </div>
+    );
+  }
 
-    if (!session?.activeOrganizationId) {
-      navigate({ to: '/organizations' });
-      return;
-    }
-    if (projectsLoading) return;
+  if (!packages.length) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-background p-8">
+        <div className="max-w-md space-y-3 text-center">
+          <h1 className="text-lg font-semibold">No packages installed</h1>
+          <p className="text-sm text-muted-foreground">
+            Studio browses metadata from packages installed on the connected
+            backend. Install a package (for example an app or a built-in
+            module) and refresh this page.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-    const lastProjectId = localStorage.getItem('objectstack.lastProjectId');
-    const targetProject =
-      (lastProjectId && projects.find((p) => p.id === lastProjectId)) ||
-      projects.find((p) => p.is_default) ||
-      projects[0];
-
-    if (targetProject) {
-      navigate({
-        to: '/projects/$projectId',
-        params: { projectId: targetProject.id },
-      });
-    } else {
-      navigate({ to: '/projects' });
-    }
-  }, [user, session, sessionLoading, projects, projectsLoading, navigate]);
-
-  return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
-    </div>
-  );
+  return null;
 }
 
-export const Route = createFileRoute('/')({
-  component: IndexRedirect,
-});
+export const Route = createFileRoute('/')({ component: IndexLanding });

@@ -1,30 +1,48 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 /**
- * Legacy `/$package` layout — redirects to the project-scoped equivalent.
+ * /$package — package workspace.
  *
- * Package browsing is now per-project: `/projects/:projectId/:package/*`.
- * If the user's last-used project is known (localStorage), we redirect
- * directly there. Otherwise we send them to the project selection page.
+ * Renders the metadata sidebar (kept in sync with the URL's $package
+ * segment via {@link usePackages}) and the `<Outlet />` for child routes:
+ *   - `/$package`                       → package overview
+ *   - `/$package/metadata/$type/$name`  → metadata viewer (PluginHost)
+ *   - `/$package/objects/$name`         → object viewer (PluginHost)
  */
 
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute, Outlet, useParams } from '@tanstack/react-router';
+import { AppSidebar } from '@/components/app-sidebar';
+import { usePackages } from '@/hooks/usePackages';
+import { useNavigate } from '@tanstack/react-router';
+import { useCallback } from 'react';
+import type { InstalledPackage } from '@objectstack/spec/kernel';
 
-export const Route = createFileRoute('/$package')({
-  beforeLoad: ({ params }) => {
-    const lastProjectId =
-      typeof localStorage !== 'undefined'
-        ? localStorage.getItem('objectstack.lastProjectId')
-        : null;
+function PackageLayoutComponent() {
+  const { package: packageId } = useParams({ from: '/$package' });
+  const navigate = useNavigate();
+  const { packages, selectedPackage } = usePackages(packageId);
 
-    if (lastProjectId) {
-      throw redirect({
-        to: '/projects/$projectId/$package',
-        params: { projectId: lastProjectId, package: params.package },
-        replace: true,
-      });
-    }
-    throw redirect({ to: '/projects', replace: true });
-  },
-  component: () => null,
-});
+  const handleSelectPackage = useCallback(
+    (pkg: InstalledPackage) => {
+      const nextId = pkg.manifest?.id;
+      if (!nextId) return;
+      navigate({ to: '/$package', params: { package: nextId } });
+    },
+    [navigate],
+  );
+
+  return (
+    <>
+      <AppSidebar
+        packages={packages}
+        selectedPackage={selectedPackage}
+        onSelectPackage={handleSelectPackage}
+      />
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <Outlet />
+      </main>
+    </>
+  );
+}
+
+export const Route = createFileRoute('/$package')({ component: PackageLayoutComponent });

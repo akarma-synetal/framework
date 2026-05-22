@@ -1,0 +1,457 @@
+// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+
+/**
+ * I18n Extractor
+ *
+ * Companion to `i18n-coverage.ts`. Where coverage *detects* missing keys,
+ * extract *scaffolds* the bundle: it walks a normalized stack config and
+ * produces ready-to-edit `TranslationData` skeletons for every requested
+ * locale, pre-populated with the source labels from the schema for the
+ * default locale.
+ *
+ * Walk surface (kept superset-aligned with the coverage detector plus the
+ * known coverage gap of object-nested `listViews` / inline `actions`):
+ *
+ *   objects.<name>.label
+ *   objects.<name>.pluralLabel
+ *   objects.<name>.description
+ *   objects.<name>.fields.<field>.label
+ *   objects.<name>.fields.<field>.help
+ *   objects.<name>.fields.<field>.placeholder
+ *   objects.<name>.fields.<field>.options.<value>
+ *   objects.<name>._views.<view>.label
+ *   objects.<name>._views.<view>.description
+ *   objects.<name>._actions.<action>.label
+ *   objects.<name>._actions.<action>.confirmText
+ *   objects.<name>._actions.<action>.successMessage
+ *   globalActions.<action>.label / .confirmText / .successMessage
+ *   apps.<app>.label / .description
+ *   apps.<app>.navigation.<id>.label
+ *   dashboards.<dash>.label / .description
+ *   dashboards.<dash>.widgets.<w>.title / .description
+ *
+ * Pure: no filesystem or network. Safe to call from the CLI, IDE tooling
+ * and unit tests.
+ */
+
+import type { TranslationBundle, TranslationData } from '@objectstack/spec/system';
+
+// ─── Public types ──────────────────────────────────────────────────────
+
+/** A single translation entry — path + source value carried from the schema. */
+export interface ExpectedEntry {
+  /** Lookup path expressed as an array of segments. */
+  path: string[];
+  /** Source-of-truth string (typically the English literal on the schema). */
+  sourceValue: string;
+  /** What kind of metadata this entry was harvested from. */
+  source:
+    | 'object'
+    | 'field'
+    | 'option'
+    | 'view'
+    | 'action'
+    | 'globalAction'
+    | 'app'
+    | 'navigation'
+    | 'dashboard'
+    | 'widget';
+  /** Object name when applicable (for `--filter` matching). */
+  objectName?: string;
+  /** App name when applicable (for `--filter` matching). */
+  appName?: string;
+}
+
+export type FillStrategy = 'empty' | 'default' | 'todo';
+
+export interface ExtractOptions {
+  /** Default locale (filled with source values). Defaults to `'en'`. */
+  defaultLocale?: string;
+  /** Locales to emit. Defaults to `[defaultLocale]`. */
+  locales?: string[];
+  /**
+   * How to populate values for non-default locales:
+   *  - `'empty'`  → empty string (default)
+   *  - `'default'` → copy source value verbatim
+   *  - `'todo'`   → source value with a `[TODO] ` prefix
+   */
+  fill?: FillStrategy;
+  /**
+   * Regex filter applied against `objectName` / `appName` / `dashboard` / view
+   * / action identifiers. When provided, only matching entries are emitted.
+   */
+  filter?: RegExp;
+  /**
+   * When true, entries that already exist in any of the stack's
+   * `translations` bundles for a given locale are *omitted* for that locale.
+   * This makes extract idempotent — re-running only fills the gaps.
+   */
+  mergeExisting?: boolean;
+}
+
+export interface ExtractResult {
+  /** Locale → TranslationData skeleton (only the entries we emitted). */
+  bundles: Record<string, TranslationData>;
+  /** Locale → number of keys emitted. */
+  counts: Record<string, number>;
+  /** Total expected entries before per-locale merge filtering. */
+  totalExpected: number;
+}
+
+// ─── Walk helpers ──────────────────────────────────────────────────────
+
+function viewObjectName(view: any): string | undefined {
+  return view?.objectName ?? view?.object ?? view?.data?.object;
+}
+
+function pushEntry(
+  out: ExpectedEntry[],
+  path: string[],
+  sourceValue: string | undefined,
+  source: ExpectedEntry['source'],
+  extra?: Pick<ExpectedEntry, 'objectName' | 'appName'>,
+): void {
+  if (typeof sourceValue !== 'string') return;
+  out.push({ path, sourceValue, source, ...extra });
+}
+
+/** Collect every translatable entry from a normalized stack config. */
+export function collectExpectedEntries(config: any): ExpectedEntry[] {
+  const out: ExpectedEntry[] = [];
+
+  // ── Objects ───────────────────────────────────────────────────────
+  const objects: any[] = Array.isArray(config?.objects) ? config.objects : [];
+  for (const obj of objects) {
+    if (!obj?.name) continue;
+    const objectName = obj.name as string;
+
+    pushEntry(out, ['objects', objectName, 'label'], obj.label ?? objectName, 'object', { objectName });
+    if (obj.pluralLabel) {
+      pushEntry(out, ['objects', objectName, 'pluralLabel'], obj.pluralLabel, 'object', { objectName });
+    }
+    if (obj.description) {
+      pushEntry(out, ['objects', objectName, 'description'], obj.description, 'object', { objectName });
+    }
+
+    // Fields (always a record on normalized schemas)
+    if (obj.fields && typeof obj.fields === 'object') {
+      for (const [fieldName, raw] of Object.entries<any>(obj.fields)) {
+        const field = raw ?? {};
+        pushEntry(out, ['objects', objectName, 'fields', fieldName, 'label'], field.label ?? fieldName, 'field', { objectName });
+
+        const help = field.help ?? field.description;
+        if (help) {
+          pushEntry(out, ['objects', objectName, 'fields', fieldName, 'help'], help, 'field', { objectName });
+        }
+        if (field.placeholder) {
+          pushEntry(out, ['objects', objectName, 'fields', fieldName, 'placeholder'], field.placeholder, 'field', { objectName });
+        }
+
+        // Options — accept either `{value, label}[]` arrays or a record map.
+        const opts = field.options;
+        if (Array.isArray(opts)) {
+          for (const opt of opts) {
+            if (opt && typeof opt === 'object' && 'value' in opt) {
+              pushEntry(
+                out,
+                ['objects', objectName, 'fields', fieldName, 'options', String(opt.value)],
+                String(opt.label ?? opt.value),
+                'option',
+                { objectName },
+              );
+            } else if (typeof opt === 'string') {
+              pushEntry(out, ['objects', objectName, 'fields', fieldName, 'options', opt], opt, 'option', { objectName });
+            }
+          }
+        } else if (opts && typeof opts === 'object') {
+          for (const [value, label] of Object.entries<any>(opts)) {
+            pushEntry(
+              out,
+              ['objects', objectName, 'fields', fieldName, 'options', value],
+              typeof label === 'string' ? label : String(value),
+              'option',
+              { objectName },
+            );
+          }
+        }
+      }
+    }
+
+    // Object-nested listViews (object-protocol view bundle).
+    if (obj.listViews && typeof obj.listViews === 'object') {
+      for (const [viewName, raw] of Object.entries<any>(obj.listViews)) {
+        const view = raw ?? {};
+        pushEntry(out, ['objects', objectName, '_views', viewName, 'label'], view.label ?? viewName, 'view', { objectName });
+        if (view.description) {
+          pushEntry(out, ['objects', objectName, '_views', viewName, 'description'], view.description, 'view', { objectName });
+        }
+      }
+    }
+
+    // Inline object-level actions (some schemas declare them on the object).
+    if (Array.isArray(obj.actions)) {
+      for (const action of obj.actions) {
+        if (!action?.name) continue;
+        const aname = action.name as string;
+        pushEntry(out, ['objects', objectName, '_actions', aname, 'label'], action.label ?? aname, 'action', { objectName });
+        if (action.confirmText) {
+          pushEntry(out, ['objects', objectName, '_actions', aname, 'confirmText'], action.confirmText, 'action', { objectName });
+        }
+        if (action.successMessage) {
+          pushEntry(out, ['objects', objectName, '_actions', aname, 'successMessage'], action.successMessage, 'action', { objectName });
+        }
+      }
+    }
+  }
+
+  // ── Top-level views (legacy / cross-object) ──────────────────────
+  const views: any[] = Array.isArray(config?.views) ? config.views : [];
+  for (const view of views) {
+    if (!view?.name) continue;
+    const objectName = viewObjectName(view);
+    if (!objectName) continue;
+    pushEntry(out, ['objects', objectName, '_views', view.name, 'label'], view.label ?? view.name, 'view', { objectName });
+    if (view.description) {
+      pushEntry(out, ['objects', objectName, '_views', view.name, 'description'], view.description, 'view', { objectName });
+    }
+  }
+
+  // ── Top-level actions ────────────────────────────────────────────
+  const actions: any[] = Array.isArray(config?.actions) ? config.actions : [];
+  for (const action of actions) {
+    if (!action?.name) continue;
+    const objectName = action.objectName ?? action.object;
+    const root = objectName
+      ? ['objects', objectName as string, '_actions', action.name]
+      : ['globalActions', action.name];
+    const kind: ExpectedEntry['source'] = objectName ? 'action' : 'globalAction';
+    pushEntry(out, [...root, 'label'], action.label ?? action.name, kind, { objectName });
+    if (action.confirmText) {
+      pushEntry(out, [...root, 'confirmText'], action.confirmText, kind, { objectName });
+    }
+    if (action.successMessage) {
+      pushEntry(out, [...root, 'successMessage'], action.successMessage, kind, { objectName });
+    }
+  }
+
+  // ── Apps + navigation ────────────────────────────────────────────
+  const apps: any[] = Array.isArray(config?.apps) ? config.apps : [];
+  for (const app of apps) {
+    if (!app?.name) continue;
+    const appName = app.name as string;
+    if (app.label) pushEntry(out, ['apps', appName, 'label'], app.label, 'app', { appName });
+    if (app.description) {
+      pushEntry(out, ['apps', appName, 'description'], app.description, 'app', { appName });
+    }
+    const nav: any[] = Array.isArray(app.navigation) ? app.navigation : [];
+    walkNavigation(nav, appName, out);
+  }
+
+  // ── Dashboards + widgets ─────────────────────────────────────────
+  const dashboards: any[] = Array.isArray(config?.dashboards) ? config.dashboards : [];
+  for (const dash of dashboards) {
+    if (!dash?.name) continue;
+    const name = dash.name as string;
+    if (dash.label) pushEntry(out, ['dashboards', name, 'label'], dash.label, 'dashboard');
+    if (dash.description) {
+      pushEntry(out, ['dashboards', name, 'description'], dash.description, 'dashboard');
+    }
+    const widgets: any[] = Array.isArray(dash.widgets) ? dash.widgets : [];
+    for (const w of widgets) {
+      if (!w?.id && !w?.name) continue;
+      const wid = (w.id ?? w.name) as string;
+      if (w.title) pushEntry(out, ['dashboards', name, 'widgets', wid, 'title'], w.title, 'widget');
+      if (w.description) {
+        pushEntry(out, ['dashboards', name, 'widgets', wid, 'description'], w.description, 'widget');
+      }
+    }
+  }
+
+  return out;
+}
+
+function walkNavigation(nav: any[], appName: string, out: ExpectedEntry[]): void {
+  for (const item of nav) {
+    if (!item) continue;
+    const id = item.id ?? item.name;
+    if (id && item.label) {
+      pushEntry(out, ['apps', appName, 'navigation', id, 'label'], item.label, 'navigation', { appName });
+    }
+    if (Array.isArray(item.items)) walkNavigation(item.items, appName, out);
+    if (Array.isArray(item.children)) walkNavigation(item.children, appName, out);
+  }
+}
+
+// ─── Filter + bundle assembly ──────────────────────────────────────────
+
+function passesFilter(entry: ExpectedEntry, filter?: RegExp): boolean {
+  if (!filter) return true;
+  if (entry.objectName && filter.test(entry.objectName)) return true;
+  if (entry.appName && filter.test(entry.appName)) return true;
+  // Allow matching against the joined path so users can target e.g. ^dashboards\.system_
+  return filter.test(entry.path.join('.'));
+}
+
+function setDeep(data: TranslationData, path: string[], value: string): void {
+  let cur: any = data;
+  for (let i = 0; i < path.length - 1; i++) {
+    const seg = path[i];
+    if (typeof cur[seg] !== 'object' || cur[seg] === null) cur[seg] = {};
+    cur = cur[seg];
+  }
+  cur[path[path.length - 1]] = value;
+}
+
+function lookupDeep(data: TranslationData | undefined, path: string[]): string | undefined {
+  let cur: any = data;
+  for (const seg of path) {
+    if (!cur || typeof cur !== 'object') return undefined;
+    cur = cur[seg];
+  }
+  return typeof cur === 'string' && cur.length > 0 ? cur : undefined;
+}
+
+function mergeBundles(bundles: TranslationBundle[]): Record<string, TranslationData> {
+  const out: Record<string, TranslationData> = {};
+  for (const bundle of bundles) {
+    if (!bundle || typeof bundle !== 'object') continue;
+    for (const [locale, data] of Object.entries(bundle)) {
+      if (!data || typeof data !== 'object') continue;
+      out[locale] = deepMerge(out[locale] ?? {}, data as TranslationData);
+    }
+  }
+  return out;
+}
+
+function deepMerge<T extends Record<string, any>>(target: T, source: T): T {
+  for (const [k, v] of Object.entries(source)) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      target[k as keyof T] = deepMerge(((target as any)[k] ?? {}) as any, v as any);
+    } else {
+      (target as any)[k] = v;
+    }
+  }
+  return target;
+}
+
+/**
+ * Build per-locale skeleton bundles from a normalized stack config.
+ */
+export function extractTranslations(config: any, opts: ExtractOptions = {}): ExtractResult {
+  const defaultLocale = opts.defaultLocale ?? 'en';
+  const locales = opts.locales && opts.locales.length > 0
+    ? Array.from(new Set([defaultLocale, ...opts.locales]))
+    : [defaultLocale];
+  const fill: FillStrategy = opts.fill ?? 'empty';
+
+  const allEntries = collectExpectedEntries(config);
+  const entries = allEntries.filter((e) => passesFilter(e, opts.filter));
+
+  const existingBundles: TranslationBundle[] = Array.isArray(config?.translations) ? config.translations : [];
+  const existing = mergeBundles(existingBundles);
+
+  const bundles: Record<string, TranslationData> = {};
+  const counts: Record<string, number> = {};
+
+  for (const locale of locales) {
+    const data: TranslationData = {};
+    let count = 0;
+    for (const entry of entries) {
+      // Skip keys that already have a non-empty translation for this locale.
+      if (opts.mergeExisting !== false) {
+        const existingValue = lookupDeep(existing[locale], entry.path);
+        if (existingValue !== undefined) continue;
+      }
+      let value: string;
+      if (locale === defaultLocale) {
+        value = entry.sourceValue;
+      } else if (fill === 'default') {
+        value = entry.sourceValue;
+      } else if (fill === 'todo') {
+        value = `[TODO] ${entry.sourceValue}`;
+      } else {
+        value = '';
+      }
+      setDeep(data, entry.path, value);
+      count += 1;
+    }
+    bundles[locale] = data;
+    counts[locale] = count;
+  }
+
+  return { bundles, counts, totalExpected: entries.length };
+}
+
+// ─── Serialization ─────────────────────────────────────────────────────
+
+/**
+ * Render a TranslationData skeleton as a TypeScript module body.
+ *
+ * The module exports a single named const (`<exportName>`) typed as
+ * `TranslationData['objects']` (or the full `TranslationData` shape when
+ * the skeleton contains non-objects sections).
+ */
+export function renderTranslationModule(
+  data: TranslationData,
+  options: {
+    locale: string;
+    exportName?: string;
+    /** When true, emit only the `objects` sub-tree (typed accordingly). */
+    objectsOnly?: boolean;
+    /** Header comment lines. */
+    header?: string[];
+  },
+): string {
+  const exportName = options.exportName ?? `${camelize(options.locale)}Objects`;
+  const objectsOnly = options.objectsOnly ?? true;
+  const payload = objectsOnly ? (data.objects ?? {}) : data;
+  const typeSig = objectsOnly
+    ? "NonNullable<TranslationData['objects']>"
+    : 'TranslationData';
+  const header = options.header ?? [
+    `Auto-generated by 'os i18n extract' for locale '${options.locale}'.`,
+    'Edit translations in place; re-run extract (with --merge) to fill new gaps.',
+    'Do not hand-edit the structure — only the leaf string values.',
+  ];
+
+  const lines: string[] = [];
+  lines.push('// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.');
+  lines.push('');
+  lines.push('/**');
+  for (const h of header) lines.push(` * ${h}`);
+  lines.push(' */');
+  lines.push('');
+  lines.push("import type { TranslationData } from '@objectstack/spec/system';");
+  lines.push('');
+  lines.push(`export const ${exportName}: ${typeSig} = ${stringifyTs(payload, 0)};`);
+  lines.push('');
+  return lines.join('\n');
+}
+
+function camelize(locale: string): string {
+  // 'zh-CN' → 'zhCN', 'ja-JP' → 'jaJP', 'es-ES' → 'esES'
+  return locale.replace(/-(.)/g, (_m, c) => c.toUpperCase());
+}
+
+function stringifyTs(value: unknown, indent: number): string {
+  const pad = '  '.repeat(indent);
+  const pad2 = '  '.repeat(indent + 1);
+  if (value === null) return 'null';
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]';
+    return '[\n' + value.map((v) => pad2 + stringifyTs(v, indent + 1)).join(',\n') + `\n${pad}]`;
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return '{}';
+    return '{\n' + entries.map(([k, v]) => `${pad2}${formatKey(k)}: ${stringifyTs(v, indent + 1)}`).join(',\n') + `\n${pad}}`;
+  }
+  return JSON.stringify(value);
+}
+
+const IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+function formatKey(key: string): string {
+  return IDENT_RE.test(key) ? key : JSON.stringify(key);
+}

@@ -1,11 +1,13 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import type { TranslationData } from '@objectstack/spec/system';
+import { esESObjects } from './es-ES.objects.generated.js';
 
 /**
  * Español (es-ES) — Setup App Translations
  */
 export const esES: TranslationData = {
+  objects: esESObjects,
   apps: {
     setup: {
       label: 'Configuración',

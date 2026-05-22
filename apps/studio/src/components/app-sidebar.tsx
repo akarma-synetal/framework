@@ -31,13 +31,12 @@ import {
   PanelLeft,
   Settings,
   Wrench,
-  Sparkles,
+  FormInput,
   type LucideIcon,
 } from "lucide-react"
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { useNavigate, useParams, useLocation } from '@tanstack/react-router';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import { useClient, useMetadataSubscriptionCallback } from '@objectstack/client-react';
-import { useScopedClient } from '@/hooks/useObjectStackClient';
 import type { InstalledPackage } from '@objectstack/spec/kernel';
 
 import {
@@ -56,7 +55,6 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
 import {
@@ -150,35 +148,19 @@ function isSystemObject(item: any): boolean {
   return name.startsWith(SYSTEM_FQN_PREFIX) || name.startsWith(SYSTEM_LEGACY_PREFIX);
 }
 
-/** Icon mapping for package types */
-const PKG_TYPE_ICONS: Record<string, LucideIcon> = {
-  app: AppWindow, plugin: Layers, driver: Database, server: Globe,
-  ui: Sparkles, theme: Sparkles, agent: Bot, module: Package,
-  objectql: Database, adapter: Zap,
-};
-
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   packages: InstalledPackage[];
   selectedPackage: InstalledPackage | null;
   onSelectPackage: (pkg: InstalledPackage) => void;
-  /** When set, all package-content URLs are rooted at /projects/:projectId/:pkg/* */
-  projectId?: string;
 }
 
 export function AppSidebar({
-  packages, selectedPackage, onSelectPackage, projectId,
+  packages, selectedPackage, onSelectPackage,
   ...props
 }: AppSidebarProps) {
-  const unscopedClient = useClient();
+  const client = useClient();
   const navigate = useNavigate();
   const params = useParams({ strict: false }) as any;
-  const location = useLocation();
-
-  // Prefer a project-scoped client when a projectId is present in the URL
-  // (e.g. under /projects/$projectId/...). Falls back to the unscoped client
-  // during login / organization pages that have no project context yet.
-  const scopedClient = useScopedClient(projectId ?? params.projectId);
-  const client = scopedClient ?? unscopedClient;
 
   // Extract current selection from URL params
   const selectedObject = params.name && params.package && !params.type ? params.name : null;
@@ -327,15 +309,25 @@ export function AppSidebar({
                       );
                       return;
                     }
-                    if (projectId) {
-                      navigate({ to: `/projects/${projectId}/${pkgId}/` });
-                    } else {
-                      navigate({ to: `/${pkgId}` });
-                    }
+                    navigate({ to: `/${pkgId}` });
                   }}
                 >
                   <LayoutDashboard className="h-4 w-4" />
                   <span>Overview</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={typeof window !== 'undefined' && window.location.pathname.endsWith('/public-forms')}
+                  onClick={() => {
+                    const pkgId =
+                      selectedPackage?.manifest?.id ?? packages[0]?.manifest?.id;
+                    if (!pkgId) return;
+                    navigate({ to: '/$package/public-forms', params: { package: pkgId } });
+                  }}
+                >
+                  <FormInput className="h-4 w-4" />
+                  <span>Public forms</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -439,12 +431,8 @@ export function AppSidebar({
                                       );
                                     }
                                   : isObjectType
-                                  ? () => projectId
-                                      ? navigate({ to: `/projects/${projectId}/${packagePath}/objects/${itemName}` })
-                                      : navigate({ to: `/${packagePath}/objects/${itemName}` })
-                                  : () => projectId
-                                      ? navigate({ to: `/projects/${projectId}/${packagePath}/metadata/${type}/${itemName}` })
-                                      : navigate({ to: `/${packagePath}/metadata/${type}/${itemName}` });
+                                  ? () => navigate({ to: `/${packagePath}/objects/${itemName}` })
+                                  : () => navigate({ to: `/${packagePath}/metadata/${type}/${itemName}` });
 
                                 return (
                                   <SidebarMenuSubItem key={itemName}>
@@ -543,42 +531,6 @@ export function AppSidebar({
                   </SidebarMenuItem>
                 </Collapsible>
               )}
-
-              {/* Static system items */}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip="API Console"
-                  isActive={location.pathname.endsWith('/api-console')}
-                  onClick={() => {
-                    const projectId = params.projectId as string | undefined;
-                    if (projectId) {
-                      navigate({ to: '/projects/$projectId/api-console', params: { projectId } });
-                    } else {
-                      navigate({ to: '/api-console' });
-                    }
-                  }}
-                >
-                  <Globe className="h-4 w-4" />
-                  <span>API Console</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip="Packages"
-                  isActive={location.pathname.endsWith('/packages')}
-                  onClick={() => {
-                    const projectId = params.projectId as string | undefined;
-                    if (projectId) {
-                      navigate({ to: '/projects/$projectId/packages', params: { projectId } });
-                    } else {
-                      navigate({ to: '/projects' });
-                    }
-                  }}
-                >
-                  <Package className="h-4 w-4" />
-                  <span>Packages</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

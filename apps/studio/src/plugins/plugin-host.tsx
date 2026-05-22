@@ -127,7 +127,6 @@ export function PluginHost({ metadataType, metadataName, data, packageId }: Plug
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
                   {activeViewer.label}
-                  {/* @ts-expect-error React 19 type mismatch with lucide-react */}
                   <ChevronDown className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>

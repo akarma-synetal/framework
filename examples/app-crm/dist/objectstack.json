@@ -20108,7 +20108,7 @@
           "filter": {
             "is_active": true,
             "last_activity_date": {
-              "$lt": "2026-05-07"
+              "$lt": "2026-05-08"
             }
           }
         },
@@ -20134,7 +20134,7 @@
           "filter": {
             "is_active": true,
             "last_activity_date": {
-              "$lt": "2026-04-21"
+              "$lt": "2026-04-22"
             }
           }
         },
@@ -20165,7 +20165,7 @@
           "filter": {
             "stage": "closed_lost",
             "close_date": {
-              "$gte": "2026-04-21"
+              "$gte": "2026-04-22"
             }
           }
         }

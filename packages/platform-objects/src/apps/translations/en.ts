@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import type { TranslationData } from '@objectstack/spec/system';
+import { enObjects } from './en.objects.generated.js';
 
 /**
  * English (en) — Setup App Translations
@@ -20,6 +21,7 @@ import type { TranslationData } from '@objectstack/spec/system';
  * sys_* object schemas themselves and translated separately.
  */
 export const en: TranslationData = {
+  objects: enObjects,
   apps: {
     setup: {
       label: 'Setup',

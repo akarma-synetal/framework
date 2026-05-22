@@ -1,11 +1,13 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import type { TranslationData } from '@objectstack/spec/system';
+import { zhCNObjects } from './zh-CN.objects.generated.js';
 
 /**
  * 简体中文 (zh-CN) — Setup App Translations
  */
 export const zhCN: TranslationData = {
+  objects: zhCNObjects,
   apps: {
     setup: {
       label: '系统设置',

@@ -5,8 +5,7 @@
  * current user and exposes logout + quick links to org/env management.
  */
 
-import { useNavigate } from '@tanstack/react-router';
-import { LogOut, Settings, User as UserIcon, Building2 } from 'lucide-react';
+import { LogOut, User as UserIcon } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +17,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/hooks/useSession';
-import { config } from '@/lib/config';
 import { gotoAccount, gotoAccountLogin } from '@/lib/auth-redirect';
 
 function initials(name?: string, email?: string): string {
@@ -29,7 +27,6 @@ function initials(name?: string, email?: string): string {
 }
 
 export function UserMenu() {
-  const navigate = useNavigate();
   const { user, loading, logout } = useSession();
 
   if (loading && !user) {
@@ -85,31 +82,15 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {!config.singleProject && (
-          <>
-            <DropdownMenuItem onSelect={() => gotoAccount('/organizations')}>
-              <Building2 className="mr-2 h-3.5 w-3.5" />
-              Organizations
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate({ to: '/projects' })}>
-              <Settings className="mr-2 h-3.5 w-3.5" />
-              Projects
-            </DropdownMenuItem>
-          </>
-        )}
         <DropdownMenuItem onSelect={() => gotoAccount('/account')}>
           <UserIcon className="mr-2 h-3.5 w-3.5" />
           Account settings
         </DropdownMenuItem>
-        {!config.singleProject && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={handleLogout}>
-              <LogOut className="mr-2 h-3.5 w-3.5" />
-              Sign out
-            </DropdownMenuItem>
-          </>
-        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={handleLogout}>
+          <LogOut className="mr-2 h-3.5 w-3.5" />
+          Sign out
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

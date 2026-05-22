@@ -1,11 +1,13 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import type { TranslationData } from '@objectstack/spec/system';
+import { jaJPObjects } from './ja-JP.objects.generated.js';
 
 /**
  * 日本語 (ja-JP) — Setup App Translations
  */
 export const jaJP: TranslationData = {
+  objects: jaJPObjects,
   apps: {
     setup: {
       label: 'セットアップ',
