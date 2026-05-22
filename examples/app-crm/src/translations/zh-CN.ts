@@ -212,7 +212,7 @@ export const zhCN: TranslationData = {
         status: {
           label: '状态',
           options: {
-            draft: '草稿', presented: '已提交', accepted: '已接受',
+            draft: '草稿', in_review: '审核中', presented: '已提交', accepted: '已接受',
             rejected: '已拒绝', expired: '已过期',
           },
         },
@@ -250,7 +250,8 @@ export const zhCN: TranslationData = {
         status: {
           label: '状态',
           options: {
-            draft: '草稿', active: '生效中', expired: '已过期', terminated: '已终止',
+            draft: '草稿', in_approval: '审批中', activated: '已激活',
+            expired: '已过期', terminated: '已终止',
           },
         },
         start_date: { label: '开始日期' },
@@ -293,8 +294,9 @@ export const zhCN: TranslationData = {
         status: {
           label: '状态',
           options: {
-            new: '新建', in_progress: '处理中', waiting: '等待中',
-            resolved: '已解决', closed: '已关闭',
+            new: '新建', in_progress: '处理中',
+            waiting_customer: '等待客户回复', waiting_support: '等待支持回复',
+            escalated: '已升级', resolved: '已解决', closed: '已关闭',
           },
         },
         priority: {
