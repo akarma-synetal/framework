@@ -12,3 +12,4 @@ export * from './canonicalize.js';
 export * from './repository.js';
 export * from './in-memory-repository.js';
 export * from './cache.js';
+export * from './layered-repository.js';
