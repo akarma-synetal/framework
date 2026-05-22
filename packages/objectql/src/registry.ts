@@ -869,6 +869,37 @@ export class SchemaRegistry {
   // ==========================================
 
   /**
+   * Invalidate the merged-schema cache for a single FQN (or short name).
+   *
+   * Call this from event-driven consumers (ADR-0008 M0 PR-7) when an
+   * upstream metadata change makes the cached merged definition stale.
+   * The contributor list is preserved — only the cached merge result is
+   * dropped, so the next `resolveObject(fqn)` recomputes from scratch.
+   *
+   * Accepts either an FQN (`acme__contact`) or a bare short name
+   * (`contact`); for the latter, all entries whose suffix matches the
+   * name are invalidated.
+   */
+  invalidate(fqnOrName: string): void {
+    if (this.mergedObjectCache.has(fqnOrName)) {
+      this.mergedObjectCache.delete(fqnOrName);
+      return;
+    }
+    // Short-name path: drop any cached merge whose FQN ends with `__<name>` or equals `<name>`.
+    const suffix = `__${fqnOrName}`;
+    for (const fqn of Array.from(this.mergedObjectCache.keys())) {
+      if (fqn === fqnOrName || fqn.endsWith(suffix)) {
+        this.mergedObjectCache.delete(fqn);
+      }
+    }
+  }
+
+  /** Drop every entry from the merged-schema cache. */
+  invalidateAll(): void {
+    this.mergedObjectCache.clear();
+  }
+
+  /**
    * Clear all registry state. Use only for testing.
    */
   reset(): void {

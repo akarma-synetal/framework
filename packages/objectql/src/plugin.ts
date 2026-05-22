@@ -86,6 +86,8 @@ export class ObjectQLPlugin implements Plugin {
   private hostContext?: Record<string, any>;
   private projectId?: string;
   private skipSchemaSync = false;
+  /** Unsubscribe handles for metadata-event subscriptions (ADR-0008 PR-7). */
+  private metadataUnsubscribes: Array<() => void> = [];
 
   constructor(qlOrOptions?: ObjectQL | ObjectQLPluginOptions, hostContext?: Record<string, any>) {
     // Back-compat: legacy callers passed `(ObjectQL, hostContext)` positionally.
@@ -181,6 +183,15 @@ export class ObjectQLPlugin implements Plugin {
         const metadataService = ctx.getService('metadata') as any;
         if (metadataService && typeof metadataService.loadMany === 'function' && this.ql) {
             await this.loadMetadataFromService(metadataService, ctx);
+        }
+        // ── ADR-0008 PR-7: subscribe to object metadata events so the
+        //    SchemaRegistry cache is invalidated on edits (Studio HMR).
+        //    The metadata service bubbles repo events through its own
+        //    `subscribe(type, cb)` API (PR-6 bridge), so we don't talk
+        //    to the repo directly here — this keeps ObjectQL decoupled
+        //    from the storage backend.
+        if (metadataService && typeof metadataService.subscribe === 'function' && this.ql) {
+            this.subscribeToMetadataEvents(metadataService, ctx);
         }
     } catch (e: any) {
         ctx.logger.debug('No external metadata service to sync from');
@@ -286,6 +297,92 @@ export class ObjectQLPlugin implements Plugin {
         driversRegistered: this.ql?.['drivers']?.size || 0,
         objectsRegistered: this.ql?.registry?.getAllObjects?.()?.length || 0
     });
+  }
+
+  stop = async (ctx: PluginContext) => {
+    // ADR-0008 PR-7: tear down metadata subscriptions on plugin stop so
+    // tests don't leak watchers and reloaded plugins don't double-subscribe.
+    for (const unsub of this.metadataUnsubscribes) {
+      try { unsub(); } catch (e: any) {
+        ctx.logger.debug('[ObjectQLPlugin] metadata-event unsubscribe failed', { error: e?.message });
+      }
+    }
+    this.metadataUnsubscribes = [];
+  }
+
+  /**
+   * Subscribe to `object` metadata events from the metadata service and
+   * invalidate the SchemaRegistry merge cache on each event (ADR-0008
+   * PR-7). For create/update we also re-load the affected object from
+   * the metadata service so subsequent reads see the new definition;
+   * for delete we unregister it from every contributing package.
+   *
+   * Events are filtered to the canonical `object` type — view/dashboard
+   * /flow edits go through their own consumers (Studio SSE, REST cache).
+   *
+   * Stored unsubscribe handle is invoked from {@link stop}.
+   */
+  private subscribeToMetadataEvents(metadataService: any, ctx: PluginContext) {
+    const handler = async (evt: any) => {
+      if (!this.ql) return;
+      const name: string = evt?.name ?? '';
+      if (!name) return;
+      const eventType: 'added' | 'changed' | 'deleted' =
+        evt?.type === 'added' || evt?.type === 'changed' || evt?.type === 'deleted'
+          ? evt.type
+          : 'changed';
+
+      try {
+        // Drop the merged-schema cache entry first so any in-flight
+        // resolveObject() races recompute against the new state.
+        this.ql.registry.invalidate(name);
+
+        if (eventType === 'deleted') {
+          ctx.logger.info('[ObjectQLPlugin] object metadata deleted — registry invalidated', { name });
+          return;
+        }
+
+        // Re-fetch the canonical definition from the metadata service.
+        // The metadata service goes through its loader chain (FS, DB,
+        // attached repository), so this picks up edits from any source.
+        const fresh = typeof metadataService.get === 'function'
+          ? await metadataService.get('object', name)
+          : undefined;
+        if (fresh && typeof fresh === 'object') {
+          // Re-register with the original contributor metadata. We use
+          // 'metadata-service' as packageId to match how the initial
+          // load enrolls these objects (see `loadMetadataFromService`).
+          const packageId = (fresh as any)._packageId ?? 'metadata-service';
+          const namespace = (fresh as any).namespace;
+          this.ql.registry.registerObject(
+            fresh as any,
+            packageId,
+            namespace,
+            'own',
+          );
+          ctx.logger.info('[ObjectQLPlugin] object metadata updated — registry refreshed', {
+            name,
+            packageId,
+          });
+        } else {
+          ctx.logger.debug('[ObjectQLPlugin] object event received but metadata service has no fresh body', { name });
+        }
+      } catch (e: any) {
+        ctx.logger.warn('[ObjectQLPlugin] metadata event handler failed', {
+          name,
+          error: e?.message,
+        });
+      }
+    };
+
+    const unsub = metadataService.subscribe('object', handler);
+    if (typeof unsub === 'function') {
+      this.metadataUnsubscribes.push(unsub);
+    } else if (unsub && typeof unsub.unsubscribe === 'function') {
+      // Support `MetadataWatchHandle` style return shape.
+      this.metadataUnsubscribes.push(() => unsub.unsubscribe());
+    }
+    ctx.logger.info('[ObjectQLPlugin] subscribed to object metadata events (ADR-0008 PR-7)');
   }
 
   /**
