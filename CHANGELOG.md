@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Studio sidebar: registry-driven Workspaces group
+
+The hardcoded "Public forms" entry that lived inside the Overview block
+has been moved to a dedicated **Workspaces** sidebar group powered by a
+small `STUDIO_WORKSPACES` registry. This separates curated workflow
+lenses (which stitch together several metadata items to answer one
+operational question — "what's publicly exposed?") from the
+auto-generated metadata browser below. New presets are now 1-line
+registry additions instead of bespoke menu items, and the active-state
+check is wired through TanStack `useLocation` instead of
+`window.location`.
+
 ### Removed — Unused Studio dependencies
 
 Dropped 10 packages from `apps/studio` that no source files reference

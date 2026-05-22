@@ -35,7 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { useNavigate, useParams } from '@tanstack/react-router';
+import { useNavigate, useParams, useLocation } from '@tanstack/react-router';
 import { useClient, useMetadataSubscriptionCallback } from '@objectstack/client-react';
 import type { InstalledPackage } from '@objectstack/spec/kernel';
 
@@ -101,6 +101,36 @@ function getTypeLabel(type: string): string {
 function getTypeIcon(type: string): LucideIcon {
   return META_TYPE_HINTS[type]?.icon || Layers;
 }
+
+// ─── Workspaces (curated lenses, hand-picked) ────────────────────────
+//
+// These are surfaced ABOVE the auto-generated metadata browser because
+// they are *workflows*, not metadata types — each one stitches together
+// several metadata items to answer a single operational question
+// ("which forms are publicly exposed?", "what does my Web-to-Lead
+// pipeline look like?", …). New presets land here as 1-line additions.
+interface StudioWorkspace {
+  /** Stable key (used as React key + URL match suffix). */
+  key: string;
+  /** Display label in the sidebar. */
+  label: string;
+  /** Lucide icon. */
+  icon: LucideIcon;
+  /** Path segment under `/$package/`. */
+  path: string;
+  /** Optional short description, shown in tooltip. */
+  hint?: string;
+}
+
+const STUDIO_WORKSPACES: StudioWorkspace[] = [
+  {
+    key: 'public-forms',
+    label: 'Public forms',
+    icon: FormInput,
+    path: 'public-forms',
+    hint: 'Anonymous form views with sharing.allowAnonymous',
+  },
+];
 
 // ─── Protocol groups ─────────────────────────────────────────────────
 interface ProtocolGroup {
@@ -288,6 +318,8 @@ export function AppSidebar({
     return { ...group, visibleTypes, totalItems };
   }).filter(g => g.totalItems > 0);
 
+  const location = useLocation();
+
   // Package switcher state (no longer used in AppSidebar, moved to TopBar)
 
   return (
@@ -299,7 +331,7 @@ export function AppSidebar({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  isActive={!!params.package && !params.name && !params.type}
+                  isActive={!!params.package && !params.name && !params.type && !STUDIO_WORKSPACES.some((w) => location.pathname.endsWith(`/${w.path}`))}
                   onClick={() => {
                     const pkgId =
                       selectedPackage?.manifest?.id ?? packages[0]?.manifest?.id;
@@ -316,23 +348,43 @@ export function AppSidebar({
                   <span>Overview</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={typeof window !== 'undefined' && window.location.pathname.endsWith('/public-forms')}
-                  onClick={() => {
-                    const pkgId =
-                      selectedPackage?.manifest?.id ?? packages[0]?.manifest?.id;
-                    if (!pkgId) return;
-                    navigate({ to: '/$package/public-forms', params: { package: pkgId } });
-                  }}
-                >
-                  <FormInput className="h-4 w-4" />
-                  <span>Public forms</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* ── Workspaces (curated lenses, registry-driven) ── */}
+        {STUDIO_WORKSPACES.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {STUDIO_WORKSPACES.map((ws) => {
+                  const Icon = ws.icon;
+                  const isActive = location.pathname.endsWith(`/${ws.path}`);
+                  return (
+                    <SidebarMenuItem key={ws.key}>
+                      <SidebarMenuButton
+                        tooltip={ws.hint}
+                        isActive={isActive}
+                        onClick={() => {
+                          const pkgId =
+                            selectedPackage?.manifest?.id ?? packages[0]?.manifest?.id;
+                          if (!pkgId) return;
+                          navigate({
+                            to: `/${pkgId}/${ws.path}`,
+                          });
+                        }}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span>{ws.label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* ── Search ── */}
         <div className="px-4 pb-2">
