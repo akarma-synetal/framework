@@ -93,14 +93,17 @@ export const OpportunityDetailPage: Page = {
                       layout: 'auto',
                       sections: [
                         {
+                          name: 'info',
                           label: 'Opportunity Information',
                           fields: ['name', 'account', 'owner', 'type', 'lead_source', 'campaign'],
                         },
                         {
+                          name: 'forecast',
                           label: 'Stage & Forecast',
                           fields: ['stage', 'probability', 'amount', 'expected_revenue', 'close_date', 'forecast_category'],
                         },
                         {
+                          name: 'description',
                           label: 'Description',
                           columns: 1,
                           collapsible: true,

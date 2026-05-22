@@ -1765,6 +1765,23 @@
                 "label": "加入营销活动",
                 "successMessage": "已将线索加入营销活动！"
               }
+            },
+            "_sections": {
+              "info": {
+                "label": "线索信息"
+              },
+              "contact": {
+                "label": "联系方式"
+              },
+              "detail": {
+                "label": "线索详情"
+              },
+              "address": {
+                "label": "地址"
+              },
+              "description": {
+                "label": "描述"
+              }
             }
           },
           "quote": {
@@ -2549,6 +2566,17 @@
               "mass_update_stage": {
                 "label": "更新阶段",
                 "successMessage": "商机阶段已更新！"
+              }
+            },
+            "_sections": {
+              "info": {
+                "label": "商机信息"
+              },
+              "forecast": {
+                "label": "阶段与预测"
+              },
+              "description": {
+                "label": "描述"
               }
             }
           }
@@ -17295,6 +17323,7 @@
                           "layout": "auto",
                           "sections": [
                             {
+                              "name": "info",
                               "label": "Lead Information",
                               "fields": [
                                 "salutation",
@@ -17306,6 +17335,7 @@
                               ]
                             },
                             {
+                              "name": "contact",
                               "label": "Contact",
                               "fields": [
                                 "email",
@@ -17315,6 +17345,7 @@
                               ]
                             },
                             {
+                              "name": "detail",
                               "label": "Lead Detail",
                               "fields": [
                                 "status",
@@ -17326,12 +17357,14 @@
                               ]
                             },
                             {
+                              "name": "address",
                               "label": "Address",
                               "fields": [
                                 "address"
                               ]
                             },
                             {
+                              "name": "description",
                               "label": "Description",
                               "fields": [
                                 "description"
@@ -17730,6 +17763,7 @@
                           "layout": "auto",
                           "sections": [
                             {
+                              "name": "info",
                               "label": "Opportunity Information",
                               "fields": [
                                 "name",
@@ -17741,6 +17775,7 @@
                               ]
                             },
                             {
+                              "name": "forecast",
                               "label": "Stage & Forecast",
                               "fields": [
                                 "stage",
@@ -17752,6 +17787,7 @@
                               ]
                             },
                             {
+                              "name": "description",
                               "label": "Description",
                               "columns": 1,
                               "collapsible": true,

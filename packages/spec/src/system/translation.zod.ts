@@ -80,6 +80,19 @@ export const ObjectTranslationDataSchema = lazySchema(() => z.object({
     confirmText: z.string().optional().describe('Translated confirmation prompt'),
     successMessage: z.string().optional().describe('Translated success toast/message'),
   })).optional().describe('Action translations keyed by action name'),
+
+  /**
+   * Section translations keyed by section name (snake_case).
+   * Convention:
+   *   objects.<object>._sections.<section_name>.label
+   * Used by `record:details` to translate per-section labels on detail pages
+   * (e.g. "Opportunity Information" → "商机信息"). Each section in the
+   * page schema must declare a stable `name` for the lookup to fire.
+   */
+  _sections: z.record(z.string(), z.object({
+    label: z.string().optional().describe('Translated section label'),
+    description: z.string().optional().describe('Translated section description'),
+  })).optional().describe('Section translations keyed by section name'),
 }).describe('Translation data for a single object'));
 
 export type ObjectTranslationData = z.infer<typeof ObjectTranslationDataSchema>;
