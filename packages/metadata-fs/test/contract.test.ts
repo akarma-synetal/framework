@@ -1,0 +1,37 @@
+// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+
+import { describe, it, beforeEach, afterEach, expect } from 'vitest';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import { runRepositoryContractTests } from '@objectstack/metadata-core/testing';
+import type { MetaRef } from '@objectstack/metadata-core';
+import { FileSystemRepository } from '../src/index.js';
+
+/** Track repos + tmpdirs across the contract suite for cleanup. */
+const created: FileSystemRepository[] = [];
+
+afterEach(async () => {
+  while (created.length) {
+    const repo = created.pop()!;
+    try { await repo.close(); } catch { /* ignore */ }
+  }
+});
+
+runRepositoryContractTests(
+  'FileSystemRepository',
+  async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'objectstack-fs-'));
+    const repo = new FileSystemRepository({
+      root: dir,
+      org: 'system',
+      project: 'test',
+      branch: 'main',
+      disableWatch: true,
+    });
+    await repo.start();
+    created.push(repo);
+    return repo;
+  },
+  { singleBranch: true },
+);

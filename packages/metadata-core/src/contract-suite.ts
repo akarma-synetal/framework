@@ -27,6 +27,12 @@ import { ConflictError } from './errors.js';
 export interface ContractSuiteOptions {
   /** If the implementation supports `version`-pinned reads, set true. */
   supportsVersionedReads?: boolean;
+  /**
+   * Set true for backends that are scoped to a single branch (e.g. the
+   * FileSystemRepository is one branch per instance). The cross-branch
+   * test is skipped.
+   */
+  singleBranch?: boolean;
 }
 
 const refOf = (overrides: Partial<MetaRef> = {}): MetaRef => ({
@@ -171,6 +177,7 @@ export function runRepositoryContractTests(
       });
 
       it('different branches have independent sequences', async () => {
+        if (opts.singleBranch) return;
         const repo = await factory();
         const mainRef = refOf({ branch: 'main' });
         const devRef = refOf({ branch: 'dev' });
