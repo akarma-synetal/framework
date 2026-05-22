@@ -10,3 +10,6 @@ export * from './types.js';
 export * from './errors.js';
 export * from './canonicalize.js';
 export * from './repository.js';
+export * from './in-memory-repository.js';
+// Note: `./contract-suite.js` is exposed via the `/testing` subpath so
+// the main entry stays free of vitest as a runtime dependency.
