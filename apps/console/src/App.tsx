@@ -26,6 +26,7 @@ import {
 } from '@object-ui/app-shell';
 import { AccountLoginRedirect } from './components/AccountLoginRedirect';
 import { CloudAwareRootRedirect } from './components/CloudAwareRootRedirect';
+import { FormPage } from './components/FormPage';
 import {
   gotoAccountLogin,
   gotoAccountRegister,
@@ -169,6 +170,14 @@ export function App() {
             <Route path="/login" element={<LoginRedirect />} />
             <Route path="/register" element={<RegisterRedirect />} />
             <Route path="/forgot-password" element={<ForgotPasswordRedirect />} />
+            {/* Public anonymous form — no auth wrapper, deliberately. */}
+            <Route path="/f/:slug" element={<FormPage mode="public" />} />
+            {/* Internal form — authed; same renderer, different submit path. */}
+            <Route path="/forms/:name" element={
+              <ProtectedRoute>
+                <FormPage mode="internal" />
+              </ProtectedRoute>
+            } />
             <Route path="/home" element={
               <ProtectedRoute>
                 <DefaultHomeLayout><DefaultHomePage /></DefaultHomeLayout>

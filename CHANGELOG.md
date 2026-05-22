@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Unified FormPage: public `/f/:slug` + internal `/forms/:name`
+
+The console now ships a single `FormPage` renderer that powers both the
+anonymous public form (`/console/f/:slug`, no auth) and the authed
+internal form route (`/console/forms/:name`). Both modes read the same
+`FormView` metadata and use the same field renderers — only the spec
+source and submit target differ.
+
+- Public mode loads via `GET /api/v1/forms/:slug` and submits to
+  `POST /api/v1/forms/:slug/submit` (anonymous, field-whitelisted).
+- Internal mode loads via `GET /api/v1/meta/view/:name` plus
+  `GET /api/v1/meta/object/:object`, and submits via the regular
+  `POST /api/v1/data/:object` data endpoint (auth cookie carries
+  identity; permissions enforced server-side).
+- URL params `?prefill_<field>=<value>` populate initial values in
+  both modes.
+- Honors a `submitBehavior` discriminated union on the FormView
+  (`thank-you` | `redirect` | `continue` | `next-record`) — defaults
+  to a thank-you screen.
+
 ### Changed — Studio simplified into a metadata browser
 
 `apps/studio` was collapsed from a multi-tenant project/org/cloud admin
