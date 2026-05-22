@@ -247,11 +247,14 @@ The bridge between the two is **Zod**, nothing else:
 - ObjectOS validates the artifact with Zod on load.
 - JSON Schema (published via `z.toJSONSchema()` in [packages/spec/scripts/build-schemas.ts](packages/spec/scripts/build-schemas.ts)) powers IDE validation and CLI error messages.
 
-If Studio later needs rich metadata browsing, diffing, or visual editing, the
-control plane can project a Project Version's artifact into `sys_metadata`
-records scoped by `organization_id` + `project_id` + `version_id`. That
-projection is derived state, not required for the version-first Phase 1 runtime
-path.
+If Studio later needs rich metadata browsing, diffing, or visual editing, those
+features read **directly from the artifact in memory** (the same source the
+runtime uses). The control plane does **not** materialise artifact contents
+into `sys_metadata` — that table is reserved exclusively for per-organisation
+overlay deltas (ADR-0005, ADR-0008 §0). Artifact change history lives in Git
+and in the deployment log; see the
+[FAQ in Metadata Lifecycle](/concepts/metadata-lifecycle#faq--when-does-code-defined-metadata-enter-the-database)
+for the full rationale.
 
 Any serializer that bypasses Zod is an anti-pattern - see §8. The Zod schema
 **is** the protocol.
@@ -478,6 +481,15 @@ Honest state of the platform as of 2026-05-08, **re-classified under the Phase
 1 code-first, version-first model**. Every future architectural decision should
 preserve Built, reduce Drift, and advance Missing.
 
+> **2026-04-13 amendment.** `MetaRef` no longer carries `project` or `branch` —
+> the metadata layer is keyed purely by `(org, type, name)`. Project survives
+> only as an artifact-packaging concept (the `objectstack.json` envelope);
+> branching is left to Git. See
+> [ADR-0008 §0](/adr/0008-metadata-repository-and-change-log#0-2026-04-13-amendment--drop-project-and-branch-from-metaref)
+> and the
+> [Metadata Lifecycle FAQ](/concepts/metadata-lifecycle#faq--when-does-code-defined-metadata-enter-the-database)
+> for the rationale.
+
 ### <Layers className="inline" /> Built (Aligned)
 
 - Organization CRUD + member/invitation system - [apps/studio/src/hooks/useSession.ts](apps/studio/src/hooks/useSession.ts)
@@ -498,7 +510,7 @@ preserve Built, reduce Drift, and advance Missing.
 - **Manifest scope enum trimmed.** `ManifestSchema.scope` accepts only `cloud`, `system`, and `project` - [packages/spec/src/kernel/manifest.zod.ts](packages/spec/src/kernel/manifest.zod.ts).
 - **Canonical package manifest files.** Plugin/service packages now share a single `src/manifest.ts` between compile-time config and runtime registration, reducing object-list drift.
 - **CLI `publish` link.** The end-to-end "local JSON -> remote server" wire is alive, even though the endpoint shape is wrong - [packages/cli/src/commands/publish.ts](packages/cli/src/commands/publish.ts).
-- **`env_id` → `project_id` migration (M2).** Metadata storage tables (`sys_metadata`, `sys_metadata_history`) have been updated to use `project_id` as the partition key. Idempotent migration helper shipped at `@objectstack/metadata/migrations` - [packages/metadata/src/migrations/migrate-env-id-to-project-id.ts](packages/metadata/src/migrations/migrate-env-id-to-project-id.ts). `DatabaseLoader` filters by `project_id` - [packages/metadata/src/loaders/database-loader.ts](packages/metadata/src/loaders/database-loader.ts). (The previously projected per-type tables `sys_object` / `sys_view` / `sys_flow` / `sys_agent` / `sys_tool` were removed in 2026-05 — all metadata now lives as JSON in `sys_metadata`.)
+- **`env_id` → `project_id` migration (M2 — superseded 2026-04).** Metadata storage tables (`sys_metadata`, `sys_metadata_history`) were migrated from `env_id` to `project_id` as the partition key. Idempotent helper at `@objectstack/metadata/migrations` - [packages/metadata/src/migrations/migrate-env-id-to-project-id.ts](packages/metadata/src/migrations/migrate-env-id-to-project-id.ts). **Note**: per the [ADR-0008 §0 amendment (2026-04-13)](/adr/0008-metadata-repository-and-change-log#0-2026-04-13-amendment--drop-project-and-branch-from-metaref), `project` and `branch` are removed from `MetaRef`; `SysMetadataRepository` now keys overlay rows purely by `organization_id` and ignores the legacy `project_id` / `branch` columns at read time. They survive in the schema for backward compatibility and will be dropped in a future major. (Per-type tables `sys_object` / `sys_view` / `sys_flow` / `sys_agent` / `sys_tool` were removed in 2026-05 — all metadata now lives as JSON in `sys_metadata`.)
 - **Artifact API endpoints (M3 + D2).** `GET /api/v1/cloud/projects/:id/artifact` returns the current artifact assembled from `sys_project.metadata.artifact_path`. `POST /api/v1/cloud/projects/:id/metadata` receives compiled JSON, persists it under `<artifactRoot>/<projectId>/artifact.json`, and updates the project metadata pointer — [packages/services/service-cloud/src/cloud-artifact-api-plugin.ts](packages/services/service-cloud/src/cloud-artifact-api-plugin.ts). `GET /api/v1/cloud/resolve-hostname` resolves a hostname to a project id.
 - **CLI `publish` routes to project publish endpoint (D2).** `objectstack publish` now POSTs to `/api/v1/cloud/projects/:id/metadata`, accepts `--project` and `--server` flags, and returns `versionId`, `commitId`, and `checksum` — [packages/cli/src/commands/publish.ts](packages/cli/src/commands/publish.ts).
 - **`apps/objectos` uses ObjectOS runtime mode (M4).** `apps/objectos/objectstack.config.ts` boots via `createBootStack({ runtime: { cloudUrl: ... } })`, separating the ObjectOS runtime from the control plane — [apps/objectos/objectstack.config.ts](apps/objectos/objectstack.config.ts).
