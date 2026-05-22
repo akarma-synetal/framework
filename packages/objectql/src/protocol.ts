@@ -2050,10 +2050,17 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
      * "Reset to factory default" semantic from ADR-0005. Whitelist is shared
      * with {@link saveMetaItem}.
      */
-    async deleteMetaItem(request: { type: string; name: string; organizationId?: string }): Promise<{
+    async deleteMetaItem(request: {
+        type: string;
+        name: string;
+        organizationId?: string;
+        parentVersion?: string | null;
+        actor?: string;
+    }): Promise<{
         success: boolean;
         message?: string;
         reset?: boolean;
+        seq?: number;
     }> {
         if (this.projectId !== undefined
             && !ObjectStackProtocolImplementation.isOverlayAllowed(request.type)) {
@@ -2066,6 +2073,96 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             throw err;
         }
 
+        const singularTypeForRepo = PLURAL_TO_SINGULAR[request.type] ?? request.type;
+        const useRepoPath = ObjectStackProtocolImplementation.isOverlayAllowed(singularTypeForRepo);
+
+        // ADR-0008 — overlay-allowed types route through SysMetadataRepository
+        // so the delete (a) is wrapped in engine.transaction(), (b) appends a
+        // tombstone row to sys_metadata_history, and (c) emits a watch event
+        // with a monotonic `seq` for HMR. Non-overlay-allowed types (only
+        // reachable in control-plane bootstrap mode where projectId is
+        // undefined) take the legacy raw-engine path below — the repository's
+        // `assertAllowed()` whitelist would 403 those deletes.
+        if (useRepoPath) {
+            const orgId = request.organizationId ?? null;
+            const repo = this.getOverlayRepo(orgId);
+            const ref = {
+                type: singularTypeForRepo,
+                name: request.name,
+                org: orgId ?? 'env',
+            } as Parameters<typeof repo.delete>[0];
+
+            try {
+                // Probe first — "no overlay exists" is a success/no-op, not
+                // a conflict. The repo would otherwise throw ConflictError.
+                const current = await repo.get(ref);
+                if (!current) {
+                    return {
+                        success: true,
+                        reset: false,
+                        message: `No customization overlay found for ${request.type}/${request.name} — already at artifact default.`,
+                    };
+                }
+
+                // Last-write-wins parent resolution unless the caller pinned
+                // an explicit version (Studio's "Reset" button is unpinned;
+                // a future "delete vN" flow can pass parentVersion).
+                const parentVersion: string = request.parentVersion !== undefined
+                    ? (request.parentVersion ?? current.hash)
+                    : current.hash;
+
+                const result = await repo.delete(ref, {
+                    parentVersion,
+                    actor: request.actor ?? 'system',
+                    source: 'protocol.deleteMetaItem',
+                });
+
+                // Refresh the in-memory artifact-side state on control-plane
+                // kernels (same logic as the legacy branch — see comments
+                // there for why this only runs when projectId === undefined).
+                if (this.projectId === undefined) {
+                    try {
+                        const services = this.getServicesRegistry?.();
+                        const metadataService = services?.get('metadata');
+                        if (metadataService && typeof metadataService.get === 'function') {
+                            const artifactItem = await metadataService.get(request.type, request.name);
+                            if (artifactItem !== undefined) {
+                                this.engine.registry.registerItem(request.type, artifactItem, 'name');
+                            }
+                        }
+                    } catch {
+                        // Best-effort registry refresh; next read fixes it anyway
+                    }
+                }
+
+                return {
+                    success: true,
+                    reset: true,
+                    seq: result.seq,
+                    message: `Customization overlay deleted — ${request.type}/${request.name} reset to artifact default. [seq=${result.seq}]`,
+                };
+            } catch (err: any) {
+                if (err instanceof ConflictError) {
+                    const conflict = new Error(
+                        `[metadata_conflict] ${request.type}/${request.name} has been modified since you loaded it. `
+                        + `Expected parent ${err.expectedParent ?? 'null'} but current is ${err.actualHead ?? 'null'}.`,
+                    );
+                    (conflict as any).code = 'metadata_conflict';
+                    (conflict as any).status = 409;
+                    (conflict as any).expectedParent = err.expectedParent;
+                    (conflict as any).actualHead = err.actualHead;
+                    throw conflict;
+                }
+                const e = new Error(`Failed to delete customization overlay: ${err.message ?? err}`);
+                (e as any).status = err?.status ?? 500;
+                throw e;
+            }
+        }
+
+        // ── Legacy raw-engine path: only reachable in control-plane bootstrap
+        // (projectId === undefined) for non-overlay-allowed types like
+        // `object`, `flow`, `agent`. No history row, no watch event — these
+        // types don't participate in the change-log model.
         const scopedWhere: Record<string, unknown> = {
             type: request.type,
             name: request.name,
@@ -2083,16 +2180,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             }
             await this.engine.delete('sys_metadata', { where: { id: existing.id } });
 
-            // Refresh in-memory state from the artifact source so subsequent
-            // reads don't return the stale overlay value via MetadataService.
-            // The registry is intentionally NOT cleared on project kernels (it
-            // is process-global there and shared); the next getMetaItem call
-            // queries sys_metadata first (now empty) and falls through to
-            // MetadataService, which retains the artifact value.
             if (this.projectId === undefined) {
-                // For control-plane kernels we can safely re-register the
-                // artifact-side value into the global registry from the
-                // MetadataService, mirroring what saveMetaItem did inversely.
                 try {
                     const services = this.getServicesRegistry?.();
                     const metadataService = services?.get('metadata');

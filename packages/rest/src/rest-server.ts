@@ -1337,10 +1337,25 @@ export class RestServer {
                         });
                         return;
                     }
+                    // Mirror saveMetaItem's OCC + actor plumbing (ADR-0008
+                    // PR-10d wiring): `If-Match` pins the expected current
+                    // version so concurrent edits get a 409 instead of a
+                    // silent reset; `X-Actor` (or req.user) flows into the
+                    // history tombstone row.
+                    const ifMatchHeader = req.headers?.['if-match'] ?? req.headers?.['If-Match'];
+                    const parentVersion = typeof ifMatchHeader === 'string'
+                        ? ifMatchHeader.replace(/^"|"$/g, '')
+                        : undefined;
+                    const actorHeader = req.headers?.['x-actor'] ?? req.headers?.['X-Actor']
+                        ?? req.user?.id ?? req.userId;
+                    const actor = typeof actorHeader === 'string' ? actorHeader : undefined;
+
                     const result = await (p as any).deleteMetaItem({
                         type: req.params.type,
                         name: req.params.name,
                         ...(projectId ? { projectId } : {}),
+                        ...(parentVersion !== undefined ? { parentVersion } : {}),
+                        ...(actor ? { actor } : {}),
                     });
                     res.json(result);
                 } catch (error: any) {

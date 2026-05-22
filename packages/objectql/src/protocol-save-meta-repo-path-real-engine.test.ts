@@ -197,3 +197,104 @@ describe('saveMetaItem — repository write path against real ObjectQL (PR-10d.4
         expect(rows.length).toBe(1);
     });
 });
+
+describe('deleteMetaItem — repository write path against real ObjectQL (PR-10d wiring)', () => {
+    let engine: ObjectQL;
+    let protocol: ObjectStackProtocolImplementation;
+
+    const sysMetadataHistoryObject = {
+        name: 'sys_metadata_history',
+        label: 'Metadata History',
+        fields: {
+            id: { name: 'id', label: 'ID', type: 'text' as const, primaryKey: true },
+            event_seq: { name: 'event_seq', label: 'Seq', type: 'number' as const, required: true },
+            metadata_id: { name: 'metadata_id', label: 'Metadata ID', type: 'text' as const },
+            type: { name: 'type', label: 'Type', type: 'text' as const, required: true },
+            name: { name: 'name', label: 'Name', type: 'text' as const, required: true },
+            version: { name: 'version', label: 'Version', type: 'number' as const, required: true },
+            operation_type: { name: 'operation_type', label: 'Op', type: 'text' as const, required: true },
+            metadata: { name: 'metadata', label: 'Body', type: 'longtext' as const },
+            checksum: { name: 'checksum', label: 'Checksum', type: 'text' as const, maxLength: 71 },
+            previous_checksum: { name: 'previous_checksum', label: 'Prev Checksum', type: 'text' as const, maxLength: 71 },
+            change_note: { name: 'change_note', label: 'Note', type: 'longtext' as const },
+            source: { name: 'source', label: 'Source', type: 'text' as const },
+            organization_id: { name: 'organization_id', label: 'Org', type: 'text' as const },
+            recorded_by: { name: 'recorded_by', label: 'By', type: 'text' as const },
+            recorded_at: { name: 'recorded_at', label: 'At', type: 'datetime' as const, required: true },
+        },
+    };
+
+    beforeEach(async () => {
+        engine = new ObjectQL();
+        const { driver } = makeMemoryDriver();
+        engine.registerDriver(driver, true);
+        await engine.init();
+        engine.registry.registerObject(sysMetadataObject as any);
+        engine.registry.registerObject(sysMetadataHistoryObject as any);
+        protocol = new ObjectStackProtocolImplementation(engine);
+    });
+
+    it('deletes the overlay row AND appends a delete tombstone to sys_metadata_history', async () => {
+        const save = await protocol.saveMetaItem({
+            type: 'view', name: 'cases', organizationId: 'org_x',
+            item: viewBody('A'), actor: 'alice',
+        });
+        expect((save as any).seq).toBe(1);
+
+        const result = await protocol.deleteMetaItem({
+            type: 'view', name: 'cases', organizationId: 'org_x', actor: 'alice',
+        });
+        expect(result.success).toBe(true);
+        expect(result.reset).toBe(true);
+        expect(result.seq).toBe(2);
+
+        // sys_metadata row gone
+        const rows = await engine.find('sys_metadata', {
+            where: { type: 'view', organization_id: 'org_x' },
+        });
+        expect(rows.length).toBe(0);
+
+        // sys_metadata_history has a create + a delete tombstone
+        const history = await engine.find('sys_metadata_history', {
+            where: { type: 'view', name: 'cases', organization_id: 'org_x' },
+        });
+        expect(history.length).toBe(2);
+        const ops = history.map((h: any) => h.operation_type).sort();
+        expect(ops).toEqual(['create', 'delete']);
+        const tombstone = history.find((h: any) => h.operation_type === 'delete') as any;
+        expect(tombstone.metadata).toBeNull();
+        expect(tombstone.checksum).toBeNull();
+        expect(tombstone.previous_checksum).toMatch(/^sha256:/);
+        expect(tombstone.event_seq).toBe(2);
+        expect(tombstone.version).toBe(2);
+        expect(tombstone.recorded_by).toBe('alice');
+        expect(tombstone.source).toBe('protocol.deleteMetaItem');
+    });
+
+    it('returns reset=false (no history write) when no overlay exists', async () => {
+        const result = await protocol.deleteMetaItem({
+            type: 'view', name: 'never_existed', organizationId: 'org_x',
+        });
+        expect(result.success).toBe(true);
+        expect(result.reset).toBe(false);
+        expect(result.seq).toBeUndefined();
+
+        const history = await engine.find('sys_metadata_history', {
+            where: { organization_id: 'org_x' },
+        });
+        expect(history.length).toBe(0);
+    });
+
+    it('plural type "views" is normalized to singular for the tombstone', async () => {
+        await protocol.saveMetaItem({
+            type: 'view', name: 'cases', organizationId: 'org_x', item: viewBody('A'),
+        });
+        await protocol.deleteMetaItem({
+            type: 'views', name: 'cases', organizationId: 'org_x',
+        });
+        const tombstone = await engine.findOne('sys_metadata_history', {
+            where: { name: 'cases', operation_type: 'delete' },
+        });
+        expect((tombstone as any).type).toBe('view');
+    });
+});
