@@ -1,0 +1,136 @@
+---
+title: Metadata Lifecycle & HMR
+description: How metadata flows through Repository → Change Log → Cache → Registry — the canonical event stream that powers Studio HMR, REST writes, and future cloud editing.
+---
+
+# Metadata Lifecycle & HMR
+
+This page documents the metadata data path introduced by [ADR-0008](/adr/0008-metadata-repository-and-change-log) and refined by [ADR-0005](/adr/0005-metadata-customization-overlay). It is the canonical event stream that powers Studio Hot Module Replacement (HMR), REST writes, and future cloud editing.
+
+<Callout type="info">
+**TL;DR** — Every write goes through a single `MetadataRepository.put()` call. The repository appends to a change log, emits a watch event with a monotonic `seq`, and broadcasts over SSE to the Studio UI. The Studio's `useMetadataHmr` hook displays the latest `seq` in the status badge and re-fetches affected views.
+</Callout>
+
+---
+
+## Architecture (one diagram)
+
+```
+   ┌─────────────────────────────────────────────┐
+   │                  Studio UI                  │
+   │      (useMetadataHmr / HmrStatusBadge)      │
+   └────────────────────┬────────────────────────┘
+                        │ SSE  /api/metadata/hmr
+                        ▼
+   ┌─────────────────────────────────────────────┐
+   │           MetadataManager (bridge)          │
+   │   forwards Repository events → SSE channel  │
+   └────────────────────┬────────────────────────┘
+                        │ MetadataEvent{seq, op, ref, ...}
+                        ▼
+   ┌─────────────────────────────────────────────┐
+   │            LayeredRepository                │
+   │   ┌─────────────────────────────────────┐   │
+   │   │  Top: SysMetadataRepository (org)   │   │ ← writable overlay
+   │   │  Bottom: FS / InMemory (artifact)   │   │ ← read-only baseline
+   │   └─────────────────────────────────────┘   │
+   └────────────────────┬────────────────────────┘
+                        │ append(change log) + emit watch event
+                        ▼
+                   sys_metadata table
+                  (or filesystem artifact)
+```
+
+Reads walk top-to-bottom: the first non-null layer wins. Writes always route to the topmost writable layer (the overlay). Deletes from the layered API only remove the overlay row — the artifact baseline survives.
+
+---
+
+## The four primitives
+
+| Primitive | Package | Purpose |
+| :--- | :--- | :--- |
+| **Repository** | `@objectstack/metadata-core` | CRUD + watch interface over a single metadata source. Implementations: `InMemoryRepository`, `FileSystemRepository`, `SysMetadataRepository`, `LayeredRepository`. |
+| **Change Log** | `@objectstack/metadata-core` | Append-only log of every mutation, tagged with a monotonic `seq`. Watchers can replay from any `since`. |
+| **Cache** | `@objectstack/metadata` | In-memory snapshot of the registry, keyed by `MetaRef`. Invalidated by change-log events. |
+| **Registry** | `@objectstack/metadata` | Typed registry the Kernel and plugins query. Built from the cache. |
+
+`MetaRef = (type, name, org, project, branch)`. As of [ADR-0006 v4](/adr/0006-project-environment-split-v4), `project` is **dead in the runtime tuple** — only `(type, name, org, branch)` is meaningful. The Zod schema still exposes `project` for backward compatibility, defaulting to `"default"`.
+
+---
+
+## Write path: Studio → SSE → repository
+
+When a user edits a view in Studio:
+
+1. Studio calls `PUT /api/v1/metadata/views/case_grid` (REST).
+2. `protocol.ts:saveMetaItem()` validates against `MetadataTypeRegistry.allowOrgOverride` (see [overlay whitelist](#overlay-whitelist)).
+3. If allowed, the call lands on `MetadataRepository.put(ref, body, { parentVersion, actor })`.
+4. The repository:
+   - Verifies `parentVersion` matches the current head (`ConflictError` on mismatch).
+   - Writes the new row + appends a change-log entry with the next `seq`.
+   - Emits a `MetadataEvent { op: 'create' | 'update' | 'delete', ref, seq, source }`.
+5. The `MetadataManager` bridge forwards the event over the SSE channel `/api/metadata/hmr` with the `seq` attached.
+6. The Studio's `useMetadataHmr` hook receives the event, updates `lastSeq`, and triggers a refetch of the affected view.
+
+The `seq` is the single source of truth for ordering. The Studio status badge (`HmrStatusBadge`) shows `Repo seq: #N` in its tooltip.
+
+---
+
+## Overlay whitelist (shared-DB tenancy invariant)
+
+In shared-database multi-tenancy, **most metadata types must not be per-org customizable** — overriding them would break the physical schema. The whitelist lives in **one** place: `MetadataTypeRegistryEntry.allowOrgOverride` in `packages/spec/src/kernel/metadata-plugin.zod.ts`.
+
+| Type | `allowOrgOverride` | Rationale |
+| :--- | :---: | :--- |
+| `view`, `dashboard`, `report`, `email_template` | ✅ | Pure rendering. Per-org customization is safe. |
+| `object`, `field` | ❌ | Defines the table schema. Overriding would break existing data. |
+| `flow`, `workflow`, `agent` | ❌ | Stateful execution; per-org overrides need a separate execution-scoping mechanism. |
+| `permission`, `role`, `profile` | ❌ | Security; tenant-level controls already exist via role assignments. |
+| `datasource` | ❌ | Connection strings; multi-tenant isolation is enforced at a higher layer. |
+
+The runtime gate is implemented in `OVERLAY_ALLOWED_TYPES` (derived from the registry) and enforced by `SysMetadataRepository.put()`. Denied types return `403 not_overridable`.
+
+See [ADR-0005](/adr/0005-metadata-customization-overlay) for the full design and amendments.
+
+---
+
+## Conflict handling
+
+Every `put()` requires a `parentVersion` (or `null` for fresh creates). If the head has moved since the caller read it, `ConflictError(ref, expectedParent, actualHead)` is thrown. Studio surfaces this as a "metadata moved" toast and offers reload-and-retry.
+
+The hash is `sha256:` + 64-hex of a canonical (sorted-keys, no-undefined) JSON serialization of the body. Identical bodies produce identical hashes — `put()` short-circuits on no-op writes.
+
+---
+
+## HMR end-to-end (latency & ordering)
+
+- **Latency.** A typical write-to-render round-trip is **&lt; 100ms** on localhost (REST `PUT` → DB write → SSE flush → Studio refetch → React re-render).
+- **Ordering.** The `seq` is monotonic per repository. If the Studio tab disconnects and reconnects, it can resume from `lastSeq` to replay missed events. (Replay is implemented by `InMemoryRepository`/`SysMetadataRepository`; the SSE bridge passes `since` as a query param.)
+- **Multi-tab.** Each tab has its own `seq` counter. Out-of-order delivery between tabs is impossible because they share the server change log.
+
+---
+
+## Cross-references
+
+- [ADR-0005: Metadata customization overlay](/adr/0005-metadata-customization-overlay) — overlay semantics, whitelist, conflict rules.
+- [ADR-0006 v4: Project removal](/adr/0006-project-environment-split-v4) — why `MetaRef.project` is dead.
+- [ADR-0008: Metadata Repository & Change Log](/adr/0008-metadata-repository-and-change-log) — the four-primitive architecture.
+- [IMetadataService Contract](/guides/contracts/metadata-service) — the runtime API plugins call.
+- [North Star](/concepts/north-star) — the product shape these primitives serve.
+
+---
+
+## Status (as of M0)
+
+| Component | State |
+| :--- | :--- |
+| `InMemoryRepository`, `FileSystemRepository`, `LayeredRepository` | ✅ Shipped (`@objectstack/metadata-core`) |
+| Change log + `seq` | ✅ Shipped |
+| SSE bridge (`/api/metadata/hmr` with `seq`) | ✅ Shipped |
+| Studio `useMetadataHmr` + `HmrStatusBadge` | ✅ Shipped |
+| `SysMetadataRepository` (overlay over `sys_metadata`) | ✅ Shipped (`@objectstack/objectql`) |
+| `LayeredRepository(SysMeta + artifact)` composition test | ✅ Shipped |
+| **`protocol.ts:saveMetaItem` flipped to use `SysMetadataRepository.put`** | ⏳ Deferred — requires hash-compat dry-run vs. existing rows |
+| Cache + Registry refactor against `MetadataRepository` | ⏳ Post-M0 |
+
+The deferred items are tracked as PR-10d in the M0 sprint plan.
