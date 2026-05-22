@@ -2207,7 +2207,7 @@ export class RestServer {
                                 // form payload is otherwise un-translated (resolveFormBySlug
                                 // returns the raw view spec), so we hydrate the schema here.
                                 try {
-                                    const i18n = await this.resolveI18nService(projectId);
+                                    const i18n = await this.resolveI18nService(projectId, req);
                                     const bundle = this.buildTranslationBundle(i18n);
                                     const locale = this.extractLocale(req, i18n);
                                     if (bundle && locale) {
