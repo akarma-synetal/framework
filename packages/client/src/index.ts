@@ -3125,8 +3125,22 @@ export class ObjectStackClient {
           error: errorBody
         });
         
-        // Create a standardized error if the response includes error details
-        const errorMessage = errorBody?.message || errorBody?.error?.message || res.statusText;
+        // Create a standardized error if the response includes error details.
+        //
+        // Server may shape the body as any of:
+        //   { message: '...' }
+        //   { error: { code, message } }
+        //   { error: 'CODE: human readable' }       ← plain-string variant (e.g. RECORD_LOCKED)
+        //   { error: '...' , code: '...' }
+        // Without the plain-string branch we'd silently fall back to
+        // `res.statusText` ("Bad Request") and hide the actual reason from
+        // callers — which made debugging things like the approval lock
+        // ("RECORD_LOCKED: …") needlessly painful.
+        const errorMessage =
+          errorBody?.message
+          ?? errorBody?.error?.message
+          ?? (typeof errorBody?.error === 'string' ? errorBody.error : undefined)
+          ?? res.statusText;
         const errorCode = errorBody?.code || errorBody?.error?.code;
         const error = new Error(`[ObjectStack] ${errorCode ? `${errorCode}: ` : ''}${errorMessage}`) as any;
         

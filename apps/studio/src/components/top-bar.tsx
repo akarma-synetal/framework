@@ -77,7 +77,7 @@ function SlashDivider() {
   return <span aria-hidden className="text-muted-foreground/50 select-none">/</span>;
 }
 
-export function TopBar() {
+export function TopBar({ rightSlot }: { rightSlot?: React.ReactNode } = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams({ strict: false }) as {
@@ -240,6 +240,7 @@ export function TopBar() {
         <div className="hidden sm:block">
           <ThemeToggle />
         </div>
+        {rightSlot}
         <UserMenu />
       </div>
       <CommandPalette selectedPackage={selectedPackage} />

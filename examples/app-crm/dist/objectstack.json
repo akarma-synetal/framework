@@ -17782,13 +17782,14 @@
                                   "type": "record:related_list",
                                   "id": "opp_quotes",
                                   "properties": {
-                                    "objectName": "opportunity_quote",
-                                    "relationshipField": "opportunity_id",
+                                    "objectName": "quote",
+                                    "relationshipField": "opportunity",
                                     "columns": [
                                       "quote_number",
+                                      "name",
                                       "status",
-                                      "total_amount",
-                                      "expires_at"
+                                      "total_price",
+                                      "expiration_date"
                                     ],
                                     "limit": 10
                                   }
@@ -17796,20 +17797,20 @@
                               ]
                             },
                             {
-                              "key": "contacts",
-                              "label": "Contacts",
+                              "key": "products",
+                              "label": "Products",
                               "children": [
                                 {
                                   "type": "record:related_list",
-                                  "id": "opp_contacts",
+                                  "id": "opp_products",
                                   "properties": {
-                                    "objectName": "opportunity_contact",
-                                    "relationshipField": "opportunity_id",
+                                    "objectName": "opportunity_line_item",
+                                    "relationshipField": "opportunity",
                                     "columns": [
-                                      "name",
-                                      "role",
-                                      "email",
-                                      "phone"
+                                      "product",
+                                      "quantity",
+                                      "unit_price",
+                                      "total_price"
                                     ],
                                     "limit": 10
                                   }
@@ -17824,13 +17825,14 @@
                                   "type": "record:related_list",
                                   "id": "opp_tasks",
                                   "properties": {
-                                    "objectName": "opportunity_task",
-                                    "relationshipField": "opportunity_id",
+                                    "objectName": "task",
+                                    "relationshipField": "related_to_opportunity",
                                     "columns": [
                                       "subject",
                                       "status",
+                                      "priority",
                                       "due_date",
-                                      "assignee"
+                                      "owner"
                                     ],
                                     "filter": [
                                       {
@@ -20738,10 +20740,10 @@
       "label": "Opportunity Discount Approval",
       "object": "opportunity",
       "active": true,
-      "description": "High-value opportunities (amount > 100k) require manager + director sign-off.",
+      "description": "High-value opportunities (amount > 500k) require manager + director sign-off.",
       "entryCriteria": {
         "dialect": "cel",
-        "source": "record.amount > 100000"
+        "source": "record.amount > 500000"
       },
       "lockRecord": true,
       "approvalStatusField": "approval_status",
@@ -20780,7 +20782,7 @@
           "config": {
             "to": "pending_approvers",
             "title": "Discount approval needed",
-            "body": "Opportunity {record_id} (amount over 100k) is awaiting your review.",
+            "body": "Opportunity {record_id} (amount over 500k) is awaiting your review.",
             "link": "/system/approvals"
           }
         }

@@ -11,6 +11,7 @@ import {
   RefreshCw, ExternalLink, Code2
 } from 'lucide-react';
 import type { InstalledPackage } from '@objectstack/spec/kernel';
+import { WelcomeOnboarding } from '@/components/WelcomeOnboarding';
 
 interface DeveloperOverviewProps {
   packages: InstalledPackage[];
@@ -82,6 +83,11 @@ export function DeveloperOverview({ packages, selectedPackage, onNavigate = () =
 
   const objectCount = stats.metadata.counts['object'] || 0;
   const totalMetaItems = Object.values(stats.metadata.counts).reduce((a, b) => a + b, 0);
+
+  // First-run onboarding: no metadata authored yet for this package.
+  if (!stats.loading && totalMetaItems === 0 && selectedPackage?.manifest?.id) {
+    return <WelcomeOnboarding packageId={selectedPackage.manifest.id} />;
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 overflow-auto">

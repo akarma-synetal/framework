@@ -22,6 +22,8 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useClient } from '@objectstack/client-react';
 import { PluginHost } from '../plugins';
 import { MetadataPreview } from '@/components/MetadataPreview';
+import { ResourceActionsMenu } from '@/components/ResourceActionsMenu';
+import { useSetInspectorTarget } from '@/hooks/useInspector';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -61,6 +63,9 @@ function ObjectHubComponent() {
   const client = useClient();
   const navigate = useNavigate();
   const [tab, setTab] = useState<string>('designer');
+
+  // Surface this object to the Inspector drawer.
+  useSetInspectorTarget({ type: 'object', name, packageId });
 
   const [views, setViews] = useState<FilteredItem[]>([]);
   const [forms, setForms] = useState<FilteredItem[]>([]);
@@ -150,6 +155,7 @@ function ObjectHubComponent() {
                 <span className="ml-1.5">View source</span>
               </Link>
             </Button>
+            <ResourceActionsMenu type="object" name={name} packageId={packageId} />
           </div>
         </div>
         <Tabs value={tab} onValueChange={setTab} className="mt-3">

@@ -8,7 +8,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/toaster';
 import { AiChatPanel } from '@/components/AiChatPanel';
 import { ProductionGuardProvider } from '@/components/production-guard';
-import { TopBar } from '@/components/top-bar';
+import { StudioShell } from '@/components/StudioShell';
 import { StudioAccessDenied } from '@/components/StudioAccessDenied';
 import { PluginRegistryProvider } from '../plugins';
 import { builtInPlugins } from '../plugins/built-in';
@@ -58,12 +58,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full flex-col">
-        <TopBar />
-        <div className="flex flex-1 w-full overflow-hidden">
-          <main className="flex flex-1 min-w-0 overflow-hidden">{children}</main>
-        </div>
-      </div>
+      <StudioShell>{children}</StudioShell>
     </SidebarProvider>
   );
 }

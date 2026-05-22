@@ -6,7 +6,7 @@ import { ApprovalProcess } from '@objectstack/spec/automation';
  * Opportunity Discount Approval
  *
  * Multi-step approval for high-value opportunities. Triggered when an
- * opportunity amount exceeds 100,000. Sales manager reviews first, then
+ * opportunity amount exceeds 500,000. Sales manager reviews first, then
  * a sales director signs off. Either rejection rolls back to the previous
  * step so the submitter can re-justify.
  *
@@ -26,9 +26,9 @@ export const OpportunityDiscountApproval = ApprovalProcess.create({
   object: 'opportunity',
   active: true,
   description:
-    'High-value opportunities (amount > 100k) require manager + director sign-off.',
+    'High-value opportunities (amount > 500k) require manager + director sign-off.',
 
-  entryCriteria: 'record.amount > 100000',
+  entryCriteria: 'record.amount > 500000',
   lockRecord: true,
   approvalStatusField: 'approval_status',
 
@@ -39,7 +39,7 @@ export const OpportunityDiscountApproval = ApprovalProcess.create({
       config: {
         to: 'pending_approvers',
         title: 'Discount approval needed',
-        body: 'Opportunity {record_id} (amount over 100k) is awaiting your review.',
+        body: 'Opportunity {record_id} (amount over 500k) is awaiting your review.',
         link: '/system/approvals',
       },
     },
