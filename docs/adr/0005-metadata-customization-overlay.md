@@ -29,6 +29,37 @@ Project concept entirely. As a consequence:
   Phase-1 transitional model. The supported scopes are
   **platform-global** (no overlay row) and **per-organization**.
 
+### Tenant-customizable type whitelist (shared-DB tenancy invariant)
+
+In **shared-DB multi-tenant** deployments (one physical database, many
+`organization_id`s on the same tables), only the metadata types whose
+runtime semantics are **render-time** can be overridden per
+organization. Anything that influences the **physical schema, persisted
+contract, or automation guarantees** must be platform-global.
+
+The authoritative whitelist lives on `MetadataTypeRegistryEntry.allowOrgOverride`
+in [`packages/spec/src/kernel/metadata-plugin.zod.ts`](../../packages/spec/src/kernel/metadata-plugin.zod.ts).
+The runtime validator (`OVERLAY_ALLOWED_TYPES` in `objectql/src/protocol.ts`)
+derives its set from that flag — there is no parallel allowlist
+(Prime Directive #8). Current invariants:
+
+| Domain | Type | Per-org override? | Why |
+|:---|:---|:---:|:---|
+| data | `object`, `field` | ❌ | A per-org overlay would diverge the table schema; shared DB cannot honour that. |
+| data | `trigger`, `validation`, `hook` | ❌ | DB-side contracts. Per-org variants must ship as a separate package, not an overlay. |
+| automation | `flow`, `workflow`, `approval` | ❌ | Carry execution side-effects (events, jobs, audit). Per-org variants are a deployment, not an overlay. |
+| security | `permission`, `profile`, `role` | ❌ | Authorization correctness; overlays would create silent privilege drift. |
+| system | `datasource`, `router`, `function`, `service` | ❌ | Wiring level; changes require code paths, not metadata. |
+| ai | `agent`, `tool`, `skill` | ❌ | Behavioural contracts with model providers; treat like flows. |
+| **ui** | **`view`, `dashboard`, `report`** | ✅ | **Pure presentation. Safe per-org override.** |
+| ui | `page`, `app`, `action` | ❌ | Conservative default — these bind to routes and side-effects. Promote individually if a concrete need appears. |
+| system | `email_template`, `translation` | ✅ / `translation` is global today | Render-time / pure-content. |
+
+Adding a type to the allowlist requires (a) a Zod-validated overlay
+schema (`resolveOverlaySchema()` must accept it) and (b) a written
+rationale that the overlay is render-only with no DB/automation/security
+side-effects. The default for any new metadata type is **`allowOrgOverride: false`**.
+
 Everything below this block reflects the pre-amendment design and is
 retained for historical traceability. Where it says `project_id`,
 read `organization_id` (or, in built-in metadata contexts, "no scope key").
