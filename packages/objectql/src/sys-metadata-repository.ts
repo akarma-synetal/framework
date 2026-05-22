@@ -23,7 +23,16 @@
  *     table yet; LISTEN/NOTIFY plumbing comes with PostgresRepository)
  *   - history() — emits empty AsyncIterable
  *   - branch ops (fork/merge)
- *   - hashSpec backfill for legacy rows missing `_hash`
+ *   - hashSpec backfill for legacy rows missing `checksum`
+ *
+ * Schema mapping (ADR-0008 PR-10d.2):
+ *   Repository concept      sys_metadata column
+ *   ─────────────────────── ───────────────────
+ *   body                  → metadata           (JSON string)
+ *   hash (sha256)         → checksum           (text(64))
+ *   monotonic version int → version            (number)
+ *   org isolation         → organization_id    (lookup)
+ *   actor                 → updated_by         (lookup, optional)
  *
  * Composition: PR-10c will compose
  *   `LayeredRepository([FileSystemRepository, SysMetadataRepository])`
@@ -150,7 +159,7 @@ export class SysMetadataRepository implements MetadataRepository {
     const existing = await this.engine.findOne('sys_metadata', {
       where: this.whereFor(ref),
     });
-    const existingHash: string | null = existing?._hash ?? null;
+    const existingHash: string | null = existing?.checksum ?? null;
     if (opts.parentVersion !== existingHash) {
       throw new ConflictError(this.fullRef(ref), opts.parentVersion, existingHash);
     }
@@ -170,7 +179,7 @@ export class SysMetadataRepository implements MetadataRepository {
       name: ref.name,
       organization_id: this.organizationId,
       metadata: JSON.stringify(body),
-      _hash: version,
+      checksum: version,
       state: 'active',
       version: (existing?.version ?? 0) + 1,
       updated_at: now,
@@ -223,7 +232,7 @@ export class SysMetadataRepository implements MetadataRepository {
       // (actual HEAD is null but caller supplied a non-null parentVersion).
       throw new ConflictError(this.fullRef(ref), opts.parentVersion, null);
     }
-    const existingHash: string | null = existing._hash ?? null;
+    const existingHash: string | null = existing.checksum ?? null;
     if (opts.parentVersion !== existingHash) {
       throw new ConflictError(this.fullRef(ref), opts.parentVersion, existingHash);
     }
@@ -396,7 +405,7 @@ export class SysMetadataRepository implements MetadataRepository {
   private rowToItem(ref: Pick<MetaRef, 'type' | 'name'>, row: any): MetadataItem {
     const body: Record<string, unknown> =
       typeof row.metadata === 'string' ? JSON.parse(row.metadata) : (row.metadata ?? {});
-    const hash: string = row._hash ?? hashSpec(body);
+    const hash: string = row.checksum ?? hashSpec(body);
     return {
       ref: this.fullRef(ref),
       body,

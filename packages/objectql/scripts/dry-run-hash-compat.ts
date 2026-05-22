@@ -38,6 +38,11 @@ export interface LegacyMetadataRow {
     metadata?: string | null;
     state?: string;
     version?: number | null;
+    /**
+     * Legacy `checksum` column (sha256 hex). PR-10d.2 reuses this column
+     * as the optimistic-locking token; pre-PR-10d rows have `null`.
+     */
+    checksum?: string | null;
     [k: string]: unknown;
 }
 
@@ -49,7 +54,9 @@ export interface RowFinding {
         | 'non_object_body'
         | 'unstable_hash'
         | 'missing_metadata'
-        | 'duplicate_overlay_key';
+        | 'duplicate_overlay_key'
+        | 'checksum_drift'
+        | 'checksum_missing';
     detail: string;
 }
 
@@ -59,6 +66,10 @@ export interface DryRunReport {
     findings: RowFinding[];
     typeDistribution: Record<string, number>;
     duplicateKeys: string[];
+    /** Rows where `checksum` is NULL — eligible for lazy backfill on first write. */
+    needsBackfill: number;
+    /** Rows where stored `checksum` disagrees with recomputed `hashSpec(body)`. */
+    checksumDrift: number;
     compatible: boolean;
 }
 
@@ -71,6 +82,8 @@ export function runDryRun(rows: LegacyMetadataRow[]): DryRunReport {
     const seen = new Map<string, LegacyMetadataRow>();
     const duplicateKeys = new Set<string>();
     let okRows = 0;
+    let needsBackfill = 0;
+    let checksumDrift = 0;
 
     for (const row of rows) {
         const tag = {
@@ -146,7 +159,31 @@ export function runDryRun(rows: LegacyMetadataRow[]): DryRunReport {
             continue;
         }
 
-        // 5. Duplicate (type, name, organization_id) — would break the unique
+        // 5. Checksum reconciliation (PR-10d.2). The repository uses the
+        //    `checksum` column as the optimistic-lock token. Pre-PR-10d
+        //    rows have `null`. Eligible for lazy backfill on next write.
+        //    If non-null, it MUST equal hashSpec(body) — otherwise legacy
+        //    code wrote a checksum we can't reproduce.
+        if (row.checksum == null) {
+            needsBackfill += 1;
+            findings.push({
+                row: tag,
+                severity: 'warning',
+                code: 'checksum_missing',
+                detail: 'legacy row with NULL checksum — will be backfilled on first put()',
+            });
+        } else if (row.checksum !== h1) {
+            checksumDrift += 1;
+            findings.push({
+                row: tag,
+                severity: 'error',
+                code: 'checksum_drift',
+                detail: `stored checksum ${row.checksum} != recomputed ${h1}`,
+            });
+            continue;
+        }
+
+        // 6. Duplicate (type, name, organization_id) — would break the unique
         //    overlay invariant. Only count active rows.
         if (row.state === 'active' && row.type && row.name) {
             const key = `${row.type}|${row.name}|${row.organization_id ?? '__env__'}`;
@@ -164,7 +201,7 @@ export function runDryRun(rows: LegacyMetadataRow[]): DryRunReport {
             seen.set(key, row);
         }
 
-        // 6. Distribution.
+        // 7. Distribution.
         if (row.type) {
             typeDistribution[row.type] = (typeDistribution[row.type] ?? 0) + 1;
         }
@@ -177,6 +214,8 @@ export function runDryRun(rows: LegacyMetadataRow[]): DryRunReport {
         findings,
         typeDistribution,
         duplicateKeys: Array.from(duplicateKeys),
+        needsBackfill,
+        checksumDrift,
         compatible: findings.every((f) => f.severity !== 'error'),
     };
 }
@@ -191,6 +230,8 @@ export function formatReport(report: DryRunReport): string {
     lines.push(`Total rows:        ${report.totalRows}`);
     lines.push(`OK rows:           ${report.okRows}`);
     lines.push(`Findings:          ${report.findings.length}`);
+    lines.push(`Needs backfill:    ${report.needsBackfill} (NULL checksum)`);
+    lines.push(`Checksum drift:    ${report.checksumDrift}`);
     lines.push(`Compatible:        ${report.compatible ? 'YES ✅' : 'NO ❌'}`);
     lines.push('');
     lines.push('## Type distribution');

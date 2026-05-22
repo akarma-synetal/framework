@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { describe, expect, it } from 'vitest';
+import { hashSpec } from '@objectstack/metadata-core';
 import { runDryRun, type LegacyMetadataRow } from '../scripts/dry-run-hash-compat';
 
 /**
@@ -13,13 +14,8 @@ import { runDryRun, type LegacyMetadataRow } from '../scripts/dry-run-hash-compa
  * or dashboard body. Shapes vary in nesting, key order, locale strings, etc.
  */
 
-const validView = (overrides: Record<string, unknown> = {}) => ({
-    id: 'r1',
-    type: 'view',
-    name: 'case_grid',
-    organization_id: 'org_alpha',
-    state: 'active',
-    metadata: JSON.stringify({
+const validView = (overrides: Record<string, unknown> = {}): LegacyMetadataRow => {
+    const body = {
         name: 'case_grid',
         type: 'grid',
         label: 'Cases',
@@ -28,8 +24,17 @@ const validView = (overrides: Record<string, unknown> = {}) => ({
             { field: 'title', width: 240 },
         ],
         ...overrides,
-    }),
-});
+    };
+    return {
+        id: 'r1',
+        type: 'view',
+        name: 'case_grid',
+        organization_id: 'org_alpha',
+        state: 'active',
+        metadata: JSON.stringify(body),
+        checksum: hashSpec(body),
+    };
+};
 
 describe('runDryRun — happy path', () => {
     it('returns compatible:true for a clean snapshot', () => {
@@ -57,13 +62,16 @@ describe('runDryRun — happy path', () => {
         // Production code does `JSON.stringify(item)` which preserves insertion
         // order. Different writers produce different orderings. canonicalize()
         // must absorb this.
+        const bodyA = { z: 1, a: 2, m: { y: 9, b: 8 } };
+        const bodyB = { a: 2, m: { b: 8, y: 9 }, z: 1 };
         const a: LegacyMetadataRow = {
             id: 'r1',
             type: 'view',
             name: 'case_grid',
             organization_id: 'org_alpha',
             state: 'active',
-            metadata: JSON.stringify({ z: 1, a: 2, m: { y: 9, b: 8 } }),
+            metadata: JSON.stringify(bodyA),
+            checksum: hashSpec(bodyA),
         };
         const b: LegacyMetadataRow = {
             id: 'r2',
@@ -71,7 +79,8 @@ describe('runDryRun — happy path', () => {
             name: 'case_kanban',
             organization_id: 'org_alpha',
             state: 'active',
-            metadata: JSON.stringify({ a: 2, m: { b: 8, y: 9 }, z: 1 }),
+            metadata: JSON.stringify(bodyB),
+            checksum: hashSpec(bodyB),
         };
         const report = runDryRun([a, b]);
         expect(report.compatible).toBe(true);
@@ -189,12 +198,55 @@ describe('runDryRun — error classification', () => {
     });
 });
 
+describe('runDryRun — checksum reconciliation (PR-10d.2)', () => {
+    it('warns (does not fail) when legacy row has NULL checksum', () => {
+        const report = runDryRun([
+            { ...validView(), checksum: null },
+        ]);
+        expect(report.compatible).toBe(true);    // warning, not error
+        expect(report.needsBackfill).toBe(1);
+        expect(report.findings).toHaveLength(1);
+        expect(report.findings[0].code).toBe('checksum_missing');
+        expect(report.findings[0].severity).toBe('warning');
+    });
+
+    it('accepts row whose stored checksum matches recomputed hashSpec(body)', () => {
+        const body = { name: 'case_grid', type: 'grid', label: 'Cases' };
+        const report = runDryRun([
+            {
+                id: 'r1',
+                type: 'view',
+                name: 'case_grid',
+                organization_id: 'org_alpha',
+                state: 'active',
+                metadata: JSON.stringify(body),
+                checksum: hashSpec(body),
+            },
+        ]);
+        expect(report.compatible).toBe(true);
+        expect(report.needsBackfill).toBe(0);
+        expect(report.checksumDrift).toBe(0);
+        expect(report.findings).toHaveLength(0);
+    });
+
+    it('flags drift when stored checksum disagrees with recomputed hash', () => {
+        const report = runDryRun([
+            { ...validView(), checksum: 'sha256:deadbeef' },
+        ]);
+        expect(report.compatible).toBe(false);
+        expect(report.checksumDrift).toBe(1);
+        expect(report.findings[0].code).toBe('checksum_drift');
+    });
+});
+
 describe('runDryRun — boundary conditions', () => {
     it('handles empty snapshot', () => {
         const report = runDryRun([]);
         expect(report.compatible).toBe(true);
         expect(report.totalRows).toBe(0);
         expect(report.okRows).toBe(0);
+        expect(report.needsBackfill).toBe(0);
+        expect(report.checksumDrift).toBe(0);
     });
 
     it('handles row with deeply nested body', () => {

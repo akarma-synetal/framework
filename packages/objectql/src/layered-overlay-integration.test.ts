@@ -26,7 +26,7 @@ interface Row {
     name: string;
     organization_id: string | null;
     metadata: string;
-    _hash: string;
+    checksum: string;
     state: string;
     version: number;
 }
