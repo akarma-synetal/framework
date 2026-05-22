@@ -137,32 +137,18 @@ export class AuthProxyPlugin implements Plugin {
                         }
                         // bootstrap-status
                         try {
-                            // When platform SSO is wired (cloud's
-                            // objectstack-cloud OIDC provider is advertised),
-                            // identity is delegated to the cloud control
-                            // plane. The local sys_user table is empty by
-                            // design — it gets JIT-populated on first
-                            // successful SSO callback. We must NEVER force
-                            // the tenant /setup wizard in that case: it
-                            // would create a local owner whose credentials
-                            // are unreachable (no /login form will be shown
-                            // since SSO auto-redirect kicks in next visit).
-                            try {
-                                const pubCfg = typeof authSvc?.getPublicConfig === 'function'
-                                    ? authSvc.getPublicConfig()
-                                    : null;
-                                const ssoProviders: Array<{ id?: string; enabled?: boolean }> = Array.isArray(pubCfg?.socialProviders)
-                                    ? pubCfg.socialProviders
-                                    : [];
-                                const ssoWired = ssoProviders.some(
-                                    (p) => p?.enabled !== false && p?.id === 'objectstack-cloud',
-                                );
-                                if (ssoWired) {
-                                    return c.json({ hasOwner: true });
-                                }
-                            } catch {
-                                // fall through to local count
-                            }
+                            // Report the real local owner state. Earlier the
+                            // proxy short-circuited to `hasOwner: true` as
+                            // soon as the `objectstack-cloud` SSO provider
+                            // was wired — the idea being "identity lives in
+                            // cloud, JIT-create on first SSO callback". That
+                            // forced every project to depend on cloud being
+                            // reachable for first-time setup AND made the
+                            // local /setup wizard unreachable. With SSO now
+                            // demoted to an *optional* federation button,
+                            // bootstrap status MUST reflect the project's
+                            // own `sys_user` table so /setup can run when
+                            // there is genuinely no local owner yet.
                             const dataEngine = typeof authSvc?.getDataEngine === 'function'
                                 ? authSvc.getDataEngine()
                                 : null;
