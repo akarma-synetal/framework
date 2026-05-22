@@ -24,6 +24,7 @@ import { PluginHost } from '../plugins';
 import { MetadataPreview } from '@/components/MetadataPreview';
 import { ResourceActionsMenu } from '@/components/ResourceActionsMenu';
 import { useSetInspectorTarget } from '@/hooks/useInspector';
+import { usePackages } from '@/hooks/usePackages';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,10 +63,14 @@ function ObjectHubComponent() {
   const { package: packageId, name } = Route.useParams();
   const client = useClient();
   const navigate = useNavigate();
+  const { selectedPackage } = usePackages(packageId);
+  // Resolve URL slug → full package id ("crm" → "com.example.crm"); fall back
+  // to the raw slug if package list hasn't loaded yet.
+  const resolvedPackageId = selectedPackage?.manifest?.id ?? packageId;
   const [tab, setTab] = useState<string>('designer');
 
   // Surface this object to the Inspector drawer.
-  useSetInspectorTarget({ type: 'object', name, packageId });
+  useSetInspectorTarget({ type: 'object', name, packageId: resolvedPackageId });
 
   const [views, setViews] = useState<FilteredItem[]>([]);
   const [forms, setForms] = useState<FilteredItem[]>([]);
@@ -82,7 +87,7 @@ function ObjectHubComponent() {
         /* ignore */
       }
       try {
-        const r = await client.meta.getItems('view', { packageId });
+        const r = await client.meta.getItems('view', { packageId: resolvedPackageId });
         const items = r?.items || (Array.isArray(r) ? r : []);
         // Multi-view docs expose nested list/form/listViews with their own
         // data.object reference; the object on the doc spec is the *primary*
@@ -112,7 +117,7 @@ function ObjectHubComponent() {
         setForms([]);
       }
       try {
-        const r = await client.meta.getItems('hook', { packageId }).catch(() => null);
+        const r = await client.meta.getItems('hook', { packageId: resolvedPackageId }).catch(() => null);
         const items = r?.items || (Array.isArray(r) ? r : []);
         const mine = items
           .map((it: any) => ({
@@ -128,7 +133,7 @@ function ObjectHubComponent() {
       }
     }
     load();
-  }, [client, name, packageId]);
+  }, [client, name, packageId, resolvedPackageId]);
 
   const objectLabel = useMemo(() => resolveLabel(object?.label) || name, [object, name]);
   const fieldCount = useMemo(() => (object?.fields ? Object.keys(object.fields).length : 0), [object]);
