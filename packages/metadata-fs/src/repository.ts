@@ -157,6 +157,15 @@ export class FileSystemRepository implements MetadataRepository {
     };
   }
 
+  async getByHash(ref: MetaRef, hash: string): Promise<MetadataItem | null> {
+    // FS repo stores only HEAD bodies on disk; the JSONL log records
+    // events (hashes) but not historical bodies. Resolve only if the
+    // requested hash matches HEAD.
+    const head = await this.get(ref);
+    if (!head || head.hash !== hash) return null;
+    return head;
+  }
+
   async *list(filter: ListFilter): AsyncIterable<MetadataItemHeader> {
     const limit = filter.limit ?? Infinity;
     let yielded = 0;

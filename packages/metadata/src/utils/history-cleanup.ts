@@ -9,7 +9,21 @@
 
 import type { IDataDriver } from '@objectstack/spec/contracts';
 import type { MetadataHistoryRetentionPolicy } from '@objectstack/spec/system';
+import { DEFAULT_METADATA_TYPE_REGISTRY } from '@objectstack/spec/kernel';
 import type { DatabaseLoader } from '../loaders/database-loader.js';
+
+/**
+ * Types whose runtime transaction rows pin a specific historical body
+ * (ADR-0009 `executionPinned`). History rows for these types are
+ * **never** garbage-collected — the `getByHash()` resolution path
+ * relies on them remaining queryable for the lifetime of any open
+ * execution.
+ */
+function executionPinnedTypes(): string[] {
+  return DEFAULT_METADATA_TYPE_REGISTRY
+    .filter((entry) => entry.executionPinned)
+    .map((entry) => entry.type);
+}
 
 /**
  * History Cleanup Manager
@@ -70,6 +84,11 @@ export class HistoryCleanupManager {
     let deleted = 0;
     let errors = 0;
 
+    // ADR-0009: collect executionPinned types — these are GC-exempt.
+    const pinnedTypes = executionPinnedTypes();
+    const isPinned = (t: string | undefined): boolean =>
+      !!t && pinnedTypes.includes(t);
+
     try {
       // Age-based cleanup
       if (this.policy.maxAgeDays) {
@@ -83,6 +102,11 @@ export class HistoryCleanupManager {
 
         if (organizationId) {
           filter.organization_id = organizationId;
+        }
+
+        if (pinnedTypes.length > 0) {
+          // Exclude executionPinned rows from bulk age delete.
+          filter.type = { $nin: pinnedTypes };
         }
 
         try {
@@ -111,7 +135,7 @@ export class HistoryCleanupManager {
           for (const record of metaItems) {
             const t = record.type as string | undefined;
             const n = record.name as string | undefined;
-            if (t && n) {
+            if (t && n && !isPinned(t)) {
               uniqueKeys.add(`${t}\x1f${n}`);
             }
           }
@@ -222,6 +246,11 @@ export class HistoryCleanupManager {
     let recordsByAge = 0;
     let recordsByCount = 0;
 
+    // ADR-0009: executionPinned types are excluded from GC.
+    const pinnedTypes = executionPinnedTypes();
+    const isPinned = (t: string | undefined): boolean =>
+      !!t && pinnedTypes.includes(t);
+
     try {
       const baseWhere: Record<string, unknown> = {};
       if (organizationId) baseWhere.organization_id = organizationId;
@@ -236,6 +265,9 @@ export class HistoryCleanupManager {
           recorded_at: { $lt: cutoffISO },
           ...baseWhere,
         };
+        if (pinnedTypes.length > 0) {
+          filter.type = { $nin: pinnedTypes };
+        }
 
         recordsByAge = await driver.count(historyTableName, {
           object: historyTableName,
@@ -255,7 +287,7 @@ export class HistoryCleanupManager {
         for (const record of metaItems) {
           const t = record.type as string | undefined;
           const n = record.name as string | undefined;
-          if (t && n) {
+          if (t && n && !isPinned(t)) {
             uniqueKeys.add(`${t}\x1f${n}`);
           }
         }

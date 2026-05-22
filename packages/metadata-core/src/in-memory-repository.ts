@@ -84,6 +84,14 @@ export class InMemoryRepository implements MetadataRepository {
     return clone(item);
   }
 
+  async getByHash(ref: MetaRef, hash: string): Promise<MetadataItem | null> {
+    // InMemoryRepository keeps only HEAD bodies; historical bodies are
+    // not retained. Resolve only if the requested hash IS HEAD.
+    const item = this.items.get(refKey(ref));
+    if (!item || item.hash !== hash) return null;
+    return clone(item);
+  }
+
   async put(ref: MetaRef, spec: unknown, opts: PutOptions): Promise<PutResult> {
     const key = refKey(ref);
     const current = this.items.get(key);

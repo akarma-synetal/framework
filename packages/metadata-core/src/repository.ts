@@ -49,6 +49,19 @@ export interface MetadataRepository {
   get(ref: MetaRef): Promise<MetadataItem | null>;
 
   /**
+   * Resolve a historical version by content hash (ADR-0009).
+   *
+   * Returns the `MetadataItem` whose canonical sha256 equals `hash`
+   * for the given ref, or `null` if no such version is recorded.
+   *
+   * Implementations MUST search history (not just HEAD) so that
+   * `executionPinned` types remain resolvable through definition
+   * upgrades. For non-`executionPinned` types, implementations MAY
+   * return `null` if they have GC'd the corresponding history row.
+   */
+  getByHash(ref: MetaRef, hash: string): Promise<MetadataItem | null>;
+
+  /**
    * Write a new version. Atomic.
    * @throws ConflictError if `parentVersion` does not match HEAD.
    * @throws SchemaValidationError if `spec` fails Zod normalisation.

@@ -171,6 +171,9 @@ export const SysMetadataHistoryObject = ObjectSchema.create({
     { fields: ['organization_id', 'event_seq'], unique: true },
     { fields: ['organization_id', 'type', 'name', 'version'], unique: true },
     { fields: ['organization_id', 'type', 'name', 'recorded_at'] },
+    // ADR-0009: getByHash() lookup — execution-pinned types resolve a
+    // historical body by content hash via this index.
+    { fields: ['organization_id', 'type', 'name', 'checksum'] },
     { fields: ['type', 'name'] },
     { fields: ['recorded_at'] },
     { fields: ['operation_type'] },

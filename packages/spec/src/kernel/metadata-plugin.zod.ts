@@ -123,7 +123,12 @@ export type MetadataType = z.infer<typeof MetadataTypeSchema>;
  * 2. Validate metadata payloads
  * 3. Determine storage behavior
  */
-export const MetadataTypeRegistryEntrySchema = lazySchema(() => z.object({
+/**
+ * Base shape of a metadata type registry entry, without invariants.
+ * Used internally where Zod operations (`.omit`, `.extend`) that don't
+ * compose with refinements are required.
+ */
+const MetadataTypeRegistryEntryBaseSchema = z.object({
   /** Metadata type identifier (e.g., 'object', 'view') */
   type: MetadataTypeSchema.describe('Metadata type identifier'),
 
@@ -174,6 +179,30 @@ export const MetadataTypeRegistryEntrySchema = lazySchema(() => z.object({
   supportsVersioning: z.boolean().default(false).describe('Whether version history is tracked'),
 
   /**
+   * Whether runtime transaction rows pin a specific historical version of
+   * this metadata by content hash (ADR-0009).
+   *
+   * Types with `executionPinned: true` give the strongest persistence
+   * guarantee in the system:
+   *
+   * 1. History rows for this type are **never** garbage-collected,
+   *    regardless of `MetadataHistoryRetentionPolicy`.
+   * 2. `MetadataRepository.getByHash(ref, hash)` MUST return the
+   *    pinned body for any hash that was ever HEAD.
+   * 3. Implies `supportsVersioning: true` (enforced via superRefine on
+   *    the wrapping `MetadataTypeRegistryEntrySchema`).
+   *
+   * Use this flag for metadata describing executable business processes
+   * whose runtime invocations can pause across redeploys
+   * (`flow`, `workflow`, `approval`). Do **not** set it for types whose
+   * runtime state captures outputs rather than the source body
+   * (`agent`, `tool`).
+   */
+  executionPinned: z.boolean().default(false).describe(
+    'Transaction rows reference a specific version_hash; history GC is disabled and getByHash() MUST resolve old hashes (ADR-0009)'
+  ),
+
+  /**
    * Priority order for loading (lower = earlier).
    * Objects load before views, views before dashboards.
    */
@@ -182,7 +211,23 @@ export const MetadataTypeRegistryEntrySchema = lazySchema(() => z.object({
   /** The domain this type belongs to */
   domain: z.enum(['data', 'ui', 'automation', 'system', 'security', 'ai'])
     .describe('Protocol domain'),
-}));
+});
+
+export const MetadataTypeRegistryEntrySchema = lazySchema(() =>
+  MetadataTypeRegistryEntryBaseSchema.superRefine((entry, ctx) => {
+    // ADR-0009 invariant: executionPinned ⇒ supportsVersioning.
+    // A type whose transaction rows pin a historical body MUST also be
+    // tracked in the history log, otherwise getByHash() has nothing to
+    // resolve against.
+    if (entry.executionPinned && !entry.supportsVersioning) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['executionPinned'],
+        message: `executionPinned requires supportsVersioning: true (type '${entry.type}')`,
+      });
+    }
+  })
+);
 
 export type MetadataTypeRegistryEntry = z.infer<typeof MetadataTypeRegistryEntrySchema>;
 
@@ -371,7 +416,7 @@ export const MetadataPluginConfigSchema = lazySchema(() => z.object({
    * Additional metadata type registrations.
    * Used by plugins to register custom metadata types beyond the built-in set.
    */
-  additionalTypes: z.array(MetadataTypeRegistryEntrySchema.omit({ type: true }).extend({
+  additionalTypes: z.array(MetadataTypeRegistryEntryBaseSchema.omit({ type: true }).extend({
     type: z.string().describe('Custom metadata type identifier'),
   })).optional().describe('Additional custom metadata types'),
 
@@ -506,42 +551,42 @@ export type MetadataPluginManifest = z.input<typeof MetadataPluginManifestSchema
  */
 export const DEFAULT_METADATA_TYPE_REGISTRY: MetadataTypeRegistryEntry[] = [
   // Data Protocol (load first)
-  { type: 'object', label: 'Object', filePatterns: ['**/*.object.ts', '**/*.object.yml', '**/*.object.json'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: true, loadOrder: 10, domain: 'data' },
-  { type: 'field', label: 'Field', filePatterns: ['**/*.field.ts', '**/*.field.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 20, domain: 'data' },
-  { type: 'trigger', label: 'Trigger', filePatterns: ['**/*.trigger.ts', '**/*.trigger.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 30, domain: 'data' },
-  { type: 'validation', label: 'Validation Rule', filePatterns: ['**/*.validation.ts', '**/*.validation.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 30, domain: 'data' },
-  { type: 'hook', label: 'Hook', filePatterns: ['**/*.hook.ts', '**/*.hook.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 30, domain: 'data' },
+  { type: 'object', label: 'Object', filePatterns: ['**/*.object.ts', '**/*.object.yml', '**/*.object.json'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: true, executionPinned: false, loadOrder: 10, domain: 'data' },
+  { type: 'field', label: 'Field', filePatterns: ['**/*.field.ts', '**/*.field.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 20, domain: 'data' },
+  { type: 'trigger', label: 'Trigger', filePatterns: ['**/*.trigger.ts', '**/*.trigger.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 30, domain: 'data' },
+  { type: 'validation', label: 'Validation Rule', filePatterns: ['**/*.validation.ts', '**/*.validation.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 30, domain: 'data' },
+  { type: 'hook', label: 'Hook', filePatterns: ['**/*.hook.ts', '**/*.hook.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 30, domain: 'data' },
 
   // UI Protocol
-  { type: 'view', label: 'View', filePatterns: ['**/*.view.ts', '**/*.view.yml', '**/*.view.json'], supportsOverlay: true, allowOrgOverride: true, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 50, domain: 'ui' },
-  { type: 'page', label: 'Page', filePatterns: ['**/*.page.ts', '**/*.page.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 50, domain: 'ui' },
-  { type: 'dashboard', label: 'Dashboard', filePatterns: ['**/*.dashboard.ts', '**/*.dashboard.yml', '**/*.dashboard.json'], supportsOverlay: true, allowOrgOverride: true, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 60, domain: 'ui' },
-  { type: 'app', label: 'Application', filePatterns: ['**/*.app.ts', '**/*.app.yml', '**/*.app.json'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: true, loadOrder: 70, domain: 'ui' },
-  { type: 'action', label: 'Action', filePatterns: ['**/*.action.ts', '**/*.action.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 50, domain: 'ui' },
-  { type: 'report', label: 'Report', filePatterns: ['**/*.report.ts', '**/*.report.yml'], supportsOverlay: true, allowOrgOverride: true, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 60, domain: 'ui' },
+  { type: 'view', label: 'View', filePatterns: ['**/*.view.ts', '**/*.view.yml', '**/*.view.json'], supportsOverlay: true, allowOrgOverride: true, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 50, domain: 'ui' },
+  { type: 'page', label: 'Page', filePatterns: ['**/*.page.ts', '**/*.page.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 50, domain: 'ui' },
+  { type: 'dashboard', label: 'Dashboard', filePatterns: ['**/*.dashboard.ts', '**/*.dashboard.yml', '**/*.dashboard.json'], supportsOverlay: true, allowOrgOverride: true, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 60, domain: 'ui' },
+  { type: 'app', label: 'Application', filePatterns: ['**/*.app.ts', '**/*.app.yml', '**/*.app.json'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: true, executionPinned: false, loadOrder: 70, domain: 'ui' },
+  { type: 'action', label: 'Action', filePatterns: ['**/*.action.ts', '**/*.action.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 50, domain: 'ui' },
+  { type: 'report', label: 'Report', filePatterns: ['**/*.report.ts', '**/*.report.yml'], supportsOverlay: true, allowOrgOverride: true, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 60, domain: 'ui' },
 
-  // Automation Protocol
-  { type: 'flow', label: 'Flow', filePatterns: ['**/*.flow.ts', '**/*.flow.yml', '**/*.flow.json'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: true, loadOrder: 80, domain: 'automation' },
-  { type: 'workflow', label: 'Workflow', filePatterns: ['**/*.workflow.ts', '**/*.workflow.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: true, loadOrder: 80, domain: 'automation' },
-  { type: 'approval', label: 'Approval Process', filePatterns: ['**/*.approval.ts', '**/*.approval.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 80, domain: 'automation' },
+  // Automation Protocol — flow/workflow/approval are executionPinned (ADR-0009)
+  { type: 'flow', label: 'Flow', filePatterns: ['**/*.flow.ts', '**/*.flow.yml', '**/*.flow.json'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: true, executionPinned: true, loadOrder: 80, domain: 'automation' },
+  { type: 'workflow', label: 'Workflow', filePatterns: ['**/*.workflow.ts', '**/*.workflow.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: true, executionPinned: true, loadOrder: 80, domain: 'automation' },
+  { type: 'approval', label: 'Approval Process', filePatterns: ['**/*.approval.ts', '**/*.approval.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: true, executionPinned: true, loadOrder: 80, domain: 'automation' },
 
   // System Protocol
-  { type: 'datasource', label: 'Datasource', filePatterns: ['**/*.datasource.ts', '**/*.datasource.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, loadOrder: 5, domain: 'system' },
-  { type: 'translation', label: 'Translation', filePatterns: ['**/*.translation.ts', '**/*.translation.yml', '**/*.translation.json'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 90, domain: 'system' },
-  { type: 'router', label: 'Router', filePatterns: ['**/*.router.ts'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, loadOrder: 40, domain: 'system' },
-  { type: 'function', label: 'Function', filePatterns: ['**/*.function.ts'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, loadOrder: 40, domain: 'system' },
-  { type: 'service', label: 'Service', filePatterns: ['**/*.service.ts'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, loadOrder: 40, domain: 'system' },
-  { type: 'email_template', label: 'Email Template', filePatterns: ['**/*.email-template.ts', '**/*.email-template.yml', '**/*.email-template.json'], supportsOverlay: true, allowOrgOverride: true, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 85, domain: 'system' },
+  { type: 'datasource', label: 'Datasource', filePatterns: ['**/*.datasource.ts', '**/*.datasource.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, executionPinned: false, loadOrder: 5, domain: 'system' },
+  { type: 'translation', label: 'Translation', filePatterns: ['**/*.translation.ts', '**/*.translation.yml', '**/*.translation.json'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 90, domain: 'system' },
+  { type: 'router', label: 'Router', filePatterns: ['**/*.router.ts'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, executionPinned: false, loadOrder: 40, domain: 'system' },
+  { type: 'function', label: 'Function', filePatterns: ['**/*.function.ts'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, executionPinned: false, loadOrder: 40, domain: 'system' },
+  { type: 'service', label: 'Service', filePatterns: ['**/*.service.ts'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, executionPinned: false, loadOrder: 40, domain: 'system' },
+  { type: 'email_template', label: 'Email Template', filePatterns: ['**/*.email-template.ts', '**/*.email-template.yml', '**/*.email-template.json'], supportsOverlay: true, allowOrgOverride: true, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 85, domain: 'system' },
 
   // Security Protocol
-  { type: 'permission', label: 'Permission Set', filePatterns: ['**/*.permission.ts', '**/*.permission.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: true, loadOrder: 15, domain: 'security' },
-  { type: 'profile', label: 'Profile', filePatterns: ['**/*.profile.ts', '**/*.profile.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 15, domain: 'security' },
-  { type: 'role', label: 'Role', filePatterns: ['**/*.role.ts', '**/*.role.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 15, domain: 'security' },
+  { type: 'permission', label: 'Permission Set', filePatterns: ['**/*.permission.ts', '**/*.permission.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: true, executionPinned: false, loadOrder: 15, domain: 'security' },
+  { type: 'profile', label: 'Profile', filePatterns: ['**/*.profile.ts', '**/*.profile.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 15, domain: 'security' },
+  { type: 'role', label: 'Role', filePatterns: ['**/*.role.ts', '**/*.role.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 15, domain: 'security' },
 
   // AI Protocol
-  { type: 'agent', label: 'AI Agent', filePatterns: ['**/*.agent.ts', '**/*.agent.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: true, loadOrder: 90, domain: 'ai' },
-  { type: 'tool', label: 'AI Tool', filePatterns: ['**/*.tool.ts', '**/*.tool.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 85, domain: 'ai' },
-  { type: 'skill', label: 'AI Skill', filePatterns: ['**/*.skill.ts', '**/*.skill.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, loadOrder: 88, domain: 'ai' },
+  { type: 'agent', label: 'AI Agent', filePatterns: ['**/*.agent.ts', '**/*.agent.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: true, executionPinned: false, loadOrder: 90, domain: 'ai' },
+  { type: 'tool', label: 'AI Tool', filePatterns: ['**/*.tool.ts', '**/*.tool.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 85, domain: 'ai' },
+  { type: 'skill', label: 'AI Skill', filePatterns: ['**/*.skill.ts', '**/*.skill.yml'], supportsOverlay: true, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 88, domain: 'ai' },
 ];
 
 // ==========================================

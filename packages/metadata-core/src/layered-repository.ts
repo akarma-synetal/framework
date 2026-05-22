@@ -93,6 +93,18 @@ export class LayeredRepository implements MetadataRepository {
     return null;
   }
 
+  async getByHash(ref: MetaRef, hash: string): Promise<MetadataItem | null> {
+    // Probe layers top→bottom; first layer that resolves the hash wins.
+    // executionPinned types are durable in the storage layer
+    // (`SysMetadataRepository`); FS / in-memory layers only resolve
+    // hash == HEAD as a fallback.
+    for (const layer of this.layers) {
+      const item = await layer.repo.getByHash(ref, hash);
+      if (item) return item;
+    }
+    return null;
+  }
+
   async put(ref: MetaRef, spec: unknown, opts: PutOptions): Promise<PutResult> {
     if (this.writableIdx < 0) {
       throw new Error('LayeredRepository: no writable layer configured');

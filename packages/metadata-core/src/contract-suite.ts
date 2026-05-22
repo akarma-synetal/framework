@@ -117,6 +117,31 @@ export function runRepositoryContractTests(
         expect(b.version).toBe(a.version);
         expect(b.seq).toBe(a.seq);
       });
+
+      // ADR-0009: every MetadataRepository must implement getByHash().
+      // For repos that retain only HEAD bodies (InMemory, FS), the
+      // contract is "HEAD-hash resolves to HEAD body; other hashes
+      // return null". For history-backed repos this widens to all
+      // recorded hashes — those repos may add their own stronger tests.
+      it('getByHash() resolves the current HEAD hash to the HEAD body', async () => {
+        const repo = await factory();
+        const ref = refOf();
+        await repo.put(ref, spec('pinned'), { parentVersion: null, actor: 't' });
+        const head = await repo.get(ref);
+        expect(head).not.toBeNull();
+        const byHash = await repo.getByHash(ref, head!.hash);
+        expect(byHash).not.toBeNull();
+        expect(byHash!.body).toEqual(spec('pinned'));
+        expect(byHash!.hash).toBe(head!.hash);
+      });
+
+      it('getByHash() returns null for an unknown hash', async () => {
+        const repo = await factory();
+        const ref = refOf();
+        await repo.put(ref, spec('whatever'), { parentVersion: null, actor: 't' });
+        const fake = 'sha256:0000000000000000000000000000000000000000000000000000000000000000';
+        expect(await repo.getByHash(ref, fake)).toBeNull();
+      });
     });
 
     // ── 2 & 3. Optimistic locking + Monotonic seq ───────────────────

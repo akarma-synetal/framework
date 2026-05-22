@@ -173,6 +173,45 @@ export class SysMetadataRepository implements MetadataRepository {
     return this.rowToItem(ref, row);
   }
 
+  /**
+   * Resolve a historical version by content hash (ADR-0009).
+   *
+   * Looks up `sys_metadata_history` by `(organization_id, type, name,
+   * checksum)`. Returns null if no row matches. `executionPinned` types
+   * are guaranteed to find their body here because history GC skips
+   * them.
+   */
+  async getByHash(ref: MetaRef, hash: string): Promise<MetadataItem | null> {
+    this.assertOpen();
+    const full = this.fullRef(ref);
+    const row = await this.engine.findOne(this.historyTable, {
+      where: {
+        organization_id: this.organizationId,
+        type: full.type,
+        name: full.name,
+        checksum: hash,
+      },
+    });
+    if (!row) return null;
+    const rawBody = (row as any).metadata;
+    if (rawBody === null || rawBody === undefined) {
+      // Tombstone — body is gone, do not resurrect.
+      return null;
+    }
+    const body =
+      typeof rawBody === 'string' ? JSON.parse(rawBody) : (rawBody as Record<string, unknown>);
+    return {
+      ref: { ...full, version: undefined },
+      body: body as Record<string, unknown>,
+      hash,
+      parentHash: (row as any).previous_checksum ?? null,
+      authoredBy: (row as any).recorded_by ?? 'unknown',
+      authoredAt: (row as any).recorded_at ?? new Date(0).toISOString(),
+      message: (row as any).change_note ?? undefined,
+      seq: ((row as any).event_seq as number) ?? 0,
+    };
+  }
+
   async put(ref: MetaRef, spec: unknown, opts: PutOptions): Promise<PutResult> {
     this.assertOpen();
     this.assertAllowed(ref.type);
