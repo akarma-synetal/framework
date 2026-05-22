@@ -13,6 +13,7 @@ import type {
   SubmitApprovalInput,
   SharingExecutionContext,
 } from '@objectstack/spec/contracts';
+import type { MetadataRepository } from '@objectstack/metadata-core';
 import { executeActions, type ApprovalTrigger, type FetchLike } from './action-executor.js';
 
 /**
@@ -69,6 +70,7 @@ function rowFromRequest(row: any): ApprovalRequestRow {
     id: String(row.id),
     organization_id: row.organization_id ?? undefined,
     process_name: String(row.process_name ?? ''),
+    process_hash: row.process_hash ?? undefined,
     object_name: String(row.object_name ?? ''),
     record_id: String(row.record_id ?? ''),
     submitter_id: row.submitter_id ?? undefined,
@@ -114,6 +116,19 @@ export interface ApprovalServiceOptions {
    * The plugin uses this to re-bind lifecycle hooks for auto-trigger / lock.
    */
   onRegistryChange?: () => void | Promise<void>;
+  /**
+   * Optional metadata repository for execution-pinned process resolution
+   * (ADR-0009). When provided:
+   *
+   *   - `submit()` records the process body's sha256 on the request row.
+   *   - `approve` / `reject` / `recall` resolve the pinned body via
+   *     `MetadataRepository.getByHash` so process upgrades don't affect
+   *     in-flight requests.
+   *
+   * When omitted, the service reads the current process from the
+   * `sys_approval_process` projection (pre-ADR-0009 behaviour).
+   */
+  metadataRepo?: MetadataRepository;
 }
 
 export class ApprovalService implements IApprovalService {
@@ -123,6 +138,7 @@ export class ApprovalService implements IApprovalService {
   private readonly fetchImpl?: FetchLike;
   private readonly webhookTimeoutMs?: number;
   private readonly onRegistryChange?: () => void | Promise<void>;
+  private readonly metadataRepo?: MetadataRepository;
 
   constructor(opts: ApprovalServiceOptions) {
     this.engine = opts.engine;
@@ -131,6 +147,7 @@ export class ApprovalService implements IApprovalService {
     this.fetchImpl = opts.fetch;
     this.webhookTimeoutMs = opts.webhookTimeoutMs;
     this.onRegistryChange = opts.onRegistryChange;
+    this.metadataRepo = opts.metadataRepo;
   }
 
   /** Allow the plugin to attach a hook re-binding callback after construction. */
@@ -270,6 +287,72 @@ export class ApprovalService implements IApprovalService {
     if (!cb) return;
     try { await cb(); }
     catch (err: any) { this.logger?.warn?.('[approvals] onRegistryChange handler failed', { error: err?.message }); }
+  }
+
+  /**
+   * Look up the HEAD checksum of an approval process from the metadata repo
+   * (ADR-0009). Returns null when no repo is wired, no metadata exists for
+   * the name, or the lookup fails — callers MUST treat null as "do not pin"
+   * and fall back to the projection table.
+   */
+  private async resolveProcessHash(processName: string, organizationId?: string | null): Promise<string | null> {
+    if (!this.metadataRepo) return null;
+    if (!processName) return null;
+    const orgRef = { org: organizationId || 'system', type: 'approval' as const, name: processName };
+    try {
+      const head = await this.metadataRepo.get(orgRef);
+      return head?.hash ?? null;
+    } catch (err: any) {
+      this.logger?.debug?.('[approvals] metadataRepo.get failed', { name: processName, error: err?.message });
+      return null;
+    }
+  }
+
+  /**
+   * Resolve the approval process for an in-flight request, honouring
+   * ADR-0009 execution pinning when a `process_hash` is recorded.
+   *
+   * Resolution order:
+   *   1. If `req.process_hash` AND `metadataRepo` are set, try
+   *      `getByHash` — return a row whose `definition` is the pinned body.
+   *   2. Otherwise (or on lookup failure) fall back to the current
+   *      projection via `getProcess(req.process_name)`.
+   */
+  private async loadProcessForRequest(req: ApprovalRequestRow, context: SharingExecutionContext): Promise<ApprovalProcessRow | null> {
+    const hash = req.process_hash;
+    if (hash && this.metadataRepo) {
+      const orgId = (req as any).organization_id ?? null;
+      const orgRef = { org: orgId || 'system', type: 'approval' as const, name: req.process_name };
+      try {
+        const pinned = await this.metadataRepo.getByHash(orgRef, hash);
+        if (pinned?.body) {
+          // Use the pinned body for the definition; pull identity/state
+          // fields from the current projection if available so display
+          // labels and active-flag stay fresh. Synthesize if absent.
+          const current = await this.getProcess(req.process_name, context);
+          const body: any = pinned.body;
+          return {
+            id: current?.id ?? `pinned_${hash.slice(7, 19)}`,
+            name: req.process_name,
+            label: body.label ?? current?.label ?? req.process_name,
+            object_name: req.object_name,
+            description: body.description ?? current?.description,
+            active: current?.active ?? true,
+            definition: body,
+            created_at: current?.created_at,
+            updated_at: current?.updated_at,
+          };
+        }
+        this.logger?.warn?.('[approvals] pinned process body not found; falling back to current', {
+          request: req.id, process: req.process_name, hash,
+        });
+      } catch (err: any) {
+        this.logger?.warn?.('[approvals] getByHash failed; falling back to current', {
+          request: req.id, error: err?.message,
+        });
+      }
+    }
+    return this.getProcess(req.process_name, context);
   }
 
   /** Mirror request status onto `process.approvalStatusField` if configured. */
@@ -432,9 +515,11 @@ export class ApprovalService implements IApprovalService {
 
     const now = this.clock.now().toISOString();
     const id = uid('areq');
+    const processHash = await this.resolveProcessHash(process.name, ctxOrg);
     const row: any = {
       id,
       process_name: process.name,
+      process_hash: processHash,
       object_name: input.object,
       record_id: input.recordId,
       submitter_id: input.submitterId ?? context.userId ?? null,
@@ -541,7 +626,7 @@ export class ApprovalService implements IApprovalService {
       throw new Error(`FORBIDDEN: actor '${input.actorId}' is not a pending approver`);
     }
 
-    const process = await this.getProcess(req.process_name, context);
+    const process = await this.loadProcessForRequest(req, context);
     if (!process) throw new Error(`PROCESS_NOT_FOUND: ${req.process_name}`);
     const steps: any[] = process.definition?.steps ?? [];
     const stepIndex = req.current_step_index ?? 0;
@@ -624,7 +709,7 @@ export class ApprovalService implements IApprovalService {
       throw new Error(`FORBIDDEN: actor '${input.actorId}' is not a pending approver`);
     }
 
-    const process = await this.getProcess(req.process_name, context);
+    const process = await this.loadProcessForRequest(req, context);
     if (!process) throw new Error(`PROCESS_NOT_FOUND: ${req.process_name}`);
     const steps: any[] = process.definition?.steps ?? [];
     const stepIndex = req.current_step_index ?? 0;
@@ -705,7 +790,7 @@ export class ApprovalService implements IApprovalService {
     }, { context: SYSTEM_CTX });
     const fresh = await this.getRequest(req.id, context);
     // Phase B: process.onRecall + status mirror.
-    const process = await this.getProcess(req.process_name, context);
+    const process = await this.loadProcessForRequest(req, context);
     if (process) {
       await this.syncStatusField(process, fresh!);
       await this.runActions((process.definition as any)?.onRecall, 'recall', process, fresh!, undefined, input.actorId, input.comment);

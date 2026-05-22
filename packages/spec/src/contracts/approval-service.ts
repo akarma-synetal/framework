@@ -35,6 +35,12 @@ export interface ApprovalProcessRow {
 export interface ApprovalRequestRow {
   id: string;
   process_name: string;
+  /**
+   * sha256 of the approval process body at submit time (ADR-0009 execution pinning).
+   * When set, the engine resolves the process via `MetadataRepository.getByHash`
+   * so process upgrades do not affect this in-flight request.
+   */
+  process_hash?: string;
   object_name: string;
   record_id: string;
   submitter_id?: string;

@@ -67,10 +67,24 @@ export class ApprovalsServicePlugin implements Plugin {
     this.engine = engine;
     this.logger = ctx.logger;
 
+    // ADR-0009: try to wire the metadata repository for execution pinning.
+    // The approvals service degrades to the projection-table path if no
+    // metadata service is registered (e.g. in tests or minimal setups).
+    let metadataRepo: any;
+    try {
+      const meta = ctx.getService<any>('metadata');
+      metadataRepo = meta?.getRepository?.();
+    } catch { /* metadata plugin not loaded — fall back */ }
+
     this.service = new ApprovalService({
       engine: engine as ApprovalEngine,
       logger: ctx.logger,
+      metadataRepo,
     });
+
+    if (metadataRepo) {
+      ctx.logger.info('ApprovalsServicePlugin: execution pinning enabled (ADR-0009)');
+    }
 
     if (!this.options.disableAutoHooks) {
       // Re-bind hooks on every registry mutation.

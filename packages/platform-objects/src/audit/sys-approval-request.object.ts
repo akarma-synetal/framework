@@ -165,6 +165,16 @@ export const SysApprovalRequest = ObjectSchema.create({
       group: 'State',
     }),
 
+    process_hash: Field.text({
+      label: 'Process Hash',
+      required: false,
+      maxLength: 80,
+      readonly: true,
+      description: 'sha256 of the approval process body at submit time (ADR-0009 execution pinning). '
+        + 'Resolved through sys_metadata_history so process upgrades do not affect in-flight requests.',
+      group: 'State',
+    }),
+
     completed_at: Field.datetime({
       label: 'Completed At',
       required: false,

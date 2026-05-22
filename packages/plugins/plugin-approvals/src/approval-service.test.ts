@@ -334,4 +334,113 @@ describe('ApprovalService', () => {
     const req = await svc.submit({ object: 'opportunity', recordId: 'opp1' }, CTX);
     expect(req.pending_approvers).toEqual(['department:unknown']);
   });
+
+  // ── ADR-0009 execution pinning ─────────────────────────────────
+
+  describe('execution pinning (ADR-0009)', () => {
+    // Minimal fake metadata repo: keeps a map of (name → versions[]) where
+    // each version has a hash. Mirrors MetadataRepository.get/getByHash.
+    function makeFakeMetadataRepo() {
+      const versions = new Map<string, { hash: string; body: any }[]>();
+      return {
+        store(name: string, body: any) {
+          const hash = `sha256:${name}_${(versions.get(name)?.length ?? 0) + 1}`;
+          const list = versions.get(name) ?? [];
+          list.push({ hash, body });
+          versions.set(name, list);
+        },
+        async get(ref: any) {
+          const list = versions.get(ref.name);
+          if (!list?.length) return null;
+          const head = list[list.length - 1];
+          return { ref, hash: head.hash, body: head.body, seq: list.length, version: list.length, parentHash: null };
+        },
+        async getByHash(ref: any, hash: string) {
+          const list = versions.get(ref.name);
+          const found = list?.find(v => v.hash === hash);
+          return found ? { ref, hash: found.hash, body: found.body, seq: 1, version: 1, parentHash: null } : null;
+        },
+        async put() { throw new Error('not implemented'); },
+        async delete() { throw new Error('not implemented'); },
+        list() { return (async function* () {})(); },
+        async *history() {},
+        watch() { return () => {}; },
+        async start() {},
+        async stop() {},
+      } as any;
+    }
+
+    it('submit records process_hash when metadataRepo is wired', async () => {
+      const repo = makeFakeMetadataRepo();
+      const v1 = multiStep();
+      repo.store('proc', v1);
+
+      const pinned = new ApprovalService({
+        engine: engine as any,
+        clock: { now: () => new Date(baseTime + (n++) * 1000) },
+        metadataRepo: repo,
+      });
+      await pinned.defineProcess({ name: 'proc', label: 'P', object: 'opportunity', definition: v1 }, CTX);
+
+      const req = await pinned.submit({ object: 'opportunity', recordId: 'opp1' }, CTX);
+      expect(req.process_hash).toMatch(/^sha256:proc_1$/);
+    });
+
+    it('process upgrade after submit does NOT affect an in-flight request', async () => {
+      const repo = makeFakeMetadataRepo();
+      const v1 = multiStep(); // 2 steps: u1 → u2
+      repo.store('proc', v1);
+
+      const pinned = new ApprovalService({
+        engine: engine as any,
+        clock: { now: () => new Date(baseTime + (n++) * 1000) },
+        metadataRepo: repo,
+      });
+      await pinned.defineProcess({ name: 'proc', label: 'P', object: 'opportunity', definition: v1 }, CTX);
+
+      // Submit the request — pinned to v1 (2 steps).
+      const req = await pinned.submit({ object: 'opportunity', recordId: 'opp1' }, CTX);
+      expect(req.pending_approvers).toEqual(['u1']);
+
+      // After submit, the process gets a brand new third step appended.
+      const v2 = {
+        name: 'proc', label: 'P', object: 'opportunity', active: true,
+        steps: [
+          ...v1.steps,
+          { name: 'step3', label: 'Step 3', approvers: [{ type: 'user' as const, value: 'u3' }], behavior: 'first_response' as const },
+        ],
+      };
+      repo.store('proc', v2);
+      // Also refresh the projection — simulates redeploy.
+      await pinned.defineProcess({ name: 'proc', label: 'P', object: 'opportunity', definition: v2 }, CTX);
+
+      // Step 1 approver acts → request advances to step 2 (pinned v1, NOT v2).
+      const r1 = await pinned.approve(req.id, { actorId: 'u1' }, CTX);
+      expect(r1.request.current_step).toBe('step2');
+      expect(r1.request.pending_approvers).toEqual(['u2']);
+      expect(r1.finalized).toBe(false);
+
+      // Step 2 approver finalises → pinned process has only 2 steps, so
+      // the request becomes `approved` instead of advancing to v2's step3.
+      const r2 = await pinned.approve(req.id, { actorId: 'u2' }, CTX);
+      expect(r2.finalized).toBe(true);
+      expect(r2.request.status).toBe('approved');
+    });
+
+    it('falls back to projection when metadataRepo has no head (e.g. defineProcess-only path)', async () => {
+      const repo = makeFakeMetadataRepo();
+      // Note: repo has NO body for 'proc' — only the projection table does.
+      const pinned = new ApprovalService({
+        engine: engine as any,
+        clock: { now: () => new Date(baseTime + (n++) * 1000) },
+        metadataRepo: repo,
+      });
+      await pinned.defineProcess({ name: 'proc', label: 'P', object: 'opportunity', definition: multiStep() }, CTX);
+      const req = await pinned.submit({ object: 'opportunity', recordId: 'opp1' }, CTX);
+      expect(req.process_hash).toBeUndefined();
+      // approve still works through the fallback path.
+      const r = await pinned.approve(req.id, { actorId: 'u1' }, CTX);
+      expect(r.request.current_step).toBe('step2');
+    });
+  });
 });

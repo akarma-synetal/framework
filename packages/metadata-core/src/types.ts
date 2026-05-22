@@ -18,18 +18,25 @@ import { z } from 'zod';
  */
 export const MetadataTypeSchema = z.enum([
   'object',
+  'field',
+  'trigger',
+  'validation',
+  'hook',
   'view',
   'page',
   'dashboard',
   'app',
+  'action',
   'flow',
   'workflow',
+  'approval',
   'agent',
   'tool',
   'skill',
   'report',
   'translation',
   'role',
+  'profile',
   'permission',
   'policy',
   'api',
@@ -37,6 +44,10 @@ export const MetadataTypeSchema = z.enum([
   'datasource',
   'cube',
   'settings',
+  'router',
+  'function',
+  'service',
+  'email_template',
 ]).describe('Canonical metadata type name');
 
 export type MetadataType = z.infer<typeof MetadataTypeSchema>;
