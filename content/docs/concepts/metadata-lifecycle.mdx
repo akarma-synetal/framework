@@ -120,17 +120,43 @@ The hash is `sha256:` + 64-hex of a canonical (sorted-keys, no-undefined) JSON s
 
 ---
 
-## Status (as of M0)
+## Status (as of 2026-04)
 
 | Component | State |
 | :--- | :--- |
 | `InMemoryRepository`, `FileSystemRepository`, `LayeredRepository` | ✅ Shipped (`@objectstack/metadata-core`) |
-| Change log + `seq` | ✅ Shipped |
+| Change log + `seq` (per-org, monotonic) | ✅ Shipped |
 | SSE bridge (`/api/metadata/hmr` with `seq`) | ✅ Shipped |
 | Studio `useMetadataHmr` + `HmrStatusBadge` | ✅ Shipped |
+| Console dev-mode HMR reloader (`MetadataHmrReloader`) | ✅ Shipped |
 | `SysMetadataRepository` (overlay over `sys_metadata`) | ✅ Shipped (`@objectstack/objectql`) |
-| `LayeredRepository(SysMeta + artifact)` composition test | ✅ Shipped |
-| **`protocol.ts:saveMetaItem` flipped to use `SysMetadataRepository.put`** | ⏳ Deferred — requires hash-compat dry-run vs. existing rows |
+| `LayeredRepository(SysMeta + artifact)` composition | ✅ Shipped |
+| `protocol.ts:saveMetaItem` routed through `SysMetadataRepository.put` | ✅ Shipped (PR-10d.6, flag removed) |
+| `sys_metadata_history` table + cross-replica LISTEN/NOTIFY | ⏳ M1 (PostgresRepository) |
 | Cache + Registry refactor against `MetadataRepository` | ⏳ Post-M0 |
 
-The deferred items are tracked as PR-10d in the M0 sprint plan.
+---
+
+## FAQ — When does code-defined metadata enter the database?
+
+**Short answer: never.** This is a deliberate design choice; the table below is the authoritative reference and supersedes any other description you may find.
+
+| Where the metadata came from | Lands in `sys_metadata`? | Lands in history? |
+|:---|:---|:---|
+| `defineView(...)` / `defineFlow(...)` / any source file → compiled into `dist/objectstack.json` | ❌ Never. Loaded into the in-memory registry on boot; refreshed via HMR in dev. | ❌ The artifact's own version history *is* Git. The metadata layer does not duplicate it. |
+| Editing a `.json` under `.objectstack/metadata/<type>/<name>.json` (FS overlay) | ❌ FS layer is independent of DB. | ✅ Appended to `.objectstack/.log/main.jsonl` by `FileSystemRepository`. |
+| Studio inline edit, or `PUT /api/v1/metadata/...` (REST) on an `allowOrgOverride: true` type | ✅ Written by `SysMetadataRepository.put()` as an **overlay row** scoped to `organization_id`. | ⚠️ M0: in-process watch broadcast only — no durable history table yet. M1: appended to `sys_metadata_history` with a Postgres `SERIAL seq`. |
+| Deploying a new build (new `dist/objectstack.json`) | ❌ The artifact is loaded into memory, not synced into `sys_metadata`. | ❌ Use Git tags / your deployment platform's release log; that's where artifact "version history" lives. |
+
+### Why artifact never enters the database
+
+1. **Single source of truth.** Code → artifact → memory. If artifact also wrote to `sys_metadata`, every deploy would need a reconciliation step ("the row says v3.0.0 but the code says v3.0.1") that is impossible to get right under concurrent edits.
+2. **Overlay stays small and auditable.** Per-org overlay = "what this organization deliberately changed at runtime". A clean table that's safe to dump, diff, or reset to factory.
+3. **Immutable infrastructure.** Rolling back a deploy = switching image tags. No DB migration, no reverse `put`, no history replay required.
+4. **Per-org multi-tenant economics.** If artifacts were materialised into `sys_metadata`, every org would carry tens of thousands of baseline rows. Overlay-only keeps each org's row count proportional to its actual customisation.
+
+### What if I want auditable history of deployed artifact changes?
+
+That's a **deployment log**, not a metadata change log. Track the envelope hash of each deployed `objectstack.json` against the org/environment in a deployment-history table. The internal items inside the artifact need no per-item history because their canonical history is the Git repo that produced them.
+
+---
