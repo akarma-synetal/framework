@@ -60,7 +60,7 @@ import { z } from 'zod';
 
 /** Supported view modes for metadata viewers */
 import { lazySchema } from '../shared/lazy-schema';
-export const ViewModeSchema = lazySchema(() => z.enum(['preview', 'design', 'code', 'data']));
+export const ViewModeSchema = lazySchema(() => z.enum(['preview', 'design', 'code', 'data', 'history']));
 export type ViewMode = z.infer<typeof ViewModeSchema>;
 
 // ─── Metadata Viewer Contribution ────────────────────────────────────

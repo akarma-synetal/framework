@@ -18,6 +18,7 @@ import { agentPlaygroundPlugin } from './agent-playground-plugin';
 import { toolPlaygroundPlugin } from './tool-playground-plugin';
 import { flowViewerPlugin } from './flow-viewer-plugin';
 import { viewPreviewPlugin } from './view-preview-plugin';
+import { historyViewerPlugin } from './history-plugin';
 
 // Protocol plugins (sidebar groups + icons)
 import { uiProtocolPlugin } from './ui-plugin';
@@ -40,6 +41,9 @@ export const builtInPlugins: StudioPlugin[] = [
   flowViewerPlugin,
   viewPreviewPlugin,
 
+  // Wildcard history timeline — available for every metadata type in `history` mode (ADR-0008 §5)
+  historyViewerPlugin,
+
   // Protocol group plugins (provide sidebar groups + icons)
   uiProtocolPlugin,
   automationProtocolPlugin,
@@ -56,6 +60,7 @@ export {
   toolPlaygroundPlugin,
   flowViewerPlugin,
   viewPreviewPlugin,
+  historyViewerPlugin,
   uiProtocolPlugin,
   automationProtocolPlugin,
   securityProtocolPlugin,

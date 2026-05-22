@@ -19,7 +19,7 @@ import { useMetadataViewer, useMetadataViewers, useAvailableModes, useMetadataAc
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Eye, PenTool, Code2, Table2,
+  Eye, PenTool, Code2, Table2, History,
   ChevronDown,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -37,6 +37,7 @@ const MODE_CONFIG: Record<ViewMode, { icon: LucideIcon; label: string }> = {
   design: { icon: PenTool as LucideIcon, label: 'Design' },
   code: { icon: Code2 as LucideIcon, label: 'Code' },
   data: { icon: Table2 as LucideIcon, label: 'Data' },
+  history: { icon: History as LucideIcon, label: 'History' },
 };
 
 // ─── Props ───────────────────────────────────────────────────────────
