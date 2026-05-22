@@ -16,9 +16,9 @@
  * 1. **Atomic put.** A successful `put()` either fully applies (item
  *    visible to subsequent `get` AND an event present in the log) or
  *    does not apply at all. No half-states.
- * 2. **Monotonic seq per branch.** `seq` is strictly increasing within
- *    `(org, project, branch)`. Different branches have independent
- *    sequences.
+ * 2. **Monotonic seq per org.** `seq` is strictly increasing within
+ *    `org`. Different orgs have independent sequences. (Repositories
+ *    scoped to a single org may treat the entire repo as one log.)
  * 3. **Optimistic locking.** `put` and `delete` throw `ConflictError`
  *    when `parentVersion` does not match the current HEAD.
  * 4. **Canonical hashing.** `item.hash === hashSpec(item.body)` — always.
@@ -42,9 +42,6 @@ import type {
   ListFilter,
   WatchFilter,
   HistoryOptions,
-  BranchRef,
-  MergeStrategy,
-  MergeResult,
 } from './types.js';
 
 export interface MetadataRepository {
@@ -79,18 +76,6 @@ export interface MetadataRepository {
    *     how to resume — Postgres LISTEN reconnect, JSONL tail, etc.).
    */
   watch(filter: WatchFilter, since?: number): AsyncIterable<MetadataEvent>;
-
-  // ── Branch ops are optional in M0/M1 ────────────────────────────────
-
-  /** M2+: create a new branch from an existing one. */
-  fork?(from: BranchRef, to: BranchRef): Promise<void>;
-
-  /** M2+: merge a source branch into a destination branch. */
-  merge?(
-    from: BranchRef,
-    to: BranchRef,
-    strategy: MergeStrategy,
-  ): Promise<MergeResult>;
 }
 
 /**

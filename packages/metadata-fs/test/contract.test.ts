@@ -25,13 +25,10 @@ runRepositoryContractTests(
     const repo = new FileSystemRepository({
       root: dir,
       org: 'system',
-      project: 'test',
-      branch: 'main',
       disableWatch: true,
     });
     await repo.start();
     created.push(repo);
     return repo;
   },
-  { singleBranch: true },
 );

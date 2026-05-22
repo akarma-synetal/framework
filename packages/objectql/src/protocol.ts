@@ -1921,8 +1921,6 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 type: singularTypeForRepo,
                 name: request.name,
                 org: orgId ?? 'env',
-                project: this.projectId ?? 'default',
-                branch: 'main',
             } as Parameters<typeof repo.put>[0];
             let parentVersion: string | null;
             if (request.parentVersion !== undefined) {

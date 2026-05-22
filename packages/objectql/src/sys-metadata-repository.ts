@@ -11,7 +11,8 @@
  * What this layer DOES (M0):
  *   - get / put / delete / list against `sys_metadata`
  *   - tenancy scope = `organization_id` (per-org overlays only;
- *     project_id is deprecated per ADR-0006 v4 / ADR-0005 amendment)
+ *     project/branch concepts removed — see ADR-0006 v5 / ADR-0008
+ *     branch-removal amendment)
  *   - hash stamping with `hashSpec` (PR-10a guarantees stability)
  *   - watch() implemented via an in-memory event broadcaster fed by
  *     every successful put/delete on THIS instance
@@ -22,7 +23,6 @@
  *   - cross-replica change-log replay (no append-only `metadata_events`
  *     table yet; LISTEN/NOTIFY plumbing comes with PostgresRepository)
  *   - history() — emits empty AsyncIterable
- *   - branch ops (fork/merge)
  *   - hashSpec backfill for legacy rows missing `checksum`
  *
  * Schema mapping (ADR-0008 PR-10d.2):
@@ -91,15 +91,6 @@ export interface SysMetadataRepositoryOptions {
    * — see ADR-0005 amendment).
    */
   organizationId?: string | null;
-  /**
-   * Conventional logical project label embedded in returned MetaRefs.
-   * The on-disk `sys_metadata` table has no project concept since
-   * ADR-0006 v4; this value is purely identifying for upstream
-   * LayeredRepository composition. Default: `"default"`.
-   */
-  projectLabel?: string;
-  /** Branch label embedded in returned MetaRefs. M0 → `"main"`. */
-  branchLabel?: string;
   /** Org label embedded in returned MetaRefs. Defaults to organizationId or `"system"`. */
   orgLabel?: string;
 }
@@ -115,8 +106,6 @@ export class SysMetadataRepository implements MetadataRepository {
   private readonly engine: SysMetadataEngine;
   private readonly organizationId: string | null;
   private readonly orgLabel: string;
-  private readonly project: string;
-  private readonly branch: string;
 
   /**
    * Local seq counter. NOT cross-replica monotonic — that requires the
@@ -131,8 +120,6 @@ export class SysMetadataRepository implements MetadataRepository {
     this.engine = opts.engine;
     this.organizationId = opts.organizationId ?? null;
     this.orgLabel = opts.orgLabel ?? (opts.organizationId ?? 'system');
-    this.project = opts.projectLabel ?? 'default';
-    this.branch = opts.branchLabel ?? 'main';
   }
 
   /**
@@ -369,7 +356,7 @@ export class SysMetadataRepository implements MetadataRepository {
         w({
           seq: -1,
           op: 'delete',
-          ref: { org: '', project: '', branch: '', type: 'view', name: '_close' } as MetaRef,
+          ref: { org: '', type: 'view', name: '_close' } as MetaRef,
           hash: null,
           parentHash: null,
           actor: 'system',
@@ -411,8 +398,6 @@ export class SysMetadataRepository implements MetadataRepository {
   private fullRef(ref: Pick<MetaRef, 'type' | 'name'>): MetaRef {
     return {
       org: this.orgLabel,
-      project: this.project,
-      branch: this.branch,
       type: ref.type,
       name: ref.name,
     };
@@ -444,7 +429,6 @@ export class SysMetadataRepository implements MetadataRepository {
     if (filter.type && evt.ref.type !== filter.type) return false;
     if (filter.name && evt.ref.name !== filter.name) return false;
     if (filter.org && evt.ref.org !== filter.org) return false;
-    if (filter.branch && evt.ref.branch !== filter.branch) return false;
     return true;
   }
 }

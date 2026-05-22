@@ -44,16 +44,21 @@ export type MetadataType = z.infer<typeof MetadataTypeSchema>;
 // ─── MetaRef ──────────────────────────────────────────────────────────
 
 /**
- * Fully-qualified reference to a metadata item. All four scopes are
- * mandatory at the storage layer; higher layers may default `org=system`,
- * `project=<current>`, `branch=main` for convenience.
+ * Fully-qualified reference to a metadata item. Identity is `(org, type, name)`.
  *
- * `version` is optional: omit to mean "branch HEAD", supply to pin.
+ * Per ADR-0008 v2 (2026-05) the metadata layer no longer carries `project`
+ * or `branch`. Project survives only as an **artifact packaging concept**
+ * (the unit a CLI/CI run compiles into `dist/objectstack.json`); it does
+ * not appear in the runtime customization scope. Branching belongs to Git
+ * (or your VCS of choice) and never propagated cleanly into the runtime
+ * model — so it has been removed entirely.
+ *
+ * Higher layers may default `org='system'` for built-ins.
+ *
+ * `version` is optional: omit to mean "HEAD", supply to pin.
  */
 export const MetaRefSchema = z.object({
   org: z.string().min(1).describe('Tenant/org identifier; "system" for built-ins'),
-  project: z.string().min(1).describe('Project identifier within the org'),
-  branch: z.string().min(1).default('main').describe('Branch name'),
   type: MetadataTypeSchema,
   name: z.string().regex(/^[a-z_][a-z0-9_]*$/).describe('Snake_case machine name'),
   version: z.string().optional().describe('Optional version pin (content hash); omit for HEAD'),
@@ -65,8 +70,8 @@ export type MetaRef = z.infer<typeof MetaRefSchema>;
  * Construct a stable string key from a MetaRef (excluding `version`,
  * which is mutable). Used as cache keys and log indexes.
  */
-export function refKey(ref: Pick<MetaRef, 'org' | 'project' | 'branch' | 'type' | 'name'>): string {
-  return `${ref.org}/${ref.project}/${ref.branch}/${ref.type}/${ref.name}`;
+export function refKey(ref: Pick<MetaRef, 'org' | 'type' | 'name'>): string {
+  return `${ref.org}/${ref.type}/${ref.name}`;
 }
 
 // ─── Item & header ────────────────────────────────────────────────────
@@ -86,7 +91,7 @@ export const MetadataItemSchema = z.object({
   authoredBy: z.string().describe('Identity of the writer (user id, "cli", "ai:claude", …)'),
   authoredAt: z.string().describe('ISO-8601 timestamp'),
   message: z.string().optional().describe('Optional commit message'),
-  seq: z.number().int().nonnegative().describe('Sequence number this write produced in the branch log'),
+  seq: z.number().int().nonnegative().describe('Sequence number this write produced in the org log'),
   schemaVersion: z.string().optional().describe('Zod schema version that wrote this spec (M3 codemod hook)'),
 });
 
@@ -160,8 +165,6 @@ export interface DeleteResult {
 
 export interface ListFilter {
   org?: string;
-  project?: string;
-  branch?: string;
   type?: MetadataType;
   /** Substring match on `name`; case-sensitive. */
   nameContains?: string;
@@ -173,8 +176,6 @@ export interface ListFilter {
 
 export interface WatchFilter {
   org?: string;
-  project?: string;
-  branch?: string;
   type?: MetadataType;
   /** When omitted, match all names within the scope. */
   name?: string;
@@ -184,24 +185,4 @@ export interface HistoryOptions {
   /** Lower bound (exclusive) for pagination. */
   sinceSeq?: number;
   limit?: number;
-}
-
-// ─── Branch ops (M2 — surface defined now to avoid churn later) ───────
-
-export interface BranchRef {
-  org: string;
-  project: string;
-  branch: string;
-}
-
-export type MergeStrategy = 'last-write-wins' | 'manual-resolve';
-
-export interface MergeResult {
-  applied: number;
-  conflicts: Array<{
-    ref: MetaRef;
-    base: string | null;
-    incoming: string;
-    current: string;
-  }>;
 }

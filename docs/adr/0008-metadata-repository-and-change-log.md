@@ -1,9 +1,42 @@
 # ADR-0008: Metadata Repository, Change Log & Subscription (M0 → M4)
 
-**Status**: Proposed (2026-05-22)
+**Status**: Accepted (2026-05-22) · Amended 2026-04-13 — branch concept removed (see §0 Amendment).
 **Deciders**: ObjectStack Protocol Architects
 **Builds on**: [ADR-0003](./0003-package-as-first-class-citizen.md), [ADR-0004](./0004-cloud-multi-kernel.md), [ADR-0005](./0005-metadata-customization-overlay.md), [ADR-0006](./0006-project-environment-split.md)
 **Supersedes (parts of)**: ad-hoc HMR wiring in `packages/metadata` and the local-only POST contract between CLI and runtime.
+
+---
+
+## 0. 2026-04-13 Amendment — drop `project` and `branch` from `MetaRef`
+
+The original ADR threaded `project` and `branch` through every metadata
+identifier as a hedge against future "promote dev → main" workflows. After
+shipping M0 we concluded the cost outweighs the benefit:
+
+1. **Project is an artifact concept, not a runtime concept.** A built
+   `objectstack.json` carries `projectId` at the envelope level — it
+   already disambiguates artifacts before they reach the repository
+   layer. Re-threading the same identifier through `MetaRef` was pure
+   ceremony.
+2. **Branching belongs to Git.** Source metadata is text on disk that
+   the developer's existing tooling (Git, Vercel preview branches,
+   GitHub PRs) already handles. Reinventing branch state inside the
+   metadata layer would compete with — and lose to — Git.
+3. **Customisation is per-organisation.** ADR-0005's overlay is keyed
+   exclusively by organisation. There is no concrete use case for
+   per-branch overlays inside an org.
+
+The amended model:
+
+```
+MetaRef = { org, type, name, version? }
+refKey  = `${org}/${type}/${name}`
+seq     = monotonic per org   (was per branch)
+```
+
+Migration impact: see the `metadata-branch-removal` changeset. All
+M0/M1 §10 PR-by-PR notes below still apply textually; mentally substitute
+"org" for any "branch" reference and ignore project segments.
 
 ---
 

@@ -10,7 +10,7 @@ import {
 } from '../src/errors.js';
 
 const ref = {
-  org: 'a', project: 'b', branch: 'main', type: 'view' as const, name: 'case',
+  org: 'a', type: 'view' as const, name: 'case',
 };
 
 describe('errors', () => {

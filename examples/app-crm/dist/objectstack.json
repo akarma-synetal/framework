@@ -14125,7 +14125,7 @@
       "listViews": {
         "case_workflow": {
           "name": "case_workflow",
-          "label": "Service Workflow (HMR-LIVE)",
+          "label": "Service Workflow",
           "type": "kanban",
           "data": {
             "provider": "object",

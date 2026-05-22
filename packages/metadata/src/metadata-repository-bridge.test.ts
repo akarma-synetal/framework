@@ -20,8 +20,6 @@ import { MetadataManager } from './metadata-manager.js';
 function makeRef(type: string, name: string): MetaRef {
   return {
     org: 'system',
-    project: 'proj_test',
-    branch: 'main',
     type: type as any,
     name,
   };

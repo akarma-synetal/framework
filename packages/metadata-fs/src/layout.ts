@@ -3,8 +3,8 @@
 /**
  * Disk layout helpers — see ADR-0008 §10 PR-4 / packages/metadata-fs README.
  *
- *   <root>/<type>/<name>.json          — canonical body
- *   <root>/.objectstack/.log/<branch>.jsonl — append-only change log
+ *   <root>/<type>/<name>.json     — canonical body
+ *   <root>/.objectstack/.log/main.jsonl  — append-only change log
  */
 
 import path from 'node:path';
@@ -13,8 +13,6 @@ import type { MetadataType } from '@objectstack/metadata-core';
 export interface FsLayout {
   /** Absolute path to the metadata root. */
   root: string;
-  /** Branch name (e.g. "main"). */
-  branch: string;
 }
 
 export function itemPath(layout: FsLayout, type: MetadataType, name: string): string {
@@ -30,7 +28,9 @@ export function logDir(layout: FsLayout): string {
 }
 
 export function logFile(layout: FsLayout): string {
-  return path.join(logDir(layout), `${layout.branch}.jsonl`);
+  // Single change log per filesystem root (branching is a Git concern,
+  // not a metadata-layer concern).
+  return path.join(logDir(layout), `main.jsonl`);
 }
 
 /** Parse a path like ".../view/case_grid.json" into {type, name}. */

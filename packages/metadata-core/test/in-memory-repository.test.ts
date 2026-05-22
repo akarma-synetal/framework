@@ -13,8 +13,6 @@ describe('InMemoryRepository — implementation-specific', () => {
     const repo = new InMemoryRepository({ now: () => fixed });
     const ref = {
       org: 'system',
-      project: 'test',
-      branch: 'main',
       type: 'view' as const,
       name: 'a',
     };
@@ -26,8 +24,6 @@ describe('InMemoryRepository — implementation-specific', () => {
     const repo = new InMemoryRepository();
     const ref = {
       org: 'system',
-      project: 'test',
-      branch: 'main',
       type: 'view' as const,
       name: 'a',
     };
@@ -42,8 +38,6 @@ describe('InMemoryRepository — implementation-specific', () => {
     const repo = new InMemoryRepository();
     const ref = {
       org: 'system',
-      project: 'test',
-      branch: 'main',
       type: 'view' as const,
       name: 'a',
     };

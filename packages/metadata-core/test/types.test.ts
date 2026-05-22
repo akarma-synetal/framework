@@ -13,28 +13,16 @@ describe('MetaRefSchema', () => {
   it('accepts a valid ref', () => {
     const ref = MetaRefSchema.parse({
       org: 'acme',
-      project: 'crm',
-      branch: 'main',
       type: 'view',
       name: 'case',
     });
     expect(ref.org).toBe('acme');
   });
 
-  it('defaults branch to main', () => {
-    const ref = MetaRefSchema.parse({
-      org: 'acme',
-      project: 'crm',
-      type: 'view',
-      name: 'case',
-    });
-    expect(ref.branch).toBe('main');
-  });
-
   it('rejects camelCase names', () => {
     expect(() =>
       MetaRefSchema.parse({
-        org: 'acme', project: 'crm', branch: 'main',
+        org: 'acme',
         type: 'view', name: 'caseRecord',
       }),
     ).toThrow();
@@ -43,7 +31,7 @@ describe('MetaRefSchema', () => {
   it('rejects unknown types', () => {
     expect(() =>
       MetaRefSchema.parse({
-        org: 'acme', project: 'crm', branch: 'main',
+        org: 'acme',
         type: 'widget', name: 'case',
       }),
     ).toThrow();
@@ -52,14 +40,14 @@ describe('MetaRefSchema', () => {
 
 describe('refKey', () => {
   it('produces a stable string key', () => {
-    expect(refKey({ org: 'a', project: 'b', branch: 'main', type: 'view', name: 'case' }))
-      .toBe('a/b/main/view/case');
+    expect(refKey({ org: 'a', type: 'view', name: 'case' }))
+      .toBe('a/view/case');
   });
 
   it('ignores version', () => {
-    const k1 = refKey({ org: 'a', project: 'b', branch: 'main', type: 'view', name: 'case' });
+    const k1 = refKey({ org: 'a', type: 'view', name: 'case' });
     const k2 = refKey({
-      org: 'a', project: 'b', branch: 'main', type: 'view', name: 'case',
+      org: 'a', type: 'view', name: 'case',
       // @ts-expect-error — refKey signature drops version, but extra fields are tolerated
       version: 'sha256:abc',
     });
@@ -69,7 +57,7 @@ describe('refKey', () => {
 
 describe('MetadataItemSchema', () => {
   const sample = {
-    ref: { org: 'a', project: 'b', branch: 'main', type: 'view' as const, name: 'case' },
+    ref: { org: 'a', type: 'view' as const, name: 'case' },
     body: { name: 'case', type: 'object-grid' },
     hash: 'sha256:' + 'a'.repeat(64),
     parentHash: null,
@@ -96,7 +84,7 @@ describe('MetadataEventSchema', () => {
     const evt = MetadataEventSchema.parse({
       seq: 1,
       op: 'create',
-      ref: { org: 'a', project: 'b', branch: 'main', type: 'view', name: 'case' },
+      ref: { org: 'a', type: 'view', name: 'case' },
       hash: 'sha256:' + 'a'.repeat(64),
       parentHash: null,
       actor: 'cli',
@@ -110,7 +98,7 @@ describe('MetadataEventSchema', () => {
     const evt = MetadataEventSchema.parse({
       seq: 2,
       op: 'delete',
-      ref: { org: 'a', project: 'b', branch: 'main', type: 'view', name: 'case' },
+      ref: { org: 'a', type: 'view', name: 'case' },
       hash: null,
       parentHash: 'sha256:' + 'a'.repeat(64),
       actor: 'cli',

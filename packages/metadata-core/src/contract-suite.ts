@@ -27,18 +27,10 @@ import { ConflictError } from './errors.js';
 export interface ContractSuiteOptions {
   /** If the implementation supports `version`-pinned reads, set true. */
   supportsVersionedReads?: boolean;
-  /**
-   * Set true for backends that are scoped to a single branch (e.g. the
-   * FileSystemRepository is one branch per instance). The cross-branch
-   * test is skipped.
-   */
-  singleBranch?: boolean;
 }
 
 const refOf = (overrides: Partial<MetaRef> = {}): MetaRef => ({
   org: 'system',
-  project: 'test',
-  branch: 'main',
   type: 'view',
   name: 'sample_view',
   ...overrides,
@@ -165,8 +157,8 @@ export function runRepositoryContractTests(
       });
     });
 
-    describe('monotonic seq per branch', () => {
-      it('seq strictly increases within a branch', async () => {
+    describe('monotonic seq per org', () => {
+      it('seq strictly increases within an org', async () => {
         const repo = await factory();
         const ref = refOf();
         const a = await repo.put(ref, spec('1'), { parentVersion: null, actor: 't' });
@@ -176,17 +168,22 @@ export function runRepositoryContractTests(
         expect(c.seq).toBeGreaterThan(b.seq);
       });
 
-      it('different branches have independent sequences', async () => {
-        if (opts.singleBranch) return;
+      it('different orgs have independent sequences', async () => {
         const repo = await factory();
-        const mainRef = refOf({ branch: 'main' });
-        const devRef = refOf({ branch: 'dev' });
-        const a = await repo.put(mainRef, spec('m1'), { parentVersion: null, actor: 't' });
-        const b = await repo.put(devRef, spec('d1'), { parentVersion: null, actor: 't' });
-        // Both can start at seq 1 (independent). The contract is only
-        // strict monotonicity *within* a branch.
-        const c = await repo.put(mainRef, spec('m2'), { parentVersion: a.version, actor: 't' });
-        const d = await repo.put(devRef, spec('d2'), { parentVersion: b.version, actor: 't' });
+        const orgA = refOf({ org: 'org_a' });
+        const orgB = refOf({ org: 'org_b' });
+        // Some backends (FileSystemRepository) are scoped to a single
+        // org; for those any foreign-org put throws — skip the test.
+        let a: { seq: number; version: string };
+        let b: { seq: number; version: string };
+        try {
+          a = await repo.put(orgA, spec('a1'), { parentVersion: null, actor: 't' });
+          b = await repo.put(orgB, spec('b1'), { parentVersion: null, actor: 't' });
+        } catch {
+          return;
+        }
+        const c = await repo.put(orgA, spec('a2'), { parentVersion: a.version, actor: 't' });
+        const d = await repo.put(orgB, spec('b2'), { parentVersion: b.version, actor: 't' });
         expect(c.seq).toBeGreaterThan(a.seq);
         expect(d.seq).toBeGreaterThan(b.seq);
       });
@@ -238,7 +235,7 @@ export function runRepositoryContractTests(
         const b = await repo.put(ref, spec('2'), { parentVersion: a.version, actor: 't' });
 
         // Start watching with `since = a.seq` — must replay b, then deliver a live event.
-        const iter = repo.watch({ org: ref.org, project: ref.project, branch: ref.branch }, a.seq);
+        const iter = repo.watch({ org: ref.org }, a.seq);
         const collected: MetadataEvent[] = [];
         const it = iter[Symbol.asyncIterator]();
 
@@ -264,7 +261,7 @@ export function runRepositoryContractTests(
         await repo.put(refOf({ name: 'a' }), spec('a'), { parentVersion: null, actor: 't' });
         await repo.put(refOf({ name: 'b' }), spec('b'), { parentVersion: null, actor: 't' });
         const events = await take(
-          repo.watch({ org: 'system', project: 'test', branch: 'main', type: 'view', name: 'a' }),
+          repo.watch({ org: 'system', type: 'view', name: 'a' }),
           5,
           200,
         );

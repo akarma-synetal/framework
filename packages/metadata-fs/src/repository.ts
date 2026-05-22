@@ -58,10 +58,6 @@ export interface FileSystemRepositoryOptions {
   root: string;
   /** Tenant/org. */
   org: string;
-  /** Project. */
-  project: string;
-  /** Branch (default: "main"). */
-  branch?: string;
   /** Identity reported in events that originate from external FS edits. */
   fsActor?: string;
   /** Disable chokidar watcher (e.g. for read-only contexts). */
@@ -72,11 +68,9 @@ export interface FileSystemRepositoryOptions {
 
 const matchRefFilter = (
   ref: MetaRef,
-  filter: { org?: string; project?: string; branch?: string; type?: MetadataType; name?: string },
+  filter: { org?: string; type?: MetadataType; name?: string },
 ): boolean => {
   if (filter.org && filter.org !== ref.org) return false;
-  if (filter.project && filter.project !== ref.project) return false;
-  if (filter.branch && filter.branch !== ref.branch) return false;
   if (filter.type && filter.type !== ref.type) return false;
   if (filter.name && filter.name !== ref.name) return false;
   return true;
@@ -87,8 +81,6 @@ const matchEvent = (evt: MetadataEvent, filter: WatchFilter): boolean => matchRe
 export class FileSystemRepository implements MetadataRepository {
   private readonly layout: FsLayout;
   private readonly org: string;
-  private readonly project: string;
-  private readonly branch: string;
   private readonly fsActor: string;
   private readonly disableWatch: boolean;
   private readonly now: () => Date;
@@ -107,12 +99,10 @@ export class FileSystemRepository implements MetadataRepository {
 
   constructor(opts: FileSystemRepositoryOptions) {
     this.org = opts.org;
-    this.project = opts.project;
-    this.branch = opts.branch ?? 'main';
     this.fsActor = opts.fsActor ?? 'fs';
     this.disableWatch = opts.disableWatch ?? false;
     this.now = opts.now ?? (() => new Date());
-    this.layout = { root: path.resolve(opts.root), branch: this.branch };
+    this.layout = { root: path.resolve(opts.root) };
     this.log = new JsonlLog(logFile(this.layout));
   }
 
@@ -198,8 +188,7 @@ export class FileSystemRepository implements MetadataRepository {
     for await (const evt of this.log.readAll()) {
       if (evt.seq <= since) continue;
       if (evt.ref.type !== ref.type || evt.ref.name !== ref.name) continue;
-      if (evt.ref.org !== ref.org || evt.ref.project !== ref.project) continue;
-      if (evt.ref.branch !== ref.branch) continue;
+      if (evt.ref.org !== ref.org) continue;
       yield evt;
       if (++yielded >= limit) return;
     }
@@ -222,7 +211,7 @@ export class FileSystemRepository implements MetadataRepository {
         replay,
         broker: this.broker,
         matches: matchEvent,
-        branchKeyOf: (e) => `${e.ref.org}/${e.ref.project}/${e.ref.branch}`,
+        branchKeyOf: (e) => e.ref.org,
       }),
     ));
   }
@@ -340,10 +329,9 @@ export class FileSystemRepository implements MetadataRepository {
   // ── Internals ───────────────────────────────────────────────────────
 
   private assertScope(ref: MetaRef): void {
-    if (ref.org !== this.org || ref.project !== this.project || ref.branch !== this.branch) {
+    if (ref.org !== this.org) {
       throw new Error(
-        `FileSystemRepository scope mismatch: expected ${this.org}/${this.project}/${this.branch}, ` +
-        `got ${ref.org}/${ref.project}/${ref.branch}`,
+        `FileSystemRepository scope mismatch: expected org=${this.org}, got org=${ref.org}`,
       );
     }
   }
@@ -373,8 +361,6 @@ export class FileSystemRepository implements MetadataRepository {
         const name = file.slice(0, -'.json'.length);
         const ref: MetaRef = {
           org: this.org,
-          project: this.project,
-          branch: this.branch,
           type: type as MetadataType,
           name,
         };
@@ -392,8 +378,7 @@ export class FileSystemRepository implements MetadataRepository {
     let last: MetadataEvent | null = null;
     for await (const evt of this.log.readAll()) {
       if (evt.ref.type !== ref.type || evt.ref.name !== ref.name) continue;
-      if (evt.ref.org !== ref.org || evt.ref.project !== ref.project) continue;
-      if (evt.ref.branch !== ref.branch) continue;
+      if (evt.ref.org !== ref.org) continue;
       if (evt.hash === hash) last = evt;
     }
     return last;
@@ -424,8 +409,6 @@ export class FileSystemRepository implements MetadataRepository {
     if (!parsed) return;
     const ref: MetaRef = {
       org: this.org,
-      project: this.project,
-      branch: this.branch,
       type: parsed.type as MetadataType,
       name: parsed.name,
     };
@@ -492,13 +475,11 @@ async function writeJsonAtomic(file: string, body: unknown): Promise<void> {
 
 function parseRefKey(key: string): MetaRef | null {
   const parts = key.split('/');
-  if (parts.length !== 5) return null;
+  if (parts.length !== 3) return null;
   return {
     org: parts[0]!,
-    project: parts[1]!,
-    branch: parts[2]!,
-    type: parts[3]! as MetadataType,
-    name: parts[4]!,
+    type: parts[1]! as MetadataType,
+    name: parts[2]!,
   };
 }
 

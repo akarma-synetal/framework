@@ -254,8 +254,6 @@ export class MetadataPlugin implements Plugin {
                 const repo = new FileSystemRepository({
                     root: repoRoot,
                     org: this.options.organizationId ?? 'system',
-                    project: this.options.projectId ?? 'proj_local',
-                    branch: 'main',
                     disableWatch: this.options.watch === false,
                 });
                 await repo.start();

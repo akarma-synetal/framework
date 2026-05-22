@@ -9,8 +9,6 @@ import { FileSystemRepository } from '../src/index.js';
 
 const baseRef = (name: string): MetaRef => ({
   org: 'system',
-  project: 'test',
-  branch: 'main',
   type: 'view',
   name,
 });
@@ -31,7 +29,7 @@ describe('FileSystemRepository — on-disk semantics', () => {
   });
 
   it('persists writes to <root>/<type>/<name>.json', async () => {
-    repo = new FileSystemRepository({ root, org: 'system', project: 'test', branch: 'main', disableWatch: true });
+    repo = new FileSystemRepository({ root, org: 'system', disableWatch: true });
     await repo.start();
     const ref = baseRef('case_grid');
     await repo.put(ref, { label: 'Cases', columns: ['id', 'subject'] }, { parentVersion: null, actor: 't' });
@@ -41,7 +39,7 @@ describe('FileSystemRepository — on-disk semantics', () => {
   });
 
   it('appends to .objectstack/.log/<branch>.jsonl on every write', async () => {
-    repo = new FileSystemRepository({ root, org: 'system', project: 'test', branch: 'main', disableWatch: true });
+    repo = new FileSystemRepository({ root, org: 'system', disableWatch: true });
     await repo.start();
     const ref = baseRef('a');
     const a = await repo.put(ref, { v: 1 }, { parentVersion: null, actor: 't' });
@@ -56,13 +54,13 @@ describe('FileSystemRepository — on-disk semantics', () => {
   });
 
   it('survives restart — heads and seq recovered from disk', async () => {
-    repo = new FileSystemRepository({ root, org: 'system', project: 'test', branch: 'main', disableWatch: true });
+    repo = new FileSystemRepository({ root, org: 'system', disableWatch: true });
     await repo.start();
     const ref = baseRef('persistent');
     const a = await repo.put(ref, { x: 1 }, { parentVersion: null, actor: 't' });
     await repo.close();
 
-    const repo2 = new FileSystemRepository({ root, org: 'system', project: 'test', branch: 'main', disableWatch: true });
+    const repo2 = new FileSystemRepository({ root, org: 'system', disableWatch: true });
     await repo2.start();
     try {
       const got = await repo2.get(ref);
@@ -76,14 +74,14 @@ describe('FileSystemRepository — on-disk semantics', () => {
   });
 
   it('chokidar: external file change emits an update event', async () => {
-    repo = new FileSystemRepository({ root, org: 'system', project: 'test', branch: 'main' });
+    repo = new FileSystemRepository({ root, org: 'system' });
     await repo.start();
 
     const ref = baseRef('externally_edited');
     await repo.put(ref, { label: 'original' }, { parentVersion: null, actor: 't' });
 
     // Subscribe BEFORE the external edit.
-    const iter = repo.watch({ org: 'system', project: 'test', branch: 'main' }, 999)[Symbol.asyncIterator]();
+    const iter = repo.watch({ org: 'system' }, 999)[Symbol.asyncIterator]();
     // Drain anything immediately available (nothing since `since` is huge).
     const collected: MetadataEvent[] = [];
     const collectorDone = (async () => {
@@ -110,7 +108,7 @@ describe('FileSystemRepository — on-disk semantics', () => {
   }, 10000);
 
   it('chokidar: own writes do not re-trigger events (self-write suppression)', async () => {
-    repo = new FileSystemRepository({ root, org: 'system', project: 'test', branch: 'main' });
+    repo = new FileSystemRepository({ root, org: 'system' });
     await repo.start();
     const ref = baseRef('self_only');
     const a = await repo.put(ref, { v: 1 }, { parentVersion: null, actor: 't' });

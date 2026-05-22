@@ -103,7 +103,7 @@ describe('SysMetadataRepository', () => {
 
     it('put creates a new row and returns the hash version', async () => {
         const result = await repo.put(
-            { org: 'org_alpha', project: 'default', branch: 'main', type: 'view', name: 'case_grid' },
+            { org: 'org_alpha', type: 'view', name: 'case_grid' },
             sampleView,
             { parentVersion: null, actor: 'studio' },
         );
@@ -114,7 +114,7 @@ describe('SysMetadataRepository', () => {
     });
 
     it('get returns the stored item with canonical body', async () => {
-        const ref = { org: 'org_alpha', project: 'default', branch: 'main', type: 'view' as const, name: 'case_grid' };
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
         await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
         const got = await repo.get(ref);
         expect(got).not.toBeNull();
@@ -124,7 +124,7 @@ describe('SysMetadataRepository', () => {
 
     it('get returns null when row is absent', async () => {
         const got = await repo.get({
-            org: 'org_alpha', project: 'default', branch: 'main',
+            org: 'org_alpha',
             type: 'view', name: 'missing',
         });
         expect(got).toBeNull();
@@ -133,7 +133,7 @@ describe('SysMetadataRepository', () => {
     // ── optimistic locking ──────────────────────────────────────────
 
     it('put rejects when parentVersion does not match HEAD', async () => {
-        const ref = { org: 'org_alpha', project: 'default', branch: 'main', type: 'view' as const, name: 'case_grid' };
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
         const first = await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
 
         await expect(
@@ -150,7 +150,7 @@ describe('SysMetadataRepository', () => {
     });
 
     it('put rejects when row already exists but caller expected absence', async () => {
-        const ref = { org: 'org_alpha', project: 'default', branch: 'main', type: 'view' as const, name: 'case_grid' };
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
         await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
         await expect(
             repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' }),
@@ -158,7 +158,7 @@ describe('SysMetadataRepository', () => {
     });
 
     it('put with identical body is a no-op (no seq bump)', async () => {
-        const ref = { org: 'org_alpha', project: 'default', branch: 'main', type: 'view' as const, name: 'case_grid' };
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
         const first = await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
         const second = await repo.put(ref, sampleView, { parentVersion: first.version, actor: 'studio' });
         expect(second.version).toBe(first.version);
@@ -172,7 +172,7 @@ describe('SysMetadataRepository', () => {
     // ── delete ──────────────────────────────────────────────────────
 
     it('delete removes the row when parentVersion matches', async () => {
-        const ref = { org: 'org_alpha', project: 'default', branch: 'main', type: 'view' as const, name: 'case_grid' };
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
         const first = await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
         await repo.delete(ref, { parentVersion: first.version, actor: 'studio' });
         expect(engine.rows.size).toBe(0);
@@ -180,7 +180,7 @@ describe('SysMetadataRepository', () => {
     });
 
     it('delete throws ConflictError on parentVersion mismatch', async () => {
-        const ref = { org: 'org_alpha', project: 'default', branch: 'main', type: 'view' as const, name: 'case_grid' };
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
         await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
         await expect(
             repo.delete(ref, { parentVersion: 'sha256:wrong', actor: 'studio' }),
@@ -190,7 +190,7 @@ describe('SysMetadataRepository', () => {
     it('delete throws on absent row', async () => {
         await expect(
             repo.delete(
-                { org: 'org_alpha', project: 'default', branch: 'main', type: 'view', name: 'missing' },
+                { org: 'org_alpha', type: 'view', name: 'missing' },
                 { parentVersion: 'sha256:anything', actor: 'studio' },
             ),
         ).rejects.toBeInstanceOf(ConflictError);
@@ -201,7 +201,7 @@ describe('SysMetadataRepository', () => {
     it('put refuses non-allowOrgOverride types (object)', async () => {
         await expect(
             repo.put(
-                { org: 'org_alpha', project: 'default', branch: 'main', type: 'object', name: 'case' },
+                { org: 'org_alpha', type: 'object', name: 'case' },
                 { name: 'case', label: 'Case', fields: {} },
                 { parentVersion: null, actor: 'studio' },
             ),
@@ -211,7 +211,7 @@ describe('SysMetadataRepository', () => {
     it('put refuses non-allowOrgOverride types (flow)', async () => {
         await expect(
             repo.put(
-                { org: 'org_alpha', project: 'default', branch: 'main', type: 'flow', name: 'on_create' },
+                { org: 'org_alpha', type: 'flow', name: 'on_create' },
                 { name: 'on_create' },
                 { parentVersion: null, actor: 'studio' },
             ),
@@ -222,12 +222,12 @@ describe('SysMetadataRepository', () => {
 
     it('list yields headers for stored items, body stripped', async () => {
         await repo.put(
-            { org: 'org_alpha', project: 'default', branch: 'main', type: 'view', name: 'a' },
+            { org: 'org_alpha', type: 'view', name: 'a' },
             { name: 'a', columns: [] },
             { parentVersion: null, actor: 'studio' },
         );
         await repo.put(
-            { org: 'org_alpha', project: 'default', branch: 'main', type: 'view', name: 'b' },
+            { org: 'org_alpha', type: 'view', name: 'b' },
             { name: 'b', columns: [] },
             { parentVersion: null, actor: 'studio' },
         );
@@ -258,11 +258,11 @@ describe('SysMetadataRepository', () => {
         // Give the iterator a tick to register before firing events.
         await new Promise((r) => setTimeout(r, 0));
         await repo.put(
-            { org: 'org_alpha', project: 'default', branch: 'main', type: 'view', name: 'one' },
+            { org: 'org_alpha', type: 'view', name: 'one' },
             { name: 'one' }, { parentVersion: null, actor: 'studio' },
         );
         await repo.put(
-            { org: 'org_alpha', project: 'default', branch: 'main', type: 'view', name: 'two' },
+            { org: 'org_alpha', type: 'view', name: 'two' },
             { name: 'two' }, { parentVersion: null, actor: 'studio' },
         );
 
@@ -288,12 +288,12 @@ describe('SysMetadataRepository', () => {
         await new Promise((r) => setTimeout(r, 0));
         // View event should be filtered out.
         await repo.put(
-            { org: 'org_alpha', project: 'default', branch: 'main', type: 'view', name: 'v1' },
+            { org: 'org_alpha', type: 'view', name: 'v1' },
             { name: 'v1' }, { parentVersion: null, actor: 'studio' },
         );
         // Dashboard event should arrive.
         await repo.put(
-            { org: 'org_alpha', project: 'default', branch: 'main', type: 'dashboard', name: 'd1' },
+            { org: 'org_alpha', type: 'dashboard', name: 'd1' },
             { name: 'd1' }, { parentVersion: null, actor: 'studio' },
         );
 
@@ -316,7 +316,7 @@ describe('SysMetadataRepository', () => {
     it('close prevents further reads/writes', () => {
         repo.close();
         return expect(
-            repo.get({ org: 'org_alpha', project: 'default', branch: 'main', type: 'view', name: 'x' }),
+            repo.get({ org: 'org_alpha', type: 'view', name: 'x' }),
         ).rejects.toThrow(/closed/);
     });
 });

@@ -79,8 +79,6 @@ function makeFakeEngine() {
 
 const VIEW_REF: MetaRef = {
     org: 'org_alpha',
-    project: 'default',
-    branch: 'main',
     type: 'view',
     name: 'case_grid',
 };
@@ -100,7 +98,7 @@ describe('LayeredRepository(overlay over artifact) — ADR-0008 PR-10c', () => {
         // scopes by ref including org. Using the same org models the
         // "platform metadata is identical across orgs" invariant for
         // this test.
-        baseline = new InMemoryRepository({ org: 'org_alpha', project: 'default', branch: 'main' });
+        baseline = new InMemoryRepository({ org: 'org_alpha' });
         await baseline.put(
             VIEW_REF,
             baselineView,

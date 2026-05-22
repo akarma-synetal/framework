@@ -1,10 +1,14 @@
 # ADR-0005: Metadata Customization Overlay (Artifact + sys_metadata Delta)
 
-**Status**: Accepted (2026-05-16) · **Amended** (2026-05-22, see "Amendment: post-ADR-0006 v4 scope")
+**Status**: Accepted (2026-05-16) · **Amended** (2026-05-22, see "Amendment: post-ADR-0006 v4 scope") · **Amended** (2026-04-13, branch concept removed — see [ADR-0008 §0](./0008-metadata-repository-and-change-log.md#0-2026-04-13-amendment--drop-project-and-branch-from-metaref))
 **Deciders**: ObjectStack Protocol Architects
 **Builds on**: [ADR-0003](./0003-package-as-first-class-citizen.md) (Package as first-class citizen), [ADR-0004](./0004-cloud-multi-kernel.md) (Cloud + per-project kernels)
-**Amended by**: [ADR-0006 v4](./0006-project-environment-split.v4.md) (drops `sys_project` entirely), [ADR-0008](./0008-metadata-repository-and-change-log.md) (re-expresses overlay as `LayeredRepository`)
+**Amended by**: [ADR-0006 v4](./0006-project-environment-split.v4.md) (drops `sys_project` entirely), [ADR-0008](./0008-metadata-repository-and-change-log.md) (re-expresses overlay as `LayeredRepository`; subsequently drops `project`/`branch` from `MetaRef`)
 **Consumers**: `@objectstack/objectql`, `@objectstack/runtime`, `@objectstack/rest`, `apps/studio`, all customer-facing tenants
+
+> **2026-04-13 note** — overlays are keyed exclusively by `organization_id`.
+> The `sys_metadata` table's legacy `project_id` / `branch` columns are
+> ignored by `SysMetadataRepository` and will be dropped in a future major.
 
 ---
 

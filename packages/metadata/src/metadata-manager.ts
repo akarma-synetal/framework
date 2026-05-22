@@ -1372,8 +1372,8 @@ export class MetadataManager implements IMetadataService {
   /**
    * Attach a {@link MetadataRepository} as a supplementary event source.
    *
-   * The manager subscribes to `repo.watch({ branch })` and re-emits each
-   * event through {@link notifyWatchers} as a legacy `MetadataWatchEvent`.
+   * The manager subscribes to `repo.watch({})` and re-emits each event
+   * through {@link notifyWatchers} as a legacy `MetadataWatchEvent`.
    * Each event also invalidates the in-memory registry entry and the
    * `list()` cache for the affected type so subsequent reads see fresh
    * data.
@@ -1383,14 +1383,14 @@ export class MetadataManager implements IMetadataService {
    *
    * Call {@link dispose} (or {@link stopRepositoryWatch}) to detach.
    */
-  setRepository(repo: MetadataRepository, opts: { branch?: string } = {}): void {
+  setRepository(repo: MetadataRepository): void {
     if (this.repository === repo) return;
     if (this.repository) {
       void this.stopRepositoryWatch();
     }
     this.repository = repo;
     this.repoWatchClosed = false;
-    void this.startRepositoryWatch(opts.branch ?? 'main');
+    void this.startRepositoryWatch();
   }
 
   /** Return the attached repository, if any. */
@@ -1419,10 +1419,10 @@ export class MetadataManager implements IMetadataService {
     this.listCache.clear();
   }
 
-  private async startRepositoryWatch(branch: string): Promise<void> {
+  private async startRepositoryWatch(): Promise<void> {
     const repo = this.repository;
     if (!repo) return;
-    const iterable = repo.watch({ branch });
+    const iterable = repo.watch({});
     const iter = (iterable as AsyncIterable<MetadataEvent>)[Symbol.asyncIterator]();
     this.repoWatchIter = iter;
     try {

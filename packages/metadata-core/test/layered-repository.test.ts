@@ -7,8 +7,6 @@ import type { MetaRef, MetadataEvent } from '../src/types.js';
 
 const ref = (name: string): MetaRef => ({
   org: 'system',
-  project: 'test',
-  branch: 'main',
   type: 'view',
   name,
 });
@@ -103,7 +101,7 @@ describe('LayeredRepository', () => {
         { label: 'bottom', repo: b },
       ],
     });
-    const iter = layered.watch({ org: 'system', project: 'test', branch: 'main' })[Symbol.asyncIterator]();
+    const iter = layered.watch({ org: 'system' })[Symbol.asyncIterator]();
     const collected: MetadataEvent[] = [];
     const done = (async () => {
       for (let i = 0; i < 2; i++) {
@@ -128,7 +126,7 @@ describe('LayeredRepository', () => {
     const layered = new LayeredRepository({
       layers: [{ label: 'a', repo: a }, { label: 'b', repo: b }],
     });
-    const iter = layered.watch({ org: 'system', project: 'test', branch: 'main' })[Symbol.asyncIterator]();
+    const iter = layered.watch({ org: 'system' })[Symbol.asyncIterator]();
     // Schedule a next() that will park (no events yet).
     const pending = iter.next();
     await sleep(10);

@@ -11,8 +11,8 @@
  * State model
  * ───────────
  *   items   : refKey → MetadataItem (current head)
- *   log     : MetadataEvent[]       (append-only, monotonic per branch)
- *   nextSeq : Map<branchKey, number>
+ *   logs    : org → MetadataEvent[]  (append-only, monotonic per org)
+ *   seqs    : org → number
  *
  * `watch()` is implemented over a simple subscriber list. Each subscriber
  * receives a deep-copy of the event so they cannot mutate the log.
@@ -37,16 +37,13 @@ import { hashSpec } from './canonicalize.js';
 import { ConflictError } from './errors.js';
 import type { MetadataRepository } from './repository.js';
 
-const branchKey = (ref: Pick<MetaRef, 'org' | 'project' | 'branch'>): string =>
-  `${ref.org}/${ref.project}/${ref.branch}`;
+const orgKey = (ref: Pick<MetaRef, 'org'>): string => ref.org;
 
 const matchesFilter = (
   ref: MetaRef,
-  filter: { org?: string; project?: string; branch?: string; type?: MetadataType; name?: string },
+  filter: { org?: string; type?: MetadataType; name?: string },
 ): boolean => {
   if (filter.org && filter.org !== ref.org) return false;
-  if (filter.project && filter.project !== ref.project) return false;
-  if (filter.branch && filter.branch !== ref.branch) return false;
   if (filter.type && filter.type !== ref.type) return false;
   if (filter.name && filter.name !== ref.name) return false;
   return true;
@@ -65,9 +62,9 @@ export interface InMemoryRepositoryOptions {
 
 export class InMemoryRepository implements MetadataRepository {
   private readonly items = new Map<string, MetadataItem>();
-  /** Per-branch event log. */
+  /** Per-org event log. */
   private readonly logs = new Map<string, MetadataEvent[]>();
-  /** Next seq per branch. */
+  /** Next seq per org. */
   private readonly seqs = new Map<string, number>();
   private readonly subscribers = new Set<Subscriber>();
   private readonly now: () => Date;
@@ -175,7 +172,7 @@ export class InMemoryRepository implements MetadataRepository {
   }
 
   async *history(ref: MetaRef, opts: HistoryOptions = {}): AsyncIterable<MetadataEvent> {
-    const log = this.logs.get(branchKey(ref)) ?? [];
+    const log = this.logs.get(orgKey(ref)) ?? [];
     const since = opts.sinceSeq ?? -1;
     const limit = opts.limit ?? Infinity;
     let yielded = 0;
@@ -196,7 +193,7 @@ export class InMemoryRepository implements MetadataRepository {
     let waiter: ((evt: IteratorResult<MetadataEvent>) => void) | null = null;
     let closed = false;
     const delivered = new Set<string>();
-    const evtKey = (e: MetadataEvent) => `${branchKey(e.ref)}#${e.seq}`;
+    const evtKey = (e: MetadataEvent) => `${orgKey(e.ref)}#${e.seq}`;
 
     const subscriber: Subscriber = {
       filter,
@@ -223,8 +220,8 @@ export class InMemoryRepository implements MetadataRepository {
     this.subscribers.add(subscriber);
 
     const replay: MetadataEvent[] = [];
-    for (const bk of this.branchKeysMatching(filter)) {
-      const log = this.logs.get(bk) ?? [];
+    for (const ok of this.orgKeysMatching(filter)) {
+      const log = this.logs.get(ok) ?? [];
       for (const evt of log) {
         if (typeof since === 'number' && evt.seq <= since) continue;
         if (!matchesFilter(evt.ref, filter)) continue;
@@ -289,18 +286,18 @@ export class InMemoryRepository implements MetadataRepository {
 
   // ── Internals ───────────────────────────────────────────────────────
 
-  private bumpSeq(ref: Pick<MetaRef, 'org' | 'project' | 'branch'>): number {
-    const bk = branchKey(ref);
-    const next = (this.seqs.get(bk) ?? 0) + 1;
-    this.seqs.set(bk, next);
+  private bumpSeq(ref: Pick<MetaRef, 'org'>): number {
+    const ok = orgKey(ref);
+    const next = (this.seqs.get(ok) ?? 0) + 1;
+    this.seqs.set(ok, next);
     return next;
   }
 
-  private appendEvent(ref: Pick<MetaRef, 'org' | 'project' | 'branch'>, evt: MetadataEvent): void {
-    const bk = branchKey(ref);
-    const log = this.logs.get(bk) ?? [];
+  private appendEvent(ref: Pick<MetaRef, 'org'>, evt: MetadataEvent): void {
+    const ok = orgKey(ref);
+    const log = this.logs.get(ok) ?? [];
     log.push(evt);
-    this.logs.set(bk, log);
+    this.logs.set(ok, log);
     // Broadcast
     for (const sub of this.subscribers) {
       if (sub.closed) continue;
@@ -309,14 +306,11 @@ export class InMemoryRepository implements MetadataRepository {
     }
   }
 
-  private branchKeysMatching(filter: WatchFilter): string[] {
+  private orgKeysMatching(filter: WatchFilter): string[] {
     const keys: string[] = [];
-    for (const bk of this.logs.keys()) {
-      const [org, project, branch] = bk.split('/');
-      if (filter.org && filter.org !== org) continue;
-      if (filter.project && filter.project !== project) continue;
-      if (filter.branch && filter.branch !== branch) continue;
-      keys.push(bk);
+    for (const ok of this.logs.keys()) {
+      if (filter.org && filter.org !== ok) continue;
+      keys.push(ok);
     }
     return keys;
   }

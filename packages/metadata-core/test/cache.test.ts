@@ -8,8 +8,6 @@ import type { MetaRef } from '../src/types.js';
 
 const baseRef = (name: string, type: 'view' | 'object' = 'view'): MetaRef => ({
   org: 'system',
-  project: 'test',
-  branch: 'main',
   type,
   name,
 });
