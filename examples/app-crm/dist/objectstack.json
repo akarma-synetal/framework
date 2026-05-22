@@ -5758,6 +5758,26 @@
           "multiple": false,
           "unique": false,
           "deleteBehavior": "set_null",
+          "fileAttachmentConfig": {
+            "virusScan": false,
+            "virusScanOnUpload": true,
+            "quarantineOnThreat": true,
+            "imageValidation": {
+              "aspectRatio": "1:1",
+              "generateThumbnails": false,
+              "preserveMetadata": false,
+              "autoRotate": true
+            },
+            "allowMultiple": false,
+            "allowReplace": true,
+            "allowDelete": true,
+            "requireUpload": false,
+            "extractMetadata": true,
+            "extractText": false,
+            "versioningEnabled": false,
+            "publicRead": false,
+            "presignedUrlExpiry": 3600
+          },
           "auditTrail": false,
           "group": "branding",
           "hidden": false,

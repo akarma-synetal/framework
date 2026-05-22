@@ -28,7 +28,7 @@ export const LeadDetailPage: Page = {
   // meaningful sidebar content — Salesforce Lightning record pages
   // similarly default to a stacked column for medium-density objects.
   template: 'full-width',
-
+  kind: 'full',
   // Page-level state variables
   variables: [
     {

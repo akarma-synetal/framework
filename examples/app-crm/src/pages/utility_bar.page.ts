@@ -22,7 +22,7 @@ export const UtilityBarPage: Page = {
   type: 'utility',
   
   template: 'utility-bar',
-  
+  kind: 'full',  
   regions: [
     {
       name: 'utilities',

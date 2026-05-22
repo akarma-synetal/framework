@@ -530,8 +530,36 @@ export class RestServer {
      * requests intentionally return `undefined` because the platform kernel
      * does not own per-app translation bundles.
      */
-    private async resolveI18nService(projectId?: string): Promise<any | undefined> {
-        if (!projectId || projectId === 'platform' || !this.kernelManager) return undefined;
+    private async resolveI18nService(projectId?: string, req?: any): Promise<any | undefined> {
+        if (projectId === 'platform') return undefined;
+        // Mirror resolveProtocol's fallback chain so unscoped routes (single-
+        // project dev servers, hostname-routed multi-tenants, X-Project-Id
+        // headers) can still pick up per-project translation bundles.
+        if (!projectId && req && this.envRegistry && this.kernelManager) {
+            const host = this.extractHostname(req);
+            if (host) {
+                try {
+                    const result = await this.envRegistry.resolveByHostname(host);
+                    if (result?.projectId) projectId = result.projectId;
+                } catch { /* fall through */ }
+            }
+            if (!projectId && typeof this.envRegistry.resolveById === 'function') {
+                const headerVal = this.extractProjectIdHeader(req);
+                if (headerVal) {
+                    try {
+                        const driver = await this.envRegistry.resolveById(headerVal);
+                        if (driver) projectId = headerVal;
+                    } catch { /* fall through */ }
+                }
+            }
+        }
+        if (!projectId && this.defaultProjectIdProvider) {
+            try {
+                const def = this.defaultProjectIdProvider();
+                if (def) projectId = def;
+            } catch { /* fall through */ }
+        }
+        if (!projectId || !this.kernelManager) return undefined;
         try {
             const kernel = await this.kernelManager.getOrCreate(projectId);
             return await kernel.getServiceAsync<any>('i18n');
@@ -770,8 +798,8 @@ export class RestServer {
      */
     private async translateMetaItem(req: any, type: string, projectId: string | undefined, item: any): Promise<any> {
         if (!item || typeof item !== 'object') return item;
-        if (type !== 'view' && type !== 'action') return item;
-        const i18n = await this.resolveI18nService(projectId);
+        if (type !== 'view' && type !== 'action' && type !== 'object') return item;
+        const i18n = await this.resolveI18nService(projectId, req);
         const bundle = this.buildTranslationBundle(i18n);
         if (!bundle) return item;
         const locale = this.extractLocale(req, i18n);
@@ -785,8 +813,8 @@ export class RestServer {
      */
     private async translateMetaItems(req: any, type: string, projectId: string | undefined, items: any): Promise<any> {
         if (!Array.isArray(items)) return items;
-        if (type !== 'view' && type !== 'action') return items;
-        const i18n = await this.resolveI18nService(projectId);
+        if (type !== 'view' && type !== 'action' && type !== 'object') return items;
+        const i18n = await this.resolveI18nService(projectId, req);
         const bundle = this.buildTranslationBundle(i18n);
         if (!bundle) return items;
         const locale = this.extractLocale(req, i18n);
@@ -2174,6 +2202,21 @@ export class RestServer {
                                     }
                                 }
                                 objectSchema = { name: obj.name, label: obj.label, fields };
+                                // Localize labels / help text / option labels so anonymous
+                                // clients render in the visitor's preferred language. The
+                                // form payload is otherwise un-translated (resolveFormBySlug
+                                // returns the raw view spec), so we hydrate the schema here.
+                                try {
+                                    const i18n = await this.resolveI18nService(projectId);
+                                    const bundle = this.buildTranslationBundle(i18n);
+                                    const locale = this.extractLocale(req, i18n);
+                                    if (bundle && locale) {
+                                        const { translateMetadataDocument } = await import('@objectstack/spec/system');
+                                        objectSchema = translateMetadataDocument('object', objectSchema, bundle, { locale });
+                                    }
+                                } catch (e: any) {
+                                    logError('[REST] Public form schema translation failed:', e);
+                                }
                             }
                         }
                     } catch (e: any) {
@@ -2207,6 +2250,7 @@ export class RestServer {
                         });
                         return { ...match.form, sections };
                     })();
+                    res.header('Vary', 'Accept-Language');
                     res.json({
                         slug,
                         object: match.object,

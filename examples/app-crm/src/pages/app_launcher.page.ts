@@ -20,7 +20,7 @@ export const AppLauncherPage: Page = {
   type: 'app',
   
   template: 'centered',
-  
+  kind: 'full',  
   regions: [
     {
       name: 'header',

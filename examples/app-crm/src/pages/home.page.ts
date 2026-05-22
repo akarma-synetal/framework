@@ -22,7 +22,7 @@ export const SalesHomePage: Page = {
   type: 'home',
   
   template: 'three-column',
-  
+  kind: 'full',  
   variables: [
     {
       name: 'selectedPeriod',

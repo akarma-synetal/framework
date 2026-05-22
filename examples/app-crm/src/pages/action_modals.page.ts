@@ -19,6 +19,9 @@ const stub = (name: string, label: string, hint: string): Page => ({
   label,
   description: hint,
   type: 'blank',
+  template: 'default',
+  isDefault: false,
+  kind: 'full',
   blankLayout: {
     columns: 12,
     rowHeight: 40,

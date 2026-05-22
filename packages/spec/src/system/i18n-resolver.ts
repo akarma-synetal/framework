@@ -247,7 +247,143 @@ export function translateMetadataDocument(
   if (!doc || typeof doc !== 'object') return doc;
   if (type === 'view') return translateView(doc, bundle, opts);
   if (type === 'action') return translateAction(doc, bundle, opts);
+  if (type === 'object') return translateObject(doc, bundle, opts);
   return doc;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Object metadata resolvers (label / pluralLabel / description / fields / options)
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Minimal object metadata shape consumed by `translateObject`. */
+export interface ObjectLike {
+  name: string;
+  label?: string;
+  pluralLabel?: string;
+  description?: string;
+  fields?: Record<string, ObjectFieldLike> | ObjectFieldLike[];
+}
+
+export interface ObjectFieldLike {
+  name?: string;
+  label?: string;
+  help?: string;
+  description?: string;
+  options?: Array<{ label?: string; value: string | number | boolean }>;
+  [key: string]: any;
+}
+
+function lookupObjectField<K extends 'label' | 'pluralLabel' | 'description'>(
+  bundle: TranslationBundle | undefined,
+  objectName: string,
+  field: K,
+  opts?: ResolveOptions,
+): string | undefined {
+  if (!bundle) return undefined;
+  for (const code of localeChain(opts)) {
+    const data = pickData(bundle, code);
+    const candidate = data?.objects?.[objectName]?.[field];
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  return undefined;
+}
+
+function lookupObjectFieldAttr(
+  bundle: TranslationBundle | undefined,
+  objectName: string,
+  fieldName: string,
+  attr: 'label' | 'help' | 'description',
+  opts?: ResolveOptions,
+): string | undefined {
+  if (!bundle) return undefined;
+  for (const code of localeChain(opts)) {
+    const data = pickData(bundle, code);
+    const candidate = (data?.objects?.[objectName]?.fields?.[fieldName] as any)?.[attr];
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  return undefined;
+}
+
+function lookupObjectFieldOption(
+  bundle: TranslationBundle | undefined,
+  objectName: string,
+  fieldName: string,
+  optionValue: string | number | boolean,
+  opts?: ResolveOptions,
+): string | undefined {
+  if (!bundle) return undefined;
+  const key = String(optionValue);
+  for (const code of localeChain(opts)) {
+    const data = pickData(bundle, code);
+    const map = data?.objects?.[objectName]?.fields?.[fieldName]?.options as
+      | Record<string, string>
+      | undefined;
+    const candidate = map?.[key];
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  return undefined;
+}
+
+/**
+ * Apply the active locale to an object metadata document. Translates the
+ * object's `label` / `pluralLabel` / `description` and walks each field to
+ * translate its `label`, `help`, and per-option `label`s. The input document
+ * is not mutated; a structural clone of the touched branches is returned.
+ *
+ * Field maps come in two shapes across the codebase: a `Record<string, Field>`
+ * (preferred — the canonical authored shape) and an `Array<Field>` (some REST
+ * responses flatten the record). Both are supported; the function returns the
+ * same shape it was given.
+ */
+export function translateObject<T extends ObjectLike>(
+  doc: T,
+  bundle: TranslationBundle | undefined,
+  opts?: ResolveOptions,
+): T {
+  if (!doc || typeof doc !== 'object') return doc;
+  const objectName = doc.name;
+  if (!objectName || !bundle) return doc;
+
+  const label = lookupObjectField(bundle, objectName, 'label', opts) ?? doc.label;
+  const pluralLabel =
+    lookupObjectField(bundle, objectName, 'pluralLabel', opts) ?? doc.pluralLabel;
+  const description =
+    lookupObjectField(bundle, objectName, 'description', opts) ?? doc.description;
+
+  const translateField = (name: string, def: ObjectFieldLike): ObjectFieldLike => {
+    const next: ObjectFieldLike = { ...def };
+    const translatedLabel = lookupObjectFieldAttr(bundle, objectName, name, 'label', opts);
+    if (translatedLabel) next.label = translatedLabel;
+    const translatedHelp = lookupObjectFieldAttr(bundle, objectName, name, 'help', opts);
+    if (translatedHelp) next.help = translatedHelp;
+    if (Array.isArray(def.options)) {
+      next.options = def.options.map((opt) => {
+        if (!opt || typeof opt !== 'object' || opt.value === undefined) return opt;
+        const translated = lookupObjectFieldOption(bundle, objectName, name, opt.value, opts);
+        return translated ? { ...opt, label: translated } : opt;
+      });
+    }
+    return next;
+  };
+
+  let fields: ObjectLike['fields'] = doc.fields;
+  if (Array.isArray(doc.fields)) {
+    fields = doc.fields.map((f) => translateField(f.name ?? '', f));
+  } else if (doc.fields && typeof doc.fields === 'object') {
+    const next: Record<string, ObjectFieldLike> = {};
+    for (const [name, def] of Object.entries(doc.fields)) {
+      next[name] = translateField(name, def);
+    }
+    fields = next;
+  }
+
+  return {
+    ...doc,
+    ...(label !== undefined ? { label } : {}),
+    ...(pluralLabel !== undefined ? { pluralLabel } : {}),
+    ...(description !== undefined ? { description } : {}),
+    ...(fields !== undefined ? { fields } : {}),
+  };
 }
 
 // ────────────────────────────────────────────────────────────────────────────

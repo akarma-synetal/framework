@@ -142,7 +142,6 @@ export const Account = ObjectSchema.create({
     logo: Field.image({
       label: 'Company Logo',
       group: 'branding',
-      crop: true,
     }),
 
     // Date field

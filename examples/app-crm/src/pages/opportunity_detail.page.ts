@@ -21,7 +21,7 @@ export const OpportunityDetailPage: Page = {
   object: 'opportunity',
 
   template: 'full-width',
-
+  kind: 'full',
   variables: [
     { name: 'activeTab', type: 'string', defaultValue: 'details' },
   ],

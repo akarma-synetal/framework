@@ -114,12 +114,10 @@ export const Product = ObjectSchema.create({
     // Images and Assets
     image: Field.image({
       label: 'Product Image',
-      crop: true,
     }),
 
     datasheet: Field.file({
       label: 'Datasheet',
-      accept: ['application/pdf', '.pdf'],
     }),
 
     // Tax & billing
