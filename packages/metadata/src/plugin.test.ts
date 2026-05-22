@@ -57,3 +57,56 @@ describe('MetadataPlugin — bootstrap × watch coupling (D2)', () => {
         expect((mgr as any).watcher).toBeUndefined();
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// PR-10e regression: artifact view items have no top-level `name`. Their
+// identity is the target object (encoded in `list.data.object` /
+// `form.data.object`). When `_parseAndRegisterArtifact` consumes a
+// compiled artifact it must derive the view name from the inner data
+// source — otherwise views are silently SKIPPED and reads through
+// `metadataService.get('view', <object>)` return undefined, falling
+// back to the boot-time SchemaRegistry copy and breaking HMR data
+// reload.
+// ─────────────────────────────────────────────────────────────────────────
+describe('MetadataPlugin._parseAndRegisterArtifact — view name resolution (PR-10e)', () => {
+    it('registers view items by their target object even when top-level `name` is absent', async () => {
+        const plugin = new MetadataPlugin({
+            watch: false,
+            config: { bootstrap: 'eager' },
+            projectId: 'proj_test',
+        });
+        const mgr = (plugin as any).manager as NodeMetadataManager;
+
+        const fakeCtx = {
+            logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+        } as any;
+
+        const artifact = {
+            id: 'com.example.test',
+            name: 'test',
+            version: '0.0.0',
+            type: 'app',
+            scope: 'app',
+            namespace: 'test',
+            defaultDatasource: 'memory',
+            views: [
+                {
+                    // intentionally NO top-level name — mirrors compiled artifact shape
+                    list: { name: 'all_case', label: 'All Cases', type: 'grid',
+                            data: { provider: 'object', object: 'case' }, columns: [] },
+                    listViews: {
+                        case_workflow: { name: 'case_workflow', label: 'Service Workflow', type: 'kanban',
+                                         data: { provider: 'object', object: 'case' }, columns: [] },
+                    },
+                },
+            ],
+        };
+
+        await (plugin as any)._parseAndRegisterArtifact(fakeCtx, artifact, 'test-artifact');
+
+        const registered = await mgr.get('view', 'case');
+        expect(registered).toBeDefined();
+        const label = (registered as any)?.listViews?.case_workflow?.label;
+        expect(label).toBe('Service Workflow');
+    });
+});

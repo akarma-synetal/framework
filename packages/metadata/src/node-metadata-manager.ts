@@ -59,6 +59,12 @@ export class NodeMetadataManager extends MetadataManager {
       ignored,
       persistent,
       ignoreInitial: true,
+      // Use polling to avoid `fs.watch` EMFILE on macOS / busy dev hosts.
+      // Recursive watch over a project root would otherwise wire native
+      // watches across the entire tree, easily exhausting the FD pool.
+      usePolling: true,
+      interval: 1000,
+      binaryInterval: 2000,
     });
 
     this.watcher.on('add', async (filePath) => {

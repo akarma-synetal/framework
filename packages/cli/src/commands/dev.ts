@@ -237,6 +237,13 @@ export default class Dev extends Command {
         ],
         ignoreInitial: true,
         persistent: true,
+        // Use polling to avoid `fs.watch` EMFILE on macOS when other
+        // long-running node processes (VS Code, parallel dev servers)
+        // saturate the native file-descriptor pool. Polling at 750ms
+        // is fast enough for human-perceived HMR.
+        usePolling: true,
+        interval: 750,
+        binaryInterval: 1500,
       });
 
       let timer: ReturnType<typeof setTimeout> | null = null;

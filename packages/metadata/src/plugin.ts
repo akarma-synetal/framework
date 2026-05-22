@@ -62,7 +62,30 @@ const ARTIFACT_FIELD_TO_TYPE: Record<string, string> = {
 
 export interface MetadataPluginOptions {
     rootDir?: string;
+    /**
+     * When `true`, NodeMetadataManager scans `rootDir` for source-file metadata
+     * (yaml/json/ts/js loaders) AND attaches a chokidar watcher to react to
+     * filesystem changes. In **artifact-mode** (this is the normal path when
+     * a `defineStack()` config is compiled into `dist/objectstack.json`) this
+     * filesystem scan is redundant and expensive — leave `watch: false`.
+     *
+     * The artifact-file HMR watcher is controlled separately by
+     * {@link artifactWatch} so that the cheap, single-file polling watcher
+     * can be enabled in dev without paying the cost of scanning the entire
+     * project root.
+     *
+     * Default: `false` (post PR-10e — was previously `true`).
+     */
     watch?: boolean;
+    /**
+     * When `true` AND `artifactSource.mode === 'local-file'`, attach a
+     * polling chokidar watcher to the artifact file so the server reloads
+     * metadata when the CLI recompiles `dist/objectstack.json` in dev mode.
+     * Independent of {@link watch} (which controls the source-file scanner).
+     *
+     * Default: `true` when `artifactSource` is set, otherwise `false`.
+     */
+    artifactWatch?: boolean;
     config?: Partial<MetadataPluginConfig>;
     /** Organization ID for metadata-scoped consumers; MetadataPlugin itself does not persist runtime metadata. */
     organizationId?: string;
@@ -297,7 +320,7 @@ export class MetadataPlugin implements Plugin {
                     }
                 });
 
-                // ── ADR-0008 PR-8: server-side artifact-file watcher ────
+                // ── ADR-0008 PR-8 / PR-10e: server-side artifact-file watcher ──
                 //
                 // When running in local-file artifact mode (e.g. `os dev`
                 // serving from `dist/objectstack.json`), watch the
@@ -306,8 +329,15 @@ export class MetadataPlugin implements Plugin {
                 // POST endpoint. The POST route stays available for
                 // external trigger sources (cloud webhook, git hook,
                 // ad-hoc curl) but is no longer the only signal.
+                //
+                // Gated on `artifactWatch` (NOT `watch` — the latter
+                // controls the source-file scanner which is redundant in
+                // artifact mode). Default: on when artifactSource is
+                // present, off otherwise.
                 const src = this.options.artifactSource;
-                if (src?.mode === 'local-file' && this.options.watch !== false && !/^https?:\/\//i.test(src.path)) {
+                const wantArtifactWatch = this.options.artifactWatch
+                    ?? (src?.mode === 'local-file');
+                if (src?.mode === 'local-file' && wantArtifactWatch && !/^https?:\/\//i.test(src.path)) {
                     try {
                         const { watch: chokidarWatch } = await import('chokidar');
                         const w = chokidarWatch(src.path, {
@@ -449,7 +479,26 @@ export class MetadataPlugin implements Plugin {
             const items = (metadata as any)[field];
             if (!Array.isArray(items) || items.length === 0) continue;
             for (const item of items) {
-                const name = (item as any)?.name;
+                // Most metadata items carry a top-level `name`. The `View`
+                // container (UI namespace) is an exception: it has no own
+                // `name` — its identity is the target object, encoded under
+                // `list.data.object` (or `form.data.object`). Mirror the
+                // resolution used by `ObjectQL.SchemaRegistry` so that
+                // artifact-loaded views land in `MetadataManager` under the
+                // SAME key reads expect (`metadataService.get('view', <object>)`).
+                // Without this, HMR pushes views into the registry only via
+                // AppPlugin's `manifest.register`, which targets the
+                // boot-only SchemaRegistry cache and is never refreshed on
+                // file edits — leaving MetadataService empty for view/* and
+                // forcing all reads to return the stale boot copy.
+                let name = (item as any)?.name;
+                if (!name) {
+                    if (metaType === 'view') {
+                        name =
+                            (item as any)?.list?.data?.object
+                            ?? (item as any)?.form?.data?.object;
+                    }
+                }
                 if (!name) continue;
                 if (manifestPackageId && (item as any)._packageId === undefined) {
                     (item as any)._packageId = manifestPackageId;

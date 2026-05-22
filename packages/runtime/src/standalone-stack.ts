@@ -163,14 +163,19 @@ export async function createStandaloneStack(config?: StandaloneStackConfig): Pro
     const plugins: any[] = [
         driverPlugin,
         new MetadataPlugin({
-            // Enable the artifact-file watcher in development so edits to
-            // `*.view.ts` / `*.flow.ts` etc. (which the CLI dev-mode watcher
-            // recompiles into `dist/objectstack.json`) are picked up by the
-            // running server WITHOUT requiring a manual restart or HMR POST.
-            // In production (`NODE_ENV=production`), the artifact is static
-            // and watching is unnecessary — keep the historical default-off
-            // behavior to avoid the chokidar process cost.
-            watch: process.env.NODE_ENV !== 'production',
+            // Source-file scanner OFF — declarative metadata is loaded
+            // from the compiled artifact, not from yaml/json files on
+            // disk. Scanning would also recursively watch the project
+            // root (incl. node_modules), which is expensive and prone
+            // to EMFILE.
+            watch: false,
+            // Artifact-file HMR ON in non-production so edits to
+            // `*.view.ts` / `*.flow.ts` (which the CLI dev-mode watcher
+            // recompiles into `dist/objectstack.json`) are picked up by
+            // the running server WITHOUT requiring a manual restart.
+            // Uses polling under the hood (see plugin.ts) to avoid
+            // `fs.watch` EMFILE on macOS / busy dev hosts.
+            artifactWatch: process.env.NODE_ENV !== 'production',
             projectId,
             artifactSource: { mode: 'local-file', path: artifactPath },
         }),
