@@ -27,6 +27,7 @@ import {
 import { AccountLoginRedirect } from './components/AccountLoginRedirect';
 import { CloudAwareRootRedirect } from './components/CloudAwareRootRedirect';
 import { FormPage } from './components/FormPage';
+import { MetadataHmrReloader } from './components/MetadataHmrReloader';
 import {
   gotoAccountLogin,
   gotoAccountRegister,
@@ -164,6 +165,7 @@ export function App() {
     <AuthProvider authUrl={AUTH_URL}>
       <UploadProvider adapter={uploadAdapter}>
         <Toaster position="bottom-right" />
+        <MetadataHmrReloader />
       <BrowserRouter basename={BASENAME}>
         <ConsoleShell>
           <Routes>
