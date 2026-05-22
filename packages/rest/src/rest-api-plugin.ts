@@ -144,6 +144,15 @@ export function createRestApiPlugin(config: RestApiPluginConfig = {}): Plugin {
                 } catch { return undefined; }
             };
 
+            // i18n service resolver — used to localize view / action / object
+            // metadata. Single-kernel fallback so labels and select options
+            // get translated even without a full multi-tenant kernelManager.
+            const i18nServiceProvider = async (_projectId?: string): Promise<any | undefined> => {
+                try {
+                    return ctx.getService<any>('i18n');
+                } catch { return undefined; }
+            };
+
             if (!server) {
                 ctx.logger.warn(`RestApiPlugin: HTTP Server service '${serverService}' not found. REST routes skipped.`);
                 return;
@@ -157,7 +166,7 @@ export function createRestApiPlugin(config: RestApiPluginConfig = {}): Plugin {
             ctx.logger.info('Hydrating REST API from Protocol...');
             
             try {
-                const restServer = new RestServer(server, protocol, config.api as any, kernelManager, envRegistry, defaultProjectIdProvider, authServiceProvider, objectQLProvider, emailServiceProvider, sharingServiceProvider, reportsServiceProvider, approvalsServiceProvider, sharingRulesServiceProvider);
+                const restServer = new RestServer(server, protocol, config.api as any, kernelManager, envRegistry, defaultProjectIdProvider, authServiceProvider, objectQLProvider, emailServiceProvider, sharingServiceProvider, reportsServiceProvider, approvalsServiceProvider, sharingRulesServiceProvider, i18nServiceProvider);
                 restServer.registerRoutes();
 
                 ctx.logger.info('REST API successfully registered');

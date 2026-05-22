@@ -291,7 +291,7 @@ export class AppPlugin implements Plugin {
         // ── i18n Translation Loading ─────────────────────────────────────
         // Auto-load translation bundles from the app config into the
         // kernel's i18n service, so discovery and handlers stay consistent.
-        this.loadTranslations(ctx, appId);
+        await this.loadTranslations(ctx, appId);
 
         // Data Seeding
         // Collect seed data from multiple locations (top-level `data` preferred, `manifest.data` for backward compat)
@@ -500,7 +500,7 @@ export class AppPlugin implements Plugin {
      * Gracefully skips when the i18n service is not registered —
      * this keeps AppPlugin resilient across server/dev/mock environments.
      */
-    private loadTranslations(ctx: PluginContext, appId: string): void {
+    private async loadTranslations(ctx: PluginContext, appId: string): Promise<void> {
         // ctx.getService throws when a service is not registered, so we
         // must use try/catch to gracefully skip when no i18n plugin is loaded.
         let i18nService: II18nService | undefined;
@@ -522,16 +522,41 @@ export class AppPlugin implements Plugin {
 
         if (!i18nService) {
             if (bundles.length > 0) {
-                ctx.logger.warn(
-                    `[i18n] App "${appId}" has ${bundles.length} translation bundle(s) but no i18n service is registered. ` +
-                    'Translations will not be served via REST API. ' +
-                    'Register I18nServicePlugin from @objectstack/service-i18n, or use DevPlugin ' +
-                    'which auto-detects translations and registers the i18n service automatically.'
-                );
+                // Auto-register the in-memory i18n fallback so the bundles
+                // we already loaded server-side become discoverable through
+                // `getService('i18n')` (used by the REST API to localize
+                // view / action / object metadata). Without this step,
+                // bundles authored in `defineStack({ translations })` were
+                // silently dropped on standalone/dev stacks that didn't
+                // explicitly install I18nServicePlugin.
+                try {
+                    const mod = await import('@objectstack/core');
+                    const createMemoryI18n = (mod as any).createMemoryI18n;
+                    if (typeof createMemoryI18n === 'function') {
+                        const fallback = createMemoryI18n();
+                        (ctx as any).registerService('i18n', fallback);
+                        i18nService = fallback;
+                        ctx.logger.info(
+                            `[i18n] Auto-registered in-memory i18n fallback for "${appId}" (${bundles.length} bundle(s) detected). ` +
+                            'Install I18nServicePlugin from @objectstack/service-i18n for file-based / production use.'
+                        );
+                    }
+                } catch (err: any) {
+                    ctx.logger.warn(
+                        `[i18n] App "${appId}" has ${bundles.length} translation bundle(s) but auto-fallback failed: ${err?.message ?? err}.`
+                    );
+                    return;
+                }
+                if (!i18nService) {
+                    ctx.logger.warn(
+                        `[i18n] App "${appId}" has ${bundles.length} translation bundle(s) but no i18n service is registered.`
+                    );
+                    return;
+                }
             } else {
                 ctx.logger.debug('[i18n] No i18n service registered; skipping translation loading', { appId });
+                return;
             }
-            return;
         }
 
         // Apply i18n config (default locale, etc.)

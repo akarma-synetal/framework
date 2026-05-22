@@ -420,6 +420,7 @@ export class RestServer {
     private reportsServiceProvider?: (projectId?: string) => Promise<any | undefined>;
     private approvalsServiceProvider?: (projectId?: string) => Promise<any | undefined>;
     private sharingRulesServiceProvider?: (projectId?: string) => Promise<any | undefined>;
+    private i18nServiceProvider?: (projectId?: string) => Promise<any | undefined>;
 
     constructor(
         server: IHttpServer,
@@ -435,6 +436,7 @@ export class RestServer {
         reportsServiceProvider?: (projectId?: string) => Promise<any | undefined>,
         approvalsServiceProvider?: (projectId?: string) => Promise<any | undefined>,
         sharingRulesServiceProvider?: (projectId?: string) => Promise<any | undefined>,
+        i18nServiceProvider?: (projectId?: string) => Promise<any | undefined>,
     ) {
         this.protocol = protocol;
         this.config = this.normalizeConfig(config);
@@ -449,6 +451,7 @@ export class RestServer {
         this.reportsServiceProvider = reportsServiceProvider;
         this.approvalsServiceProvider = approvalsServiceProvider;
         this.sharingRulesServiceProvider = sharingRulesServiceProvider;
+        this.i18nServiceProvider = i18nServiceProvider;
     }
 
     /**
@@ -559,13 +562,21 @@ export class RestServer {
                 if (def) projectId = def;
             } catch { /* fall through */ }
         }
-        if (!projectId || !this.kernelManager) return undefined;
-        try {
-            const kernel = await this.kernelManager.getOrCreate(projectId);
-            return await kernel.getServiceAsync<any>('i18n');
-        } catch {
-            return undefined;
+        // Multi-tenant kernel lookup first; falls back to the single-kernel
+        // provider supplied by RestApiPlugin in dev / standalone mode.
+        if (projectId && this.kernelManager) {
+            try {
+                const kernel = await this.kernelManager.getOrCreate(projectId);
+                const svc = await kernel.getServiceAsync<any>('i18n');
+                if (svc) return svc;
+            } catch { /* fall through */ }
         }
+        if (this.i18nServiceProvider) {
+            try {
+                return await this.i18nServiceProvider(projectId);
+            } catch { return undefined; }
+        }
+        return undefined;
     }
 
     /**
