@@ -585,6 +585,29 @@ export const FormViewSchema = lazySchema(() => z.object({
   /** Public form sharing configuration */
   sharing: SharingConfigSchema.optional().describe('Public sharing configuration for this form'),
 
+  /**
+   * What happens after a successful submit.
+   *
+   * - `thank-you` (default) — show a confirmation panel
+   * - `redirect` — send the browser to a URL
+   * - `continue` — reset the form so another response can be entered
+   * - `next-record` — advance to the next record (internal queues only)
+   */
+  submitBehavior: z.union([
+    z.object({
+      kind: z.literal('thank-you'),
+      title: z.string().optional(),
+      message: z.string().optional(),
+    }),
+    z.object({
+      kind: z.literal('redirect'),
+      url: z.string(),
+      delayMs: z.number().int().min(0).optional(),
+    }),
+    z.object({ kind: z.literal('continue') }),
+    z.object({ kind: z.literal('next-record') }),
+  ]).optional().describe('Post-submit behavior'),
+
   /** ARIA accessibility attributes */
   aria: AriaPropsSchema.optional().describe('ARIA accessibility attributes for the form view'),
 }));
