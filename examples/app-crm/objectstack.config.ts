@@ -3,30 +3,30 @@
 import { defineStack } from '@objectstack/spec';
 import * as cubes from './src/cubes/index.js';
 
-import * as objects from './src/objects';
-import * as actions from './src/actions';
-import * as dashboards from './src/dashboards';
-import * as reports from './src/reports';
-import { allFlows } from './src/flows';
-import { allAgents } from './src/agents';
-import { allSkills } from './src/skills';
-import * as ragPipelines from './src/rag';
-import * as profiles from './src/profiles';
-import * as apps from './src/apps';
-import * as views from './src/views';
-import * as pages from './src/pages';
-import * as approvals from './src/approvals';
-import * as translations from './src/translations';
-import { CrmSeedData } from './src/data';
+import * as objects from './src/objects/index.js';
+import * as actions from './src/actions/index.js';
+import * as dashboards from './src/dashboards/index.js';
+import * as reports from './src/reports/index.js';
+import { allFlows } from './src/flows/index.js';
+import { allAgents } from './src/agents/index.js';
+import { allSkills } from './src/skills/index.js';
+import * as ragPipelines from './src/rag/index.js';
+import * as profiles from './src/profiles/index.js';
+import * as apps from './src/apps/index.js';
+import * as views from './src/views/index.js';
+import * as pages from './src/pages/index.js';
+import * as approvals from './src/approvals/index.js';
+import * as translations from './src/translations/index.js';
+import { CrmSeedData } from './src/data/index.js';
 
 import {
   AccountTeamSharingRule, TerritorySharingRules,
   OpportunitySalesSharingRule,
   CaseEscalationSharingRule,
   RoleHierarchy,
-} from './src/sharing';
+} from './src/sharing/index.js';
 
-import { allHooks } from './src/hooks';
+import { allHooks } from './src/hooks/index.js';
 
 export default defineStack({
   manifest: {

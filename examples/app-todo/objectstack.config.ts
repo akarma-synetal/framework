@@ -3,20 +3,20 @@
 import { defineStack } from '@objectstack/spec';
 
 // ─── Barrel Imports (one per metadata type) ─────────────────────────
-import * as objects from './src/objects';
-import * as actions from './src/actions';
-import * as dashboards from './src/dashboards';
-import * as reports from './src/reports';
-import { allFlows } from './src/flows';
-import * as apps from './src/apps';
-import { TodoSeedData } from './src/data';
-import * as translations from './src/translations';
+import * as objects from './src/objects/index.js';
+import * as actions from './src/actions/index.js';
+import * as dashboards from './src/dashboards/index.js';
+import * as reports from './src/reports/index.js';
+import { allFlows } from './src/flows/index.js';
+import * as apps from './src/apps/index.js';
+import { TodoSeedData } from './src/data/index.js';
+import * as translations from './src/translations/index.js';
 
 // ─── Action Handler Registration (runtime lifecycle) ────────────────
 // Handlers are wired separately from metadata. The `onEnable` export
 // is called by the kernel's AppPlugin after the engine is ready.
 // See: src/actions/register-handlers.ts for the full registration flow.
-import { registerTaskActionHandlers } from './src/actions/register-handlers';
+import { registerTaskActionHandlers } from './src/actions/register-handlers.js';
 
 /**
  * Plugin lifecycle hook — called by AppPlugin when the engine is ready.

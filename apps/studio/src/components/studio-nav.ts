@@ -1,0 +1,121 @@
+// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+
+/**
+ * Studio top-level navigation registry — drives the flat sidebar and the
+ * Cmd+K command palette. Inspired by Power Apps' fixed left rail and
+ * Salesforce Setup's "Object Manager" pattern: the sidebar lists *jobs*
+ * (Objects, Forms, Automations, …), not a tree of every metadata item.
+ *
+ * Each top-level area maps to a route under `/$package/`.
+ */
+
+import {
+  Home,
+  Package,
+  FormInput,
+  AppWindow,
+  Workflow,
+  Bot,
+  Shield,
+  Globe,
+  FlaskConical,
+  ScrollText,
+  type LucideIcon,
+} from 'lucide-react';
+
+export interface StudioNavItem {
+  /** Stable key (also used as the URL segment under /$package/). */
+  key: string;
+  /** Display label in sidebar + command palette. */
+  label: string;
+  /** Lucide icon component. */
+  icon: LucideIcon;
+  /** Metadata types this entry surfaces (drives list pages + facets). */
+  types: string[];
+  /** One-line description shown in tooltip + palette. */
+  hint: string;
+}
+
+/**
+ * Top-level navigation areas. Order matches the sidebar.
+ *
+ * "Home" is special — it uses an empty `types` array because its route is
+ * `/$package` (no trailing segment).
+ */
+export const STUDIO_NAV: readonly StudioNavItem[] = [
+  {
+    key: 'home',
+    label: 'Home',
+    icon: Home,
+    types: [],
+    hint: 'Project overview & quick links',
+  },
+  {
+    key: 'objects',
+    label: 'Objects',
+    icon: Package,
+    types: ['object'],
+    hint: 'Data model — tables, fields, relations',
+  },
+  {
+    key: 'forms',
+    label: 'Forms',
+    icon: FormInput,
+    types: ['view'], // filtered to viewType=form
+    hint: 'Public + internal forms with publish controls',
+  },
+  {
+    key: 'views',
+    label: 'Views & Apps',
+    icon: AppWindow,
+    types: ['view', 'app', 'page', 'dashboard', 'report', 'theme'],
+    hint: 'Grids, kanbans, dashboards, app navigation',
+  },
+  {
+    key: 'automations',
+    label: 'Automations',
+    icon: Workflow,
+    types: ['flow', 'workflow', 'approval', 'webhook', 'hook'],
+    hint: 'Flows, workflows, hooks, webhooks',
+  },
+  {
+    key: 'ai',
+    label: 'AI',
+    icon: Bot,
+    types: ['agent', 'tool', 'ragPipeline'],
+    hint: 'Agents, tools, RAG pipelines',
+  },
+  {
+    key: 'security',
+    label: 'Security',
+    icon: Shield,
+    types: ['role', 'profile', 'permission', 'sharingRule', 'policy'],
+    hint: 'Roles, profiles, sharing & policy',
+  },
+  {
+    key: 'apis',
+    label: 'APIs',
+    icon: Globe,
+    types: ['api', 'connector'],
+    hint: 'REST endpoints & external connectors',
+  },
+  {
+    key: 'playground',
+    label: 'Playground',
+    icon: FlaskConical,
+    types: [],
+    hint: 'Try REST, ObjectQL, formulas, forms & agents live',
+  },
+  {
+    key: 'logs',
+    label: 'Logs',
+    icon: ScrollText,
+    types: [],
+    hint: 'Request log · event log · audit trail',
+  },
+] as const;
+
+/** Look up the nav item that owns a given metadata type. Returns null if none. */
+export function navItemForType(type: string): StudioNavItem | null {
+  return STUDIO_NAV.find((item) => item.types.includes(type)) ?? null;
+}
