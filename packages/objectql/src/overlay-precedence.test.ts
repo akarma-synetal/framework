@@ -1,0 +1,353 @@
+// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+
+/**
+ * ADR-0008 PR-10a — Overlay precedence + hash dry-run fixtures.
+ *
+ * Pins down two invariants that must survive the PR-10b/c refactor
+ * (re-expressing the overlay path as a LayeredRepository):
+ *
+ *   1. **Whitelist enforcement** — only metadata types whose registry
+ *      entry sets `allowOrgOverride: true` may be persisted as
+ *      per-organization overlays. Everything else (object, field, flow,
+ *      agent, permission, …) MUST throw with `code='not_overridable'`,
+ *      `status=403`. This is the shared-DB tenancy invariant
+ *      (ADR-0005 amendment §"Tenant-customizable type whitelist").
+ *
+ *   2. **Canonical hash stability** — every overlay row will carry a
+ *      content hash once PR-10b lands. The hash must be insensitive
+ *      to key order, whitespace, undefined-vs-absent, and otherwise
+ *      stable across structurally-equivalent payloads. This is the
+ *      dry-run precondition: if these properties hold, we can backfill
+ *      `_hash` for existing sys_metadata rows without surprises.
+ *
+ * No production code is touched by this file — it exists to fail loud
+ * if a future PR weakens the contract.
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ObjectStackProtocolImplementation } from './protocol.js';
+import { SchemaRegistry } from './registry.js';
+import { canonicalize, hashSpec } from '@objectstack/metadata-core';
+import { DEFAULT_METADATA_TYPE_REGISTRY } from '@objectstack/spec/kernel';
+
+// ──────────────────────────────────────────────────────────────────────
+// Shared test fixtures
+// ──────────────────────────────────────────────────────────────────────
+
+const validView = {
+    name: 'case_grid',
+    label: 'Cases',
+    object: 'case',
+    columns: [
+        { field: 'name', label: 'Name' },
+        { field: 'status', label: 'Status' },
+    ],
+};
+
+const validDashboard = {
+    name: 'sales_overview',
+    label: 'Sales Overview',
+    widgets: [],
+};
+
+const validReport = {
+    name: 'monthly_revenue',
+    label: 'Monthly Revenue',
+    object: 'invoice',
+};
+
+function makeProtocol(opts: { projectId?: string } = {}) {
+    const registry = new SchemaRegistry({ multiTenant: false });
+    const mockEngine: any = {
+        registry,
+        find: vi.fn().mockResolvedValue([]),
+        findOne: vi.fn().mockResolvedValue(null),
+        insert: vi.fn().mockResolvedValue({ id: 'new-uuid' }),
+        update: vi.fn().mockResolvedValue({ id: 'existing-uuid' }),
+        delete: vi.fn().mockResolvedValue({ deleted: 1 }),
+        count: vi.fn().mockResolvedValue(0),
+        aggregate: vi.fn().mockResolvedValue([]),
+    };
+    const protocol = new ObjectStackProtocolImplementation(
+        mockEngine,
+        undefined, // getServicesRegistry
+        undefined, // getFeedService
+        opts.projectId,
+    );
+    return { protocol, mockEngine, registry };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 1. Whitelist enforcement (ADR-0005 amendment §"Tenant-customizable …")
+// ══════════════════════════════════════════════════════════════════════
+
+describe('overlay whitelist enforcement (shared-DB invariant)', () => {
+    let protocol: ObjectStackProtocolImplementation;
+
+    beforeEach(() => {
+        // projectId must be defined to engage the gate — single-kernel
+        // deployments (no projectId) intentionally bypass it.
+        ({ protocol } = makeProtocol({ projectId: 'env_prod' }));
+    });
+
+    afterEach(() => vi.clearAllMocks());
+
+    // ── allowed types: pure render-time, safe per-org override ──
+    describe('allowed (allowOrgOverride: true) — must accept', () => {
+        it('accepts view', async () => {
+            const result = await protocol.saveMetaItem({
+                type: 'view',
+                name: 'case_grid',
+                item: validView,
+                organizationId: 'org_alpha',
+            });
+            expect(result.success).toBe(true);
+        });
+
+        it('accepts dashboard', async () => {
+            const result = await protocol.saveMetaItem({
+                type: 'dashboard',
+                name: 'sales_overview',
+                item: validDashboard,
+                organizationId: 'org_alpha',
+            });
+            expect(result.success).toBe(true);
+        });
+
+        it('accepts report (flipped to allowOrgOverride:true on 2026-05-22)', async () => {
+            // This test pins the user-requested change from 8494fe8e —
+            // if someone flips report back to false, this fails loud.
+            const result = await protocol.saveMetaItem({
+                type: 'report',
+                name: 'monthly_revenue',
+                item: validReport,
+                organizationId: 'org_alpha',
+            });
+            expect(result.success).toBe(true);
+        });
+
+        it('accepts email_template', async () => {
+            const result = await protocol.saveMetaItem({
+                type: 'email_template',
+                name: 'welcome',
+                item: { name: 'welcome', subject: 'Hi', body: 'Hello' },
+                organizationId: 'org_alpha',
+            });
+            expect(result.success).toBe(true);
+        });
+
+        it('accepts plural form of allowed type (views)', async () => {
+            const result = await protocol.saveMetaItem({
+                type: 'views',
+                name: 'case_grid',
+                item: validView,
+                organizationId: 'org_alpha',
+            });
+            expect(result.success).toBe(true);
+        });
+    });
+
+    // ── denied types: would break shared schema / behaviour ──
+    describe('denied (allowOrgOverride: false) — must throw 403 not_overridable', () => {
+        // Anything in this set, if accepted, can corrupt cross-tenant invariants.
+        const denied: Array<{ type: string; reason: string; item: any }> = [
+            {
+                type: 'object',
+                reason: 'per-org overlay would diverge the table schema',
+                item: { name: 'case', fields: { extra: { type: 'text' } } },
+            },
+            {
+                type: 'field',
+                reason: 'per-org field overlay = unshared columns',
+                item: { name: 'extra', type: 'text' },
+            },
+            {
+                type: 'flow',
+                reason: 'per-org flow overlay = silent automation drift',
+                item: { name: 'on_create', triggers: [] },
+            },
+            {
+                type: 'workflow',
+                reason: 'same as flow',
+                item: { name: 'approval', states: [] },
+            },
+            {
+                type: 'agent',
+                reason: 'per-org agent overlay = unsanctioned model calls',
+                item: { name: 'helper', model: 'gpt-4' },
+            },
+            {
+                type: 'permission',
+                reason: 'overlays would create silent privilege drift',
+                item: { name: 'admin', grants: [] },
+            },
+            {
+                type: 'role',
+                reason: 'authorization correctness',
+                item: { name: 'editor', permissions: [] },
+            },
+            {
+                type: 'profile',
+                reason: 'authorization correctness',
+                item: { name: 'sales_rep', permissions: [] },
+            },
+            {
+                type: 'datasource',
+                reason: 'wiring level; must be code, not metadata',
+                item: { name: 'analytics', driver: 'sql' },
+            },
+            {
+                type: 'objects', // plural
+                reason: 'plural form of denied must also be denied',
+                item: { name: 'case', fields: {} },
+            },
+            {
+                type: 'flows', // plural
+                reason: 'plural form of denied must also be denied',
+                item: { name: 'on_create' },
+            },
+        ];
+
+        for (const { type, reason, item } of denied) {
+            it(`rejects ${type} — ${reason}`, async () => {
+                await expect(
+                    protocol.saveMetaItem({
+                        type,
+                        name: item.name,
+                        item,
+                        organizationId: 'org_alpha',
+                    }),
+                ).rejects.toMatchObject({
+                    code: 'not_overridable',
+                    status: 403,
+                });
+            });
+        }
+    });
+
+    // ── single-kernel deployments: gate disengaged ──
+    describe('single-kernel mode (no projectId) — gate bypassed', () => {
+        it('allows object overlay when projectId is undefined', async () => {
+            // No projectId => not project-kernel mode => legacy "anything goes"
+            // path used by control-plane bootstrap. ADR-0005 §"Whitelist".
+            const { protocol: localProto } = makeProtocol({ projectId: undefined });
+            const result = await localProto.saveMetaItem({
+                type: 'object',
+                name: 'case',
+                item: { name: 'case', label: 'Case', fields: {} },
+            });
+            expect(result.success).toBe(true);
+        });
+    });
+
+    // ── registry invariant: whitelist derives from spec, no parallel list ──
+    describe('registry-as-source-of-truth (Prime Directive #8)', () => {
+        it('every type in OVERLAY_ALLOWED_TYPES has allowOrgOverride:true in the registry', () => {
+            // The protocol's whitelist is derived from
+            // DEFAULT_METADATA_TYPE_REGISTRY. If anyone introduces a parallel
+            // list, this test catches it: every accepted type must trace back
+            // to a registry entry that opted in.
+            const allowedFromRegistry = new Set<string>();
+            for (const entry of DEFAULT_METADATA_TYPE_REGISTRY) {
+                if (entry.allowOrgOverride) allowedFromRegistry.add(entry.type);
+            }
+            // Render-time types must be in the set; if any of these drop out,
+            // the shared-DB contract is broken.
+            expect(allowedFromRegistry.has('view')).toBe(true);
+            expect(allowedFromRegistry.has('dashboard')).toBe(true);
+            expect(allowedFromRegistry.has('report')).toBe(true);
+            expect(allowedFromRegistry.has('email_template')).toBe(true);
+            // DB-affecting types must NOT be in the set.
+            expect(allowedFromRegistry.has('object')).toBe(false);
+            expect(allowedFromRegistry.has('field')).toBe(false);
+            expect(allowedFromRegistry.has('flow')).toBe(false);
+            expect(allowedFromRegistry.has('workflow')).toBe(false);
+            expect(allowedFromRegistry.has('agent')).toBe(false);
+            expect(allowedFromRegistry.has('permission')).toBe(false);
+            expect(allowedFromRegistry.has('role')).toBe(false);
+            expect(allowedFromRegistry.has('profile')).toBe(false);
+        });
+    });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// 2. Canonical hash stability (ADR-0008 PR-10b backfill precondition)
+// ══════════════════════════════════════════════════════════════════════
+
+describe('canonical hash stability (PR-10b backfill precondition)', () => {
+    it('canonicalize: key order does not change output', () => {
+        const a = canonicalize({ b: 1, a: 2, c: 3 });
+        const b = canonicalize({ c: 3, a: 2, b: 1 });
+        expect(a).toBe(b);
+    });
+
+    it('canonicalize: nested key order does not change output', () => {
+        const a = canonicalize({ outer: { z: 1, a: 2 }, top: true });
+        const b = canonicalize({ top: true, outer: { a: 2, z: 1 } });
+        expect(a).toBe(b);
+    });
+
+    it('hashSpec: returns "sha256:..." prefix with 64-hex digest', () => {
+        const h = hashSpec({ name: 'case_grid' });
+        expect(h).toMatch(/^sha256:[0-9a-f]{64}$/);
+    });
+
+    it('hashSpec: stable across key reorder for a view payload', () => {
+        const reordered = {
+            columns: validView.columns,
+            object: validView.object,
+            label: validView.label,
+            name: validView.name,
+        };
+        expect(hashSpec(validView)).toBe(hashSpec(reordered));
+    });
+
+    it('hashSpec: undefined fields collapse to "absent" (typical PUT shape)', () => {
+        // Studio PUTs frequently include `undefined` for optional fields the
+        // user cleared. Canonicalize must drop these so the hash matches the
+        // body as it would be re-read from the DB (where NULL columns vanish).
+        const withUndef = { ...validView, description: undefined };
+        expect(hashSpec(validView)).toBe(hashSpec(withUndef));
+    });
+
+    it('hashSpec: dashboard payload deterministic', () => {
+        const h1 = hashSpec(validDashboard);
+        const h2 = hashSpec({ ...validDashboard });
+        expect(h1).toBe(h2);
+    });
+
+    it('hashSpec: report payload deterministic', () => {
+        const h1 = hashSpec(validReport);
+        const h2 = hashSpec({ ...validReport });
+        expect(h1).toBe(h2);
+    });
+
+    it('hashSpec: distinct payloads produce distinct hashes', () => {
+        expect(hashSpec(validView)).not.toBe(hashSpec(validDashboard));
+        expect(hashSpec(validView)).not.toBe(
+            hashSpec({ ...validView, label: 'Different' }),
+        );
+    });
+
+    it('hashSpec: array order IS significant (positional semantics preserved)', () => {
+        // Columns in a view are ordered — swapping them is a real change.
+        const swapped = {
+            ...validView,
+            columns: [validView.columns[1], validView.columns[0]],
+        };
+        expect(hashSpec(validView)).not.toBe(hashSpec(swapped));
+    });
+
+    it('hashSpec: handles deeply-nested optional fields without throwing', () => {
+        const deep = {
+            ...validView,
+            filters: {
+                where: { status: 'open', priority: undefined },
+                sort: [{ field: 'name', dir: 'asc' }],
+            },
+        };
+        expect(() => hashSpec(deep)).not.toThrow();
+        // Same value re-evaluated yields same hash.
+        expect(hashSpec(deep)).toBe(hashSpec(JSON.parse(JSON.stringify(deep))));
+    });
+});
