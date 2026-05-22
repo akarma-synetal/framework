@@ -83,9 +83,16 @@ function makeStubEngine() {
 }
 
 describe('saveMetaItem — repository write path (PR-10d.3)', () => {
-    it('legacy path remains the default when no flag is passed', async () => {
+    it('legacy path is used when explicitly opted out via { useRepositoryWritePath: false }', async () => {
+        // PR-10d.5 flipped the default to repository-path-on. The legacy
+        // raw-engine path is still available behind an explicit opt-out
+        // until PR-10d.6 deletes it. This test pins the legacy semantics
+        // so any regression in the opt-out branch is caught.
         const { engine, rows } = makeStubEngine();
-        const protocol = new ObjectStackProtocolImplementation(engine);
+        const protocol = new ObjectStackProtocolImplementation(
+            engine, undefined, undefined, undefined,
+            { useRepositoryWritePath: false },
+        );
         const result = await protocol.saveMetaItem({
             type: 'view',
             name: 'case_grid',
@@ -97,6 +104,22 @@ describe('saveMetaItem — repository write path (PR-10d.3)', () => {
         expect((result as any).seq).toBeUndefined();
         const row = Array.from(rows.values())[0];
         expect(row.checksum).toBeUndefined();
+    });
+
+    it('PR-10d.5 — repository path is the default; checksum/seq are present without opt-in', async () => {
+        const { engine, rows } = makeStubEngine();
+        const protocol = new ObjectStackProtocolImplementation(engine);
+        const result = await protocol.saveMetaItem({
+            type: 'view',
+            name: 'case_grid',
+            organizationId: 'org_alpha',
+            item: { name: 'case_grid', type: 'grid', label: 'Cases', columns: ['id', 'title'] },
+        });
+        expect(result.success).toBe(true);
+        expect((result as any).seq).toBeGreaterThan(0);
+        const row = Array.from(rows.values())[0];
+        expect(typeof row.checksum).toBe('string');
+        expect(row.checksum.startsWith('sha256:')).toBe(true);
     });
 
     it('repository path writes the checksum and surfaces seq', async () => {
