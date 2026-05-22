@@ -242,4 +242,123 @@ describe('ObjectStackProtocolImplementation - Data Operations', () => {
             ).rejects.toThrow('not found');
         });
     });
+
+    // ═══════════════════════════════════════════════════════════════
+    // Optimistic Concurrency Control — updateData / deleteData
+    // ═══════════════════════════════════════════════════════════════
+    describe('Optimistic Concurrency Control', () => {
+        beforeEach(() => {
+            // Both update and delete need `update` / `delete` on the
+            // engine, plus `findOne` for the version probe.
+            mockEngine.update = vi.fn().mockResolvedValue({ id: 'r1', updated_at: '2026-05-22T07:14:33.000Z' });
+            mockEngine.delete = vi.fn().mockResolvedValue(true);
+        });
+
+        it('updateData proceeds when no expectedVersion is supplied (legacy callers)', async () => {
+            await protocol.updateData({ object: 'task', id: 'r1', data: { name: 'New' } });
+            // No version probe was issued
+            expect(mockEngine.findOne).not.toHaveBeenCalled();
+            expect(mockEngine.update).toHaveBeenCalledOnce();
+        });
+
+        it('updateData proceeds when expectedVersion matches current updated_at', async () => {
+            mockEngine.findOne.mockResolvedValue({ id: 'r1', updated_at: '2026-05-22T07:14:00.000Z' });
+            await protocol.updateData({
+                object: 'task',
+                id: 'r1',
+                data: { name: 'New' },
+                expectedVersion: '2026-05-22T07:14:00.000Z',
+            });
+            expect(mockEngine.findOne).toHaveBeenCalledOnce();
+            expect(mockEngine.update).toHaveBeenCalledOnce();
+        });
+
+        it('updateData strips RFC-7232 quotes from the If-Match token', async () => {
+            mockEngine.findOne.mockResolvedValue({ id: 'r1', updated_at: '2026-05-22T07:14:00.000Z' });
+            await protocol.updateData({
+                object: 'task',
+                id: 'r1',
+                data: { name: 'New' },
+                expectedVersion: '"2026-05-22T07:14:00.000Z"',
+            });
+            expect(mockEngine.update).toHaveBeenCalledOnce();
+        });
+
+        it('updateData throws ConcurrentUpdateError when versions differ', async () => {
+            mockEngine.findOne.mockResolvedValue({
+                id: 'r1',
+                updated_at: '2026-05-22T07:14:00.000Z',
+                name: 'Server side',
+            });
+            await expect(
+                protocol.updateData({
+                    object: 'task',
+                    id: 'r1',
+                    data: { name: 'My change' },
+                    expectedVersion: '2026-05-22T07:00:00.000Z',
+                })
+            ).rejects.toMatchObject({
+                name: 'ConcurrentUpdateError',
+                code: 'CONCURRENT_UPDATE',
+                status: 409,
+                currentVersion: '2026-05-22T07:14:00.000Z',
+                currentRecord: expect.objectContaining({ id: 'r1', name: 'Server side' }),
+            });
+            // update was NOT invoked
+            expect(mockEngine.update).not.toHaveBeenCalled();
+        });
+
+        it('updateData skips the check when the record has no updated_at column', async () => {
+            mockEngine.findOne.mockResolvedValue({ id: 'r1', name: 'No timestamps' });
+            await protocol.updateData({
+                object: 'task',
+                id: 'r1',
+                data: { name: 'New' },
+                expectedVersion: '2026-05-22T07:14:00.000Z',
+            });
+            expect(mockEngine.update).toHaveBeenCalledOnce();
+        });
+
+        it('updateData skips the check when expectedVersion is empty string', async () => {
+            await protocol.updateData({
+                object: 'task',
+                id: 'r1',
+                data: { name: 'New' },
+                expectedVersion: '   ',
+            });
+            expect(mockEngine.findOne).not.toHaveBeenCalled();
+            expect(mockEngine.update).toHaveBeenCalledOnce();
+        });
+
+        it('deleteData throws ConcurrentUpdateError on version mismatch', async () => {
+            mockEngine.findOne.mockResolvedValue({
+                id: 'r1',
+                updated_at: '2026-05-22T07:14:00.000Z',
+            });
+            await expect(
+                protocol.deleteData({
+                    object: 'task',
+                    id: 'r1',
+                    expectedVersion: '2026-05-22T06:00:00.000Z',
+                })
+            ).rejects.toMatchObject({
+                name: 'ConcurrentUpdateError',
+                code: 'CONCURRENT_UPDATE',
+            });
+            expect(mockEngine.delete).not.toHaveBeenCalled();
+        });
+
+        it('deleteData proceeds when versions match', async () => {
+            mockEngine.findOne.mockResolvedValue({
+                id: 'r1',
+                updated_at: '2026-05-22T07:14:00.000Z',
+            });
+            await protocol.deleteData({
+                object: 'task',
+                id: 'r1',
+                expectedVersion: '2026-05-22T07:14:00.000Z',
+            });
+            expect(mockEngine.delete).toHaveBeenCalledOnce();
+        });
+    });
 });

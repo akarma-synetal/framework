@@ -2984,11 +2984,24 @@ export class ObjectStackClient {
         return this.unwrapResponse<T[]>(res);
     },
 
-    update: async <T = any>(object: string, id: string, data: Partial<T>): Promise<UpdateDataResult<T>> => {
+    update: async <T = any>(
+        object: string,
+        id: string,
+        data: Partial<T>,
+        opts?: { ifMatch?: string },
+    ): Promise<UpdateDataResult<T>> => {
         const route = this.getRoute('data');
+        const headers: Record<string, string> = {};
+        // Optimistic Concurrency Control: when the caller passes
+        // `opts.ifMatch` (typically the `updated_at` value they read), we
+        // forward it as a standard `If-Match` header. The server returns
+        // `409 CONCURRENT_UPDATE` if the record has been modified since.
+        // See packages/objectql/src/protocol.ts ConcurrentUpdateError.
+        if (opts?.ifMatch) headers['If-Match'] = String(opts.ifMatch);
         const res = await this.fetch(`${this.baseUrl}${route}/${object}/${id}`, {
             method: 'PATCH',
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
+            ...(Object.keys(headers).length ? { headers } : {}),
         });
         return this.unwrapResponse<UpdateDataResult<T>>(res);
     },
@@ -3027,10 +3040,18 @@ export class ObjectStackClient {
         return this.unwrapResponse<BatchUpdateResponse>(res);
     },
 
-    delete: async (object: string, id: string): Promise<DeleteDataResult> => {
+    delete: async (
+        object: string,
+        id: string,
+        opts?: { ifMatch?: string },
+    ): Promise<DeleteDataResult> => {
         const route = this.getRoute('data');
+        const headers: Record<string, string> = {};
+        // OCC: same opt-in protocol as `update`. See note there.
+        if (opts?.ifMatch) headers['If-Match'] = String(opts.ifMatch);
         const res = await this.fetch(`${this.baseUrl}${route}/${object}/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            ...(Object.keys(headers).length ? { headers } : {}),
         });
         return this.unwrapResponse<DeleteDataResult>(res);
     },
