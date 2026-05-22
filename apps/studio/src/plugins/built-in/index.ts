@@ -17,6 +17,7 @@ import { defaultInspectorPlugin } from './default-plugin';
 import { agentPlaygroundPlugin } from './agent-playground-plugin';
 import { toolPlaygroundPlugin } from './tool-playground-plugin';
 import { flowViewerPlugin } from './flow-viewer-plugin';
+import { viewPreviewPlugin } from './view-preview-plugin';
 
 // Protocol plugins (sidebar groups + icons)
 import { uiProtocolPlugin } from './ui-plugin';
@@ -37,6 +38,7 @@ export const builtInPlugins: StudioPlugin[] = [
   agentPlaygroundPlugin,
   toolPlaygroundPlugin,
   flowViewerPlugin,
+  viewPreviewPlugin,
 
   // Protocol group plugins (provide sidebar groups + icons)
   uiProtocolPlugin,
@@ -53,6 +55,7 @@ export {
   agentPlaygroundPlugin,
   toolPlaygroundPlugin,
   flowViewerPlugin,
+  viewPreviewPlugin,
   uiProtocolPlugin,
   automationProtocolPlugin,
   securityProtocolPlugin,
