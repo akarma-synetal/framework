@@ -187,8 +187,18 @@ export class SysMetadataRepository implements MetadataRepository {
     if (!existing) rowData.created_at = now;
 
     if (existing) {
+      // Update by primary key — real ObjectQL.update rejects multi-row
+      // where-clauses without `options.multi=true`. The overlay invariant
+      // (unique active row per (type,name,org)) means existing.id is
+      // unambiguous when we reach this branch.
+      const existingId = (existing as { id?: string }).id;
+      if (existingId === undefined) {
+        throw new Error(
+          `SysMetadataRepository.put: existing row for ${ref.type}/${ref.name} has no id column`,
+        );
+      }
       await this.engine.update('sys_metadata', rowData, {
-        where: this.whereFor(ref),
+        where: { id: existingId },
       });
     } else {
       await this.engine.insert('sys_metadata', rowData);
@@ -237,7 +247,13 @@ export class SysMetadataRepository implements MetadataRepository {
       throw new ConflictError(this.fullRef(ref), opts.parentVersion, existingHash);
     }
 
-    await this.engine.delete('sys_metadata', { where: this.whereFor(ref) });
+    const existingId = (existing as { id?: string }).id;
+    if (existingId === undefined) {
+      throw new Error(
+        `SysMetadataRepository.delete: existing row for ${ref.type}/${ref.name} has no id column`,
+      );
+    }
+    await this.engine.delete('sys_metadata', { where: { id: existingId } });
 
     this.seqCounter += 1;
     const seq = this.seqCounter;

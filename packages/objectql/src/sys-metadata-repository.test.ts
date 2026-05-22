@@ -31,6 +31,19 @@ function makeFakeEngine() {
     const keyOf = (where: Record<string, unknown>) =>
         `${where.type}|${where.name}|${String(where.organization_id ?? 'null')}`;
 
+    // Locate a row by either its overlay tuple or its primary id.
+    const findRow = (where: Record<string, unknown>): { key: string; row: Row } | null => {
+        if (where.id !== undefined) {
+            for (const [k, r] of rows) {
+                if (r.id === where.id) return { key: k, row: r };
+            }
+            return null;
+        }
+        const k = keyOf(where);
+        const r = rows.get(k);
+        return r ? { key: k, row: r } : null;
+    };
+
     return {
         rows,
         async find(_t: string, opts: { where: Record<string, unknown> }) {
@@ -43,7 +56,7 @@ function makeFakeEngine() {
             });
         },
         async findOne(_t: string, opts: { where: Record<string, unknown> }) {
-            return rows.get(keyOf(opts.where)) ?? null;
+            return findRow(opts.where)?.row ?? null;
         },
         async insert(_t: string, data: Record<string, unknown>) {
             const k = keyOf(data);
@@ -52,16 +65,16 @@ function makeFakeEngine() {
             return { id: row.id };
         },
         async update(_t: string, data: Record<string, unknown>, opts: { where: Record<string, unknown> }) {
-            const k = keyOf(opts.where);
-            const cur = rows.get(k);
-            if (!cur) throw new Error('not found');
-            rows.set(k, { ...cur, ...(data as any) });
-            return { id: cur.id };
+            const found = findRow(opts.where);
+            if (!found) throw new Error('not found');
+            rows.set(found.key, { ...found.row, ...(data as any) });
+            return { id: found.row.id };
         },
         async delete(_t: string, opts: { where: Record<string, unknown> }) {
-            const k = keyOf(opts.where);
-            const had = rows.delete(k);
-            return { deleted: had ? 1 : 0 };
+            const found = findRow(opts.where);
+            if (!found) return { deleted: 0 };
+            rows.delete(found.key);
+            return { deleted: 1 };
         },
     };
 }

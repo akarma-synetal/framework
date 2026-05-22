@@ -3,6 +3,8 @@
 import { ObjectStackProtocol } from '@objectstack/spec/api';
 import { IDataEngine } from '@objectstack/core';
 import type { ObjectQL } from './engine.js';
+import { SysMetadataRepository, type SysMetadataEngine } from './sys-metadata-repository.js';
+import { ConflictError } from '@objectstack/metadata-core';
 import type {
     BatchUpdateRequest,
     BatchUpdateResponse,
@@ -154,16 +156,61 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
      */
     private projectId?: string;
 
+    /**
+     * ADR-0008 PR-10d.3 feature flag. When `true`, `saveMetaItem` routes
+     * overlay writes through {@link SysMetadataRepository.put} so every
+     * mutation produces a change-log entry with a monotonic `seq` for
+     * HMR / replay. When `false` (default), uses the legacy inline
+     * insertOrUpdate path that bypasses the change log. Flipped to `true`
+     * by default in PR-10d.4 after staging soak.
+     *
+     * Can also be enabled at runtime via
+     * `OBJECTSTACK_USE_REPOSITORY_WRITE_PATH=1`.
+     */
+    private useRepositoryWritePath: boolean;
+
+    /**
+     * Lazily-instantiated SysMetadataRepository per organization. Keyed by
+     * `${organizationId ?? '__env__'}`. Repositories are stateful — they
+     * carry the per-org `seqCounter` and watch subscribers — so we cache
+     * them rather than constructing one per call.
+     */
+    private overlayRepos = new Map<string, SysMetadataRepository>();
+
     constructor(
         engine: IDataEngine,
         getServicesRegistry?: () => Map<string, any>,
         getFeedService?: () => IFeedService | undefined,
         projectId?: string,
+        options?: { useRepositoryWritePath?: boolean },
     ) {
         this.engine = engine as ObjectQL;
         this.getServicesRegistry = getServicesRegistry;
         this.getFeedService = getFeedService;
         this.projectId = projectId;
+        // Constructor option takes precedence, then env var, then default off.
+        const envFlag = typeof process !== 'undefined'
+            && process.env?.OBJECTSTACK_USE_REPOSITORY_WRITE_PATH === '1';
+        this.useRepositoryWritePath = options?.useRepositoryWritePath ?? envFlag ?? false;
+    }
+
+    /**
+     * Lazily obtain a SysMetadataRepository for the given organization.
+     * Env-wide overlays (organizationId == null) share a singleton under
+     * the `__env__` key.
+     */
+    private getOverlayRepo(organizationId: string | null): SysMetadataRepository {
+        const key = organizationId ?? '__env__';
+        let repo = this.overlayRepos.get(key);
+        if (!repo) {
+            repo = new SysMetadataRepository({
+                engine: this.engine as unknown as SysMetadataEngine,
+                organizationId,
+                orgLabel: organizationId ?? 'env',
+            });
+            this.overlayRepos.set(key, repo);
+        }
+        return repo;
     }
 
     /**
@@ -1743,7 +1790,29 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             || ObjectStackProtocolImplementation.OVERLAY_ALLOWED_TYPES.has(type);
     }
 
-    async saveMetaItem(request: { type: string, name: string, item?: any, organizationId?: string }) {
+    /**
+     * Mirror an object-type overlay write into the in-memory engine
+     * registry so subsequent CRUD finds the new schema. Idempotent and
+     * safe to call after a successful persistence call. For the legacy
+     * write path this is invoked BEFORE persistence (historical behavior
+     * preserved); for the PR-10d.3 repository path it is invoked only
+     * AFTER `put()` resolves successfully, so a failed write — DB error,
+     * optimistic-lock conflict, validation failure — never leaks a
+     * stale schema into the registry.
+     */
+    private applyObjectRegistryMutation(request: { type: string; name: string; item?: any }): void {
+        if (request.type !== 'object' && request.type !== 'objects') return;
+        this.engine.registry.registerItem(request.type, request.item, 'name');
+        try {
+            this.engine.registry.registerObject(request.item as any, 'sys_metadata');
+        } catch (err: any) {
+            console.warn(
+                `[Protocol] registerObject failed for ${request.name}: ${err?.message ?? err}`,
+            );
+        }
+    }
+
+    async saveMetaItem(request: { type: string, name: string, item?: any, organizationId?: string, parentVersion?: string | null, actor?: string }) {
         if (!request.item) {
             throw new Error('Item data is required');
         }
@@ -1807,16 +1876,11 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         //    first (ADR-0005). Mutating the registry here would create a
         //    "stale overlay" hazard: `deleteMetaItem` cannot restore the
         //    original artifact value because it was overwritten in-place.
-        if (request.type === 'object' || request.type === 'objects') {
-            this.engine.registry.registerItem(request.type, request.item, 'name');
-            try {
-                this.engine.registry.registerObject(request.item as any, 'sys_metadata');
-            } catch (err: any) {
-                console.warn(
-                    `[Protocol] registerObject failed for ${request.name}: ${err?.message ?? err}`,
-                );
-            }
-        }
+        // 1. (deferred) — Object-type runtime-registry mutation used to happen
+        //    here unconditionally. Moved to AFTER successful persistence
+        //    (PR-10d.3 rubber-duck #3): a failed put() — DB error, optimistic
+        //    conflict, validation — must not leave a stale object schema in
+        //    the in-memory registry. See `applyObjectRegistryMutation` below.
 
         // 2. Persist to sys_metadata as a customization overlay row.
         //    ADR-0005 (revised 2026-05): isolation key is `organization_id`
@@ -1824,6 +1888,79 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         //    rows belong to the active organization in the request; env-wide
         //    overlays are written with organization_id = NULL.
         await this.ensureOverlayIndex();
+
+        // ADR-0008 PR-10d.3 — repository write path. When the flag is on,
+        // route through SysMetadataRepository.put so every mutation appends
+        // to the change log and emits a watch event with a monotonic seq.
+        // Callers that omit `parentVersion` get backward-compatible
+        // "last-write-wins" semantics: we read the current row's checksum
+        // and use it as the parent, so the conflict check tautologically
+        // passes (best-effort — racy under concurrent writes; explicit
+        // optimistic-lock is opt-in via `parentVersion`).
+        // Callers that pass an explicit `parentVersion` (e.g. Studio after
+        // reading an item) get true optimistic-lock conflict detection
+        // surfaced as a 409.
+        if (this.useRepositoryWritePath) {
+            const orgId = request.organizationId ?? null;
+            const repo = this.getOverlayRepo(orgId);
+            // Rubber-duck #5: normalize plural → singular before constructing
+            // the ref. SysMetadataRepository.assertAllowed() only knows the
+            // singular registry types; passing 'views' would 403 even though
+            // the protocol gate accepts both forms.
+            const singularType = PLURAL_TO_SINGULAR[request.type] ?? request.type;
+            const ref = {
+                type: singularType,
+                name: request.name,
+                org: orgId ?? 'env',
+                project: this.projectId ?? 'default',
+                branch: 'main',
+            } as Parameters<typeof repo.put>[0];
+            let parentVersion: string | null;
+            if (request.parentVersion !== undefined) {
+                parentVersion = request.parentVersion;
+            } else {
+                const current = await repo.get(ref);
+                parentVersion = current?.hash ?? null;
+            }
+            try {
+                const result = await repo.put(ref, request.item, {
+                    parentVersion,
+                    actor: request.actor ?? 'system',
+                    source: 'protocol.saveMetaItem',
+                });
+                // Persistence succeeded — NOW it's safe to mutate the
+                // in-memory object registry. If put() had thrown, the
+                // registry would still reflect the prior state.
+                this.applyObjectRegistryMutation(request);
+                return {
+                    success: true,
+                    version: result.version,
+                    seq: result.seq,
+                    message: orgId
+                        ? `Saved customization overlay (org=${orgId}) — type=${request.type}, name=${request.name} [seq=${result.seq}]`
+                        : `Saved customization overlay (env-wide) — type=${request.type}, name=${request.name} [seq=${result.seq}]`,
+                };
+            } catch (err: any) {
+                if (err instanceof ConflictError) {
+                    const conflict = new Error(
+                        `[metadata_conflict] ${request.type}/${request.name} has been modified since you loaded it. `
+                        + `Expected parent ${err.expectedParent ?? 'null'} but current is ${err.actualHead ?? 'null'}.`,
+                    );
+                    (conflict as any).code = 'metadata_conflict';
+                    (conflict as any).status = 409;
+                    (conflict as any).expectedParent = err.expectedParent;
+                    (conflict as any).actualHead = err.actualHead;
+                    throw conflict;
+                }
+                throw err;
+            }
+        }
+
+        // Legacy path: keep the pre-persistence registry mutation for
+        // backward compatibility (it has always been this way), but the
+        // hazard is documented and PR-10d.4 retires this branch.
+        this.applyObjectRegistryMutation(request);
+
         try {
             const now = new Date().toISOString();
             const orgId = request.organizationId ?? null;

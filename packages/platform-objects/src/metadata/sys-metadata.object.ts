@@ -154,11 +154,11 @@ export const SysMetadataObject = ObjectSchema.create({
       defaultValue: 1,
     }),
 
-    /** Content checksum for change detection */
+    /** Content checksum for change detection (e.g. `sha256:<64 hex>` = 71 chars) */
     checksum: Field.text({
       label: 'Checksum',
       required: false,
-      maxLength: 64,
+      maxLength: 71,
     }),
 
     /** Origin of this metadata record */

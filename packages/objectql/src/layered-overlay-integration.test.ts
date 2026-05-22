@@ -35,6 +35,15 @@ function makeFakeEngine() {
     const rows = new Map<string, Row>();
     const keyOf = (w: Record<string, unknown>) =>
         `${w.type}|${w.name}|${String(w.organization_id ?? 'null')}`;
+    const findRow = (w: Record<string, unknown>): { key: string; row: Row } | null => {
+        if (w.id !== undefined) {
+            for (const [k, r] of rows) if (r.id === w.id) return { key: k, row: r };
+            return null;
+        }
+        const k = keyOf(w);
+        const r = rows.get(k);
+        return r ? { key: k, row: r } : null;
+    };
     return {
         rows,
         async find(_t: string, opts: { where: Record<string, unknown> }) {
@@ -46,7 +55,7 @@ function makeFakeEngine() {
             );
         },
         async findOne(_t: string, opts: { where: Record<string, unknown> }) {
-            return rows.get(keyOf(opts.where)) ?? null;
+            return findRow(opts.where)?.row ?? null;
         },
         async insert(_t: string, data: Record<string, unknown>) {
             const row: Row = { id: `r_${rows.size + 1}`, ...(data as any) };
@@ -54,13 +63,16 @@ function makeFakeEngine() {
             return { id: row.id };
         },
         async update(_t: string, data: Record<string, unknown>, opts: { where: Record<string, unknown> }) {
-            const k = keyOf(opts.where);
-            const cur = rows.get(k)!;
-            rows.set(k, { ...cur, ...(data as any) });
-            return { id: cur.id };
+            const found = findRow(opts.where);
+            if (!found) return { id: null };
+            rows.set(found.key, { ...found.row, ...(data as any) });
+            return { id: found.row.id };
         },
         async delete(_t: string, opts: { where: Record<string, unknown> }) {
-            return { deleted: rows.delete(keyOf(opts.where)) ? 1 : 0 };
+            const found = findRow(opts.where);
+            if (!found) return { deleted: 0 };
+            rows.delete(found.key);
+            return { deleted: 1 };
         },
     };
 }
