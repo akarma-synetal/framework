@@ -72,6 +72,7 @@ export const Product = ObjectSchema.create({
     
     // Pricing
     list_price: Field.currency({ 
+      currency: 'CNY',
       label: 'List Price',
       scale: 2,
       min: 0,
@@ -79,6 +80,7 @@ export const Product = ObjectSchema.create({
     }),
     
     cost: Field.currency({ 
+      currency: 'CNY',
       label: 'Cost',
       scale: 2,
       min: 0,

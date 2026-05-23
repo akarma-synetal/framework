@@ -89,6 +89,7 @@ export const Contract = ObjectSchema.create({
     
     // Financial
     contract_value: Field.currency({ 
+      currency: 'CNY',
       label: 'Contract Value',
       scale: 2,
       min: 0,

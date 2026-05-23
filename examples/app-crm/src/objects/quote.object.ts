@@ -92,6 +92,7 @@ export const Quote = ObjectSchema.create({
     
     // Pricing
     subtotal: Field.currency({ 
+      currency: 'CNY',
       label: 'Subtotal',
       scale: 2,
       readonly: true,
@@ -105,22 +106,26 @@ export const Quote = ObjectSchema.create({
     }),
     
     discount_amount: Field.currency({ 
+      currency: 'CNY',
       label: 'Discount Amount',
       scale: 2,
       readonly: true,
     }),
     
     tax: Field.currency({ 
+      currency: 'CNY',
       label: 'Tax',
       scale: 2,
     }),
     
     shipping_handling: Field.currency({ 
+      currency: 'CNY',
       label: 'Shipping & Handling',
       scale: 2,
     }),
     
     total_price: Field.currency({ 
+      currency: 'CNY',
       label: 'Total Price',
       scale: 2,
       readonly: true,

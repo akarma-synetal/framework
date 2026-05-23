@@ -86,24 +86,28 @@ export const Campaign = ObjectSchema.create({
     
     // Budget & ROI
     budgeted_cost: Field.currency({ 
+      currency: 'CNY',
       label: 'Budgeted Cost',
       scale: 2,
       min: 0,
     }),
     
     actual_cost: Field.currency({ 
+      currency: 'CNY',
       label: 'Actual Cost',
       scale: 2,
       min: 0,
     }),
     
     expected_revenue: Field.currency({ 
+      currency: 'CNY',
       label: 'Expected Revenue',
       scale: 2,
       min: 0,
     }),
     
     actual_revenue: Field.currency({ 
+      currency: 'CNY',
       label: 'Actual Revenue',
       scale: 2,
       min: 0,

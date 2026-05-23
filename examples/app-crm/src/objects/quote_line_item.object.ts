@@ -47,11 +47,13 @@ export const QuoteLineItem = ObjectSchema.create({
     }),
 
     list_price: Field.currency({
+      currency: 'CNY',
       label: 'List Price',
       readonly: true,
     }),
 
     unit_price: Field.currency({
+      currency: 'CNY',
       label: 'Sales Price',
       required: true,
     }),
