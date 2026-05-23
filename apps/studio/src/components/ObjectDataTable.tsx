@@ -25,8 +25,31 @@ interface ObjectDataTableProps {
     refreshTrigger?: number;
 }
 
+function formatNumber(value: any, opts?: Intl.NumberFormatOptions): string {
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n)) return String(value);
+    try {
+        return new Intl.NumberFormat(undefined, opts).format(n);
+    } catch {
+        return String(value);
+    }
+}
+
+function formatDate(value: any, withTime: boolean): string {
+    if (value == null) return '';
+    const d = value instanceof Date ? value : new Date(String(value));
+    if (Number.isNaN(d.getTime())) return String(value);
+    try {
+        return d.toLocaleString(undefined, withTime
+            ? { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }
+            : { year: 'numeric', month: 'short', day: '2-digit' });
+    } catch {
+        return d.toISOString();
+    }
+}
+
 function CellValue({ value, type }: { value: any; type: string }) {
-    if (value === undefined || value === null) {
+    if (value === undefined || value === null || value === '') {
         return <span className="text-muted-foreground/50">—</span>;
     }
     if (type === 'boolean') {
@@ -41,12 +64,73 @@ function CellValue({ value, type }: { value: any; type: string }) {
         );
     }
     if (type === 'number') {
-        return <span className="font-mono text-sm tabular-nums">{value}</span>;
+        return <span className="font-mono text-sm tabular-nums">{formatNumber(value)}</span>;
+    }
+    if (type === 'currency') {
+        // Use compact "$5M" style only above 1M to keep the cell readable;
+        // otherwise full grouped form. Falls back gracefully on bad input.
+        const n = Number(value);
+        const long = Number.isFinite(n) ? formatNumber(n, { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : String(value);
+        return <span className="font-mono text-sm tabular-nums tracking-tight">{long}</span>;
+    }
+    if (type === 'percent') {
+        const n = Number(value);
+        const s = Number.isFinite(n) ? formatNumber(n, { style: 'percent', maximumFractionDigits: 1 }) : String(value);
+        return <span className="font-mono text-sm tabular-nums">{s}</span>;
+    }
+    if (type === 'date' || type === 'datetime' || type === 'time') {
+        return <span className="text-sm">{formatDate(value, type !== 'date')}</span>;
+    }
+    if (type === 'url') {
+        const href = String(value);
+        return (
+            <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-sm text-primary underline-offset-2 hover:underline truncate"
+            >
+                {href.replace(/^https?:\/\//, '')}
+            </a>
+        );
+    }
+    if (type === 'email') {
+        const addr = String(value);
+        return (
+            <a
+                href={`mailto:${addr}`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-sm text-primary underline-offset-2 hover:underline"
+            >
+                {addr}
+            </a>
+        );
     }
     if (type === 'select') {
         return <Badge variant="outline">{String(value)}</Badge>;
     }
-    const str = String(value);
+    if (type === 'address') {
+        // Address fields persist as either a string ("123 Main St")
+        // or a structured object ({street, city, country, ...}).
+        // Collapse the object form to a single comma-separated line.
+        if (typeof value === 'object') {
+            const parts = ['street', 'street2', 'city', 'state', 'postalCode', 'postcode', 'country']
+                .map((k) => (value as Record<string, unknown>)[k])
+                .filter((v) => typeof v === 'string' && v.trim().length > 0);
+            return <span className="text-sm">{parts.join(', ') || '—'}</span>;
+        }
+        return <span className="text-sm">{String(value)}</span>;
+    }
+    if (type === 'json' || type === 'object') {
+        try {
+            const s = typeof value === 'string' ? value : JSON.stringify(value);
+            return <span className="font-mono text-xs text-muted-foreground">{s.length > 60 ? s.slice(0, 60) + '…' : s}</span>;
+        } catch {
+            return <span className="text-muted-foreground/50">—</span>;
+        }
+    }
+    const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
     if (str.length > 50) {
         return (
             <TooltipProvider>
@@ -285,11 +369,18 @@ export function ObjectDataTable({ objectApiName, onEdit, refreshTrigger = 0 }: O
                                 <TableSkeleton cols={columns.length} />
                             ) : filteredRecords.map(record => (
                                 <TableRow key={record.id} className="group">
-                                    {columns.map(col => (
-                                        <TableCell key={col.name} className="py-2.5">
-                                            <CellValue value={record[col.name]} type={col.type} />
-                                        </TableCell>
-                                    ))}
+                                    {columns.map(col => {
+                                        // Single-line types stay compact; text/longtext/json may wrap.
+                                        const compact = ['phone', 'email', 'url', 'number', 'currency', 'percent', 'date', 'datetime', 'time', 'boolean', 'select'].includes(col.type);
+                                        return (
+                                            <TableCell
+                                                key={col.name}
+                                                className={`py-2.5 ${compact ? 'whitespace-nowrap' : 'max-w-[28rem]'}`}
+                                            >
+                                                <CellValue value={record[col.name]} type={col.type} />
+                                            </TableCell>
+                                        );
+                                    })}
                                     <TableCell className="py-2.5 sticky right-0 bg-background">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
