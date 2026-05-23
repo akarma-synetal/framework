@@ -141,35 +141,38 @@ function ObjectHubComponent() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b px-6 pt-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-              <Database className="h-4 w-4 text-muted-foreground" />
-              {objectLabel}
-              <code className="ml-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
-                {name}
-              </code>
-            </h1>
-            {object?.description && (
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{object.description}</p>
-            )}
+      {/* A single Tabs root wraps both the list (in the header) and the
+          content panes — Radix triggers must live inside the same Tabs
+          context as their content for value changes to propagate. */}
+      <Tabs value={tab} onValueChange={setTab} className="flex h-full flex-col overflow-hidden">
+        <div className="border-b px-6 pt-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+                <Database className="h-4 w-4 text-muted-foreground" />
+                {objectLabel}
+                <code className="ml-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                  {name}
+                </code>
+              </h1>
+              {object?.description && (
+                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{object.description}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  to="/$package/metadata/$type/$name"
+                  params={{ package: packageId, type: 'object', name }}
+                >
+                  <Code2 className="h-3.5 w-3.5" />
+                  <span className="ml-1.5">View source</span>
+                </Link>
+              </Button>
+              <ResourceActionsMenu type="object" name={name} packageId={packageId} />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link
-                to="/$package/metadata/$type/$name"
-                params={{ package: packageId, type: 'object', name }}
-              >
-                <Code2 className="h-3.5 w-3.5" />
-                <span className="ml-1.5">View source</span>
-              </Link>
-            </Button>
-            <ResourceActionsMenu type="object" name={name} packageId={packageId} />
-          </div>
-        </div>
-        <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList>
+          <TabsList className="mt-3">
             <TabsTrigger value="designer" className="gap-1.5">
               <Database className="h-3.5 w-3.5" /> Designer
             </TabsTrigger>
@@ -186,11 +189,9 @@ function ObjectHubComponent() {
               <Shield className="h-3.5 w-3.5" /> Permissions
             </TabsTrigger>
           </TabsList>
-        </Tabs>
-      </div>
+        </div>
 
-      <div className="flex-1 overflow-hidden">
-        <Tabs value={tab} className="h-full">
+        <div className="flex-1 overflow-hidden">
           <TabsContent value="designer" className="m-0 h-full overflow-hidden">
             {/* The embedded object-designer plugin owns Schema / Data / API
                 sub-tabs — we surface it as a single "Designer" canvas to
@@ -278,8 +279,8 @@ function ObjectHubComponent() {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
-      </div>
+        </div>
+      </Tabs>
 
       <Dialog open={!!previewItem} onOpenChange={(o) => !o && setPreviewItem(null)}>
         <DialogContent className="max-w-4xl">

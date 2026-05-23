@@ -370,12 +370,14 @@ export function ObjectDataTable({ objectApiName, onEdit, refreshTrigger = 0 }: O
                             ) : filteredRecords.map(record => (
                                 <TableRow key={record.id} className="group">
                                     {columns.map(col => {
-                                        // Single-line types stay compact; text/longtext/json may wrap.
-                                        const compact = ['phone', 'email', 'url', 'number', 'currency', 'percent', 'date', 'datetime', 'time', 'boolean', 'select'].includes(col.type);
+                                        // Airtable convention: cells stay on one line by default;
+                                        // only genuinely long-form text wraps. Width-capped so a
+                                        // huge value cannot blow out the layout.
+                                        const wraps = ['longtext', 'textarea', 'richtext', 'markdown', 'json', 'object'].includes(col.type);
                                         return (
                                             <TableCell
                                                 key={col.name}
-                                                className={`py-2.5 ${compact ? 'whitespace-nowrap' : 'max-w-[28rem]'}`}
+                                                className={`py-2.5 ${wraps ? 'max-w-[28rem]' : 'whitespace-nowrap max-w-[20rem] truncate'}`}
                                             >
                                                 <CellValue value={record[col.name]} type={col.type} />
                                             </TableCell>
