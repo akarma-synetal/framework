@@ -86,6 +86,16 @@ export const RestApiConfigSchema = lazySchema(() => z.object({
   enableDiscovery: z.boolean().default(true).describe('Enable API discovery endpoint'),
 
   /**
+   * Enable OpenAPI 3.1 spec endpoints — `GET <basePath>/openapi.json`
+   * for the machine-readable contract and `GET <basePath>/docs` for a
+   * zero-dep Scalar-rendered HTML viewer. The spec ships pre-generated
+   * from @objectstack/spec and is enriched at request time with the
+   * actual server URL + the runtime-registered objects (so `{object}`
+   * placeholders expand into one path per concrete table).
+   */
+  enableOpenApi: z.boolean().default(true).describe('Enable OpenAPI 3.1 spec & docs viewer endpoints'),
+
+  /**
    * Enable project-scoped routing (/api/v1/projects/:projectId/data/...)
    * When true, all data/meta/AI APIs are scoped under /projects/:projectId
    * Control plane routes (/auth, /cloud) remain unscoped

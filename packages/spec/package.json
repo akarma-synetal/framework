@@ -85,7 +85,9 @@
       "types": "./dist/shared/index.d.ts",
       "import": "./dist/shared/index.mjs",
       "require": "./dist/shared/index.js"
-    }
+    },
+    "./openapi.json": "./json-schema/openapi.json",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
