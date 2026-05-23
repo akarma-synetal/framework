@@ -58,7 +58,17 @@ export function pickDescription(item: any, type: string): string | undefined {
       if (item?.form) parts.push('form');
       const extra = (item?.listViews?.length ?? 0) + (item?.formViews?.length ?? 0);
       if (extra > 0) parts.push(`${extra} variant${extra === 1 ? '' : 's'}`);
-      return parts.length ? `Default ${parts.join(' + ')} for ${item?.name}` : undefined;
+      // Try a few well-known shapes for the bound object — top-level
+      // `object` (canonical view), nested `data.object` (modern view
+      // wrapper), or the legacy list/form sub-spec.
+      const obj =
+        item?.object ??
+        item?.data?.object ??
+        item?.list?.data?.object ??
+        item?.form?.data?.object ??
+        item?.name;
+      if (!parts.length) return undefined;
+      return obj ? `Default ${parts.join(' + ')} for ${obj}` : `Default ${parts.join(' + ')}`;
     }
     case 'agent': {
       const m = item?.model;
