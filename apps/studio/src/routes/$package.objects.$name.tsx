@@ -103,17 +103,19 @@ function ObjectHubComponent() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <Tabs value={tab} onValueChange={setTab} className="flex h-full flex-col overflow-hidden">
-        <div className="border-b px-6 pt-3">
+        <div className="border-b px-6 py-2.5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <Database className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-              <h1 className="truncate text-lg font-semibold tracking-tight">
-                {objectLabel}
-              </h1>
-              <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                {name}
-              </code>
-              <div className="hidden items-center gap-3 text-[11px] text-muted-foreground md:flex">
+              <div className="flex min-w-0 items-baseline gap-2">
+                <h1 className="truncate text-lg font-semibold tracking-tight" title={object?.description || undefined}>
+                  {objectLabel}
+                </h1>
+                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                  {name}
+                </code>
+              </div>
+              <div className="hidden items-center gap-3 text-[11px] text-muted-foreground lg:flex">
                 {fieldCount !== null && (
                   <span className="inline-flex items-center gap-1">
                     <Columns3 className="h-3 w-3" />
@@ -143,24 +145,23 @@ function ObjectHubComponent() {
                 )}
               </div>
             </div>
-            <ResourceActionsMenu type="object" name={name} packageId={packageId} />
+            <div className="flex items-center gap-2">
+              <TabsList className="h-8">
+                <TabsTrigger value="designer" className="h-7 gap-1.5 text-xs">
+                  <Database className="h-3.5 w-3.5" /> Designer
+                </TabsTrigger>
+                <TabsTrigger value="related" className="h-7 gap-1.5 text-xs">
+                  <Layers className="h-3.5 w-3.5" /> Related
+                  {relatedCount !== null && relatedCount > 0 && (
+                    <span className="ml-1 rounded-sm bg-muted px-1 text-[10px] font-medium tabular-nums text-muted-foreground">
+                      {relatedCount}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+              <ResourceActionsMenu type="object" name={name} packageId={packageId} />
+            </div>
           </div>
-          {object?.description && (
-            <p className="mt-1 ml-8 truncate text-xs text-muted-foreground">{object.description}</p>
-          )}
-          <TabsList className="mt-2">
-            <TabsTrigger value="designer" className="gap-1.5">
-              <Database className="h-3.5 w-3.5" /> Designer
-            </TabsTrigger>
-            <TabsTrigger value="related" className="gap-1.5">
-              <Layers className="h-3.5 w-3.5" /> Related
-              {relatedCount !== null && relatedCount > 0 && (
-                <span className="ml-1 rounded-sm bg-muted px-1 text-[10px] font-medium tabular-nums text-muted-foreground">
-                  {relatedCount}
-                </span>
-              )}
-            </TabsTrigger>
-          </TabsList>
         </div>
 
         <div className="flex-1 overflow-hidden">

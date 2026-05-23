@@ -177,13 +177,11 @@ export function TopBar({ rightSlot }: { rightSlot?: React.ReactNode } = {}) {
   }, [viewType, params]);
 
   const apiBadge = useMemo(() => {
-    if (viewType === 'object' && params.name) {
-      return `/api/v1/data/${params.name}`;
-    }
-    if (viewType === 'metadata' && params.type && params.name) {
-      return `/api/v1/meta/${params.type}/${params.name}`;
-    }
-    return null;
+    // Intentionally disabled: the page-level "API" tab on object/metadata pages
+    // already surfaces this endpoint. Keeping it in the topbar duplicated info
+    // and ate horizontal space next to search/HMR. If we later want a power-user
+    // "show endpoint everywhere" toggle, gate it behind a dev-mode preference.
+    return null as string | null;
   }, [viewType, params]);
 
   return (
