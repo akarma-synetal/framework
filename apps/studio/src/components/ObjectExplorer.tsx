@@ -36,6 +36,8 @@ import { ObjectApiConsole } from './ObjectApiConsole';
 import { useObjectUiDataSource } from '@/hooks/useObjectUiDataSource';
 import { useScopedClient } from '@/hooks/useObjectStackClient';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface ObjectExplorerProps {
@@ -155,6 +157,12 @@ function DesignerRecordsGrid({ objectApiName }: { objectApiName: string }) {
 
   return (
     <>
+      <div className="flex items-center justify-end gap-2 border-b px-3 py-2">
+        <Button size="sm" onClick={handleAddRecord} className="h-7 gap-1.5 text-xs">
+          <Plus className="h-3.5 w-3.5" />
+          New record
+        </Button>
+      </div>
       <ObjectGrid
         key={refreshKey}
         schema={{ type: 'object-grid', objectName: objectApiName, ...(columns ? { columns } : {}) }}
