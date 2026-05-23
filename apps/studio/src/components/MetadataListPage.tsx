@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { Eye, LayoutGrid, List, Search } from 'lucide-react';
+import { ChevronRight, Eye, LayoutGrid, List, Search } from 'lucide-react';
 import { useClient, useMetadataSubscriptionCallback } from '@objectstack/client-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -178,22 +178,19 @@ export function MetadataListPage({
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden">
-      <div className="border-b px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
+      <div className="border-b px-6 py-2.5">
+        <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-baseline gap-3">
+            <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+            <p className="hidden truncate text-xs text-muted-foreground lg:block">{subtitle}</p>
           </div>
-          <div className="flex items-center gap-2">{rightSlot}</div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="relative max-w-md flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative ml-auto w-64 max-w-sm flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search ${title}…`}
-              className="pl-9"
+              placeholder={`Search ${title.toLowerCase()}…`}
+              className="h-8 pl-8 text-sm"
               autoFocus
             />
           </div>
@@ -218,7 +215,7 @@ export function MetadataListPage({
               })}
             </div>
           )}
-          <div className="ml-auto inline-flex rounded-md border bg-background p-0.5">
+          <div className="inline-flex rounded-md border bg-background p-0.5">
             <Button
               variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
               size="sm"
@@ -242,6 +239,7 @@ export function MetadataListPage({
               <List className="h-3.5 w-3.5" />
             </Button>
           </div>
+          {rightSlot && <div className="flex items-center gap-2">{rightSlot}</div>}
         </div>
       </div>
 
@@ -418,21 +416,27 @@ function CompactList({ rows, showTypeBadge, iconForType, onOpen, onPreview }: Co
                 </span>
               )}
             </div>
-            {canPreview ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 opacity-40 transition group-hover:opacity-100"
-                title="Preview"
-                aria-label={`Preview ${row.label}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPreview(row);
-                }}
-              >
-                <Eye className="h-3.5 w-3.5" />
-              </Button>
-            ) : <span className="w-6" />}
+            <div className="flex items-center gap-0.5">
+              {canPreview && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 opacity-0 transition group-hover:opacity-100 group-focus:opacity-100"
+                  title="Preview"
+                  aria-label={`Preview ${row.label}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPreview(row);
+                  }}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <ChevronRight
+                aria-hidden
+                className="h-4 w-4 shrink-0 text-muted-foreground/40 transition group-hover:translate-x-0.5 group-hover:text-foreground"
+              />
+            </div>
           </div>
         );
       })}
