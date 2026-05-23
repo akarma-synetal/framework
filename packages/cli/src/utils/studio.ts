@@ -337,6 +337,125 @@ export function createStudioStaticPlugin(distPath: string, options?: { isDev?: b
   };
 }
 
+// ─── Dev-only Write API ─────────────────────────────────────────────
+
+/**
+ * Dev-only plugin that exposes a tiny write API at
+ * `/_studio/api/metadata/*` so Studio's "Create" dialogs can scaffold
+ * real `.ts` files instead of asking the user to paste a snippet.
+ *
+ * Security posture: enabled ONLY when `isDev === true`. All file paths
+ * must live under `<cwd>`, contain a `/src/` segment, and carry an
+ * approved extension. Path traversal (`..`) and absolute paths are
+ * rejected outright. Existing files are NEVER overwritten unless the
+ * caller passes `mode: 'overwrite'`.
+ *
+ * Endpoints:
+ *   GET  /_studio/api/metadata/layout?package=<id>
+ *     200: { srcRoot: string }   relative to cwd, e.g. "src" or "packages/<id>/src"
+ *
+ *   POST /_studio/api/metadata/file
+ *     body: { path: string, content: string, mode?: 'create' | 'overwrite' }
+ *     200: { ok: true, path: string }
+ *     409: { ok: false, error: 'exists' }
+ *     400: { ok: false, error: ... }
+ */
+export function createStudioWriteApiPlugin(cwd: string, options: { isDev: boolean } = { isDev: false }) {
+  return {
+    name: 'com.objectstack.studio-write-api',
+
+    init: async () => {},
+
+    start: async (ctx: any) => {
+      if (!options.isDev) return;
+      const httpServer = ctx.getService?.('http.server');
+      if (!httpServer?.getRawApp) {
+        ctx.logger?.warn?.('Studio write API: http.server not found — skipping');
+        return;
+      }
+
+      const app = httpServer.getRawApp();
+      const projectRoot = path.resolve(cwd);
+      const ALLOWED_EXT = new Set(['.ts', '.tsx', '.json']);
+
+      const respond = (_c: any, status: number, body: Record<string, unknown>) =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json; charset=utf-8' },
+        });
+
+      // Resolve the most likely source-code root for a given package id.
+      const resolveSrcRoot = (pkgId: string | null): string | null => {
+        const candidates = [
+          pkgId ? path.join('packages', pkgId, 'src') : null,
+          pkgId ? path.join('examples', pkgId, 'src') : null,
+          'src',  // single-app project layout
+        ].filter(Boolean) as string[];
+        for (const c of candidates) {
+          if (fs.existsSync(path.join(projectRoot, c))) return c;
+        }
+        return null;
+      };
+
+      app.get(`${STUDIO_PATH}/api/metadata/layout`, (c: any) => {
+        const pkgId = c.req.query?.('package') ?? null;
+        const srcRoot = resolveSrcRoot(pkgId);
+        return respond(c, 200, { srcRoot });
+      });
+
+      app.post(`${STUDIO_PATH}/api/metadata/file`, async (c: any) => {
+        let body: any;
+        try {
+          body = await c.req.json();
+        } catch {
+          return respond(c, 400, { ok: false, error: 'invalid json body' });
+        }
+
+        const rel = typeof body?.path === 'string' ? body.path : '';
+        const content = typeof body?.content === 'string' ? body.content : '';
+        const mode = body?.mode === 'overwrite' ? 'overwrite' : 'create';
+
+        if (!rel) return respond(c, 400, { ok: false, error: 'path is required' });
+        if (path.isAbsolute(rel) || rel.split(/[\\/]/).includes('..')) {
+          return respond(c, 400, { ok: false, error: 'path must be a project-relative path without `..`' });
+        }
+        const ext = path.extname(rel).toLowerCase();
+        if (!ALLOWED_EXT.has(ext)) {
+          return respond(c, 400, { ok: false, error: `unsupported extension ${ext}` });
+        }
+
+        const abs = path.resolve(projectRoot, rel);
+        if (!abs.startsWith(projectRoot + path.sep)) {
+          return respond(c, 400, { ok: false, error: 'path escapes project root' });
+        }
+
+        // Must contain a `/src/` segment — keeps writes scoped to source
+        // code, not random config files at the repo root.
+        const segments = path.relative(projectRoot, abs).split(path.sep);
+        if (!segments.includes('src')) {
+          return respond(c, 400, { ok: false, error: 'path must live under a src/ directory' });
+        }
+
+        if (fs.existsSync(abs) && mode === 'create') {
+          return respond(c, 409, { ok: false, error: 'exists' });
+        }
+
+        try {
+          await fs.promises.mkdir(path.dirname(abs), { recursive: true });
+          await fs.promises.writeFile(abs, content, 'utf-8');
+          ctx.logger?.info?.(`Studio write API: ${mode} ${rel}`);
+          return respond(c, 200, { ok: true, path: rel });
+        } catch (err: any) {
+          ctx.logger?.error?.(`Studio write API failed: ${err?.message}`);
+          return respond(c, 500, { ok: false, error: err?.message ?? String(err) });
+        }
+      });
+
+      ctx.logger?.info?.(`Studio write API mounted at ${STUDIO_PATH}/api/metadata/* (dev mode)`);
+    },
+  };
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 const MIME_TYPES: Record<string, string> = {

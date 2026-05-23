@@ -78,12 +78,35 @@ export default defineConfig({
     ]
   },
   build: {
+    chunkSizeWarningLimit: 1000,
     commonjsOptions: {
       include: [/node_modules/, /packages/],
       exclude: [/\.node$/, /rollup/, /fsevents/],
       transformMixedEsModules: true
     },
     rollupOptions: {
+      // Split heavy vendor groups into their own chunks so the main
+      // bundle stays under the 500KB warning and the browser can cache
+      // them independently across deploys.
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          // Heaviest groups first — order matters because the first
+          // match wins.
+          if (/[\\/]@object-ui[\\/]plugin-form[\\/]/.test(id)) return 'vendor-object-ui-form';
+          if (/[\\/]@object-ui[\\/]plugin-grid[\\/]/.test(id)) return 'vendor-object-ui-grid';
+          if (/[\\/]@object-ui[\\/]plugin-(dashboard|report|kanban|calendar|timeline)[\\/]/.test(id)) return 'vendor-object-ui-views';
+          if (/[\\/]@object-ui[\\/]/.test(id)) return 'vendor-object-ui-core';
+          if (/[\\/]@tanstack[\\/]/.test(id)) return 'vendor-tanstack';
+          if (/[\\/]recharts[\\/]|[\\/]d3-/.test(id)) return 'vendor-charts';
+          if (/[\\/]monaco-editor[\\/]|[\\/]codemirror[\\/]/.test(id)) return 'vendor-editor';
+          if (/[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'vendor-react';
+          if (/[\\/]lucide-react[\\/]/.test(id)) return 'vendor-icons';
+          if (/[\\/]@radix-ui[\\/]/.test(id)) return 'vendor-radix';
+          if (/[\\/]@objectstack[\\/]/.test(id)) return 'vendor-objectstack';
+          return 'vendor';
+        },
+      },
       // Suppress warnings for optional dynamic imports in runtime
       onwarn(warning, warn) {
         // Ignore unresolved import warnings for @objectstack/driver-memory

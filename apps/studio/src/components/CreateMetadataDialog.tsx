@@ -305,6 +305,30 @@ export function CreateMetadataDialog({
   const [machineName, setMachineName] = useState('');
   const [machineEdited, setMachineEdited] = useState(false);
   const [copied, setCopied] = useState<'snippet' | 'path' | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [srcRoot, setSrcRoot] = useState<string | null>(null);
+
+  // Probe the host for the on-disk source root once per dialog open.
+  // If the host doesn't expose the dev write API (production, custom
+  // hosts) the endpoint 404s and we fall back to a placeholder path.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = packageId && packageId !== 'all'
+          ? `/_studio/api/metadata/layout?package=${encodeURIComponent(packageId)}`
+          : '/_studio/api/metadata/layout';
+        const resp = await fetch(url);
+        if (!resp.ok) { if (!cancelled) setSrcRoot(null); return; }
+        const data = await resp.json().catch(() => null);
+        if (!cancelled) setSrcRoot(data?.srcRoot ?? null);
+      } catch {
+        if (!cancelled) setSrcRoot(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, packageId]);
 
   // When user changes the type, ensure selection stays in allowed list.
   useEffect(() => {
@@ -342,9 +366,13 @@ export function CreateMetadataDialog({
 
   const filePath = useMemo(() => {
     if (!template) return '';
+    if (srcRoot) {
+      // Real on-disk location returned by the host.
+      return `${srcRoot}/${template.dir}/${finalName}${template.suffix}`;
+    }
     const pkg = packageId && packageId !== 'all' ? packageId : '<package>';
     return `packages/${pkg}/src/${template.dir}/${finalName}${template.suffix}`;
-  }, [template, packageId, finalName]);
+  }, [template, packageId, finalName, srcRoot]);
 
   const copySnippet = useCallback(async () => {
     try {
@@ -367,6 +395,58 @@ export function CreateMetadataDialog({
       toast({ title: 'Copy failed', description: err?.message ?? String(err), variant: 'destructive' as any });
     }
   }, [filePath]);
+
+  // Whether the host runtime exposes the dev-only write API. Probed
+  // via the layout endpoint — when present, we have a real srcRoot.
+  const canCreateFile = srcRoot != null && template != null;
+
+  const createFile = useCallback(async () => {
+    if (!canCreateFile) return;
+    setCreating(true);
+    try {
+      const resp = await fetch('/_studio/api/metadata/file', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: filePath, content: snippet, mode: 'create' }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data?.ok) {
+        if (resp.status === 409) {
+          toast({
+            title: 'File already exists',
+            description: `${filePath} is already on disk — pick a different name or open the existing file.`,
+            variant: 'destructive' as any,
+          });
+        } else if (resp.status === 404) {
+          toast({
+            title: 'Write API unavailable',
+            description: 'Run the studio in dev mode (objectstack dev) to enable filesystem writes.',
+            variant: 'destructive' as any,
+          });
+        } else {
+          toast({
+            title: 'Create failed',
+            description: data?.error ?? `HTTP ${resp.status}`,
+            variant: 'destructive' as any,
+          });
+        }
+        return;
+      }
+      toast({
+        title: 'File created',
+        description: `${filePath} — HMR will reload momentarily.`,
+      });
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({
+        title: 'Create failed',
+        description: err?.message ?? String(err),
+        variant: 'destructive' as any,
+      });
+    } finally {
+      setCreating(false);
+    }
+  }, [canCreateFile, filePath, snippet, onOpenChange]);
 
   if (allowed.length === 0) return null;
 
@@ -475,9 +555,17 @@ export function CreateMetadataDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={copySnippet} className="gap-1.5">
+          <Button variant="outline" onClick={copySnippet} className="gap-1.5">
             {copied === 'snippet' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
             Copy snippet
+          </Button>
+          <Button onClick={createFile} disabled={!canCreateFile || creating} className="gap-1.5">
+            {creating ? (
+              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+            ) : (
+              <FileText className="h-3.5 w-3.5" />
+            )}
+            {creating ? 'Creating…' : 'Create file'}
           </Button>
         </DialogFooter>
       </DialogContent>

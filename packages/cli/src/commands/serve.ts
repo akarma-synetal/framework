@@ -22,6 +22,7 @@ import {
   resolveStudioPath,
   hasStudioDist,
   createStudioStaticPlugin,
+  createStudioWriteApiPlugin,
 } from '../utils/studio.js';
 import {
   ACCOUNT_PATH,
@@ -1366,6 +1367,10 @@ export default class Serve extends Command {
             console.warn(chalk.yellow(`  ⚠ @objectstack/studio not found — skipping UI`));
           } else if (hasStudioDist(studioPath)) {
             const distPath = path.join(studioPath, 'dist');
+            // Write API must register BEFORE the static plugin so its POST
+            // routes win over `/_studio/*` GET fallback (Hono matches by
+            // method, but registering first keeps semantics obvious).
+            await kernel.use(createStudioWriteApiPlugin(process.cwd(), { isDev }));
             await kernel.use(createStudioStaticPlugin(distPath, {
               isDev,
               rootRedirect: !consoleWillMount,

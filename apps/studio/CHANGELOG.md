@@ -1,5 +1,48 @@
 # @objectstack/studio
 
+## Unreleased
+
+### Studio UX overhaul
+
+This iteration polished Studio against Airtable / Linear / Power Apps and
+introduced the first real **metadata-as-code write loop**.
+
+**New capabilities:**
+
+- **Dev-only write API** (`@objectstack/cli`): mounts
+  `POST /_studio/api/metadata/file` and `GET /_studio/api/metadata/layout`
+  under the same Hono app that serves Studio. Whitelisted to
+  project-relative paths under a `src/` directory with `.ts/.tsx/.json`
+  extensions; rejects path traversal, absolute paths, existing files
+  (unless `mode: 'overwrite'`). Only registered when `isDev === true`.
+- **"Create file" button** in `CreateMetadataDialog`: clicking now
+  scaffolds a real file on disk and lets HMR reload the runtime.
+  `Copy snippet` remains as a fallback for production hosts.
+- **Layout discovery**: the dialog probes the host for the on-disk
+  source root, so it works equally for single-app projects
+  (`<cwd>/src/...`) and monorepo packages (`packages/<id>/src/...`).
+
+**UX polish (carried over earlier in the iteration):**
+
+- Home Quick Start tiles open `CreateMetadataDialog` scoped to a single
+  metadata type.
+- Empty-state pages get a tinted medallion + primary "Create your first
+  X" CTA instead of a flat placeholder.
+- Global `Cmd/Ctrl+K` command palette (cmdk-backed) with categorized
+  Go-to + per-type results.
+- Field detail drawer gains inline edit for `label`, `description`,
+  `required`. Edits regenerate the snippet on every keystroke; dirty
+  state surfaces an amber paste-handoff callout and flips the Copy
+  button to primary "Copy edited snippet".
+
+**Build pipeline:**
+
+- Vite bundle split into named vendor chunks (`vendor-react`,
+  `vendor-tanstack`, `vendor-charts`, `vendor-icons`, `vendor-radix`,
+  `vendor-object-ui-{core,form,grid,views}`, `vendor-objectstack`).
+  Main app chunk dropped from ~3.4 MB to ~505 KB and vendor chunks now
+  cache independently across deploys.
+
 ## 5.1.0
 
 ### Patch Changes
