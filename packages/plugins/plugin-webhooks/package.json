@@ -11,6 +11,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./sql": {
+      "types": "./dist/sql-outbox.d.ts",
+      "import": "./dist/sql-outbox.js",
+      "require": "./dist/sql-outbox.cjs"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.js",
+      "require": "./dist/schema.cjs"
     }
   },
   "scripts": {

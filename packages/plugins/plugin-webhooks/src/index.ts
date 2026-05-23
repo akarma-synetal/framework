@@ -1,7 +1,7 @@
 // Copyright (c) 2026 ObjectStack. Licensed under the Apache-2.0 license.
 
 /**
- * @objectstack/plugin-webhook-outbox
+ * @objectstack/plugin-webhooks
  *
  * Persistent, cluster-aware webhook outbox + dispatcher.
  *
@@ -11,6 +11,15 @@
  * `webhook.outbox.enqueue()` service consumers call after persistence.
  *
  * The first real cross-node consumer of `cluster.lock`.
+ *
+ * ## Subpath exports
+ * - `@objectstack/plugin-webhooks/sql` — `SqlWebhookOutbox` (production
+ *   storage; durable rows via ObjectQL / any driver)
+ * - `@objectstack/plugin-webhooks/schema` — `SysWebhookDelivery` object
+ *   schema to register in `defineStack({ objects: [...] })`
+ *
+ * The main entry intentionally ships only the `MemoryWebhookOutbox` so
+ * downstream bundles don't pay for the SQL impl unless they import it.
  */
 
 export {
