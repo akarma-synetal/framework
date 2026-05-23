@@ -163,6 +163,13 @@ export function ObjectSchemaInspector({ objectApiName }: ObjectSchemaInspectorPr
   const [srcRoot, setSrcRoot] = useState<string | null>(null);
   const packageId = (params as any)?.package as string | undefined;
 
+  // DnD wiring — must be called unconditionally before any early return
+  // to keep hook order stable across renders.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   // Probe the dev write API so we know whether to enable drag-to-save.
   useEffect(() => {
     let cancelled = false;
@@ -261,11 +268,7 @@ export function ObjectSchemaInspector({ objectApiName }: ObjectSchemaInspectorPr
       )
     : fieldEntries;
 
-  // DnD wiring — pointer drag (5 px activation) + keyboard for a11y.
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  // DnD wiring — drag activates after 5px to avoid stealing row clicks.
   const canReorder = !!srcRoot && !searchQuery; // disable while filtering — order would be misleading
 
   const onDragEnd = async (e: DragEndEvent) => {
