@@ -142,6 +142,18 @@ export class MarketplaceInstallLocalPlugin implements Plugin {
         for (const entry of entries) {
             try {
                 manifestService!.register(entry.manifest);
+                // Sync schemas so the driver creates tables for the newly-
+                // registered objects (idempotent — already-synced tables
+                // are no-ops).
+                try {
+                    const ql: any = ctx.getService('objectql');
+                    if (ql && typeof ql.syncSchemas === 'function') await ql.syncSchemas();
+                } catch { /* non-fatal */ }
+                // Replay translations + register seed datasets, but don't
+                // re-run seeding — existing rows are already in the DB from
+                // the original install, and multi-tenant orgs will replay
+                // via the security middleware on next sys_organization insert.
+                await this.applySideEffects(ctx, entry.manifest, { seedNow: false });
                 ctx.logger?.info?.(`[MarketplaceInstallLocal] rehydrated ${entry.manifestId}@${entry.version}`);
             } catch (err: any) {
                 ctx.logger?.error?.(`[MarketplaceInstallLocal] rehydrate failed for ${entry.manifestId}`, err instanceof Error ? err : new Error(String(err)));
@@ -237,6 +249,27 @@ export class MarketplaceInstallLocalPlugin implements Plugin {
             ctx.logger?.warn?.(`[MarketplaceInstallLocal] hot-register failed for ${manifestId} (will load on next restart): ${err?.message ?? err}`);
         }
 
+        // 4b. Sync schemas to physical tables — registerApp only adds the
+        //     object definitions to the in-memory registry; the driver
+        //     must be asked to materialize tables/columns before any seed
+        //     insert (or user write) succeeds.
+        try {
+            const ql: any = ctx.getService('objectql');
+            if (ql && typeof ql.syncSchemas === 'function') {
+                await ql.syncSchemas();
+                ctx.logger?.info?.(`[MarketplaceInstallLocal] syncSchemas() ran after registering ${manifestId}`);
+            }
+        } catch (err: any) {
+            ctx.logger?.warn?.(`[MarketplaceInstallLocal] syncSchemas failed for ${manifestId}: ${err?.message ?? err}`);
+        }
+
+        // 5. Replicate the AppPlugin start-time side-effects that the
+        //    `manifest` service does NOT do on its own:
+        //      • load translation bundles into the i18n service
+        //      • stash seed datasets on the kernel + run them now so the
+        //        installed app has demo data on first paint.
+        const seededSummary = await this.applySideEffects(ctx, manifest, { seedNow: true, c });
+
         return c.json({
             success: true,
             data: {
@@ -246,6 +279,8 @@ export class MarketplaceInstallLocalPlugin implements Plugin {
                 installedAt: entry.installedAt,
                 hotLoaded: true,
                 upgradedFrom: conflict === 'marketplace' ? 'previous-marketplace-version' : null,
+                translationsLoaded: seededSummary.translationsLoaded,
+                seeded: seededSummary.seeded,
                 note: 'App is now available in this runtime. Refresh the console to see it in the app switcher.',
             },
         }, 200);
@@ -331,6 +366,192 @@ export class MarketplaceInstallLocalPlugin implements Plugin {
      * dev / single-tenant runtimes. Stricter checks can be layered on
      * via a middleware in cloud-hosted multi-tenant deployments.
      */
+    /**
+     * Replicate the start-time side-effects that AppPlugin runs for
+     * statically-declared apps but the `manifest` service does NOT:
+     *
+     *   1. Load `manifest.translations` (array of `Record<locale, data>`)
+     *      into the i18n service — auto-creating an in-memory fallback if
+     *      none is registered, matching AppPlugin's behaviour.
+     *
+     *   2. Merge `manifest.data` (an array of seed datasets) into the
+     *      kernel's `seed-datasets` service so SecurityPlugin's per-org
+     *      replay middleware picks them up on every future
+     *      sys_organization insert.
+     *
+     *   3. When `seedNow=true`, also run the seed immediately so the user
+     *      sees demo data without having to create a new org:
+     *        • single-tenant: run SeedLoaderService inline (mirrors
+     *          AppPlugin single-tenant branch)
+     *        • multi-tenant: invoke `seed-replayer` for the caller's
+     *          active org (resolved from the request session)
+     *
+     * Errors are logged but never thrown — install succeeds even if
+     * post-register side-effects partially fail (the manifest itself is
+     * already registered + cached). Returns a small summary for the
+     * response envelope.
+     */
+    private applySideEffects = async (
+        ctx: PluginContext,
+        manifest: any,
+        opts: { seedNow: boolean; c?: any },
+    ): Promise<{ translationsLoaded: number; seeded: { mode: 'inline' | 'replayer' | 'skipped'; inserted?: number; updated?: number; errors?: number; reason?: string } }> => {
+        const appId = String(manifest?.id ?? 'unknown');
+        let translationsLoaded = 0;
+        let seedSummary: any = { mode: 'skipped', reason: 'no-datasets' };
+
+        // ── 1. i18n bundles ─────────────────────────────────────────────
+        try {
+            const bundles: Array<Record<string, unknown>> = [];
+            if (Array.isArray(manifest?.translations)) bundles.push(...manifest.translations);
+            if (Array.isArray(manifest?.i18n)) bundles.push(...manifest.i18n);
+
+            if (bundles.length > 0) {
+                let i18nService: any;
+                try { i18nService = ctx.getService('i18n'); } catch { /* not registered */ }
+                if (!i18nService) {
+                    try {
+                        const mod = await import('@objectstack/core');
+                        const createMemoryI18n = (mod as any).createMemoryI18n;
+                        if (typeof createMemoryI18n === 'function') {
+                            i18nService = createMemoryI18n();
+                            (ctx as any).registerService?.('i18n', i18nService);
+                            ctx.logger?.info?.(`[MarketplaceInstallLocal] auto-registered in-memory i18n fallback for "${appId}"`);
+                        }
+                    } catch { /* fallback unavailable */ }
+                }
+                if (i18nService?.loadTranslations) {
+                    for (const bundle of bundles) {
+                        for (const [locale, data] of Object.entries(bundle)) {
+                            if (data && typeof data === 'object') {
+                                try {
+                                    i18nService.loadTranslations(locale, data as Record<string, unknown>);
+                                    translationsLoaded++;
+                                } catch (err: any) {
+                                    ctx.logger?.warn?.(`[MarketplaceInstallLocal] failed to load ${appId} translations for ${locale}: ${err?.message ?? err}`);
+                                }
+                            }
+                        }
+                    }
+                    ctx.logger?.info?.(`[MarketplaceInstallLocal] loaded ${translationsLoaded} locale bundle(s) for ${appId}`);
+                }
+            }
+        } catch (err: any) {
+            ctx.logger?.warn?.(`[MarketplaceInstallLocal] i18n side-effect failed for ${appId}: ${err?.message ?? err}`);
+        }
+
+        // ── 2. Seed datasets — merge into kernel service ─────────────────
+        const datasets = Array.isArray(manifest?.data)
+            ? manifest.data.filter((d: any) => d && d.object && Array.isArray(d.records))
+            : [];
+
+        if (datasets.length > 0) {
+            try {
+                const kernel: any = (ctx as any).kernel;
+                let existing: any[] = [];
+                try {
+                    const v = kernel?.getService?.('seed-datasets');
+                    if (Array.isArray(v)) existing = v;
+                } catch { /* unset */ }
+                const merged = [...existing, ...datasets];
+                if (kernel?.registerService) kernel.registerService('seed-datasets', merged);
+                else (ctx as any).registerService?.('seed-datasets', merged);
+                ctx.logger?.info?.(`[MarketplaceInstallLocal] merged ${datasets.length} seed dataset(s) into kernel (total: ${merged.length})`);
+            } catch (err: any) {
+                ctx.logger?.warn?.(`[MarketplaceInstallLocal] failed to merge seed-datasets: ${err?.message ?? err}`);
+            }
+        }
+
+        // ── 3. Optional immediate seed ───────────────────────────────────
+        // Always seed inline via SeedLoaderService — don't rely on the
+        // `seed-replayer` registered by AppPlugin since (a) it isn't
+        // registered when the host runtime has no AppPlugin app with
+        // seed data, and (b) its closure may use stale datasets. In
+        // multi-tenant mode we pass `organizationId` so the loader
+        // writes tenant-scoped rows the same way AppPlugin's
+        // single-tenant branch + SecurityPlugin's per-org replay do.
+        if (opts.seedNow && datasets.length > 0) {
+            const multiTenant = String(process.env.OS_MULTI_TENANT ?? 'true').toLowerCase() !== 'false';
+            try {
+                const ql: any = ctx.getService('objectql');
+                let metadata: any;
+                try { metadata = ctx.getService('metadata'); } catch { /* none */ }
+                if (!ql || !metadata) {
+                    seedSummary = { mode: 'skipped', reason: 'objectql-or-metadata-missing' };
+                } else {
+                    let organizationId: string | undefined;
+                    if (multiTenant) {
+                        const resolved = await this.resolveActiveOrgId(opts.c, ctx);
+                        if (resolved) organizationId = resolved;
+                        else {
+                            seedSummary = { mode: 'skipped', reason: 'multi-tenant-no-active-org' };
+                            ctx.logger?.warn?.('[MarketplaceInstallLocal] multi-tenant: no active org on request — data not seeded');
+                        }
+                    }
+                    if (!multiTenant || organizationId) {
+                        const [{ SeedLoaderService }, { SeedLoaderRequestSchema }] = await Promise.all([
+                            import('../seed-loader.js'),
+                            import('@objectstack/spec/data'),
+                        ]);
+                        const seedLoader = new (SeedLoaderService as any)(ql, metadata, ctx.logger);
+                        const request = (SeedLoaderRequestSchema as any).parse({
+                            datasets,
+                            config: {
+                                defaultMode: 'upsert',
+                                multiPass: true,
+                                ...(organizationId ? { organizationId } : {}),
+                            },
+                        });
+                        const result = await seedLoader.load(request);
+                        seedSummary = {
+                            mode: 'inline',
+                            inserted: result.summary.totalInserted,
+                            updated: result.summary.totalUpdated,
+                            errors: result.errors.length,
+                        };
+                        ctx.logger?.info?.(`[MarketplaceInstallLocal] inline seed for ${appId}${organizationId ? ` (org=${organizationId})` : ''}: inserted=${seedSummary.inserted} updated=${seedSummary.updated} errors=${seedSummary.errors}`);
+                    }
+                }
+            } catch (err: any) {
+                seedSummary = { mode: 'skipped', reason: `seed-error: ${err?.message ?? err}` };
+                ctx.logger?.warn?.(`[MarketplaceInstallLocal] seed run failed for ${appId}: ${err?.message ?? err}`);
+            }
+        }
+
+        return { translationsLoaded, seeded: seedSummary };
+    };
+
+    /**
+     * Best-effort active-org resolution. Reads the better-auth session
+     * (same path as requireAuthenticatedUser) and returns
+     * `session.activeOrganizationId`, falling back to the user's first
+     * org membership.
+     */
+    private resolveActiveOrgId = async (c: any, ctx: PluginContext): Promise<string | null> => {
+        if (!c?.req?.raw?.headers) return null;
+        try {
+            const authService: any = ctx.getService('auth');
+            let api: any = authService?.api;
+            if (!api && typeof authService?.getApi === 'function') api = await authService.getApi();
+            if (!api?.getSession) return null;
+            const session = await api.getSession({ headers: c.req.raw.headers });
+            const direct = session?.session?.activeOrganizationId ?? session?.activeOrganizationId ?? null;
+            if (direct) return String(direct);
+            // Fall back to the user's first membership row.
+            const userId = session?.user?.id;
+            if (!userId) return null;
+            try {
+                const ql: any = ctx.getService('objectql');
+                if (ql?.find) {
+                    const rows = await ql.find('sys_organization_member', { where: { user_id: userId }, limit: 1, context: { isSystem: true } } as any);
+                    const row = Array.isArray(rows) ? rows[0] : (rows?.items?.[0] ?? null);
+                    return row?.organization_id ? String(row.organization_id) : null;
+                }
+            } catch { /* ignore */ }
+        } catch { /* ignore */ }
+        return null;
+    };
+
     private requireAuthenticatedUser = async (c: any, ctx: PluginContext): Promise<string | null> => {
         try {
             // Mirror `hono-plugin.ts` resolveCtx: pull the better-auth `api`

@@ -115,3 +115,5 @@ playwright/.cache/
 apps/cloud/artifacts/
 studio-crm.png
 examples/app-crm/storage/
+
+.objectstack
