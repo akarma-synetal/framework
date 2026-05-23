@@ -153,7 +153,20 @@ export function createConsoleStaticPlugin(distPath: string, options?: { isDev?: 
         return;
       }
 
-      const readIndexHtml = () => fs.readFileSync(indexPath, 'utf-8');
+      const readIndexHtml = () => {
+        const raw = fs.readFileSync(indexPath, 'utf-8');
+        // Inject <base href="${CONSOLE_PATH}/"> so:
+        //   1. Relative asset URLs ('./assets/...') resolve to the
+        //      correct mount path regardless of where the user navigated.
+        //   2. The SPA can derive its React Router basename from
+        //      `document.baseURI` at runtime, freeing the published
+        //      build from being pinned to a specific mount.
+        //
+        // Idempotent — bails if the build already shipped a <base>.
+        if (/<base\s/i.test(raw)) return raw;
+        const baseTag = `<base href="${CONSOLE_PATH}/">`;
+        return raw.replace(/<head(\s[^>]*)?>/i, (m) => `${m}\n    ${baseTag}`);
+      };
 
       // The Console is the default end-user surface — root `/` redirects
       // here whenever the Console is mounted (`rootRedirect !== false`).
@@ -178,8 +191,14 @@ export function createConsoleStaticPlugin(distPath: string, options?: { isDev?: 
           return c.text('Forbidden', 403);
         }
 
-        // Try serving the exact file
+        // Try serving the exact file (HTML files go through the base-tag
+        // injection path so all entry points stay path-portable).
         if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+          if (filePath.endsWith('.html')) {
+            return new Response(readIndexHtml(), {
+              headers: { 'content-type': 'text/html; charset=utf-8' },
+            });
+          }
           const content = fs.readFileSync(filePath);
           return new Response(content, {
             headers: { 'content-type': mimeType(filePath) },
