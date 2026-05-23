@@ -80,7 +80,54 @@ export async function addObjectField(
       return { ok: false, error: `field \`${fieldName}\` already exists` };
     }
     try {
-      fieldsObj.addPropertyAssignment({ name: fieldName, initializer });
+      // Append by raw-text insertion so we match the file's existing
+      // indentation / line-break conventions instead of forcing ts-morph
+      // defaults (which produced 6-space indent and a flush-left closing
+      // brace inside a 4-space-indented body).
+      const openBrace = fieldsObj.getFirstChildByKind(SyntaxKind.OpenBraceToken);
+      const closeBrace = fieldsObj.getLastChildByKind(SyntaxKind.CloseBraceToken);
+      if (!openBrace || !closeBrace) {
+        return { ok: false, error: 'malformed object literal (missing braces)' };
+      }
+      const sf = fieldsObj.getSourceFile();
+      const fullText = sf.getFullText();
+      const bodyStart = openBrace.getEnd();
+      const bodyEnd = closeBrace.getStart();
+
+      // Detect existing indentation: prefer the first prop's leading
+      // whitespace; otherwise derive from the closing brace's indentation
+      // + 2 spaces.
+      const firstProp = fieldsObj.getProperties()[0];
+      let propIndent = '    ';
+      if (firstProp && firstProp.isKind(SyntaxKind.PropertyAssignment)) {
+        const start = firstProp.getStart();
+        let i = start - 1;
+        while (i >= 0 && (fullText[i] === ' ' || fullText[i] === '\t')) i--;
+        propIndent = fullText.slice(i + 1, start);
+      } else {
+        // Derive from close brace indent
+        let i = closeBrace.getStart() - 1;
+        while (i >= 0 && (fullText[i] === ' ' || fullText[i] === '\t')) i--;
+        const braceIndent = fullText.slice(i + 1, closeBrace.getStart());
+        propIndent = braceIndent + '  ';
+      }
+
+      // Body region between braces; rebuild with the new prop appended,
+      // ensuring trailing comma + newline + indent before the new prop and
+      // a newline + closing indent before the close brace.
+      const body = fullText.slice(bodyStart, bodyEnd);
+      let trimmed = body.replace(/\s+$/, '');
+      if (trimmed && !trimmed.endsWith(',')) trimmed += ',';
+      const isEmpty = trimmed.length === 0;
+      // Compute close-brace indent (one level less than propIndent).
+      const closeIndent = propIndent.replace(/  $/, '');
+      const newBody = isEmpty
+        ? `\n${propIndent}${fieldName}: ${initializer},\n${closeIndent}`
+        : `${trimmed}\n${propIndent}${fieldName}: ${initializer},\n${closeIndent}`;
+      // Use raw SourceFile.replaceText to avoid ts-morph auto-reindenting
+      // every line inside the literal (replaceWithText on an ObjectLiteral
+      // re-indents by manipulation settings, shifting unchanged lines).
+      sf.replaceText([bodyStart, bodyEnd], newBody);
       return { ok: true };
     } catch (err: any) {
       return { ok: false, error: `add failed: ${err?.message ?? String(err)}` };
@@ -94,10 +141,14 @@ export async function addObjectField(
  * the end in their existing relative order — keeps the operation safe
  * if the UI has a stale snapshot.
  *
- * Implementation: snapshot the full source text of every property,
- * then rewrite the literal in the new order. This loses any comments
- * between properties — an acceptable trade-off for a v1; comments
- * inside a single property are preserved.
+ * Implementation: slice each property's source range out of the file
+ * (including any leading whitespace / blank-line / comment trivia and
+ * the trailing `,`), then concatenate the slices in the new order. By
+ * working on the raw source, indentation, trailing commas, blank-line
+ * separators and inline comments are all preserved verbatim. The only
+ * cost: a hanging blank line that previously sat *between* two props
+ * follows whichever property it precedes after the reorder, which is
+ * the natural and least-surprising behaviour.
  */
 export async function reorderObjectFields(
   absPath: string,
@@ -108,28 +159,60 @@ export async function reorderObjectFields(
   }
   return withFieldsObj(absPath, async (fieldsObj) => {
     const props = fieldsObj.getProperties();
-    const byName = new Map<string, string>();
-    for (const p of props) {
-      if (p.isKind(SyntaxKind.PropertyAssignment) || p.isKind(SyntaxKind.ShorthandPropertyAssignment)) {
-        byName.set((p as any).getName(), p.getText());
+    const openBrace = fieldsObj.getFirstChildByKind(SyntaxKind.OpenBraceToken);
+    const closeBrace = fieldsObj.getLastChildByKind(SyntaxKind.CloseBraceToken);
+    if (!openBrace || !closeBrace) {
+      return { ok: false, error: 'malformed object literal (missing braces)' };
+    }
+    const sf = fieldsObj.getSourceFile();
+    const fullText = sf.getFullText();
+    const bodyStart = openBrace.getEnd();
+    const bodyEnd = closeBrace.getStart();
+
+    // For each property: capture the slice from "just after previous prop's
+    // trailing comma" (or bodyStart for the first prop) up to and including
+    // this prop's own trailing comma (skipping inline whitespace up to it).
+    // Leading whitespace / blank lines / comments that precede a prop stay
+    // with that prop, so they travel together when reordered.
+    const slices = new Map<string, string>();
+    let cursor = bodyStart;
+    for (let i = 0; i < props.length; i++) {
+      const p = props[i];
+      if (!p.isKind(SyntaxKind.PropertyAssignment) && !p.isKind(SyntaxKind.ShorthandPropertyAssignment)) {
+        continue;
       }
+      const name = (p as any).getName();
+      // Find end-of-slice: skip whitespace after the prop, swallow one comma if present.
+      let end = p.getEnd();
+      while (end < bodyEnd && /[ \t]/.test(fullText[end])) end++;
+      if (fullText[end] === ',') end++;
+      slices.set(name, fullText.slice(cursor, end));
+      cursor = end;
     }
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const name of order) {
-      const t = byName.get(name);
-      if (t) { out.push(t); seen.add(name); }
-    }
-    // Append any property the UI didn't know about so we never drop fields.
-    for (const [name, t] of byName) {
-      if (!seen.has(name)) out.push(t);
-    }
-    if (out.length === 0) {
+    // Anything between the last prop's comma and the close brace (typically
+    // a trailing newline + indentation) becomes the new "tail".
+    const tail = fullText.slice(cursor, bodyEnd);
+
+    if (slices.size === 0) {
       return { ok: false, error: '`fields` is empty — nothing to reorder' };
     }
-    const newText = `{\n    ${out.join(',\n    ')},\n  }`;
+
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const name of order) {
+      const slice = slices.get(name);
+      if (slice !== undefined) { ordered.push(slice); seen.add(name); }
+    }
+    // Append anything the UI didn't know about so we never drop fields.
+    for (const [name, slice] of slices) {
+      if (!seen.has(name)) ordered.push(slice);
+    }
+
+    const newBody = ordered.join('') + tail;
     try {
-      fieldsObj.replaceWithText(newText);
+      // sf.replaceText avoids re-indenting unchanged lines, which is what
+      // makes fieldsObj.replaceWithText destroy formatting.
+      sf.replaceText([bodyStart, bodyEnd], newBody);
       return { ok: true };
     } catch (err: any) {
       return { ok: false, error: `reorder failed: ${err?.message ?? String(err)}` };
