@@ -29,13 +29,57 @@ export const SysNotification = ObjectSchema.create({
   titleFormat: '{title}',
   compactLayout: ['title', 'type', 'is_read', 'created_at'],
 
+  /**
+   * Row-level inbox actions. Use `visible` CEL expressions to ensure
+   * `mark_read` only shows on unread rows and vice-versa, mirroring the
+   * mark-as-read affordances in GitHub / Linear inboxes. The toolbar-level
+   * `mark_all_read` is intentionally omitted server-side: it requires a
+   * bulk update primitive that doesn't yet exist on the REST surface, and
+   * the popover already handles the multi-row case client-side via N
+   * single-row PATCHes (see `InboxPopover.tsx` -> AppHeader `markAllRead`).
+   */
+  actions: [
+    {
+      name: 'mark_read',
+      label: 'Mark as Read',
+      icon: 'check',
+      variant: 'secondary',
+      mode: 'custom',
+      locations: ['list_item'],
+      type: 'api',
+      method: 'PATCH',
+      target: '/api/v1/data/sys_notification/{id}',
+      bodyExtra: { is_read: true },
+      visible: '!record.is_read',
+      successMessage: 'Notification marked as read',
+      refreshAfter: true,
+    },
+    {
+      name: 'mark_unread',
+      label: 'Mark as Unread',
+      icon: 'bell-dot',
+      variant: 'secondary',
+      mode: 'custom',
+      locations: ['list_item'],
+      type: 'api',
+      method: 'PATCH',
+      target: '/api/v1/data/sys_notification/{id}',
+      bodyExtra: { is_read: false, read_at: null },
+      visible: 'record.is_read',
+      successMessage: 'Notification marked as unread',
+      refreshAfter: true,
+    },
+  ],
+
   listViews: {
     unread: {
       type: 'grid',
       name: 'unread',
       label: 'Unread',
       data: { provider: 'object', object: 'sys_notification' },
-      columns: ['type', 'title', 'recipient_id', 'created_at'],
+      // Title + actor first (the "who/what" the user actually scans);
+      // type stays as a categorising chip; created_at right-aligned.
+      columns: ['title', 'actor_name', 'type', 'created_at'],
       filter: [
         { field: 'recipient_id', operator: 'equals', value: '{current_user_id}' },
         { field: 'is_read', operator: 'equals', value: false },
@@ -49,17 +93,21 @@ export const SysNotification = ObjectSchema.create({
       name: 'mine',
       label: 'Mine',
       data: { provider: 'object', object: 'sys_notification' },
-      columns: ['type', 'title', 'is_read', 'created_at'],
+      columns: ['title', 'actor_name', 'type', 'is_read', 'created_at'],
       filter: [{ field: 'recipient_id', operator: 'equals', value: '{current_user_id}' }],
       sort: [{ field: 'created_at', order: 'desc' }],
       pagination: { pageSize: 50 },
+      // Group by notification category so mention/assignment storms don't
+      // hide system or task_due rows. Users still toggle to flat via the
+      // toolbar Group control if they prefer chronology only.
+      grouping: { fields: [{ field: 'type', order: 'asc', collapsed: false }] },
     },
     all_notifications: {
       type: 'grid',
       name: 'all_notifications',
       label: 'All',
       data: { provider: 'object', object: 'sys_notification' },
-      columns: ['type', 'title', 'recipient_id', 'is_read', 'created_at'],
+      columns: ['title', 'recipient_id', 'actor_name', 'type', 'is_read', 'created_at'],
       sort: [{ field: 'created_at', order: 'desc' }],
       pagination: { pageSize: 100 },
     },
