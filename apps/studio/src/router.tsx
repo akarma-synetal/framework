@@ -9,6 +9,7 @@
 
 import { createRouter } from '@tanstack/react-router';
 import { routeTree } from './routeTree.gen';
+import { NotFoundPage } from './components/NotFoundPage';
 
 /**
  * Compute the router basepath from Vite's `BASE_URL`.
@@ -30,6 +31,17 @@ function resolveBasepath(): string {
 export const router = createRouter({
   routeTree,
   basepath: resolveBasepath(),
+  defaultNotFoundComponent: () => {
+    // Try to recover the current package id from the URL so the "home"
+    // button can land back where the user was working instead of dumping
+    // them at the global Studio root.
+    const base = resolveBasepath();
+    const path = typeof window !== 'undefined' ? window.location.pathname : '';
+    const stripped = base !== '/' && path.startsWith(base) ? path.slice(base.length) : path;
+    const segments = stripped.split('/').filter(Boolean);
+    const packageId = segments[0] && segments[0].includes('.') ? segments[0] : undefined;
+    return <NotFoundPage packageId={packageId} />;
+  },
 });
 
 // Register things for type-safety

@@ -260,6 +260,8 @@ export function DeveloperOverview({ packages, selectedPackage, onNavigate = () =
                   .sort((a, b) => b[1] - a[1])
                   .map(([type, count]) => {
                     const Icon = iconForMetadataType(type) ?? Code2;
+                    const label = typeLabel(type);
+                    const showRawKey = label.toLowerCase() !== type.toLowerCase();
                     return (
                       <div
                         key={type}
@@ -267,8 +269,10 @@ export function DeveloperOverview({ packages, selectedPackage, onNavigate = () =
                       >
                         <div className="flex items-center gap-2">
                           <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-sm">{typeLabel(type)}</span>
-                          <code className="text-[10px] text-muted-foreground/60 font-mono">{type}</code>
+                          <span className="text-sm">{label}</span>
+                          {showRawKey && (
+                            <code className="text-[10px] text-muted-foreground/60 font-mono">{type}</code>
+                          )}
                         </div>
                         <Badge variant="secondary" className="text-xs font-mono">
                           {count}
