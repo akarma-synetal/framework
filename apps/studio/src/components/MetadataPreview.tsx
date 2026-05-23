@@ -11,6 +11,7 @@
  *   view + kanban → ObjectKanban
  *   view + grid   → ObjectGrid
  *   view + detail → DetailView (single-record)
+ *   view + timeline → ObjectTimeline (@object-ui/plugin-timeline)
  *   view + calendar → ObjectCalendar (if available)
  *   dashboard     → DashboardRenderer (@object-ui/plugin-dashboard)
  *   report        → ReportRenderer (@object-ui/plugin-report)
@@ -33,7 +34,6 @@ import { useObjectUiDataSource } from '@/hooks/useObjectUiDataSource';
 import { useMetadataHmr } from '@/hooks/useMetadataHmr';
 import { LiveFormPreview } from './LiveFormPreview';
 import { LivePreviewStatusBar } from './LivePreviewStatusBar';
-import { TimelinePreview } from './TimelinePreview';
 import { AlertCircle, Eye, LayoutGrid, KanbanSquare, Calendar as CalendarIcon, FileText, ListChecks } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -106,6 +106,13 @@ function resolveSubViewLabel(spec: any, viewType: string, fallback: string): str
 const ObjectCalendar = lazy(async () => {
   const mod = (await import('@object-ui/plugin-calendar')) as any;
   return { default: mod.ObjectCalendar as React.ComponentType<any> };
+});
+
+// Same treatment for timeline — the package pulls in framer-motion helpers
+// for animated swimlanes; we only need it when a view actually requests it.
+const ObjectTimeline = lazy(async () => {
+  const mod = (await import('@object-ui/plugin-timeline')) as any;
+  return { default: mod.ObjectTimeline as React.ComponentType<any> };
 });
 
 export interface MetadataPreviewProps {
@@ -320,15 +327,30 @@ export function MetadataPreview({
           </Suspense>
         );
       }
-      case 'timeline':
+      case 'timeline': {
+        const t = subSpec?.timeline ?? {};
+        const { data: _drop, ...rest } = subSpec ?? {};
         return (
-          <TimelinePreview
-            objectName={resolvedObject}
-            spec={subSpec}
-            dataSource={dataSource}
-            className={className}
-          />
+          <Suspense fallback={<PreviewLoading />}>
+            <ObjectTimeline
+              schema={{
+                type: 'object-timeline',
+                objectName: resolvedObject,
+                ...rest,
+                ...(t.startDateField ? { startDateField: t.startDateField } : {}),
+                ...(t.endDateField ? { endDateField: t.endDateField } : {}),
+                ...(t.titleField ? { titleField: t.titleField } : {}),
+                ...(t.descriptionField ? { descriptionField: t.descriptionField } : {}),
+                ...(t.groupByField ? { groupByField: t.groupByField } : {}),
+                ...(t.colorField ? { colorField: t.colorField } : {}),
+                ...(t.scale ? { scale: t.scale } : {}),
+              }}
+              dataSource={dataSource as any}
+              className={className}
+            />
+          </Suspense>
         );
+      }
       default:
         return <UnsupportedPreview type={`view/${viewType}`} spec={subSpec} />;
     }
