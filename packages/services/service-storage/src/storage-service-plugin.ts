@@ -2,6 +2,11 @@
 
 import type { Plugin, PluginContext } from '@objectstack/core';
 import type { IHttpServer, IDataEngine, IStorageService } from '@objectstack/spec/contracts';
+import {
+  OBSERVABILITY_METRICS_SERVICE,
+  NoopMetricsRegistry,
+  type MetricsRegistry,
+} from '@objectstack/observability';
 import { LocalStorageAdapter } from './local-storage-adapter.js';
 import type { LocalStorageAdapterOptions } from './local-storage-adapter.js';
 import { S3StorageAdapter } from './s3-storage-adapter.js';
@@ -47,6 +52,13 @@ export interface StorageServicePluginOptions {
    * adapter constructor-driven (useful in tests). Default: true.
    */
   bindToSettings?: boolean;
+  /**
+   * Optional explicit metrics backend. Wins over the service-registry
+   * lookup. Mostly an escape hatch for tests; production hosts should
+   * register `ObservabilityServicePlugin` (from `@objectstack/runtime`)
+   * once and let every service pick the host's backend up automatically.
+   */
+  metrics?: MetricsRegistry;
 }
 
 /**
@@ -82,6 +94,7 @@ export class StorageServicePlugin implements Plugin {
   private readonly options: StorageServicePluginOptions;
   private storage: SwappableStorageService | null = null;
   private store: StorageMetadataStore | null = null;
+  private metrics: MetricsRegistry = new NoopMetricsRegistry();
 
   constructor(options: StorageServicePluginOptions = {}) {
     this.options = { adapter: 'local', ...options };
@@ -103,6 +116,7 @@ export class StorageServicePlugin implements Plugin {
         accessKeyId: (values.s3_access_key_id as string | undefined) || undefined,
         secretAccessKey: (values.s3_secret_access_key as string | undefined) || undefined,
         forcePathStyle: !!values.s3_force_path_style,
+        metrics: this.metrics,
       };
       return new S3StorageAdapter(opts);
     }
@@ -112,10 +126,12 @@ export class StorageServicePlugin implements Plugin {
       ...(this.options.local ?? {}),
       // settings value wins over any constructor-provided local.rootDir
       rootDir,
+      metrics: this.metrics,
     } as LocalStorageAdapterOptions);
   }
 
   async init(ctx: PluginContext): Promise<void> {
+    this.metrics = resolveMetrics(ctx, this.options.metrics);
     const adapter = this.options.adapter;
     let initial: IStorageService;
     if (adapter === 's3') {
@@ -125,11 +141,11 @@ export class StorageServicePlugin implements Plugin {
       if (!s3Opts) {
         throw new Error('StorageServicePlugin: s3 options are required when adapter is "s3"');
       }
-      initial = new S3Ctor(s3Opts);
+      initial = new S3Ctor({ ...s3Opts, metrics: this.metrics });
     } else {
       const rootDir = this.options.local?.rootDir ?? './storage';
       const basePath = this.options.basePath ?? '/api/v1/storage';
-      initial = new LocalStorageAdapter({ rootDir, basePath, ...this.options.local });
+      initial = new LocalStorageAdapter({ rootDir, basePath, ...this.options.local, metrics: this.metrics });
     }
 
     this.storage = new SwappableStorageService(initial, (prev, next) => {
@@ -142,7 +158,9 @@ export class StorageServicePlugin implements Plugin {
     });
 
     ctx.registerService('file-storage', this.storage);
-    ctx.logger.info(`StorageServicePlugin: registered ${adapter} storage adapter (swappable)`);
+    ctx.logger.info(
+      `StorageServicePlugin: registered ${adapter} storage adapter (swappable, metrics=${this.metrics.constructor?.name ?? 'unknown'})`,
+    );
 
     // Register system objects via manifest service (if available)
     try {
@@ -275,5 +293,25 @@ export class StorageServicePlugin implements Plugin {
       }
     });
   }
+}
+
+/**
+ * Look up the host's MetricsRegistry from the service registry, with
+ * the canonical fallback chain (explicit override → registered service
+ * → noop). Local helper to avoid making `service-storage` depend on
+ * `@objectstack/runtime`.
+ */
+function resolveMetrics(
+  ctx: PluginContext,
+  override: MetricsRegistry | undefined,
+): MetricsRegistry {
+  if (override) return override;
+  try {
+    const m = ctx.getService<MetricsRegistry | undefined>(OBSERVABILITY_METRICS_SERVICE);
+    if (m) return m;
+  } catch {
+    // Service not registered — silent fall-through.
+  }
+  return new NoopMetricsRegistry();
 }
 

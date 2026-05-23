@@ -10,6 +10,9 @@
 // Contracts
 export type { MetricsRegistry, MetricSample, ErrorReporter, CapturedError, Logger } from './contracts.js';
 
+// Service-registry names (consumed by runtime's ObservabilityServicePlugin and lookup sites)
+export { OBSERVABILITY_METRICS_SERVICE, OBSERVABILITY_ERRORS_SERVICE } from './service-names.js';
+
 // Semantic conventions
 export { SEMCONV, RUNTIME_METRICS } from './semconv.js';
 

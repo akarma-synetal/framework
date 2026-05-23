@@ -1,6 +1,11 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import type { Plugin, PluginContext } from '@objectstack/core';
+import {
+  OBSERVABILITY_METRICS_SERVICE,
+  NoopMetricsRegistry,
+  type MetricsRegistry,
+} from '@objectstack/observability';
 import { MemoryCacheAdapter } from './memory-cache-adapter.js';
 import type { MemoryCacheAdapterOptions } from './memory-cache-adapter.js';
 
@@ -14,6 +19,14 @@ export interface CacheServicePluginOptions {
   memory?: MemoryCacheAdapterOptions;
   /** Redis connection URL (used when adapter is 'redis') */
   redisUrl?: string;
+  /**
+   * Optional explicit metrics backend. Wins over the service-registry
+   * lookup. Mostly an escape hatch for tests — production code should
+   * register `ObservabilityServicePlugin` (from `@objectstack/runtime`)
+   * once and let every service pick the host's metrics backend up
+   * automatically.
+   */
+  metrics?: MetricsRegistry;
 }
 
 /**
@@ -21,6 +34,17 @@ export interface CacheServicePluginOptions {
  *
  * Registers a cache service with the kernel during the init phase.
  * Supports in-memory and Redis adapters.
+ *
+ * ## Metrics
+ *
+ * The adapter emits `cache_lookups_total` and `cache_writes_total`
+ * counters (see `SEMCONV` in `@objectstack/observability`). The
+ * MetricsRegistry is resolved in this order:
+ *
+ *   1. `options.metrics` (explicit constructor wiring)
+ *   2. `ctx.getService('observability:metrics')` (registered by
+ *      `ObservabilityServicePlugin`)
+ *   3. `NoopMetricsRegistry` (silent; no instrumentation)
  *
  * @example
  * ```ts
@@ -56,8 +80,31 @@ export class CacheServicePlugin implements Plugin {
       );
     }
 
-    const cache = new MemoryCacheAdapter(this.options.memory);
+    const metrics = resolveMetrics(ctx, this.options.metrics);
+    const cache = new MemoryCacheAdapter({ ...this.options.memory, metrics });
     ctx.registerService('cache', cache);
-    ctx.logger.info('CacheServicePlugin: registered memory cache adapter');
+    ctx.logger.info(
+      `CacheServicePlugin: registered memory cache adapter (metrics=${metrics.constructor?.name ?? 'unknown'})`,
+    );
   }
+}
+
+/**
+ * Look up the host's MetricsRegistry from the service registry, with
+ * the canonical fallback chain (explicit override → registered service
+ * → noop). Local helper to avoid making `service-cache` depend on
+ * `@objectstack/runtime`.
+ */
+function resolveMetrics(
+  ctx: PluginContext,
+  override: MetricsRegistry | undefined,
+): MetricsRegistry {
+  if (override) return override;
+  try {
+    const m = ctx.getService<MetricsRegistry | undefined>(OBSERVABILITY_METRICS_SERVICE);
+    if (m) return m;
+  } catch {
+    // Service not registered — silent fall-through.
+  }
+  return new NoopMetricsRegistry();
 }

@@ -28,3 +28,12 @@ export {
     instrumentRouteHandler,
     type InstrumentOptions,
 } from './instrument.js';
+
+export {
+    ObservabilityServicePlugin,
+    OBSERVABILITY_METRICS_SERVICE,
+    OBSERVABILITY_ERRORS_SERVICE,
+    resolveMetrics,
+    resolveErrorReporter,
+    type ObservabilityServicePluginOptions,
+} from './observability-service-plugin.js';

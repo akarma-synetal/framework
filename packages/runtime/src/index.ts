@@ -68,6 +68,12 @@ export {
     InMemoryErrorReporter,
     type ErrorReporter,
     type CapturedError,
+    ObservabilityServicePlugin,
+    OBSERVABILITY_METRICS_SERVICE,
+    OBSERVABILITY_ERRORS_SERVICE,
+    resolveMetrics,
+    resolveErrorReporter,
+    type ObservabilityServicePluginOptions,
 } from './observability/index.js';
 
 // Export Artifact Loader
