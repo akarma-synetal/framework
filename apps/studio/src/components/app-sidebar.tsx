@@ -14,7 +14,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from '@tanstack/react-router';
-import { PanelLeft } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { InstalledPackage } from '@objectstack/spec/kernel';
 
 import {
@@ -23,6 +23,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -70,6 +71,13 @@ export function AppSidebar({
 
   return (
     <Sidebar collapsible="icon" {...props}>
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <CollapseButton />
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
@@ -102,13 +110,7 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <CollapseButton />
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
+      <SidebarFooter />
     </Sidebar>
   );
 }
@@ -116,13 +118,16 @@ export function AppSidebar({
 function CollapseButton() {
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === 'collapsed';
+  const Icon = collapsed ? PanelLeftOpen : PanelLeftClose;
   return (
     <SidebarMenuButton
       onClick={toggleSidebar}
-      tooltip={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      tooltip={collapsed ? 'Expand sidebar (⌘B)' : 'Collapse sidebar (⌘B)'}
       aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      className="text-muted-foreground hover:text-foreground"
     >
-      <PanelLeft className="size-4" />
+      <Icon className="size-4" />
+      <span>{collapsed ? 'Expand' : 'Collapse'}</span>
     </SidebarMenuButton>
   );
 }
