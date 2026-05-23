@@ -150,8 +150,15 @@ export function CommandPalette({ selectedPackage }: PaletteProps) {
             className="flex h-12 w-full border-b border-border bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted-foreground"
           />
           <Command.List className="max-h-[480px] overflow-y-auto p-2">
-            <Command.Empty className="py-8 text-center text-sm text-muted-foreground">
-              {loaded ? 'No matches.' : 'Loading…'}
+            <Command.Empty className="py-10 text-center text-sm text-muted-foreground">
+              {loaded ? (
+                <div className="space-y-1">
+                  <p>No matches.</p>
+                  <p className="text-xs">Try an object name (e.g. <code className="rounded bg-muted px-1 py-0.5 font-mono">account</code>), a metadata type, or a route name.</p>
+                </div>
+              ) : (
+                'Loading…'
+              )}
             </Command.Empty>
 
             {/* Top-level routes */}

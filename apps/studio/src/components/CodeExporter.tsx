@@ -51,7 +51,12 @@ function formatValue(value: unknown, depth: number = 0): string {
   }
 
   if (typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>);
+    // Strip framework-internal keys (e.g. _packageId, _hash) — they
+    // are added by the metadata loader at runtime and are never written
+    // by hand, so they shouldn't appear in exported source.
+    const entries = Object.entries(value as Record<string, unknown>).filter(
+      ([key]) => !key.startsWith('_')
+    );
     if (entries.length === 0) return '{}';
     const lines = entries.map(
       ([key, val]) => `${indent(`${key}: ${formatValue(val, depth + 1)}`, depth + 1)}`
@@ -170,7 +175,23 @@ export function CodeExporter({ type, definition, name }: CodeExporterProps) {
     return generator ? generator(definition, name) : '// Unknown export type';
   }, [type, definition, name]);
 
-  const jsonCode = useMemo(() => JSON.stringify(definition, null, 2), [definition]);
+  const jsonCode = useMemo(() => {
+    // Recursively drop framework-internal `_`-prefixed keys so the JSON
+    // export mirrors the TypeScript one (no runtime _packageId etc.).
+    function strip(input: unknown): unknown {
+      if (Array.isArray(input)) return input.map(strip);
+      if (input && typeof input === 'object') {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+          if (k.startsWith('_')) continue;
+          out[k] = strip(v);
+        }
+        return out;
+      }
+      return input;
+    }
+    return JSON.stringify(strip(definition), null, 2);
+  }, [definition]);
 
   const displayCode = format === 'typescript' ? tsCode : jsonCode;
 
