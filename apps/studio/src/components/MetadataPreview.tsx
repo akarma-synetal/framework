@@ -368,13 +368,15 @@ export function MetadataPreview({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-2 border-b border-dashed px-4 py-2 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <Eye className="h-3.5 w-3.5" />
-          <span>Live preview · rendered with @object-ui</span>
+      <div className="border-b">
+        <div className="flex items-center justify-between gap-2 px-4 py-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Eye className="h-3.5 w-3.5" />
+            <span>Live preview · rendered with @object-ui</span>
+          </div>
         </div>
         {subViews.length > 1 && (
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="-mt-1 flex items-center gap-1 overflow-x-auto px-3 pb-2 scrollbar-thin">
             {subViews.map((sv) => {
               const Icon = sv.icon;
               const active = sv.key === effectiveSub?.key;
@@ -383,7 +385,7 @@ export function MetadataPreview({
                   key={sv.key}
                   size="sm"
                   variant={active ? 'default' : 'ghost'}
-                  className="h-6 gap-1 px-2 text-[11px]"
+                  className="h-6 shrink-0 gap-1 px-2 text-[11px]"
                   onClick={() => setActiveSub(sv.key)}
                   title={sv.viewType}
                 >
