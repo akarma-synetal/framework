@@ -14,7 +14,7 @@ describe('DOM Simulation', () => {
         if (env) env.cleanup();
     });
 
-    it('simulates ObjectDataTable structure verifying columns exist', async () => {
+    it('simulates ObjectGrid integration verifying columns exist', async () => {
         const { client } = env;
         
         // 1. Fetch Definition (use short name — resolves via registry fallback)

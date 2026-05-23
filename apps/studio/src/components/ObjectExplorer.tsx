@@ -10,17 +10,24 @@
  * one row of mode buttons.
  *
  * Mode mapping (see `object-plugin.tsx`):
- *   - `data`   → records grid (default landing; Airtable-style)
- *   - `design` → field/schema editor
- *   - `code`   → REST API console
+ *   - `data`   → records grid via `@object-ui/plugin-grid`'s ObjectGrid
+ *                (the same mature component runtime apps use — full
+ *                Airtable-style filter/group/sort/density/edit out of
+ *                the box, no hand-rolled table to maintain).
+ *   - `design` → field/schema editor (ObjectSchemaInspector — schema,
+ *                not data, so not replaced by @object-ui).
+ *   - `code`   → REST API console.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { ObjectGrid } from '@object-ui/plugin-grid';
+import { useClient } from '@objectstack/client-react';
+import { useParams } from '@tanstack/react-router';
 import type { ViewMode } from '@objectstack/spec/studio';
-import { ObjectDataTable } from './ObjectDataTable';
 import { ObjectSchemaInspector } from './ObjectSchemaInspector';
-import { ObjectDataForm } from './ObjectDataForm';
 import { ObjectApiConsole } from './ObjectApiConsole';
+import { useObjectUiDataSource } from '@/hooks/useObjectUiDataSource';
+import { useScopedClient } from '@/hooks/useObjectStackClient';
 
 interface ObjectExplorerProps {
   objectApiName: string;
@@ -28,53 +35,58 @@ interface ObjectExplorerProps {
   mode?: ViewMode;
 }
 
+/**
+ * Designer-mode Records grid: like Airtable, surface every field by
+ * default so authors can see exactly what their schema produces.
+ * @object-ui's ObjectGrid picks a minimal column set when no `columns`
+ * are passed; for the schema-designer context we want the full picture.
+ */
+function DesignerRecordsGrid({ objectApiName }: { objectApiName: string }) {
+  const dataSource = useObjectUiDataSource();
+  const unscoped = useClient();
+  const params = useParams({ strict: false }) as { projectId?: string };
+  const scoped = useScopedClient(params.projectId);
+  const client: any = scoped ?? unscoped;
+  const [columns, setColumns] = useState<string[] | undefined>(undefined);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const found: any = await client.meta.getItem('object', objectApiName);
+        const def = found?.item || found?.spec || found;
+        const fields = def?.fields || {};
+        const all = Object.keys(fields)
+          .map((k) => fields[k]?.name || k)
+          // Hide framework-internal projection fields that aren't useful in the designer.
+          .filter((n) => n && n !== 'formatted_summary');
+        if (mounted) setColumns(all);
+      } catch {
+        if (mounted) setColumns(undefined);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [client, objectApiName]);
+
+  return (
+    <ObjectGrid
+      schema={{ type: 'object-grid', objectName: objectApiName, ...(columns ? { columns } : {}) }}
+      dataSource={dataSource}
+      className="h-full"
+    />
+  );
+}
+
 export function ObjectExplorer({ objectApiName, mode = 'data' }: ObjectExplorerProps) {
-  const [editingRecord, setEditingRecord] = useState<any>(null);
-  const [showForm, setShowForm] = useState(false);
-  // Refresh trigger: increment this to force data table to refetch
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  function handleEdit(record: any) {
-    setEditingRecord(record);
-    setShowForm(true);
-  }
-
-  function handleFormSuccess() {
-    setShowForm(false);
-    setEditingRecord(null);
-    setRefreshTrigger((prev) => prev + 1);
-  }
-
-  // Resolve the active panel from the mode prop. Anything that isn't a
-  // first-class object mode lands on the records grid so the user always
-  // sees data first.
   const panel = mode === 'design' ? 'design' : mode === 'code' ? 'code' : 'data';
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex-1 overflow-auto">
-        {panel === 'data' && (
-          <ObjectDataTable
-            objectApiName={objectApiName}
-            onEdit={handleEdit}
-            refreshTrigger={refreshTrigger}
-          />
-        )}
+        {panel === 'data' && <DesignerRecordsGrid objectApiName={objectApiName} />}
         {panel === 'design' && <ObjectSchemaInspector objectApiName={objectApiName} />}
         {panel === 'code' && <ObjectApiConsole objectApiName={objectApiName} />}
       </div>
-
-      {showForm && (
-        <ObjectDataForm
-          objectApiName={objectApiName}
-          record={editingRecord && Object.keys(editingRecord).length > 0 ? editingRecord : undefined}
-          onSuccess={handleFormSuccess}
-          onCancel={() => {
-            setShowForm(false);
-            setEditingRecord(null);
-          }}
-        />
-      )}
     </div>
   );
 }

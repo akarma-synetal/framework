@@ -6,7 +6,7 @@
  * Tabs:
  *   • Schema      — embeds PluginHost for the canonical metadata viewer
  *                   (preview / design / code modes).
- *   • Data        — ObjectDataTable for live records.
+ *   • Data        — ObjectGrid (@object-ui/plugin-grid) for live records.
  *   • Views       — FormViews + non-form views bound to this object.
  *   • Forms       — FormViews for this object (public + internal).
  *   • Hooks       — hook/trigger metadata referencing this object.
