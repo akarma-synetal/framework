@@ -371,6 +371,9 @@ importers:
       '@object-ui/plugin-calendar':
         specifier: ^5.1.1
         version: 5.1.1(@object-ui/permissions@5.1.1(ai@6.0.190(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.190(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-dashboard':
+        specifier: ^5.1.1
+        version: 5.1.1(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.190(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-grid-layout@2.2.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/plugin-detail':
         specifier: ^5.1.1
         version: 5.1.1(@object-ui/components@5.1.1(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.190(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/core@5.1.1(ai@6.0.190(zod@4.4.3)))(@object-ui/fields@5.1.1(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.190(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3))(@object-ui/permissions@5.1.1(ai@6.0.190(zod@4.4.3))(react@19.2.6))(@object-ui/react@5.1.1(ai@6.0.190(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(@object-ui/types@5.1.1(ai@6.0.190(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -383,6 +386,9 @@ importers:
       '@object-ui/plugin-kanban':
         specifier: ^5.1.1
         version: 5.1.1(@object-ui/permissions@5.1.1(ai@6.0.190(zod@4.4.3))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.190(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
+      '@object-ui/plugin-report':
+        specifier: ^5.1.1
+        version: 5.1.1(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(ai@6.0.190(zod@4.4.3))(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react-is@17.0.2)(react@19.2.6)(redux@5.0.1)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@object-ui/react':
         specifier: ^5.1.1
         version: 5.1.1(ai@6.0.190(zod@4.4.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)

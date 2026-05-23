@@ -12,7 +12,8 @@
  *   view + grid   → ObjectGrid
  *   view + detail → DetailView (single-record)
  *   view + calendar → ObjectCalendar (if available)
- *   dashboard     → grid of widgets — falls back to JSON
+ *   dashboard     → DashboardRenderer (@object-ui/plugin-dashboard)
+ *   report        → ReportRenderer (@object-ui/plugin-report)
  *
  * Anything we don't recognise renders a small "no preview available"
  * note with the metadata payload printed as JSON so authors can still
@@ -26,12 +27,13 @@ import * as React from 'react';
 import { ObjectGrid } from '@object-ui/plugin-grid';
 import { ObjectKanban } from '@object-ui/plugin-kanban';
 import { DetailView } from '@object-ui/plugin-detail';
+import { DashboardRenderer } from '@object-ui/plugin-dashboard';
+import { ReportRenderer } from '@object-ui/plugin-report';
 import { useObjectUiDataSource } from '@/hooks/useObjectUiDataSource';
 import { useMetadataHmr } from '@/hooks/useMetadataHmr';
 import { LiveFormPreview } from './LiveFormPreview';
 import { LivePreviewStatusBar } from './LivePreviewStatusBar';
 import { TimelinePreview } from './TimelinePreview';
-import { DashboardPreview } from './DashboardPreview';
 import { AlertCircle, Eye, LayoutGrid, KanbanSquare, Calendar as CalendarIcon, FileText, ListChecks } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -187,7 +189,27 @@ export function MetadataPreview({
     }
 
     if (type === 'dashboard' && spec) {
-      return <DashboardPreview spec={spec} dataSource={dataSource} className={className} />;
+      // @object-ui's DashboardRenderer expects schema.type === 'dashboard'
+      // and a `widgets[]` array — same shape as our dashboard spec, so we
+      // can pass it through. Widgets that declare a data provider use
+      // the shared Studio DataSource.
+      return (
+        <DashboardRenderer
+          schema={{ type: 'dashboard', ...spec }}
+          dataSource={dataSource as any}
+          className={className}
+        />
+      );
+    }
+
+    if (type === 'report' && spec) {
+      return (
+        <ReportRenderer
+          schema={spec}
+          dataSource={dataSource as any}
+          className={className}
+        />
+      );
     }
 
     if (type !== 'view' || !spec) {
