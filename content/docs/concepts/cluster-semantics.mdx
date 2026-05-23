@@ -368,10 +368,16 @@ is configured."*
 | `postgres`   | `LISTEN/NOTIFY`       | advisory locks             | dedicated KV table  | sequence       |
 | `nats`       | NATS subjects + JetStream | KV bucket lock         | KV bucket           | KV INCR        |
 
-The `postgres` driver is the recommended starting point for production:
-zero new infrastructure (reuses the existing DB), good enough for tens of
-nodes, and trivially debuggable with `psql`. Move to `redis` or `nats` when
-throughput exceeds what Postgres LISTEN/NOTIFY can sustain (~10k msg/s).
+The `redis` driver is the recommended starting point for production
+ObjectStack deployments: it shares its connection pool with the planned
+`service-cache` Redis adapter (no extra infrastructure once cache is on
+Redis), gives native semantics for every primitive (SETNX/Lua/INCR/PUBSUB),
+and decouples cluster transport from the choice of database driver
+(SQL / Turso / Postgres / SQLite all work the same).
+
+The `postgres` driver remains a viable "single binary, single dependency"
+choice for small deployments that already run Postgres and want to avoid
+a Redis dependency. It is deferred to a community/optional driver.
 
 ## 9. Industry alignment
 
@@ -420,11 +426,17 @@ primitive works; behaviour on one node is identical to today. This phase
 proves the API shape against real callers (EventBus, service-cache,
 service-job) before committing to a wire format.
 
-### Phase 3 — Postgres driver (~3 days)
+### Phase 3 — Redis driver (~2 days) ✅
 
-Implement `postgres` driver (LISTEN/NOTIFY + advisory locks + KV table).
-First real multi-node deployment becomes possible. No new infrastructure
-for users who already run Postgres.
+Implement `redis` driver via `@objectstack/service-cluster-redis`
+(PUBSUB + SETNX/Lua locks + WATCH/MULTI KV + INCR counter). Ships as a
+sibling package so adopters opt in by importing it. Shares its ioredis
+client pool with `service-cache` to avoid double connections.
+
+> **Note**: this was switched from "Postgres first" — see commit history.
+> Rationale: Postgres isn't a fixed dependency in the ObjectStack stack,
+> so binding cluster to PG would couple the two unnecessarily. Redis is
+> already the planned cache backend.
 
 ### Phase 4 — Existing services migrate (~3 days, opportunistic)
 
@@ -433,11 +445,13 @@ for users who already run Postgres.
 - `service-realtime` adds cross-node fan-out via PubSub.
 - Webhook dispatcher (planned) uses `partitioned` strategy from day one.
 
-### Phase 5 — Redis / NATS drivers (deferred, customer-driven)
+### Phase 5 — Postgres / NATS drivers (deferred, optional)
 
-Added when a customer reports throughput needs exceeding the Postgres
-driver. No protocol changes required at that point — only a new
-implementation.
+Postgres driver downgraded to community/optional — useful for the
+"one binary, one container" deployment archetype that wants to skip
+Redis. NATS deferred until a customer reports throughput needs that
+exceed Redis PUBSUB. No protocol changes required at that point — only
+a new implementation that calls `registerClusterDriver()`.
 
 ## 11. Non-goals (v1)
 
