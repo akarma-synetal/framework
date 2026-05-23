@@ -21,7 +21,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMetadataHmr } from '@/hooks/useMetadataHmr';
 import {
   Eye, FormInput, Workflow, Bell, BarChart3, FileText, Bot, Wrench, Mail,
-  Shield, Zap, ListChecks, GitBranch, ExternalLink, Search, Code2,
+  Shield, Zap, ListChecks, GitBranch, ExternalLink, Search, Code2, Copy, Check,
 } from 'lucide-react';
 import { RELATED_TYPES, itemReferencesObject, isFormView, type RelatedDomain } from './detector';
 
@@ -192,7 +192,7 @@ export function ObjectRelatedPanel({ packageId, objectName }: ObjectRelatedPanel
                                   }`}
                                 >
                                   {isActive && (
-                                    <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-primary" />
+                                    <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r bg-primary" />
                                   )}
                                   <span className="truncate font-medium">{it.label}</span>
                                   {it.label !== it.name && (
@@ -286,12 +286,37 @@ function RelatedDetail({ packageId, objectName, item }: RelatedDetailProps) {
 }
 
 function SpecCard({ spec }: { spec: any }) {
+  const [copied, setCopied] = useState(false);
   const json = useMemo(() => {
     try { return JSON.stringify(spec, null, 2); } catch { return String(spec); }
   }, [spec]);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(json);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable */ }
+  }
+
   return (
-    <pre className="overflow-auto rounded-md border bg-muted/30 p-3 text-[11px] leading-relaxed">
-      <code>{json}</code>
-    </pre>
+    <div className="overflow-hidden rounded-md border bg-muted/30">
+      <div className="flex items-center justify-between border-b bg-muted/30 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <span>Spec</span>
+        <Button
+          type="button"
+          onClick={copy}
+          size="sm"
+          variant="ghost"
+          className="mr-8 h-6 gap-1 text-[11px]"
+        >
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          {copied ? 'Copied' : 'Copy'}
+        </Button>
+      </div>
+      <pre className="overflow-auto p-3 text-[11px] leading-relaxed">
+        <code>{json}</code>
+      </pre>
+    </div>
   );
 }
