@@ -82,6 +82,8 @@ export type { LoadArtifactBundleOptions } from './load-artifact-bundle.js';
 // project dev workflows. See `cloud/objectos-stack.ts`.
 export { createObjectOSStack } from './cloud/objectos-stack.js';
 export type { ObjectOSStackConfig, ObjectOSStackResult } from './cloud/objectos-stack.js';
+export { MarketplaceProxyPlugin } from './cloud/marketplace-proxy-plugin.js';
+export type { MarketplaceProxyPluginConfig } from './cloud/marketplace-proxy-plugin.js';
 export { ArtifactApiClient } from './cloud/artifact-api-client.js';
 export type {
     ArtifactApiClientConfig,

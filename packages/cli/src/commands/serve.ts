@@ -813,7 +813,31 @@ export default class Serve extends Command {
         }
       }
 
-      // 5b. Auto-register AuthPlugin (and paired Security/Audit) when the
+      // 5b. Auto-register MarketplaceProxyPlugin when OS_CLOUD_URL is set
+      // and no marketplace proxy is already configured. This forwards
+      // /api/v1/marketplace/* from the local dev kernel to the configured
+      // cloud control-plane so the runtime console's marketplace browse UI
+      // works in `objectstack dev` without manually wiring the plugin into
+      // every user's objectstack.config.ts.
+      const hasMarketplaceProxy = plugins.some(
+        (p: any) => p?.name === 'com.objectstack.runtime.marketplace-proxy'
+          || p?.constructor?.name === 'MarketplaceProxyPlugin'
+      );
+      const cloudUrlForMarketplace = process.env.OS_CLOUD_URL?.trim();
+      if (!hasMarketplaceProxy && cloudUrlForMarketplace
+          && cloudUrlForMarketplace.toLowerCase() !== 'local'
+          && cloudUrlForMarketplace.toLowerCase() !== 'off') {
+        try {
+          const runtimePkg = '@objectstack/runtime';
+          const { MarketplaceProxyPlugin } = await import(/* webpackIgnore: true */ runtimePkg);
+          await kernel.use(new MarketplaceProxyPlugin({ controlPlaneUrl: cloudUrlForMarketplace }));
+          trackPlugin('MarketplaceProxy');
+        } catch (err: any) {
+          console.warn(chalk.yellow(`  ⚠ MarketplaceProxyPlugin auto-inject failed: ${err?.message ?? err}`));
+        }
+      }
+
+      // 5c. Auto-register AuthPlugin (and paired Security/Audit) when the
       // 'auth' tier is enabled and no auth plugin is already configured.
       // The Studio + Account portals expect /api/v1/auth/* to be served by
       // better-auth via @objectstack/plugin-auth. Without this block,
@@ -841,11 +865,19 @@ export default class Serve extends Command {
           // AuthPlugin here would compete with the per-project one — its
           // shared OS_AUTH_SECRET would erroneously validate cookies across
           // unrelated projects. Refuse to inject in runtime mode.
-          const cloudUrl = process.env.OS_CLOUD_URL?.trim();
-          const isRuntimeMode = !!cloudUrl && cloudUrl.toLowerCase() !== 'local' && cloudUrl.toLowerCase() !== 'off';
-          if (isRuntimeMode) {
+          //
+          // Detect runtime mode by the presence of ObjectOSProjectPlugin
+          // (added by createObjectOSStack). OS_CLOUD_URL alone is NOT a
+          // reliable signal — a regular `objectstack dev` app may set it
+          // just to enable the marketplace proxy yet still want its own
+          // local AuthPlugin.
+          const isHostKernel = plugins.some(
+            (p: any) => p?.name === 'com.objectstack.runtime.objectos-project'
+              || p?.constructor?.name === 'ObjectOSProjectPlugin'
+          );
+          if (isHostKernel) {
             console.warn(chalk.yellow(
-              '  ⚠ AuthPlugin skipped on host kernel — runtime mode (OS_CLOUD_URL set).\n' +
+              '  ⚠ AuthPlugin skipped on host kernel — runtime mode (ObjectOSProjectPlugin detected).\n' +
               '    Auth is owned per-project by ArtifactKernelFactory (see service-cloud).'
             ));
           } else if (!secret) {

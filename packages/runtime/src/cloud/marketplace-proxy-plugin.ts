@@ -121,9 +121,8 @@ export class MarketplaceProxyPlugin implements Plugin {
                     const body = await resp.arrayBuffer();
                     return new Response(body, { status: resp.status, headers });
                 } catch (err: any) {
-                    ctx.logger?.error?.('[MarketplaceProxyPlugin] proxy failed', {
-                        message: err?.message ?? String(err),
-                    });
+                    const errObj = err instanceof Error ? err : new Error(err?.message ?? String(err));
+                    ctx.logger?.error?.('[MarketplaceProxyPlugin] proxy failed', errObj);
                     return c.json({
                         success: false,
                         error: {
