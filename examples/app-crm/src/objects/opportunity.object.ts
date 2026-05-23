@@ -52,7 +52,7 @@ export const Opportunity = ObjectSchema.create({
 
     // Financial Information
     amount: Field.currency({
-      currency: 'CNY',
+      currencyConfig: { defaultCurrency: 'USD' },
       label: 'Amount',
       required: true,
       scale: 2,
@@ -61,7 +61,7 @@ export const Opportunity = ObjectSchema.create({
     }),
 
     expected_revenue: Field.currency({
-      currency: 'CNY',
+      currencyConfig: { defaultCurrency: 'USD' },
       label: 'Expected Revenue',
       scale: 2,
       readonly: true,  // Calculated field

@@ -48,14 +48,14 @@ export const OpportunityLineItem = ObjectSchema.create({
     }),
 
     list_price: Field.currency({
-      currency: 'CNY',
+      currencyConfig: { defaultCurrency: 'USD' },
       label: 'List Price',
       readonly: true,
       description: 'Auto-populated from product.list_price',
     }),
 
     unit_price: Field.currency({
-      currency: 'CNY',
+      currencyConfig: { defaultCurrency: 'USD' },
       label: 'Sales Price',
       required: true,
       description: 'Negotiated unit price (may differ from list price)',

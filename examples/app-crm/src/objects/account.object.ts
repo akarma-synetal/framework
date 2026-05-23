@@ -72,7 +72,7 @@ export const Account = ObjectSchema.create({
 
     // Number fields
     annual_revenue: Field.currency({
-      currency: 'CNY',
+      currencyConfig: { defaultCurrency: 'USD' },
       label: 'Annual Revenue',
       scale: 2,
       min: 0,

@@ -5608,6 +5608,11 @@
           "scale": 2,
           "min": 0,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "group": "financials",
           "hidden": false,
@@ -6306,6 +6311,11 @@
           "scale": 2,
           "min": 0,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": false,
@@ -6323,6 +6333,11 @@
           "scale": 2,
           "min": 0,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": false,
@@ -6340,6 +6355,11 @@
           "scale": 2,
           "min": 0,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": false,
@@ -6357,6 +6377,11 @@
           "scale": 2,
           "min": 0,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": true,
@@ -8556,6 +8581,11 @@
           "scale": 2,
           "min": 0,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": false,
@@ -9468,6 +9498,11 @@
           "unique": false,
           "scale": 2,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "group": "additional",
           "hidden": false,
@@ -9995,6 +10030,11 @@
           "scale": 2,
           "min": 0,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "group": "financials",
           "hidden": false,
@@ -10012,6 +10052,11 @@
           "unique": false,
           "scale": 2,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "group": "financials",
           "hidden": false,
@@ -10927,6 +10972,11 @@
           "multiple": false,
           "unique": false,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": true,
@@ -10943,6 +10993,11 @@
           "multiple": false,
           "unique": false,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": false,
@@ -11169,6 +11224,11 @@
           "scale": 2,
           "min": 0,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": false,
@@ -11186,6 +11246,11 @@
           "scale": 2,
           "min": 0,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": false,
@@ -11741,6 +11806,11 @@
           "unique": false,
           "scale": 2,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": true,
@@ -11775,6 +11845,11 @@
           "unique": false,
           "scale": 2,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": true,
@@ -11791,6 +11866,11 @@
           "unique": false,
           "scale": 2,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": false,
@@ -11807,6 +11887,11 @@
           "unique": false,
           "scale": 2,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": false,
@@ -11823,6 +11908,11 @@
           "unique": false,
           "scale": 2,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": true,
@@ -12167,6 +12257,11 @@
           "multiple": false,
           "unique": false,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": true,
@@ -12182,6 +12277,11 @@
           "multiple": false,
           "unique": false,
           "deleteBehavior": "set_null",
+          "currencyConfig": {
+            "precision": 2,
+            "currencyMode": "dynamic",
+            "defaultCurrency": "USD"
+          },
           "auditTrail": false,
           "hidden": false,
           "readonly": false,
