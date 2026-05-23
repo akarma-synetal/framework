@@ -37,7 +37,16 @@ import { useObjectUiDataSource } from '@/hooks/useObjectUiDataSource';
 import { useScopedClient } from '@/hooks/useObjectStackClient';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
+import { Plus, EyeOff, Eye } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface ObjectExplorerProps {
@@ -85,6 +94,39 @@ function DesignerRecordsGrid({ objectApiName }: { objectApiName: string }) {
   // Bump to force the grid to refetch after create/update/delete.
   const [refreshKey, setRefreshKey] = useState(0);
   const refreshTimerRef = useRef<number | null>(null);
+
+  // Hide-fields preferences are persisted per-object in localStorage so each
+  // object remembers its own column visibility, just like Airtable does.
+  const hiddenKey = `objectstack.hiddenFields.${objectApiName}`;
+  const [hiddenFields, setHiddenFields] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set<string>();
+    try {
+      const raw = window.localStorage.getItem(hiddenKey);
+      return raw ? new Set<string>(JSON.parse(raw)) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(hiddenKey, JSON.stringify([...hiddenFields]));
+    } catch {
+      /* quota exceeded — ignore */
+    }
+  }, [hiddenFields, hiddenKey]);
+  const toggleField = useCallback((name: string) => {
+    setHiddenFields(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }, []);
+  const showAllFields = useCallback(() => setHiddenFields(new Set()), []);
+  const visibleColumns = useMemo(
+    () => columns?.filter(c => !hiddenFields.has(c)),
+    [columns, hiddenFields],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -157,7 +199,53 @@ function DesignerRecordsGrid({ objectApiName }: { objectApiName: string }) {
 
   return (
     <>
-      <div className="flex items-center justify-end gap-2 border-b px-3 py-2">
+      <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs">
+                {hiddenFields.size > 0 ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                Hide fields
+                {hiddenFields.size > 0 && (
+                  <span className="ml-1 rounded bg-muted px-1 text-[10px] tabular-nums">
+                    {hiddenFields.size}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-[60vh] w-64 overflow-y-auto">
+              <DropdownMenuLabel className="flex items-center justify-between">
+                <span>Field visibility</span>
+                {hiddenFields.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={showAllFields}
+                    className="text-xs font-normal text-muted-foreground hover:text-foreground"
+                  >
+                    Show all
+                  </button>
+                )}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {(columns ?? []).length === 0 ? (
+                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                  Loading schema…
+                </DropdownMenuItem>
+              ) : (
+                (columns ?? []).map((name) => (
+                  <DropdownMenuCheckboxItem
+                    key={name}
+                    checked={!hiddenFields.has(name)}
+                    onCheckedChange={() => toggleField(name)}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <span className="truncate font-mono text-xs">{name}</span>
+                  </DropdownMenuCheckboxItem>
+                ))
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         <Button size="sm" onClick={handleAddRecord} className="h-7 gap-1.5 text-xs">
           <Plus className="h-3.5 w-3.5" />
           New record
@@ -165,7 +253,15 @@ function DesignerRecordsGrid({ objectApiName }: { objectApiName: string }) {
       </div>
       <ObjectGrid
         key={refreshKey}
-        schema={{ type: 'object-grid', objectName: objectApiName, ...(columns ? { columns } : {}) }}
+        schema={{
+          type: 'object-grid',
+          objectName: objectApiName,
+          showSearch: true,
+          showFilters: true,
+          showPagination: true,
+          resizable: true,
+          ...(visibleColumns ? { columns: visibleColumns } : {}),
+        }}
         dataSource={dataSource}
         className="h-full"
         onRowClick={handleRowClick}
