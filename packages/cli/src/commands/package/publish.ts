@@ -142,6 +142,18 @@ export default class PackagePublish extends Command {
       description: 'Mark this version as a pre-release',
       default: false,
     }),
+    submit: Flags.boolean({
+      description:
+        'After publishing, submit the new version for marketplace review ' +
+        '(requires --visibility=marketplace and a complete listing).',
+      default: false,
+    }),
+    'auto-approve': Flags.boolean({
+      description:
+        'Platform admin only: skip the review queue and publish straight to the ' +
+        'marketplace catalog. Used by first-party CI / dogfood publishes.',
+      default: false,
+    }),
     note: Flags.string({
       char: 'n',
       description: 'Release notes (markdown ok)',
@@ -252,6 +264,8 @@ export default class PackagePublish extends Command {
         is_pre_release: flags['pre-release'] || /-(alpha|beta|rc|dev|preview|staging|pr)/i.test(version),
       };
       if (flags.note) verBody.release_notes = flags.note;
+      if (flags.submit) verBody.submit_for_review = true;
+      if (flags['auto-approve']) verBody.auto_approve = true;
 
       const shouldInstall = flags.install && flags.env;
       if (shouldInstall) {
@@ -273,6 +287,8 @@ export default class PackagePublish extends Command {
         return;
       }
       const ver = verRes.body?.data ?? verRes.body;
+      const violations = Array.isArray(verRes.body?.violations) ? verRes.body.violations : [];
+      const warnings = Array.isArray(ver?.warnings) ? ver.warnings : [];
 
       console.log('');
       printSuccess('Package published');
@@ -290,6 +306,38 @@ export default class PackagePublish extends Command {
         printKV('  Installation', String(ver.installation.installation_id ?? '—'));
       }
       printKV('  Server',         baseUrl);
+
+      // Surface the listing state so authors know whether their package is
+      // public yet. With --submit it lands in pending_review; with
+      // --auto-approve it goes straight to approved (admins only).
+      if (ver?.listing_status) {
+        console.log('');
+        printKV('  Listing', String(ver.listing_status));
+        if (ver.listing_status === 'draft' && flags.visibility === 'marketplace') {
+          console.log('');
+          console.log(
+            '  Hint: visibility is marketplace but the version is still draft. Pass --submit on the\n' +
+            '        next publish (or POST /cloud/packages/:id/versions/:vid/submit) to request review.',
+          );
+        }
+        if (ver.listing_status === 'pending_review') {
+          console.log('');
+          console.log('  A platform admin will review this version and either approve or reject it.');
+        }
+        if (ver.listing_status === 'approved') {
+          console.log('');
+          console.log('  Version is live in the public marketplace catalog.');
+        }
+      }
+      if (warnings.length > 0) {
+        console.log('');
+        for (const w of warnings) console.log(`  ⚠️  ${w}`);
+      }
+      if (violations.length > 0) {
+        console.log('');
+        console.log('  Marketplace policy violations:');
+        for (const v of violations) console.log(`    • ${v}`);
+      }
     } catch (error) {
       printError((error as Error).message);
       this.exit(1);
