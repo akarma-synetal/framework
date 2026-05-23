@@ -13,9 +13,11 @@ import {
   Search, Copy, Check, Key, Hash, Type, ToggleLeft,
   List, Link, Calculator, Calendar, FileText, CircleDot,
   DollarSign, Percent, Mail, Phone, Link as LinkIcon, MapPin, Braces, Clock, Sigma,
-  FileCode, Map,
+  FileCode, Map, Plus, ChevronRight,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { FieldDetailDrawer, type FieldSpec } from './FieldDetailDrawer';
+import { AddFieldDialog } from './AddFieldDialog';
 
 interface ObjectSchemaInspectorProps {
   objectApiName: string;
@@ -79,7 +81,8 @@ const FIELD_TYPE_COLORS: Record<string, string> = {
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
@@ -106,6 +109,8 @@ export function ObjectSchemaInspector({ objectApiName }: ObjectSchemaInspectorPr
   const [def, setDef] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedField, setSelectedField] = useState<FieldSpec | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -146,7 +151,8 @@ export function ObjectSchemaInspector({ objectApiName }: ObjectSchemaInspectorPr
   }
 
   const fields = def.fields || {};
-  const fieldEntries = Object.entries(fields).map(([key, f]: [string, any]) => ({
+  const fieldEntries: FieldSpec[] = Object.entries(fields).map(([key, f]: [string, any]) => ({
+    ...(f as object),
     name: f.name || key,
     label: f.label || key,
     type: f.type || 'text',
@@ -163,6 +169,7 @@ export function ObjectSchemaInspector({ objectApiName }: ObjectSchemaInspectorPr
 
   // Parse FQN: namespace__shortName (used elsewhere; namespace/shortName intentionally derived even if unused)
   const objectName = def.name || objectApiName;
+  const packageId = (params as any)?.package as string | undefined;
 
   const filtered = searchQuery
     ? fieldEntries.filter(f =>
@@ -187,6 +194,15 @@ export function ObjectSchemaInspector({ objectApiName }: ObjectSchemaInspectorPr
         <span className="ml-auto whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
           {searchQuery ? `${filtered.length} of ${fieldEntries.length}` : `${fieldEntries.length} fields`}
         </span>
+        <Button
+          size="sm"
+          variant="default"
+          onClick={() => setAddOpen(true)}
+          className="h-7 gap-1.5 px-2.5 text-xs"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add field
+        </Button>
       </div>
       <div className="flex-1 overflow-auto">
         <Table>
@@ -198,6 +214,7 @@ export function ObjectSchemaInspector({ objectApiName }: ObjectSchemaInspectorPr
               <TableHead className="font-medium">Type</TableHead>
               <TableHead className="font-medium">Required</TableHead>
               <TableHead className="font-medium">Details</TableHead>
+              <TableHead className="w-8"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -205,7 +222,11 @@ export function ObjectSchemaInspector({ objectApiName }: ObjectSchemaInspectorPr
                   const FieldIcon = FIELD_TYPE_ICONS[field.type] || CircleDot;
                   const colorClass = FIELD_TYPE_COLORS[field.type] || 'text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-950 dark:border-gray-800';
                   return (
-                    <TableRow key={field.name} className="group">
+                    <TableRow
+                      key={field.name}
+                      className="group cursor-pointer"
+                      onClick={() => setSelectedField(field)}
+                    >
                       <TableCell className="py-2 text-center text-xs text-muted-foreground tabular-nums">
                         {idx + 1}
                       </TableCell>
@@ -264,12 +285,15 @@ export function ObjectSchemaInspector({ objectApiName }: ObjectSchemaInspectorPr
                           )}
                         </div>
                       </TableCell>
+                      <TableCell className="py-2 pr-3 text-right">
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+                      </TableCell>
                     </TableRow>
                   );
                 })}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground text-sm">
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground text-sm">
                       {searchQuery ? 'No fields matching filter' : 'No fields defined'}
                     </TableCell>
                   </TableRow>
@@ -277,6 +301,18 @@ export function ObjectSchemaInspector({ objectApiName }: ObjectSchemaInspectorPr
               </TableBody>
             </Table>
       </div>
+      <FieldDetailDrawer
+        field={selectedField}
+        objectName={objectName}
+        packageId={packageId}
+        onClose={() => setSelectedField(null)}
+      />
+      <AddFieldDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        objectName={objectName}
+        packageId={packageId}
+      />
     </div>
   );
 }
