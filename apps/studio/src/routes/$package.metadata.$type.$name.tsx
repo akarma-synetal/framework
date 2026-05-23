@@ -8,14 +8,8 @@ import { usePackages } from '../hooks/usePackages';
 import { useSetInspectorTarget } from '@/hooks/useInspector';
 import { ResourceActionsMenu } from '@/components/ResourceActionsMenu';
 import { iconForMetadataType, typeLabel } from '@/components/studio-nav';
+import { pickLabel, pickDescription } from '@/lib/metadata-display';
 import { Badge } from '@/components/ui/badge';
-
-function resolveLabel(val: unknown): string {
-  if (typeof val === 'string') return val;
-  if (val && typeof val === 'object' && 'defaultValue' in val) return String((val as any).defaultValue);
-  if (val && typeof val === 'object' && 'key' in val) return String((val as any).key);
-  return '';
-}
 
 function MetadataViewComponent() {
   const { package: packageId, type, name } = Route.useParams();
@@ -43,8 +37,8 @@ function MetadataViewComponent() {
     return () => { cancelled = true; };
   }, [client, type, name, resolvedPkgId]);
 
-  const label = resolveLabel(item?.label) || name;
-  const description = resolveLabel(item?.description);
+  const label = item ? pickLabel({ ...item, name }) : name;
+  const description = item ? pickDescription(item, type) : undefined;
   const Icon = iconForMetadataType(type);
 
   return (

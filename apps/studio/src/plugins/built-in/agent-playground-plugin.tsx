@@ -488,17 +488,10 @@ function AgentPlaygroundViewer({ metadataType, metadataName, data, packageId }: 
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
+      {/* Action bar — route header already shows the agent name/type;
+          this strip is just the playground actions (metadata · download · clear). */}
       <div className="shrink-0 border-b bg-background">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Bot className="h-5 w-5 text-primary" />
-            <div>
-              <h2 className="text-sm font-semibold">{agent.label}</h2>
-              <p className="text-xs text-muted-foreground">{agent.role}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-end gap-1 px-4 py-2">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -549,7 +542,6 @@ function AgentPlaygroundViewer({ metadataType, metadataName, data, packageId }: 
               </Tooltip>
             </TooltipProvider>
           </div>
-        </div>
 
         {/* Agent Metadata (collapsible) */}
         {showMetadata && (

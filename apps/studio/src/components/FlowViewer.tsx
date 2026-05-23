@@ -5,7 +5,7 @@ import { useParams } from '@tanstack/react-router';
 import { useClient } from '@objectstack/client-react';
 import { useScopedClient } from '@/hooks/useObjectStackClient';
 import type { MetadataViewerProps } from '@/plugins/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -13,7 +13,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Workflow, Zap, Calendar, MousePointerClick, Globe, Database, CheckCircle2 } from 'lucide-react';
-import { CopyButton, JsonTree } from './MetadataInspector';
+import { JsonTree } from './MetadataInspector';
 import { FlowTestRunner } from './FlowTestRunner';
 import { FlowRunsPanel } from './FlowRunsPanel';
 
@@ -101,9 +101,7 @@ export function FlowViewer({ metadataName, data, packageId }: MetadataViewerProp
     );
   }
 
-  const label = resolveLabel(flow.label) || flow.name || metadataName;
   const name = flow.name || metadataName;
-  const description = resolveLabel(flow.description);
   const status: string | undefined = flow.status;
   const isActive = status === 'active';
   const triggerType: string = flow.type || 'autolaunched';
@@ -116,40 +114,22 @@ export function FlowViewer({ metadataName, data, packageId }: MetadataViewerProp
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="space-y-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Workflow className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-xl truncate">{label}</CardTitle>
-                <Badge variant="outline" className="text-xs">Flow</Badge>
-                {typeof flow.version === 'number' && (
-                  <Badge variant="secondary" className="text-[10px] font-mono">v{flow.version}</Badge>
-                )}
-                {isActive ? (
-                  <Badge variant="outline" className="text-[10px] font-mono text-emerald-600 border-emerald-300 inline-flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" /> Enabled
-                  </Badge>
-                ) : status ? (
-                  <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground">{status}</Badge>
-                ) : null}
-              </div>
-              <CardDescription className="flex items-center gap-2 flex-wrap">
-                <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{name}</code>
-                <CopyButton text={name} />
-                {description && (
-                  <>
-                    <span>·</span>
-                    <span className="text-xs">{description}</span>
-                  </>
-                )}
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+      {/* Compact strip — route header already shows label/name/type/description;
+          here we just surface flow-specific status (version + enabled state). */}
+      {(typeof flow.version === 'number' || isActive || status) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          {typeof flow.version === 'number' && (
+            <Badge variant="secondary" className="text-[10px] font-mono">v{flow.version}</Badge>
+          )}
+          {isActive ? (
+            <Badge variant="outline" className="text-[10px] font-mono text-emerald-600 border-emerald-300 inline-flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3" /> Enabled
+            </Badge>
+          ) : status ? (
+            <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground">{status}</Badge>
+          ) : null}
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">
