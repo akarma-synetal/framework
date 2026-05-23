@@ -1,22 +1,27 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 /**
- * FieldDetailDrawer — read-only side panel for inspecting a single field.
+ * FieldDetailDrawer — inspect AND lightly edit a single field.
  *
  * Opens when a row in the Fields table is clicked. Shows the full field
- * spec (every property normalised from the schema), plus two power-user
- * escape hatches:
+ * spec plus inline edits for the three properties authors tweak most
+ * often (label, description, required).
  *
- *   • Open in VS Code — vscode:// deep-link to the parent object's source
- *     file (the vscode-objectstack extension resolves it).
- *   • Copy field snippet — defineField-style TS literal of just this
- *     field, ready to paste somewhere.
+ * Because metadata is code, the drawer does not persist edits over the
+ * wire. Instead it regenerates the field snippet on every keystroke
+ * and surfaces "Copy snippet" — paste it in place of the existing
+ * definition, save, HMR.
  *
- * Why a drawer (not a modal): the user is exploring; they want to keep
- * the field list visible so they can quickly compare adjacent fields.
+ *   • Open in VS Code — vscode:// deep-link to the parent object's
+ *     source file (the vscode-objectstack extension resolves it).
+ *   • Copy field snippet — defineField-style TS literal reflecting the
+ *     current edited state.
+ *
+ * Why a drawer (not a modal): authors want the field list visible so
+ * they can quickly compare adjacent fields.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -26,8 +31,10 @@ import {
 } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Copy, ExternalLink, Check } from 'lucide-react';
-import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Copy, ExternalLink, Check, Pencil } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export interface FieldSpec {
@@ -77,6 +84,45 @@ function fieldSnippet(field: FieldSpec): string {
 
 export function FieldDetailDrawer({ field, objectName, packageId, onClose }: FieldDetailDrawerProps) {
   const [copied, setCopied] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+
+  // Local editable mirrors of the three most-tweaked properties.
+  // We keep them as local state so edits are debounce-free; the original
+  // `field` is the source of truth on open / object switch.
+  const [editLabel, setEditLabel] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editRequired, setEditRequired] = useState(false);
+
+  useEffect(() => {
+    if (!field) return;
+    setEditLabel(field.label ?? '');
+    setEditDescription((field.description as string) ?? '');
+    setEditRequired(Boolean(field.required));
+    setEditMode(false);
+    setCopied(false);
+  }, [field]);
+
+  // The "effective" field used for snippet generation reflects current
+  // edits when in edit mode; otherwise it's just the upstream field.
+  const effectiveField: FieldSpec | null = useMemo(() => {
+    if (!field) return null;
+    if (!editMode) return field;
+    return {
+      ...field,
+      label: editLabel,
+      description: editDescription || undefined,
+      required: editRequired || undefined,
+    };
+  }, [field, editMode, editLabel, editDescription, editRequired]);
+
+  const dirty = useMemo(() => {
+    if (!field || !editMode) return false;
+    return (
+      editLabel !== (field.label ?? '') ||
+      editDescription !== ((field.description as string) ?? '') ||
+      editRequired !== Boolean(field.required)
+    );
+  }, [field, editMode, editLabel, editDescription, editRequired]);
 
   const openVsCode = useCallback(() => {
     if (!field) return;
@@ -85,42 +131,103 @@ export function FieldDetailDrawer({ field, objectName, packageId, onClose }: Fie
   }, [field, objectName, packageId]);
 
   const copySnippet = useCallback(async () => {
-    if (!field) return;
+    if (!effectiveField) return;
     try {
-      await navigator.clipboard.writeText(fieldSnippet(field));
+      await navigator.clipboard.writeText(fieldSnippet(effectiveField));
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-      toast({ title: `Copied ${field.name} snippet` });
+      toast({
+        title: dirty ? `Copied edited ${effectiveField.name} snippet` : `Copied ${effectiveField.name} snippet`,
+        description: dirty ? 'Paste over the existing field definition in the .object.ts file.' : undefined,
+      });
     } catch {
       toast({ title: 'Clipboard unavailable', variant: 'destructive' as any });
     }
-  }, [field]);
+  }, [effectiveField, dirty]);
 
-  if (!field) return null;
+  if (!field || !effectiveField) return null;
 
   // Surface every non-internal property in a definition list. Skip ones we
-  // already render in the header (name, label, type).
+  // already render in the header (name, label, type), plus the ones we
+  // expose as inline-edits below (description, required) when in edit mode.
   const headerKeys = new Set(['name', 'label', 'type']);
-  const detailEntries = Object.entries(field).filter(([k, v]) => !headerKeys.has(k) && v !== undefined && v !== false && v !== null && v !== '');
+  const inlineKeys = editMode ? new Set(['description', 'required']) : new Set();
+  const detailEntries = Object.entries(field).filter(([k, v]) =>
+    !headerKeys.has(k) && !inlineKeys.has(k) && v !== undefined && v !== false && v !== null && v !== ''
+  );
 
   return (
     <Sheet open={!!field} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <SheetContent className="w-[420px] sm:max-w-[420px] overflow-y-auto">
+      <SheetContent className="w-[440px] sm:max-w-[440px] overflow-y-auto">
         <SheetHeader className="space-y-2 pb-4">
-          <div className="flex items-center gap-2">
-            <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-medium">{field.name}</code>
-            <Badge variant="outline" className="text-[10px]">{field.type}{field.multiple ? '[]' : ''}</Badge>
-            {field.required && (
-              <Badge className="bg-amber-100 text-[10px] text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800">
-                Required
-              </Badge>
-            )}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <code className="truncate rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-medium">{field.name}</code>
+              <Badge variant="outline" className="shrink-0 text-[10px]">{field.type}{field.multiple ? '[]' : ''}</Badge>
+              {effectiveField.required && (
+                <Badge className="shrink-0 bg-amber-100 text-[10px] text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800">
+                  Required
+                </Badge>
+              )}
+            </div>
+            <Button
+              variant={editMode ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setEditMode((v) => !v)}
+              className="h-6 gap-1 px-2 text-[11px]"
+              title={editMode ? 'Exit edit mode' : 'Edit label / description / required'}
+            >
+              <Pencil className="h-3 w-3" />
+              {editMode ? 'Done' : 'Edit'}
+            </Button>
           </div>
-          <SheetTitle className="text-base font-medium">{field.label}</SheetTitle>
-          {field.description ? (
-            <SheetDescription className="text-xs">{field.description}</SheetDescription>
+
+          {editMode ? (
+            <div className="space-y-3 pt-1">
+              <div className="space-y-1">
+                <Label htmlFor="fd-label" className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Label
+                </Label>
+                <Input
+                  id="fd-label"
+                  value={editLabel}
+                  onChange={(e) => setEditLabel(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="fd-desc" className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Description
+                </Label>
+                <textarea
+                  id="fd-desc"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Help text shown under the label in forms."
+                  className="block w-full resize-y rounded-md border border-input bg-background px-2.5 py-1.5 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                />
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-xs">
+                <Checkbox
+                  checked={editRequired}
+                  onCheckedChange={(c) => setEditRequired(c === true)}
+                />
+                <span>Required</span>
+                <span className="text-[10px] text-muted-foreground">
+                  Forms reject blank values for required fields.
+                </span>
+              </label>
+            </div>
           ) : (
-            <SheetDescription className="sr-only">Field details</SheetDescription>
+            <>
+              <SheetTitle className="text-base font-medium">{field.label}</SheetTitle>
+              {field.description ? (
+                <SheetDescription className="text-xs">{field.description as string}</SheetDescription>
+              ) : (
+                <SheetDescription className="sr-only">Field details</SheetDescription>
+              )}
+            </>
           )}
         </SheetHeader>
 
@@ -154,14 +261,30 @@ export function FieldDetailDrawer({ field, objectName, packageId, onClose }: Fie
           </dl>
         </div>
 
+        {editMode && dirty && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-[11px] dark:border-amber-900 dark:bg-amber-950/30">
+            <p className="font-medium text-amber-900 dark:text-amber-200">Unsaved snippet edit</p>
+            <p className="mt-0.5 text-amber-800/80 dark:text-amber-300/80">
+              Click <span className="font-medium">Copy snippet</span> then paste over the existing
+              <code className="mx-0.5 rounded bg-amber-100/60 px-1 dark:bg-amber-900/30">{field.name}</code>
+              definition in the <code className="rounded bg-amber-100/60 px-1 dark:bg-amber-900/30">.object.ts</code> file.
+            </p>
+          </div>
+        )}
+
         <div className="mt-6 flex gap-2 border-t pt-4">
           <Button variant="outline" size="sm" onClick={openVsCode} className="flex-1 gap-1.5">
             <ExternalLink className="h-3.5 w-3.5" />
             Open in VS Code
           </Button>
-          <Button variant="outline" size="sm" onClick={copySnippet} className="flex-1 gap-1.5">
+          <Button
+            variant={dirty ? 'default' : 'outline'}
+            size="sm"
+            onClick={copySnippet}
+            className="flex-1 gap-1.5"
+          >
             {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
-            {copied ? 'Copied' : 'Copy snippet'}
+            {copied ? 'Copied' : dirty ? 'Copy edited snippet' : 'Copy snippet'}
           </Button>
         </div>
 
