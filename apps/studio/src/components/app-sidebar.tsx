@@ -12,6 +12,7 @@
  * Driven by the registry in `studio-nav.ts`.
  */
 
+import { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from '@tanstack/react-router';
 import { PanelLeft } from 'lucide-react';
 import type { InstalledPackage } from '@objectstack/spec/kernel';
@@ -43,6 +44,12 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  // Focus mode: object detail pages and full-page metadata viewers benefit
+  // from collapsing the rail to icon-only — the inner sub-tabs (Designer /
+  // Related, etc) already eat horizontal space and the rail is just chrome
+  // by then. We auto-collapse on entry and restore the previous expanded
+  // state on exit so the user's preference is preserved everywhere else.
+  useAutoCollapseOnFocusRoute(location.pathname);
   // Active package id for navigation. Falls back to first package; the URL
   // segment "all" is used as the sentinel for "全部 (All packages)" mode.
   const urlSegment = location.pathname.split('/').filter(Boolean)[0];
@@ -62,7 +69,7 @@ export function AppSidebar({
   };
 
   return (
-    <Sidebar {...props}>
+    <Sidebar collapsible="icon" {...props}>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
@@ -118,4 +125,49 @@ function CollapseButton() {
       <PanelLeft className="size-4" />
     </SidebarMenuButton>
   );
+}
+
+// Routes that benefit from focus-mode (sidebar auto-collapsed to icon-only):
+//   /$pkg/objects/$name            — Object Hub (Designer + Related tabs)
+//   /$pkg/metadata/$type/$name     — single-metadata viewer
+const FOCUS_ROUTE_PATTERNS: RegExp[] = [
+  /^\/[^/]+\/objects\/[^/]+/,
+  /^\/[^/]+\/metadata\/[^/]+\/[^/]+/,
+];
+
+function isFocusRoute(path: string): boolean {
+  return FOCUS_ROUTE_PATTERNS.some((re) => re.test(path));
+}
+
+/**
+ * Auto-collapses the sidebar to icon-only mode while the user is on a
+ * focus route (Object Hub, single-metadata viewer). Restores the previous
+ * open state on exit so the user's manual preference isn't clobbered.
+ *
+ * If the user explicitly toggles the rail while inside a focus route,
+ * the override is dropped — we only auto-restore when we ourselves were
+ * the ones who closed it.
+ */
+function useAutoCollapseOnFocusRoute(pathname: string) {
+  const { open, setOpen } = useSidebar();
+  const wasOpenBeforeFocus = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    const focused = isFocusRoute(pathname);
+    if (focused) {
+      // Entering focus: remember state once, then collapse.
+      if (wasOpenBeforeFocus.current === null) {
+        wasOpenBeforeFocus.current = open;
+        if (open) setOpen(false);
+      }
+    } else if (wasOpenBeforeFocus.current !== null) {
+      // Leaving focus: restore prior state, then forget.
+      const prior = wasOpenBeforeFocus.current;
+      wasOpenBeforeFocus.current = null;
+      if (prior !== open) setOpen(prior);
+    }
+    // We deliberately depend on pathname only — re-checking on every
+    // `open` change would cause an infinite collapse/restore loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 }
