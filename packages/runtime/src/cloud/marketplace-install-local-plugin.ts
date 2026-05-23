@@ -153,7 +153,7 @@ export class MarketplaceInstallLocalPlugin implements Plugin {
         if (!this.cloudUrl) {
             return c.json({ success: false, error: { code: 'marketplace_unavailable', message: 'OS_CLOUD_URL not configured.' } }, 503);
         }
-        const userId = await this.requireAuthenticatedUser(c);
+        const userId = await this.requireAuthenticatedUser(c, ctx);
         if (!userId) {
             return c.json({ success: false, error: { code: 'unauthorized', message: 'Authentication required to install packages.' } }, 401);
         }
@@ -271,7 +271,7 @@ export class MarketplaceInstallLocalPlugin implements Plugin {
     };
 
     private handleUninstall = async (c: any, ctx: PluginContext): Promise<Response> => {
-        const userId = await this.requireAuthenticatedUser(c);
+        const userId = await this.requireAuthenticatedUser(c, ctx);
         if (!userId) {
             return c.json({ success: false, error: { code: 'unauthorized', message: 'Authentication required.' } }, 401);
         }
@@ -331,15 +331,24 @@ export class MarketplaceInstallLocalPlugin implements Plugin {
      * dev / single-tenant runtimes. Stricter checks can be layered on
      * via a middleware in cloud-hosted multi-tenant deployments.
      */
-    private requireAuthenticatedUser = async (c: any): Promise<string | null> => {
+    private requireAuthenticatedUser = async (c: any, ctx: PluginContext): Promise<string | null> => {
         try {
-            // Attempt to read a session via the better-auth helper exposed
-            // on the context by AuthPlugin; fall back to header probe.
-            const session = (c?.get?.('auth')?.session) ?? c?.session ?? null;
-            const userId = session?.user?.id ?? session?.userId ?? null;
-            if (userId) return String(userId);
-        } catch { /* ignore */ }
-        // Header fallback for cases where Hono context doesn't surface it
+            // Mirror `hono-plugin.ts` resolveCtx: pull the better-auth `api`
+            // off the auth service and call `getSession({ headers })`. The
+            // earlier guess `c.get('auth').session` is wrong — AuthPlugin
+            // does not pre-populate the Hono context.
+            const authService: any = ctx.getService('auth');
+            let api: any = authService?.api;
+            if (!api && typeof authService?.getApi === 'function') {
+                api = await authService.getApi();
+            }
+            if (api?.getSession && c?.req?.raw?.headers) {
+                const session = await api.getSession({ headers: c.req.raw.headers });
+                const userId = session?.user?.id ?? null;
+                if (userId) return String(userId);
+            }
+        } catch { /* ignore — fall through */ }
+        // Header fallback for cases where auth is disabled (e.g. test stubs)
         const xUserId = c?.req?.header?.('x-user-id');
         if (xUserId) return String(xUserId);
         return null;
