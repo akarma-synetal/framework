@@ -368,15 +368,9 @@ export function MetadataPreview({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b">
-        <div className="flex items-center justify-between gap-2 px-4 py-2 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Eye className="h-3.5 w-3.5" />
-            <span>Live preview · rendered with @object-ui</span>
-          </div>
-        </div>
-        {subViews.length > 1 && (
-          <div className="-mt-1 flex items-center gap-1 overflow-x-auto px-3 pb-2 scrollbar-thin">
+      {subViews.length > 1 && (
+        <div className="border-b">
+          <div className="flex items-center gap-1 overflow-x-auto px-3 py-1.5 scrollbar-thin">
             {subViews.map((sv) => {
               const Icon = sv.icon;
               const active = sv.key === effectiveSub?.key;
@@ -395,8 +389,8 @@ export function MetadataPreview({
               );
             })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
       <div className={isFormSub ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-0 flex-1 overflow-auto p-4'}>
         <div key={`hmr-${hmrVersion}`} className="h-full">{rendered}</div>
       </div>

@@ -185,13 +185,13 @@ export function ObjectRelatedPanel({ packageId, objectName }: ObjectRelatedPanel
                                 <button
                                   type="button"
                                   onClick={() => setSelected(key)}
-                                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition ${
+                                  className={`flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left text-xs transition ${
                                     isActive
                                       ? 'bg-primary/10 text-primary'
                                       : 'hover:bg-muted-foreground/10'
                                   }`}
                                 >
-                                  <span className="flex-1 truncate">{it.label}</span>
+                                  <span className="truncate font-medium">{it.label}</span>
                                   {it.label !== it.name && (
                                     <code className="truncate text-[10px] text-muted-foreground">{it.name}</code>
                                   )}

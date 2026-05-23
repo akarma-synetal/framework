@@ -157,7 +157,7 @@ export function DeveloperOverview({ packages, selectedPackage, onNavigate = () =
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => onNavigate('objects')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Objects</CardTitle>
             <Database className="h-4 w-4 text-muted-foreground" />
@@ -251,9 +251,9 @@ export function DeveloperOverview({ packages, selectedPackage, onNavigate = () =
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-1.5">
+            <div className="grid gap-1.5 sm:grid-cols-2">
               {stats.metadata.types.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-4 text-center">Loading...</p>
+                <p className="text-xs text-muted-foreground py-4 text-center sm:col-span-2">Loading...</p>
               ) : (
                 dedupeRegistryEntries(stats.metadata.types, stats.metadata.counts)
                   .filter(([, count]) => count > 0)
@@ -261,7 +261,6 @@ export function DeveloperOverview({ packages, selectedPackage, onNavigate = () =
                   .map(([type, count]) => {
                     const Icon = iconForMetadataType(type) ?? Code2;
                     const label = typeLabel(type);
-                    const showRawKey = label.toLowerCase() !== type.toLowerCase();
                     const nav = navItemForType(type);
                     const clickable = !!nav;
                     return (
@@ -276,16 +275,13 @@ export function DeveloperOverview({ packages, selectedPackage, onNavigate = () =
                             ? 'hover:bg-muted/50 cursor-pointer'
                             : 'cursor-default opacity-90')
                         }
-                        title={clickable ? `Open ${nav!.label}` : undefined}
+                        title={clickable ? `Open ${nav!.label} · ${type}` : type}
                       >
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-sm">{label}</span>
-                          {showRawKey && (
-                            <code className="text-[10px] text-muted-foreground/60 font-mono">{type}</code>
-                          )}
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <span className="truncate text-sm">{label}</span>
                         </div>
-                        <Badge variant="secondary" className="text-xs font-mono">
+                        <Badge variant="secondary" className="ml-2 shrink-0 text-xs font-mono">
                           {count}
                         </Badge>
                       </button>
