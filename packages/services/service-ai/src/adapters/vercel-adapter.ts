@@ -6,11 +6,14 @@ import type {
   AIResult,
   TextStreamPart,
   ToolSet,
+  AIObjectResult,
+  GenerateObjectOptions,
 } from '@objectstack/spec/contracts';
 import type { LLMAdapter } from '@objectstack/spec/contracts';
 import type { AIToolDefinition } from '@objectstack/spec/contracts';
 import type { LanguageModelV2 } from '@ai-sdk/provider';
-import { generateText, streamText, tool as vercelTool, jsonSchema } from 'ai';
+import type { z } from 'zod';
+import { generateText, streamText, generateObject, tool as vercelTool, jsonSchema } from 'ai';
 
 /**
  * Convert ObjectStack `AIRequestOptions` into the subset of Vercel AI SDK
@@ -136,6 +139,32 @@ export class VercelLLMAdapter implements LLMAdapter {
       '[VercelLLMAdapter] Embeddings require a dedicated EmbeddingModel. ' +
       'Configure an embedding adapter instead.',
     );
+  }
+
+  async generateObject<T>(
+    messages: ModelMessage[],
+    schema: z.ZodType<T>,
+    options?: GenerateObjectOptions,
+  ): Promise<AIObjectResult<T>> {
+    const { schemaName, schemaDescription, ...rest } = options ?? {};
+    const result = await generateObject({
+      model: this.model,
+      messages,
+      schema,
+      schemaName,
+      schemaDescription,
+      ...buildVercelOptions(rest),
+    });
+
+    return {
+      object: result.object as T,
+      model: result.response?.modelId,
+      usage: result.usage ? {
+        promptTokens: result.usage.inputTokens ?? 0,
+        completionTokens: result.usage.outputTokens ?? 0,
+        totalTokens: result.usage.totalTokens ?? 0,
+      } : undefined,
+    };
   }
 
   async listModels(): Promise<string[]> {

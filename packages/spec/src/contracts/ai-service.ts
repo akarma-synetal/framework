@@ -52,6 +52,7 @@ import type {
     TextStreamPart,
     ToolSet,
 } from 'ai';
+import type { z } from 'zod';
 
 /**
  * @deprecated Use `ModelMessage` from `ai` instead.
@@ -203,6 +204,30 @@ export interface IAIService {
     streamChat?(messages: ModelMessage[], options?: AIRequestOptions): AsyncIterable<TextStreamPart<ToolSet>>;
 
     /**
+     * Generate a strongly-typed object that conforms to a Zod schema.
+     *
+     * Implementations should leverage native structured-output features
+     * (OpenAI JSON mode / Responses API, Anthropic tool use, Gemini schema)
+     * when available. The result `object` is guaranteed to validate against
+     * the schema.
+     *
+     * Optional — adapters that do not support structured output should
+     * either throw or omit this method.
+     *
+     * @example
+     * ```ts
+     * const Schema = z.object({ name: z.string(), priority: z.number().int() });
+     * const { object } = await ai.generateObject(messages, Schema);
+     * // object is typed as { name: string; priority: number }
+     * ```
+     */
+    generateObject?<T>(
+        messages: ModelMessage[],
+        schema: z.ZodType<T>,
+        options?: GenerateObjectOptions,
+    ): Promise<AIObjectResult<T>>;
+
+    /**
      * Chat with automatic tool call resolution.
      *
      * Sends messages to the LLM with tool definitions, automatically
@@ -231,6 +256,32 @@ export interface ChatWithToolsOptions extends AIRequestOptions {
      * or `'abort'` to immediately stop the tool call loop.
      */
     onToolError?: (toolCall: ToolCallPart, error: string) => 'continue' | 'abort';
+}
+
+/**
+ * Options for {@link IAIService.generateObject}.
+ */
+export interface GenerateObjectOptions extends AIRequestOptions {
+    /** Optional schema name to send to the provider (improves prompt clarity). */
+    schemaName?: string;
+    /** Optional schema description (sent to the provider). */
+    schemaDescription?: string;
+}
+
+/**
+ * Result of a {@link IAIService.generateObject} call.
+ */
+export interface AIObjectResult<T> {
+    /** The validated, strongly-typed object. */
+    object: T;
+    /** Model used for generation. */
+    model?: string;
+    /** Token usage statistics. */
+    usage?: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+    };
 }
 
 // ---------------------------------------------------------------------------

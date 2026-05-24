@@ -2,6 +2,7 @@
 
 import type { Plugin, PluginContext } from '@objectstack/core';
 import type { IAIService, IAIConversationService, IDataEngine, IMetadataService, LLMAdapter } from '@objectstack/spec/contracts';
+import type * as AI from '@objectstack/spec/ai';
 import { AIService } from './ai-service.js';
 import type { AIServiceConfig } from './ai-service.js';
 import { buildAIRoutes } from './routes/ai-routes.js';
@@ -9,15 +10,18 @@ import { buildAgentRoutes } from './routes/agent-routes.js';
 import { buildAssistantRoutes } from './routes/assistant-routes.js';
 import { buildToolRoutes } from './routes/tool-routes.js';
 import { ObjectQLConversationService } from './conversation/objectql-conversation-service.js';
-import { AiConversationObject, AiMessageObject } from './objects/index.js';
+import { AiConversationObject, AiMessageObject, AiTraceObject } from './objects/index.js';
 import { registerDataTools } from './tools/data-tools.js';
 import { registerMetadataTools } from './tools/metadata-tools.js';
+import { registerQueryDataTool } from './tools/query-data.tool.js';
 import { AgentRuntime } from './agent-runtime.js';
 import { SkillRegistry } from './skill-registry.js';
 import { DATA_CHAT_AGENT, METADATA_ASSISTANT_AGENT } from './agents/index.js';
 import { DATA_EXPLORER_SKILL, METADATA_AUTHORING_SKILL } from './skills/index.js';
 import { VercelLLMAdapter } from './adapters/vercel-adapter.js';
 import { MemoryLLMAdapter } from './adapters/memory-adapter.js';
+import { ModelRegistry } from './model-registry.js';
+import { ObjectQLTraceRecorder, type TraceRecorder } from './trace-recorder.js';
 
 /**
  * Configuration options for the AIServicePlugin.
@@ -29,6 +33,22 @@ export interface AIServicePluginOptions {
   debug?: boolean;
   /** Explicit conversation service override. When set, auto-detection is skipped. */
   conversationService?: IAIConversationService;
+  /**
+   * Models to register in the runtime {@link ModelRegistry}.
+   *
+   * Used for default-model resolution and cost attribution in traces.
+   * If omitted, the registry starts empty and trace `cost_*` fields are null.
+   */
+  models?: AI.ModelConfig[];
+  /** Default model id (must appear in `models`). */
+  defaultModelId?: string;
+  /**
+   * Explicit trace recorder override. When set, auto-detection
+   * of {@link ObjectQLTraceRecorder} is skipped.
+   *
+   * Set to `null` to disable tracing entirely.
+   */
+  traceRecorder?: TraceRecorder | null;
 }
 
 /**
@@ -209,10 +229,40 @@ export class AIServicePlugin implements Plugin {
     // Log the selected adapter
     ctx.logger.info(`[AI] Using LLM adapter: ${adapterDescription}`);
 
+    // Model registry — empty by default; populated from plugin options.
+    const modelRegistry = new ModelRegistry({
+      models: this.options.models,
+      defaultModelId: this.options.defaultModelId,
+    });
+    if (modelRegistry.size > 0) {
+      ctx.logger.info(`[AI] ModelRegistry initialised with ${modelRegistry.size} model(s)`);
+    }
+
+    // Trace recorder — explicit > auto-detect IDataEngine > NullTraceRecorder
+    let traceRecorder: TraceRecorder | undefined;
+    if (this.options.traceRecorder === null) {
+      // Explicit opt-out
+      ctx.logger.debug('[AI] Tracing disabled (traceRecorder=null)');
+    } else if (this.options.traceRecorder) {
+      traceRecorder = this.options.traceRecorder;
+    } else {
+      try {
+        const engine = ctx.getService<IDataEngine>('data');
+        if (engine && typeof engine.insert === 'function') {
+          traceRecorder = new ObjectQLTraceRecorder(engine, { logger: ctx.logger });
+          ctx.logger.info('[AI] Using ObjectQLTraceRecorder (IDataEngine detected)');
+        }
+      } catch {
+        // No data engine — leave undefined → NullTraceRecorder
+      }
+    }
+
     const config: AIServiceConfig = {
       adapter,
       logger: ctx.logger,
       conversationService,
+      modelRegistry,
+      traceRecorder,
     };
 
     this.service = new AIService(config);
@@ -232,7 +282,7 @@ export class AIServicePlugin implements Plugin {
       type: 'plugin',
       scope: 'project',
       namespace: 'ai',
-      objects: [AiConversationObject, AiMessageObject],
+      objects: [AiConversationObject, AiMessageObject, AiTraceObject],
     });
 
     if (this.options.debug) {
@@ -277,6 +327,17 @@ export class AIServicePlugin implements Plugin {
       if (dataEngine) {
         registerDataTools(this.service.toolRegistry, { dataEngine });
         ctx.logger.info('[AI] Built-in data tools registered');
+
+        // Register query_data tool when metadata service is also available —
+        // it composes AI + Metadata + Data into a single NL-to-records call.
+        if (metadataService) {
+          registerQueryDataTool(this.service.toolRegistry, {
+            ai: this.service,
+            metadata: metadataService,
+            dataEngine,
+          });
+          ctx.logger.info('[AI] query_data tool registered');
+        }
 
         // Register data tools as metadata (for Studio visibility)
         if (metadataService) {

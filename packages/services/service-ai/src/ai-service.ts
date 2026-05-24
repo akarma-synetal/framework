@@ -7,17 +7,27 @@ import type {
   ToolSet,
   AIRequestOptions,
   AIResult,
+  AIObjectResult,
+  GenerateObjectOptions,
   IAIService,
   IAIConversationService,
   ChatWithToolsOptions,
   LLMAdapter,
 } from '@objectstack/spec/contracts';
 import type { Logger } from '@objectstack/spec/contracts';
+import type { z } from 'zod';
 import { createLogger } from '@objectstack/core';
 import { MemoryLLMAdapter } from './adapters/memory-adapter.js';
 import { ToolRegistry } from './tools/tool-registry.js';
 import type { ToolExecutionResult } from './tools/tool-registry.js';
 import { InMemoryConversationService } from './conversation/in-memory-conversation-service.js';
+import { ModelRegistry } from './model-registry.js';
+import {
+  NullTraceRecorder,
+  buildTraceEvent,
+  type TraceRecorder,
+  type TraceOperation,
+} from './trace-recorder.js';
 
 // ── Stream event helpers ──────────────────────────────────────────
 // These helpers construct properly-typed Vercel AI SDK stream parts
@@ -50,6 +60,10 @@ export interface AIServiceConfig {
   toolRegistry?: ToolRegistry;
   /** Conversation service (defaults to InMemoryConversationService). */
   conversationService?: IAIConversationService;
+  /** Model registry for pricing + default model resolution. Optional. */
+  modelRegistry?: ModelRegistry;
+  /** Trace recorder for per-call observability. Defaults to no-op. */
+  traceRecorder?: TraceRecorder;
 }
 
 /**
@@ -72,16 +86,20 @@ export class AIService implements IAIService {
   private readonly logger: Logger;
   readonly toolRegistry: ToolRegistry;
   readonly conversationService: IAIConversationService;
+  readonly modelRegistry?: ModelRegistry;
+  readonly traceRecorder: TraceRecorder;
 
   constructor(config: AIServiceConfig = {}) {
     this.adapter = config.adapter ?? new MemoryLLMAdapter();
     this.logger = config.logger ?? createLogger({ level: 'info', format: 'pretty' });
     this.toolRegistry = config.toolRegistry ?? new ToolRegistry();
     this.conversationService = config.conversationService ?? new InMemoryConversationService();
+    this.modelRegistry = config.modelRegistry;
+    this.traceRecorder = config.traceRecorder ?? new NullTraceRecorder();
 
     this.logger.info(
       `[AI] Service initialized with adapter="${this.adapter.name}", ` +
-      `tools=${this.toolRegistry.size}`,
+      `tools=${this.toolRegistry.size}, models=${this.modelRegistry?.size ?? 0}`,
     );
   }
 
@@ -90,16 +108,84 @@ export class AIService implements IAIService {
     return this.adapter.name;
   }
 
+  /**
+   * Run an adapter call and emit a trace event.
+   *
+   * Records both success and failure. Tracing failures never escape — the
+   * recorder is expected to be defensive.
+   */
+  private async instrument<T extends { model?: string; usage?: AIResult['usage'] }>(
+    operation: TraceOperation,
+    options: AIRequestOptions | undefined,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const started = Date.now();
+    try {
+      const result = await fn();
+      void this.traceRecorder.record(buildTraceEvent({
+        operation,
+        adapter: this.adapter.name,
+        model: result.model ?? options?.model,
+        usage: result.usage,
+        latencyMs: Date.now() - started,
+        status: 'success',
+        registry: this.modelRegistry,
+      }));
+      return result;
+    } catch (err) {
+      void this.traceRecorder.record(buildTraceEvent({
+        operation,
+        adapter: this.adapter.name,
+        model: options?.model,
+        latencyMs: Date.now() - started,
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+        registry: this.modelRegistry,
+      }));
+      throw err;
+    }
+  }
+
   // ── IAIService implementation ──────────────────────────────────
 
   async chat(messages: ModelMessage[], options?: AIRequestOptions): Promise<AIResult> {
     this.logger.debug('[AI] chat', { messageCount: messages.length, model: options?.model });
-    return this.adapter.chat(messages, options);
+    return this.instrument('chat', options, () => this.adapter.chat(messages, options));
   }
 
   async complete(prompt: string, options?: AIRequestOptions): Promise<AIResult> {
     this.logger.debug('[AI] complete', { promptLength: prompt.length, model: options?.model });
-    return this.adapter.complete(prompt, options);
+    return this.instrument('complete', options, () => this.adapter.complete(prompt, options));
+  }
+
+  /**
+   * Generate a strongly-typed object validated against a Zod schema.
+   *
+   * Delegates to the adapter's `generateObject` when supported; throws a
+   * descriptive error when the adapter does not implement structured output.
+   *
+   * @example
+   * ```ts
+   * import { z } from 'zod';
+   * const Schema = z.object({ name: z.string(), priority: z.number().int() });
+   * const { object } = await ai.generateObject(messages, Schema);
+   * ```
+   */
+  async generateObject<T>(
+    messages: ModelMessage[],
+    schema: z.ZodType<T>,
+    options?: GenerateObjectOptions,
+  ): Promise<AIObjectResult<T>> {
+    this.logger.debug('[AI] generateObject', { messageCount: messages.length, model: options?.model });
+    if (!this.adapter.generateObject) {
+      throw new Error(
+        `[AI] Adapter "${this.adapter.name}" does not support generateObject. ` +
+        `Use VercelLLMAdapter with a structured-output-capable model.`,
+      );
+    }
+    return this.instrument('generateObject', options, () =>
+      this.adapter.generateObject!(messages, schema, options),
+    );
   }
 
   async *streamChat(

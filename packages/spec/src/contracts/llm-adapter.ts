@@ -24,7 +24,10 @@ import type {
 import type {
   AIRequestOptions,
   AIResult,
+  AIObjectResult,
+  GenerateObjectOptions,
 } from './ai-service.js';
+import type { z } from 'zod';
 
 export interface LLMAdapter {
   /** Unique adapter identifier (e.g. 'openai', 'anthropic', 'memory') */
@@ -54,6 +57,19 @@ export interface LLMAdapter {
    * Generate embedding vectors.
    */
   embed?(input: string | string[], model?: string): Promise<number[][]>;
+
+  /**
+   * Generate a strongly-typed object that conforms to a Zod schema.
+   *
+   * Adapters should delegate to the provider's native structured-output
+   * facility when available. Adapters without structured-output support
+   * may omit this method — the AI service will throw a clear error.
+   */
+  generateObject?<T>(
+    messages: ModelMessage[],
+    schema: z.ZodType<T>,
+    options?: GenerateObjectOptions,
+  ): Promise<AIObjectResult<T>>;
 
   /**
    * List models available through this adapter.

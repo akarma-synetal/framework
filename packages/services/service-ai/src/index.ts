@@ -68,7 +68,36 @@ export type { SkillContext, SkillSummary } from './skill-registry.js';
 export { DATA_CHAT_AGENT, METADATA_ASSISTANT_AGENT } from './agents/index.js';
 
 // Object definitions
-export { AiConversationObject, AiMessageObject } from './objects/index.js';
+export { AiConversationObject, AiMessageObject, AiTraceObject } from './objects/index.js';
+
+// Model registry
+export { ModelRegistry, computeCost } from './model-registry.js';
+export type { ModelRegistryConfig, CostEstimate, TokenUsage } from './model-registry.js';
+
+// Trace recorder
+export {
+  NullTraceRecorder,
+  ObjectQLTraceRecorder,
+  buildTraceEvent,
+} from './trace-recorder.js';
+export type { TraceRecorder, TraceEvent, TraceOperation } from './trace-recorder.js';
+
+// Schema retriever (keyword-based metadata retrieval for AI prompts)
+export { SchemaRetriever } from './schema-retriever.js';
+export type {
+  SchemaHit,
+  SchemaRetrieverOptions,
+  ObjectShape,
+  FieldShape,
+} from './schema-retriever.js';
+
+// query_data tool (NL → ObjectQL via structured output)
+export {
+  QUERY_DATA_TOOL,
+  createQueryDataHandler,
+  registerQueryDataTool,
+} from './tools/query-data.tool.js';
+export type { QueryDataToolContext, QueryPlan } from './tools/query-data.tool.js';
 
 // Routes
 export { buildAIRoutes } from './routes/ai-routes.js';
