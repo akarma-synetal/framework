@@ -41,6 +41,7 @@
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.119",
     "@object-ui/console": "^5.3.1",
+    "@object-ui/studio": "^5.3.2",
     "@objectstack/client": "workspace:*",
     "@objectstack/core": "workspace:*",
     "@objectstack/driver-memory": "workspace:^",

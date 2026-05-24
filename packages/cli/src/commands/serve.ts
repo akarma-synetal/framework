@@ -1511,7 +1511,7 @@ export default class Serve extends Command {
         if (studioEnabled) {
           const studioPath = resolveStudioPath();
           if (!studioPath) {
-            console.warn(chalk.yellow(`  ⚠ @objectstack/studio not found — skipping UI`));
+            console.warn(chalk.yellow(`  ⚠ @object-ui/studio not found — skipping UI (run \`pnpm add @object-ui/studio\`)`));
           } else if (hasStudioDist(studioPath)) {
             const distPath = path.join(studioPath, 'dist');
             // Write API must register BEFORE the static plugin so its POST
@@ -1524,7 +1524,7 @@ export default class Serve extends Command {
             }));
             trackPlugin('StudioUI');
           } else {
-            console.warn(chalk.yellow(`  ⚠ Studio dist not found — run "pnpm --filter @objectstack/studio build" first`));
+            console.warn(chalk.yellow(`  ⚠ Studio dist not found — install \`@object-ui/studio\` (already built) or run \`pnpm --filter @object-ui/studio build\` in the objectui workspace`));
           }
         }
 

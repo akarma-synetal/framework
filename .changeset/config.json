@@ -19,7 +19,6 @@
       "@objectstack/platform-objects",
       "@objectstack/runtime",
       "@objectstack/rest",
-      "@objectstack/studio",
       "@objectstack/driver-memory",
       "@objectstack/driver-sql",
       "@objectstack/driver-turso",
