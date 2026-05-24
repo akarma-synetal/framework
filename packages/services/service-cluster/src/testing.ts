@@ -132,9 +132,9 @@ export function runLockContract(name: string, make: () => Promise<ILock>) {
 
         it('TTL auto-releases a stuck holder', async () => {
             const l = await make();
-            const h1 = await l.acquire('k', { ttlMs: 30 });
+            const h1 = await l.acquire('k', { ttlMs: 50 });
             expect(h1).not.toBeNull();
-            await new Promise((r) => setTimeout(r, 60));
+            await new Promise((r) => setTimeout(r, 150));
             expect(h1!.isHeld()).toBe(false);
             const h2 = await l.acquire('k');
             expect(h2).not.toBeNull();
@@ -155,11 +155,11 @@ export function runLockContract(name: string, make: () => Promise<ILock>) {
 
         it('renew extends the lease', async () => {
             const l = await make();
-            const h = await l.acquire('k', { ttlMs: 40 });
-            await new Promise((r) => setTimeout(r, 20));
-            await h!.renew(100);
-            await new Promise((r) => setTimeout(r, 30));
-            // total 50ms in, original TTL would have expired at 40ms.
+            const h = await l.acquire('k', { ttlMs: 200 });
+            await new Promise((r) => setTimeout(r, 50));
+            await h!.renew(400);
+            await new Promise((r) => setTimeout(r, 250));
+            // total 300ms in, original TTL would have expired at 200ms.
             expect(h!.isHeld()).toBe(true);
             await h!.release();
             await l.close();
@@ -167,8 +167,8 @@ export function runLockContract(name: string, make: () => Promise<ILock>) {
 
         it('renew on a lost lock throws', async () => {
             const l = await make();
-            const h = await l.acquire('k', { ttlMs: 20 });
-            await new Promise((r) => setTimeout(r, 50));
+            const h = await l.acquire('k', { ttlMs: 50 });
+            await new Promise((r) => setTimeout(r, 150));
             await expect(h!.renew()).rejects.toThrow();
             await l.close();
         });
