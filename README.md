@@ -112,7 +112,8 @@ pnpm docs:dev
 | Script | Description |
 | :--- | :--- |
 | `pnpm build` | Build all packages (excludes docs) |
-| `pnpm dev:crm` | Run the CRM example end-to-end (`@example/app-crm`) |
+| `pnpm dev` | Run the minimal CRM example (`@objectstack/example-crm`) — REST + Studio |
+| `pnpm dev:todo` | Run the Todo example (`@example/app-todo`) |
 | `pnpm studio:start` | Start the prebuilt Studio IDE |
 | `pnpm test` | Run all tests (Turborepo) |
 | `pnpm setup` | Install dependencies and build the spec package |
@@ -242,7 +243,8 @@ Cloud, package registry, and project management subcommands (`os projects`, `os 
 | Example | Description | Level |
 | :--- | :--- | :--- |
 | [`@example/app-todo`](examples/app-todo) | Task management app — objects, views, dashboards, flows | Beginner |
-| [`@example/app-crm`](examples/app-crm) | Enterprise CRM — accounts, contacts, opportunities, leads | Intermediate |
+| [`@objectstack/example-crm`](examples/app-crm) | Minimal CRM smoke-test workspace — validates the metadata loading pipeline | Intermediate |
+| [HotCRM](https://github.com/objectstack-ai/hotcrm) | Full-featured enterprise CRM reference app (separate repo) | Advanced |
 
 ## Codebase Metrics
 

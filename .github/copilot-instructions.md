@@ -91,8 +91,11 @@ objectstack-ai/spec/
 │
 ├── examples/              # 📚 Reference implementations
 │   ├── app-todo/          # Beginner: simple CRUD
-│   ├── app-crm/           # Advanced: full CRM with relations
+│   ├── app-crm/           # Minimal CRM smoke-test (metadata pipeline validation)
 │   └── plugin-bi/         # Plugin example: BI dashboard
+│
+│   # Full-featured CRM example lives in its own repo:
+│   #   https://github.com/objectstack-ai/hotcrm
 │
 ├── skills/                # 🤖 AI skill definitions (for Claude Code, Copilot, Cursor)
 │   ├── objectstack-schema/

@@ -7,7 +7,7 @@ import { CheckSquare, Building2, BarChart3, Server } from 'lucide-react';
 
 # Example Apps
 
-The monorepo includes 3 ready-to-run examples that progressively demonstrate ObjectStack features — from a simple Todo app to a full enterprise CRM.
+The monorepo includes 2 ready-to-run examples that progressively demonstrate ObjectStack features — from a simple Todo app to a reusable BI plugin template. For a full enterprise reference, see the [HotCRM repository](https://github.com/objectstack-ai/hotcrm).
 
 <Cards>
   <Card
@@ -17,7 +17,8 @@ The monorepo includes 3 ready-to-run examples that progressively demonstrate Obj
   />
   <Card
     icon={<Building2 />}
-    title="app-crm"
+    title="HotCRM (external)"
+    href="https://github.com/objectstack-ai/hotcrm"
     description="Full-featured CRM: 10+ objects, AI agents, flows, security, sharing rules."
   />
   <Card
@@ -183,16 +184,16 @@ export default defineStack({
 
 ---
 
-## app-crm — Enterprise Scale
+## HotCRM — Enterprise Scale (external repo)
 
-**Path:** `examples/app-crm/`
+**Repo:** [github.com/objectstack-ai/hotcrm](https://github.com/objectstack-ai/hotcrm)
 
-A production-grade CRM demonstrating every ObjectStack feature. Use this as a reference for building real enterprise apps.
+A production-grade CRM demonstrating every ObjectStack feature. Use this as a reference for building real enterprise apps. It lives in a dedicated repository so it can evolve independently of the framework.
 
 ### What's Inside
 
 ```
-examples/app-crm/
+hotcrm/
 ├── objectstack.config.ts
 ├── src/
 │   ├── objects/          # 10 objects: Account, Contact, Lead, Opportunity, ...
@@ -225,14 +226,16 @@ examples/app-crm/
 ### Run It
 
 ```bash
-cd examples/app-crm
+git clone https://github.com/objectstack-ai/hotcrm.git
+cd hotcrm
+pnpm install
 pnpm dev        # Starts with auto-detected plugins
 ```
 
 Or inspect its metadata without starting a server:
 
 ```bash
-cd examples/app-crm
+cd hotcrm
 os info          # Show object/field/flow/agent counts
 os validate      # Check schema correctness
 os compile       # Build to dist/objectstack.json
@@ -283,7 +286,7 @@ import { defineStack } from '@objectstack/spec';
 import { AppPlugin, DriverPlugin } from '@objectstack/runtime';
 import { ObjectQLPlugin } from '@objectstack/objectql';
 import { InMemoryDriver } from '@objectstack/driver-memory';
-import CrmApp from '../examples/app-crm/objectstack.config';
+import CrmApp from 'hotcrm/objectstack.config';  // from https://github.com/objectstack-ai/hotcrm
 import TodoApp from '../examples/app-todo/objectstack.config';
 import BiPlugin from '../examples/plugin-bi/objectstack.config';
 

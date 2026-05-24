@@ -1,7 +1,7 @@
 {
   "name": "@objectstack/example-crm",
   "version": "4.0.11",
-  "description": "Example CRM implementation using ObjectStack Protocol",
+  "description": "Minimal CRM example — a smoke-test workspace that exercises the metadata loading pipeline (objects → views → app → dashboard → hook → flow → seed). For a full-featured enterprise CRM see https://github.com/objectstack-ai/hotcrm.",
   "license": "Apache-2.0",
   "private": true,
   "main": "./objectstack.config.ts",
@@ -15,22 +15,15 @@
     "start": "objectstack start",
     "build": "objectstack build",
     "typecheck": "tsc --noEmit",
-    "test": "objectstack test",
-    "test:e2e": "playwright test",
-    "test:e2e:drivers": "./scripts/run-driver-acceptance.sh"
+    "test": "vitest run"
   },
   "dependencies": {
-    "@objectstack/driver-mongodb": "workspace:*",
     "@objectstack/runtime": "workspace:*",
-    "@objectstack/service-analytics": "workspace:*",
-    "@objectstack/service-automation": "workspace:*",
-    "@objectstack/spec": "workspace:*",
-    "pg": "^8.21.0",
-    "@objectstack/plugin-webhooks": "workspace:*"
+    "@objectstack/spec": "workspace:*"
   },
   "devDependencies": {
     "@objectstack/cli": "workspace:*",
-    "@playwright/test": "^1.60.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^3.2.4"
   }
 }

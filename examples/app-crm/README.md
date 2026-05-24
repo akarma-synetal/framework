@@ -1,198 +1,51 @@
-# ObjectStack Enterprise CRM Application
+# @objectstack/example-crm — Minimal CRM Smoke-Test App
 
-[English](#english) | [中文](#中文)
+A deliberately tiny CRM workspace that exercises the **metadata application
+loading pipeline** end-to-end. It is **not** a feature showcase — for the
+full enterprise reference (10+ objects, AI agents, RAG, sharing rules,
+approval flows, multi-driver E2E) see
+**[github.com/objectstack-ai/hotcrm](https://github.com/objectstack-ai/hotcrm)**.
 
----
+## Purpose
 
-## English
+This example exists so the framework monorepo can validate that a realistic,
+relational metadata bundle compiles and boots:
 
-### 🎯 Overview
+- `objects/` — 3 related objects (`account`, `contact`, `opportunity`) with
+  `lookup`, `select`, `formula`, and `currency` field types
+- `views/` — list + form views for one object (exercise the view loader)
+- `apps/` — one app shell with grouped navigation
+- `dashboards/` — one dashboard widget
+- `hooks/` — one `beforeInsert` hook (formula-derived data)
+- `flows/` — one record-triggered automation flow
+- `data/` — small seed dataset using `defineDataset` + `cel\`...\``
+  install-time expressions
+- `tests/smoke.test.ts` — Zod-validates every piece of metadata
 
-**Enterprise CRM** is a comprehensive, production-ready Customer Relationship Management system built on the ObjectStack Protocol. It demonstrates all 128+ protocol modules across 15 categories, showcasing enterprise-grade architecture following Salesforce and ServiceNow best practices.
-
-### ✨ Key Features
-
-#### 📊 **Complete Data Model**
-- **10 Core Objects** organized by domain (Sales, Service, Marketing, Products)
-- **50+ Field Types** including advanced types (Location, Color, Address)
-- **Comprehensive Relationships** with lookups and master-detail
-- **Smart Validations** with script-based rules and formulas
-
-#### 🔒 **Enterprise Security**
-- **5 User Profiles** (Admin, Sales Manager, Sales Rep, Service Agent, Marketing User)
-- **Role Hierarchy** with 10 roles
-- **Sharing Rules** (criteria-based, owner-based, territory-based)
-- **Field-Level Security** for sensitive data
-- **Organization-Wide Defaults** for baseline access control
-
-#### 🤖 **AI-Powered Automation**
-- **5 AI Agents** (Sales Assistant, Service Agent, Lead Enrichment, Revenue Intelligence, Email Campaign)
-- **4 RAG Pipelines** for knowledge retrieval
-- **Natural Language Queries** for intuitive data access
-- **Predictive Analytics** (lead scoring, revenue forecasting)
-
-#### ⚡ **Business Process Automation**
-- **5 Automated Flows** (Lead Conversion, Opportunity Approval, Case Escalation, Quote Generation, Campaign Enrollment)
-- **Workflow Rules** for field updates and notifications
-- **Approval Processes** for large deals and contracts
-- **Scheduled Jobs** for batch processing
-
-#### 📈 **Analytics & Reporting**
-- **3 Interactive Dashboards** (Sales, Service, Executive)
-- **8 Pre-built Reports** (opportunities, accounts, cases, leads, tasks)
-- **Real-time Metrics** with KPIs and trends
-- **Custom Charts** (funnel, bar, line, pie, table)
-
-### 📁 Architecture
-
-Follows the **by-type** directory layout — the ObjectStack standard aligned with Salesforce DX:
-
-```
-src/
-├── objects/          # 📦 10 Core Objects (account, contact, lead, opportunity, ...)
-├── views/            # 👁️ UI Views (FormView & ListView configurations for all objects)
-├── pages/            # 📄 Pages (Record, Home, App, Utility page layouts)
-├── actions/          # ⚡ Custom Actions (lead, contact, opportunity, case, global)
-├── apis/             # 🌐 REST Endpoints (pipeline-stats, lead-convert)
-├── apps/             # 🚀 App Configuration (crm.app.ts)
-├── dashboards/       # 📊 3 Dashboards (sales, service, executive)
-├── reports/          # 📈 8 Reports (opportunity, account, case, lead, contact, task)
-├── flows/            # 🔄 5 Flows (lead-conversion, opportunity-approval, ...)
-├── agents/           # 🤖 5 AI Agents (sales, service, lead-enrichment, ...)
-├── rag/              # 🧠 4 RAG Pipelines (sales-knowledge, support, product, ...)
-├── profiles/         # 🔒 5 Profiles (admin, sales-manager, sales-rep, ...)
-└── sharing/          # 🛡️ Sharing Rules & Role Hierarchy
-```
-
-### 📚 Documentation
-
-Comprehensive guides covering all aspects:
-
-1. **[Data Modeling](./docs/01-data-modeling.md)** - Objects, fields, relationships, validations
-2. **[Business Logic](./docs/02-business-logic.md)** - Workflows, triggers, formulas
-3. **[Security](./docs/05-security.md)** - Profiles, roles, sharing, permissions
-4. **[AI Capabilities](./docs/08-ai-capabilities.md)** - Agents, RAG, NLQ, ML
-
-### 🎨 UI Examples
-
-The CRM includes comprehensive UI examples demonstrating all form layouts and page types:
-
-#### FormView Examples (`src/views/`)
-- **6 Form Layout Types**: Simple, Tabbed, Wizard, Split, Drawer, Modal
-- **Advanced Features**: Collapsible sections, 1-4 column layouts, conditional visibility, cascading dependencies
-- **5 List View Types**: Grid, Kanban, Calendar, Gallery, filtered views
-- **Field Controls**: readonly, required, hidden, colSpan, visibleOn, dependsOn, custom widgets
-
-#### PageSchema Examples (`src/pages/`)
-- **Record Page**: Comprehensive detail page with highlights, tabs, accordion, related lists, AI chat
-- **Home Page**: Dashboard-style with KPIs and quick actions
-- **App Page**: Application launcher grid
-- **Utility Page**: Floating utility panels
-
-See `src/views/lead.view.ts` and `src/pages/` for complete implementations.
-
-### 🚀 Quick Start
+## How to run
 
 ```bash
-# Install dependencies (from monorepo root)
-corepack enable && pnpm install
+# From the monorepo root
+pnpm --filter @objectstack/example-crm dev
 
-# Build the application
-pnpm --filter @example/app-crm build
-# Expected: Build succeeds with no type errors
-
-# Type-check
-pnpm --filter @example/app-crm typecheck
-# Expected: No errors — all 10 objects validated against @objectstack/spec
-
-# Run development server
-pnpm --filter @example/app-crm dev
-# Expected: Server starts at http://localhost:3000
+# Or from this directory
+cd examples/app-crm
+pnpm dev          # starts CLI dev server (REST API + Studio UI)
+pnpm build        # compiles to dist/objectstack.json
+pnpm test         # vitest smoke test
 ```
 
-### 📦 What's Included
+Open <http://localhost:3000/_studio/> after `pnpm dev` boots.
 
-| Category | Count | Examples |
-|----------|-------|----------|
-| **Objects** | 10 | Account, Opportunity, Case, Product |
-| **Fields** | 100+ | AutoNumber, Formula, Lookup, Address |
-| **Views** | 12+ | Grid, Kanban, Calendar, Gallery, Forms (Simple, Tabbed, Wizard, Split, Drawer, Modal) |
-| **Pages** | 4 | Record Detail, Home, App Launcher, Utility Bar |
-| **Profiles** | 5 | Admin, Sales Manager, Sales Rep |
-| **Sharing Rules** | 5+ | Criteria-based, Territory-based |
-| **AI Agents** | 5 | Sales Assistant, Service Agent |
-| **RAG Pipelines** | 4 | Sales Knowledge, Support KB |
-| **Flows** | 5 | Lead Conversion, Approval |
-| **Dashboards** | 3 | Sales, Service, Executive |
-| **Reports** | 8 | Opportunities, Cases, Leads |
+## What this example is **not**
 
----
+- Not a "real" CRM — fields and relationships are intentionally minimal.
+- Not a place to add new feature demos. Add them to
+  [hotcrm](https://github.com/objectstack-ai/hotcrm) instead.
+- Not a driver-acceptance harness. Driver E2E lives next to each driver
+  package (`packages/plugins/driver-*/src/*.test.ts`) and in
+  [hotcrm](https://github.com/objectstack-ai/hotcrm).
 
-## 中文
+## License
 
-### 🎯 概述
-
-**企业级CRM** 是基于 ObjectStack 协议构建的综合性、生产就绪的客户关系管理系统。它展示了15个类别中的128+协议模块,遵循 Salesforce 和 ServiceNow 的企业级架构最佳实践。
-
-### ✨ 核心特性
-
-#### 📊 **完整数据模型**
-- **10个核心对象** 按领域组织（销售、服务、营销、产品）
-- **50+字段类型** 包括高级类型（位置、颜色、地址）
-- **全面的关系** 查找和主从关系
-- **智能验证** 基于脚本的规则和公式
-
-#### 🔒 **企业级安全**
-- **5种用户配置文件** （管理员、销售经理、销售代表、服务代表、营销用户）
-- **角色层次结构** 包含10个角色
-- **共享规则** （基于条件、基于所有者、基于区域）
-- **字段级安全** 保护敏感数据
-- **组织范围默认值** 基线访问控制
-
-#### 🤖 **AI驱动自动化**
-- **5个AI代理** （销售助手、服务代理、线索丰富、收入智能、邮件营销）
-- **4个RAG管道** 用于知识检索
-- **自然语言查询** 直观的数据访问
-- **预测分析** （线索评分、收入预测）
-
-#### ⚡ **业务流程自动化**
-- **5个自动化流程** （线索转换、商机审批、案例升级、报价生成、营销注册）
-- **工作流规则** 字段更新和通知
-- **审批流程** 大型交易和合同
-- **定时任务** 批处理
-
-#### 📈 **分析与报表**
-- **3个交互式仪表板** （销售、服务、高管）
-- **8个预制报表** （商机、客户、案例、线索、任务）
-- **实时指标** KPI和趋势
-- **自定义图表** （漏斗、柱状、折线、饼图、表格）
-
-### 📚 文档
-
-1. **[数据建模](./docs/01-data-modeling.md)** - 对象、字段、关系、验证
-2. **[业务逻辑](./docs/02-business-logic.md)** - 工作流、触发器、公式
-3. **[安全模型](./docs/05-security.md)** - 配置文件、角色、共享、权限
-4. **[AI能力](./docs/08-ai-capabilities.md)** - 代理、RAG、NLQ、机器学习
-
-### 🚀 快速开始
-
-```bash
-# 安装依赖（从 monorepo 根目录）
-corepack enable && pnpm install
-
-# 构建应用
-pnpm --filter @example/app-crm build
-# 预期: 构建成功，无类型错误
-
-# 类型检查
-pnpm --filter @example/app-crm typecheck
-# 预期: 无错误 — 所有10个对象通过 @objectstack/spec 验证
-
-# 运行开发服务器
-pnpm --filter @example/app-crm dev
-# 预期: 服务器启动在 http://localhost:3000
-```
-
----
-
-**构建全球最顶级的企业管理软件平台** 🚀
+Apache-2.0

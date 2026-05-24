@@ -863,7 +863,8 @@ export default class Serve extends Command {
 
       // 5. Auto-register Studio single-project signal in dev mode.
       //
-      // `objectstack dev` runs a vanilla user stack (e.g. examples/app-crm)
+      // `objectstack dev` runs a vanilla user stack (e.g. the HotCRM
+      // reference app at https://github.com/objectstack-ai/hotcrm)
       // as a single project — there is no apps/cloud control plane and no
       // org/project picker is meaningful. Without this plugin Studio would
       // fall back to its multi-project default and ask the user to "Create

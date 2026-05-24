@@ -5,7 +5,9 @@
   "description": "ObjectStack Protocol & Specification - Monorepo for TypeScript Interfaces, JSON Schemas, and Convention Configurations",
   "scripts": {
     "build": "turbo run build --filter=!@objectstack/docs",
-    "dev:crm": "pnpm --filter @objectstack/example-crm build && OS_PROJECT_ID=proj_crm pnpm --filter @objectstack/example-crm dev",
+    "dev": "pnpm --filter @objectstack/example-crm dev",
+    "dev:crm": "pnpm --filter @objectstack/example-crm dev",
+    "dev:todo": "pnpm --filter @example/app-todo dev",
     "studio:start": "pnpm --filter @objectstack/studio start",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",

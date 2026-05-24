@@ -11,18 +11,18 @@ Welcome to the ObjectStack examples catalog! This directory contains carefully c
 | Level | Examples | Description |
 |-------|----------|-------------|
 | 🟢 **Beginner** | [App Todo](#app-todo), [Plugin BI](#plugin-bi) | Start here - simple, focused examples |
-| 🟡 **Intermediate** | [App CRM](#app-crm) | Real-world enterprise application |
+| 🟡 **Intermediate** | [HotCRM](https://github.com/objectstack-ai/hotcrm) | Real-world enterprise application (separate repo) |
 | 🔴 **Advanced** | [Server](../apps/objectos/) | Server hosting & plugin orchestration |
 
 ### By Protocol Category
 
 | Protocol | Examples | Status |
 |----------|----------|--------|
-| **Data (ObjectQL)** | [App CRM](./app-crm/), [App Todo](./app-todo/) | ✅ Complete |
-| **UI (ObjectUI)** | [App CRM](./app-crm/), [App Todo](./app-todo/) | ✅ Complete |
-| **System (ObjectOS)** | [Server](../apps/objectos/), [App CRM](./app-crm/) | ✅ Complete |
-| **Automation** | [App CRM](./app-crm/), [App Todo](./app-todo/) | ✅ Complete |
-| **API** | [Server](../apps/objectos/) | ✅ Complete |
+| **Data (ObjectQL)** | [App Todo](./app-todo/), [HotCRM](https://github.com/objectstack-ai/hotcrm) | ✅ Complete |
+| **UI (ObjectUI)** | [App Todo](./app-todo/), [HotCRM](https://github.com/objectstack-ai/hotcrm) | ✅ Complete |
+| **System (ObjectOS)** | [HotCRM](https://github.com/objectstack-ai/hotcrm) | ✅ Complete |
+| **Automation** | [App Todo](./app-todo/), [HotCRM](https://github.com/objectstack-ai/hotcrm) | ✅ Complete |
+| **API** | [HotCRM](https://github.com/objectstack-ai/hotcrm) | ✅ Complete |
 | **BI / Analytics** | [Plugin BI](./plugin-bi/) | 🔴 Stub |
 | **Hub & Marketplace** | _Coming soon_ | 🔴 Planned |
 
@@ -78,76 +78,36 @@ pnpm typecheck
 
 ---
 
-### App CRM
-**Path:** [`examples/app-crm/`](./app-crm/)  
-**Level:** 🟡 Intermediate  
-**Protocols:** Data, UI, Automation, AI  
+### App CRM (external)
+**Repo:** [github.com/objectstack-ai/hotcrm](https://github.com/objectstack-ai/hotcrm)
+**Level:** 🟡 Intermediate
+**Protocols:** Data, UI, Automation, AI
 
-**Full-featured CRM** demonstrating enterprise-grade patterns and all major field types.
+**Full-featured CRM** demonstrating enterprise-grade patterns and all major field types. The CRM example has been extracted into its own repository (HotCRM) so it can evolve independently of the framework. Clone it side-by-side to follow along with the docs:
+
+```bash
+git clone https://github.com/objectstack-ai/hotcrm.git
+cd hotcrm
+pnpm install
+pnpm dev
+```
 
 **What's included:**
 - 12 interconnected objects (Account, Contact, Opportunity, Lead, Case, Task, Campaign, Contract, Product, Quote)
 - All 28 field types demonstrated
 - Multiple view types (Grid, Kanban, Calendar, Gantt)
 - Validation rules and workflows
-- 3 dashboards (Executive, Sales, Service)
+- 3 dashboards (Executive, Sales, Service) plus a unified CRM overview
 - 6 reports (by account, contact, lead, opportunity, case, task)
 - 5 automation flows (lead conversion, case escalation, opportunity approval, etc.)
 - AI agents and RAG pipelines
+- Sharing rules, profiles, and role hierarchy
 - **I18n translations** (English, Chinese, Japanese, Spanish)
-
-**Directory Structure:**
-```
-app-crm/
-├── objectstack.config.ts
-├── src/
-│   ├── objects/                # 12 object + hook definitions
-│   │   ├── account.object.ts
-│   │   ├── account.hook.ts
-│   │   ├── contact.object.ts
-│   │   ├── lead.object.ts
-│   │   ├── lead.hook.ts
-│   │   ├── lead.state.ts
-│   │   ├── opportunity.object.ts
-│   │   └── ...
-│   ├── actions/                # Context-aware actions
-│   │   ├── lead.actions.ts
-│   │   ├── opportunity.actions.ts
-│   │   └── ...
-│   ├── apps/                   # App navigation
-│   │   └── crm.app.ts
-│   ├── dashboards/             # Analytics dashboards
-│   │   ├── executive.dashboard.ts
-│   │   ├── sales.dashboard.ts
-│   │   └── service.dashboard.ts
-│   ├── reports/                # Business reports
-│   │   ├── account.report.ts
-│   │   ├── opportunity.report.ts
-│   │   └── ...
-│   ├── flows/                  # Automation flows
-│   │   ├── lead-conversion.flow.ts
-│   │   ├── case-escalation.flow.ts
-│   │   └── ...
-│   ├── translations/           # I18n translations (en, zh-CN, ja-JP, es-ES)
-│   │   └── crm.translation.ts
-│   ├── agents/                 # AI agents
-│   ├── rag/                    # RAG pipelines
-│   ├── apis/                   # Custom APIs
-│   ├── profiles/               # Permission profiles
-│   └── sharing/                # Sharing rules
-└── test/
-```
-
-**Quick Start:**
-```bash
-cd examples/app-crm
-pnpm install
-pnpm build
-```
+- Multi-driver E2E acceptance harness (sqlite / mongodb / postgres)
 
 ---
 
-**Note:** The production server example has been moved to [`apps/objectos/`](../apps/objectos/) — see the [Server documentation](../apps/objectos/README.md) for details on server hosting, plugin orchestration, and deployment.
+**Note:** Each example app in the framework monorepo is intentionally minimal. Production-grade reference apps (HotCRM, …) live in dedicated repositories under the [objectstack-ai org](https://github.com/objectstack-ai).
 
 ---
 
@@ -184,26 +144,26 @@ pnpm typecheck
 ### Data Protocol (ObjectQL)
 | Protocol | Example | Location |
 |----------|---------|----------|
-| Object Definition | ✅ Complete | [CRM Objects](./app-crm/src/objects/), [Todo Objects](./app-todo/src/objects/) |
-| Field Types (28 types) | ✅ Complete | [CRM Account](./app-crm/src/objects/account.object.ts) |
-| Validation Rules | ✅ Complete | [CRM](./app-crm/), [Todo](./app-todo/src/objects/task.object.ts) |
-| Relationships | ✅ Complete | [CRM Contact](./app-crm/src/objects/contact.object.ts) |
-| Formulas | ✅ Complete | [CRM Account](./app-crm/src/objects/account.object.ts) |
-| Hooks | ✅ Complete | [CRM Hooks](./app-crm/src/objects/account.hook.ts), [Todo Hooks](./app-todo/src/objects/task.hook.ts) |
-| State Machines | ✅ Complete | [CRM Lead State](./app-crm/src/objects/lead.state.ts) |
-| Query & Filters | ✅ Complete | [CRM](./app-crm/), [Todo](./app-todo/) |
+| Object Definition | ✅ Complete | [Todo Objects](./app-todo/src/objects/), [HotCRM Objects](https://github.com/objectstack-ai/hotcrm/tree/main/src/objects) |
+| Field Types (28 types) | ✅ Complete | [HotCRM Account](https://github.com/objectstack-ai/hotcrm/blob/main/src/objects/account.object.ts) |
+| Validation Rules | ✅ Complete | [Todo](./app-todo/src/objects/task.object.ts), [HotCRM](https://github.com/objectstack-ai/hotcrm) |
+| Relationships | ✅ Complete | [HotCRM Contact](https://github.com/objectstack-ai/hotcrm/blob/main/src/objects/contact.object.ts) |
+| Formulas | ✅ Complete | [HotCRM Account](https://github.com/objectstack-ai/hotcrm/blob/main/src/objects/account.object.ts) |
+| Hooks | ✅ Complete | [Todo Hooks](./app-todo/src/objects/task.hook.ts), [HotCRM Hooks](https://github.com/objectstack-ai/hotcrm/tree/main/src/objects) |
+| State Machines | ✅ Complete | [HotCRM Lead State](https://github.com/objectstack-ai/hotcrm/blob/main/src/objects/lead.state.ts) |
+| Query & Filters | ✅ Complete | [Todo](./app-todo/), [HotCRM](https://github.com/objectstack-ai/hotcrm) |
 | Document Storage | 🔴 Missing | _Planned_ |
 
 ### UI Protocol (ObjectUI)
 | Protocol | Example | Location |
 |----------|---------|----------|
-| List Views | ✅ Complete | [CRM](./app-crm/) - Grid, Kanban, Calendar, Gantt |
-| Form Views | ✅ Complete | [CRM](./app-crm/) - Simple, Tabbed, Wizard |
-| Actions | ✅ Complete | [CRM Actions](./app-crm/src/actions/), [Todo Actions](./app-todo/src/actions/) |
-| Dashboards | ✅ Complete | [CRM Dashboards](./app-crm/src/dashboards/), [Todo Dashboard](./app-todo/src/dashboards/) |
-| Reports | ✅ Complete | [CRM Reports](./app-crm/src/reports/), [Todo Reports](./app-todo/src/reports/) |
-| Apps | ✅ Complete | [CRM App](./app-crm/src/apps/crm.app.ts), [Todo App](./app-todo/src/apps/todo.app.ts) |
-| Charts | ✅ Complete | [CRM Dashboards](./app-crm/src/dashboards/) |
+| List Views | ✅ Complete | [HotCRM](https://github.com/objectstack-ai/hotcrm) - Grid, Kanban, Calendar, Gantt |
+| Form Views | ✅ Complete | [HotCRM](https://github.com/objectstack-ai/hotcrm) - Simple, Tabbed, Wizard |
+| Actions | ✅ Complete | [Todo Actions](./app-todo/src/actions/), [HotCRM Actions](https://github.com/objectstack-ai/hotcrm/tree/main/src/actions) |
+| Dashboards | ✅ Complete | [Todo Dashboard](./app-todo/src/dashboards/), [HotCRM Dashboards](https://github.com/objectstack-ai/hotcrm/tree/main/src/dashboards) |
+| Reports | ✅ Complete | [Todo Reports](./app-todo/src/reports/), [HotCRM Reports](https://github.com/objectstack-ai/hotcrm/tree/main/src/reports) |
+| Apps | ✅ Complete | [Todo App](./app-todo/src/apps/todo.app.ts), [HotCRM App](https://github.com/objectstack-ai/hotcrm/blob/main/src/apps/crm.app.ts) |
+| Charts | ✅ Complete | [HotCRM Dashboards](https://github.com/objectstack-ai/hotcrm/tree/main/src/dashboards) |
 | Widgets | ✅ Complete | [Todo Dashboard](./app-todo/src/dashboards/task.dashboard.ts) |
 | Components | 🔴 Missing | _Planned_ |
 
@@ -211,40 +171,40 @@ pnpm typecheck
 | Protocol | Example | Location |
 |----------|---------|----------|
 | Manifest | ✅ Complete | All examples with `objectstack.config.ts` |
-| Plugin System | ✅ Complete | [Server](../apps/objectos/) |
-| Preview Mode | ✅ Complete | [Server](../apps/objectos/) — `OS_MODE=preview` |
-| Datasources | 🟡 Partial | [Server](../apps/objectos/) |
-| I18n / Translations | ✅ Complete | [Todo Translations](./app-todo/src/translations/), [CRM Translations](./app-crm/src/translations/) |
+| Plugin System | ✅ Complete | [HotCRM](https://github.com/objectstack-ai/hotcrm) |
+| Preview Mode | ✅ Complete | [HotCRM](https://github.com/objectstack-ai/hotcrm) — `OS_MODE=preview` |
+| Datasources | 🟡 Partial | [HotCRM](https://github.com/objectstack-ai/hotcrm) |
+| I18n / Translations | ✅ Complete | [Todo Translations](./app-todo/src/translations/), [HotCRM Translations](https://github.com/objectstack-ai/hotcrm/tree/main/src/translations) |
 | Job Scheduling | 🔴 Missing | _Planned_ |
 | Metrics | 🔴 Missing | _Planned_ |
 
 ### AI Protocol
 | Protocol | Example | Location |
 |----------|---------|----------|
-| Agent | ✅ Complete | [CRM Agents](./app-crm/src/agents/) |
-| RAG Pipeline | ✅ Complete | [CRM RAG](./app-crm/src/rag/) |
+| Agent | ✅ Complete | [HotCRM Agents](https://github.com/objectstack-ai/hotcrm/tree/main/src/agents) |
+| RAG Pipeline | ✅ Complete | [HotCRM RAG](https://github.com/objectstack-ai/hotcrm/tree/main/src/rag) |
 | Model Registry | ✅ Complete | _Spec Only_ |
 
 ### Automation Protocol
 | Protocol | Example | Location |
 |----------|---------|----------|
-| Workflow Rules | ✅ Complete | [CRM](./app-crm/), [Todo](./app-todo/src/objects/task.object.ts) |
-| Flow (Visual) | ✅ Complete | [CRM Flows](./app-crm/src/flows/), [Todo Flows](./app-todo/src/flows/) |
-| Approval Processes | ✅ Complete | [CRM Opportunity Approval](./app-crm/src/flows/opportunity-approval.flow.ts) |
-| Triggers | ✅ Complete | [CRM](./app-crm/), [Todo](./app-todo/) |
+| Workflow Rules | ✅ Complete | [Todo](./app-todo/src/objects/task.object.ts), [HotCRM](https://github.com/objectstack-ai/hotcrm) |
+| Flow (Visual) | ✅ Complete | [Todo Flows](./app-todo/src/flows/), [HotCRM Flows](https://github.com/objectstack-ai/hotcrm/tree/main/src/flows) |
+| Approval Processes | ✅ Complete | [HotCRM Opportunity Approval](https://github.com/objectstack-ai/hotcrm/blob/main/src/flows/opportunity-approval.flow.ts) |
+| Triggers | ✅ Complete | [Todo](./app-todo/), [HotCRM](https://github.com/objectstack-ai/hotcrm) |
 
 ### Auth & Permissions
 | Protocol | Example | Location |
 |----------|---------|----------|
-| Profiles | ✅ Complete | [CRM Profiles](./app-crm/src/profiles/) |
-| Sharing Rules | ✅ Complete | [CRM Sharing](./app-crm/src/sharing/) |
-| RBAC | 🟡 Partial | [CRM](./app-crm/) |
+| Profiles | ✅ Complete | [HotCRM Profiles](https://github.com/objectstack-ai/hotcrm/tree/main/src/profiles) |
+| Sharing Rules | ✅ Complete | [HotCRM Sharing](https://github.com/objectstack-ai/hotcrm/tree/main/src/sharing) |
+| RBAC | 🟡 Partial | [HotCRM](https://github.com/objectstack-ai/hotcrm) |
 
 ### API Protocol
 | Protocol | Example | Location |
 |----------|---------|----------|
-| REST Server | ✅ Complete | [Server](../apps/objectos/) |
-| Custom APIs | ✅ Complete | [CRM APIs](./app-crm/src/apis/) |
+| REST Server | ✅ Complete | [HotCRM](https://github.com/objectstack-ai/hotcrm) |
+| Custom APIs | ✅ Complete | [HotCRM APIs](https://github.com/objectstack-ai/hotcrm/tree/main/src/apis) |
 | GraphQL | 🔴 Missing | _Planned_ |
 | WebSocket/Realtime | 🔴 Missing | _Planned_ |
 
@@ -273,9 +233,9 @@ pnpm --filter @objectstack/spec build
 cd examples/app-todo
 pnpm typecheck
 
-# 4. Or explore the CRM
-cd examples/app-crm
-pnpm build
+# 4. Or explore the CRM (separate repository)
+git clone https://github.com/objectstack-ai/hotcrm.git
+cd hotcrm && pnpm install && pnpm build
 ```
 
 ### Learning Path
@@ -283,13 +243,12 @@ pnpm build
 #### Path 1: Quick Start (1-2 hours)
 1. Read [Todo Example](./app-todo/) - Understand basic structure and conventions
 2. Explore [Todo objectstack.config.ts](./app-todo/objectstack.config.ts) - See manifest patterns
-3. Browse [CRM Example](./app-crm/) - Learn advanced features
+3. Browse [HotCRM](https://github.com/objectstack-ai/hotcrm) - Learn advanced features
 
 #### Path 2: Deep Dive (1-2 days)
 1. Complete Path 1
-2. Study all [CRM Objects](./app-crm/src/objects/) - Master field types and relationships
-3. Review [CRM Flows](./app-crm/src/flows/) - Understand automation patterns
-4. Explore [Server](../apps/objectos/) - Server and plugin orchestration
+2. Study [HotCRM Objects](https://github.com/objectstack-ai/hotcrm/tree/main/src/objects) - Master field types and relationships
+3. Review [HotCRM Flows](https://github.com/objectstack-ai/hotcrm/tree/main/src/flows) - Understand automation patterns
 
 ---
 
@@ -365,5 +324,5 @@ All examples are licensed under Apache 2.0. See [LICENSE](../LICENSE) for detail
 
 **Last Updated:** 2026-02-12
 **Protocol Version:** 3.0.0
-**Total Examples:** 3 (app-todo, app-crm, plugin-bi)
+**Total Examples:** 2 in-repo (app-todo, plugin-bi) + 1 external ([HotCRM](https://github.com/objectstack-ai/hotcrm))
 **Directory Convention:** By-Type (Salesforce DX style)

@@ -204,7 +204,7 @@ Five files in `packages/platform-objects/src/metadata/` duplicate a Zod schema t
 
 - Unit:`saveMetaItem` upserts on `(type, name, project_id)`; `deleteMetaItem` removes the row; whitelist enforced.
 - Integration: PUT writes a row; GET returns the overlaid value; restart preserves; DELETE returns to artifact default.
-- Browser E2E: Studio dashboard edit + save + reload demonstrates persistence in `examples/app-crm`.
+- Browser E2E: Studio dashboard edit + save + reload demonstrates persistence in the [HotCRM reference app](https://github.com/objectstack-ai/hotcrm).
 - SQL: `sys_metadata` rows visible with `type='dashboard'`, `scope='project'`, `metadata` containing the full JSON document.
 
 ---
@@ -217,13 +217,13 @@ Five files in `packages/platform-objects/src/metadata/` duplicate a Zod schema t
 - `packages/spec/src/kernel/metadata-plugin.zod.ts` — `MetadataTypeRegistryEntrySchema.supportsOverlay` (future hook for the whitelist)
 - `packages/spec/src/kernel/metadata-customization.zod.ts` — pre-existing `MetadataOverlaySchema` (kept; field-level patches are a future phase, not implemented here)
 - `packages/platform-objects/src/metadata/sys-{view,flow,agent,tool,object}.object.ts` — files marked `@deprecated` by this ADR
-- `examples/app-crm` — primary E2E reference workspace
+- [HotCRM reference app](https://github.com/objectstack-ai/hotcrm) — primary E2E reference workspace
 
 ---
 
 ## Addendum — 2026-05-16: Phase 4 list-merge gate fix + overlay id-stripping rule
 
-Two implementation issues were discovered during browser E2E verification with `examples/app-crm` and fixed:
+Two implementation issues were discovered during browser E2E verification with the [HotCRM reference app](https://github.com/objectstack-ai/hotcrm) and fixed:
 
 ### 1. List endpoint did not include overlay rows in project kernels
 
@@ -252,8 +252,8 @@ as defence-in-depth.
 
 ### Verified operations (browser E2E)
 
-After the fixes, all view-CRUD operations were verified end-to-end in
-`examples/app-crm` against `sys_metadata`:
+After the fixes, all view-CRUD operations were verified end-to-end in the
+[HotCRM reference app](https://github.com/objectstack-ai/hotcrm) against `sys_metadata`:
 
 | Operation | Storage check |
 |---|---|

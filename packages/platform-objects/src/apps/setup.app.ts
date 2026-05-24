@@ -17,10 +17,10 @@
  * `manifest.register({...})`).
  *
  * Menu shape: flat `navigation[]` with `type: 'group'` category nodes,
- * matching the convention used by the CRM example app
- * (`examples/app-crm/src/apps/crm.app.ts`). The legacy `areas[]` shape
- * was abandoned because it rendered poorly compared to the category
- * style ObjectUI is built around.
+ * matching the convention used by the HotCRM reference app at
+ * https://github.com/objectstack-ai/hotcrm (see `src/apps/crm.app.ts`).
+ * The legacy `areas[]` shape was abandoned because it rendered poorly
+ * compared to the category style ObjectUI is built around.
  */
 
 import type { App } from '@objectstack/spec/ui';

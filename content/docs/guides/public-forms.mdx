@@ -42,7 +42,7 @@ Only the spec'd whitelist of form fields is accepted; everything else (status, o
 ## 1. Declare the form view
 
 ```ts
-// examples/app-crm/src/views/lead.view.ts
+// hotcrm/src/views/lead.view.ts  (https://github.com/objectstack-ai/hotcrm)
 import { defineView } from '@objectstack/spec';
 
 export default defineView({
@@ -92,7 +92,7 @@ export default defineView({
 The submit handler attaches `permissions: ['guest_portal']` to the anonymous execution context, so you must define a profile by that name (or rename and adjust the handler logic). Restrict it to INSERT-only on the target object.
 
 ```ts
-// examples/app-crm/src/profiles/guest-portal.profile.ts
+// hotcrm/src/profiles/guest-portal.profile.ts
 import { defineProfile } from '@objectstack/spec/security';
 
 export default defineProfile({
@@ -114,7 +114,7 @@ Anonymous submitters cannot be trusted to set `lead_source`, `status`, `owner`, 
 - Strip any internal fields that slipped past the whitelist
 
 ```ts
-// examples/app-crm/src/objects/lead.hook.ts
+// hotcrm/src/objects/lead.hook.ts
 import type { Hook, HookContext } from '@objectstack/spec/data';
 
 const leadGuestDefaults: Hook = {
@@ -239,7 +239,7 @@ The ObjectUI console ships a unified `FormPage` renderer at `/console/f/:slug` (
 Sometimes you want the same FormView metadata to power an authed operator flow — "new lead", "new ticket", a queue triage screen. Set the FormView up normally (no `sharing.allowAnonymous`) and navigate to `/console/forms/<view_name>`:
 
 ```ts
-// examples/app-crm/src/views/lead.view.ts
+// hotcrm/src/views/lead.view.ts (internal form variant)
 export default defineView({
   name: 'lead_views',
   object: 'lead',
@@ -325,7 +325,7 @@ formViews: {
 App actions can declare `type: 'form'` to open a FormView without resorting to free-form URLs. The `target` is the FormView name; the runtime navigates to `/console/forms/:name`.
 
 ```ts
-// examples/app-crm/src/actions/new-lead.action.ts
+// hotcrm/src/actions/new-lead.action.ts
 import { defineAction } from '@objectstack/spec';
 
 export default defineAction({
@@ -343,7 +343,7 @@ Compared to `{ type: 'url', target: '/console/forms/quick_create' }`, the `'form
 Set `defaultDetailForm` on an object schema to pin the FormView used by the record-detail / edit screen. This is the Airtable Interface-form binding pattern.
 
 ```ts
-// examples/app-crm/src/objects/lead.object.ts
+// hotcrm/src/objects/lead.object.ts
 export default defineObject({
   name: 'lead',
   label: 'Lead',

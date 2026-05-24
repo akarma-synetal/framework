@@ -518,7 +518,7 @@ preserve Built, reduce Drift, and advance Missing.
 - **Storage driver matrix expanded to MongoDB.** `@objectstack/driver-mongodb` ships a full `IDataDriver` (filter translator, aggregation builder, schema sync) with 75 unit tests against `mongodb-memory-server`, and is wired into the CLI / `service-cloud` driver factory — [packages/plugins/driver-mongodb/](packages/plugins/driver-mongodb/), [packages/services/service-cloud/src/driver-factory.ts](packages/services/service-cloud/src/driver-factory.ts).
 - **Driver auto-detection from URL scheme.** `OS_DATABASE_URL` / `OS_CONTROL_DATABASE_URL` infer the driver from `mongodb://`, `postgres://`, `mysql://`, `libsql://`, `file:`, `:memory:` so deploys can drop the explicit `OS_DATABASE_DRIVER` flag — [packages/cli/src/commands/serve.ts](packages/cli/src/commands/serve.ts), [apps/objectos/objectstack.config.ts](apps/objectos/objectstack.config.ts).
 - **CLI startup banner shows resolved driver + redacted DB URL.** `objectstack serve` prints a `Driver:` line (e.g. `MongoDBDriver → mongodb://admin:****@host/db`) so operators can verify URL inference at a glance — [packages/cli/src/utils/format.ts](packages/cli/src/utils/format.ts).
-- **Multi-driver e2e harness.** `examples/app-crm` ships a shared `runDriverAcceptance()` helper plus per-driver Playwright specs (sqlite / mongodb / postgres) and a `scripts/run-driver-acceptance.sh` wrapper that boots `pnpm dev` per-driver — [examples/app-crm/e2e/_acceptance.ts](examples/app-crm/e2e/_acceptance.ts).
+- **Multi-driver e2e harness.** The [HotCRM reference app](https://github.com/objectstack-ai/hotcrm) ships a shared `runDriverAcceptance()` helper plus per-driver Playwright specs (sqlite / mongodb / postgres) and a `scripts/run-driver-acceptance.sh` wrapper that boots `pnpm dev` per-driver.
 
 ### <AlertTriangle className="inline" /> Drift (Needs Cleanup)
 
@@ -545,7 +545,7 @@ preserve Built, reduce Drift, and advance Missing.
   OpenAPI runtime expression），但 schema 层既不区分 dialect 也不强制 AST 形式。
   修复方向：统一替换为 `ExpressionSchema { dialect, ast }`（详见 ROADMAP M9.3）。
 - **Compile-time-frozen seed timestamps.**
-  [examples/app-crm/src/data/index.ts](examples/app-crm/src/data/index.ts) 的种子
+  HotCRM 的种子
   记录用 `new Date(Date.now() + 86400000 * 30)` 形式生成日期。这些表达式在 TS
   编译期就被求值，把开发者的 wall-clock 烧进 `dist/objectstack.json`：(1) 两次
   连续 `objectstack build` 的产物**不字节一致**，破坏 cacheable artifact 的隐式

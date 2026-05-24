@@ -12,7 +12,7 @@ This example serves as a **quick-start reference** for learning ObjectStack basi
 - Automation flows for reminders, escalation, and recurring tasks
 - Full configuration using `objectstack.config.ts` with the standard **by-type** layout
 
-For a **comprehensive enterprise example** with advanced features (AI agents, security profiles, sharing rules), see the **[CRM Example](../app-crm/)**.
+For a **comprehensive enterprise example** with advanced features (AI agents, security profiles, sharing rules), see the **[HotCRM reference app](https://github.com/objectstack-ai/hotcrm)** (separate repository).
 
 ## 📂 Structure
 
@@ -111,7 +111,7 @@ Open `objectstack.config.ts` to see how all pieces connect via `defineStack()`.
 ## 📖 Learning Path
 
 1. **Start Here** — Simple task management with full protocol coverage
-2. **Next Step** — [CRM Example](../app-crm/) — Enterprise features, AI agents, security
+2. **Next Step** — [HotCRM](https://github.com/objectstack-ai/hotcrm) — Enterprise features, AI agents, security
 3. **Then** — [Official Documentation](../../content/docs/) — Complete protocol reference
 
 ## 🔗 Related Resources
@@ -120,7 +120,7 @@ Open `objectstack.config.ts` to see how all pieces connect via `defineStack()`.
 - [Metadata Protocol](../../content/prompts/plugin/metadata.prompt.md) — File suffix system
 - [Object Schema Reference](../../packages/spec/src/data/object.zod.ts)
 - [Field Types Reference](../../packages/spec/src/data/field.zod.ts)
-- [CRM Example](../app-crm/README.md) — Full-featured enterprise reference
+- [HotCRM](https://github.com/objectstack-ai/hotcrm) — Full-featured enterprise reference (separate repo)
 
 ## 📝 License
 

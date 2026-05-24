@@ -477,7 +477,7 @@ The plan is intentionally staged so each milestone is **independently shippable*
 - [ ] `GET /api/v1/meta/view/case` reflects the new spec immediately after a file save (no restart)
 - [ ] `objectstack dev` no longer requires the `/api/v1/dev/metadata-events` POST endpoint
 - [ ] All existing tests pass; new contract suite passes for both `InMemoryRepository` and `FileSystemRepository`
-- [ ] Cold start of `examples/app-crm` is ≤ current baseline (no eager full-load)
+- [ ] Cold start of the [HotCRM reference app](https://github.com/objectstack-ai/hotcrm) is ≤ current baseline (no eager full-load)
 - [ ] `MetadataEvent` stream visible in `apps/studio/Logs` panel
 - [ ] No code in `packages/objectql/src/protocol.ts` reads files or imports from `@objectstack/metadata-fs`
 
