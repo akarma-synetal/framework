@@ -70,6 +70,9 @@ export { DATA_CHAT_AGENT, METADATA_ASSISTANT_AGENT } from './agents/index.js';
 // Object definitions
 export { AiConversationObject, AiMessageObject, AiTraceObject } from './objects/index.js';
 
+// View definitions (built-in Studio surfaces)
+export { AiTraceView } from './views/index.js';
+
 // Model registry
 export { ModelRegistry, computeCost } from './model-registry.js';
 export type { ModelRegistryConfig, CostEstimate, TokenUsage } from './model-registry.js';

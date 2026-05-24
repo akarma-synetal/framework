@@ -11,6 +11,7 @@ import { buildAssistantRoutes } from './routes/assistant-routes.js';
 import { buildToolRoutes } from './routes/tool-routes.js';
 import { ObjectQLConversationService } from './conversation/objectql-conversation-service.js';
 import { AiConversationObject, AiMessageObject, AiTraceObject } from './objects/index.js';
+import { AiTraceView } from './views/index.js';
 import { registerDataTools } from './tools/data-tools.js';
 import { registerMetadataTools } from './tools/metadata-tools.js';
 import { registerQueryDataTool } from './tools/query-data.tool.js';
@@ -283,6 +284,7 @@ export class AIServicePlugin implements Plugin {
       scope: 'project',
       namespace: 'ai',
       objects: [AiConversationObject, AiMessageObject, AiTraceObject],
+      views: [AiTraceView],
     });
 
     if (this.options.debug) {

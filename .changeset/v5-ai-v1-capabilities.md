@@ -40,6 +40,12 @@ non-breaking — new contract methods are optional and existing callers keep wor
   through `IDataEngine.find`. Returns `{ plan, count, records }`. The composed primitive that
   closes the loop from "ask in English" → "validated SQL-shaped result".
 
+- **`ai_traces` Studio view** (auto-registered): `AIServicePlugin` now publishes a built-in
+  `ai_traces` view via the manifest — Studio gets a ready-made list (sorted by time desc),
+  plus saved views for **Errors** (status=error filter) and **By Model** (grouped). Available
+  the moment `AIServicePlugin` is loaded; no user config needed. Exported as `AiTraceView`
+  for advanced reuse / composition.
+
 - **Working demo in `examples/app-todo`**: `pnpm --filter @example/app-todo test:ai` boots the
   full Todo stack, invokes `query_data` against the seeded tasks, and verifies the call lands
   in `ai_traces`. Zero API keys, ~3 seconds end-to-end. Serves as the canonical reference for
