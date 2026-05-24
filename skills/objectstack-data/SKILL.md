@@ -2,20 +2,23 @@
 name: objectstack-data
 description: >
   Design ObjectStack data schemas — objects, fields, relationships,
-  validations, indexes, lifecycle hooks, permissions, and row-level security.
-  Use when the user is creating or modifying `*.object.ts` files, picking
-  field types, modelling relationships, writing `beforeInsert`/`afterUpdate`
-  hooks, or configuring per-object access control. Do not use for querying
-  data (see objectstack-query) or for plugin / kernel hooks (see
-  objectstack-platform). CEL expressions in formulas / validations / sharing
-  rules: load objectstack-formula alongside.
+  validations, indexes, lifecycle hooks, permissions, row-level security —
+  and the seed datasets (`defineDataset()`) that load fixtures and
+  reference data alongside them. Use when the user is creating or
+  modifying `*.object.ts` / `*.seed.ts` files, picking field types,
+  modelling relationships, writing `beforeInsert`/`afterUpdate` hooks,
+  configuring per-object access control, or authoring bootstrap / demo
+  data. Do not use for querying data (see objectstack-query) or for
+  plugin / kernel hooks (see objectstack-platform). CEL expressions in
+  formulas / validations / sharing rules / dynamic seed values: load
+  objectstack-formula alongside.
 license: Apache-2.0
 compatibility: Requires @objectstack/spec Zod schemas (v4+)
 metadata:
   author: objectstack-ai
-  version: "4.1"
+  version: "4.2"
   domain: data
-  tags: object, field, validation, index, relationship, hook, schema, permission, rls, security
+  tags: object, field, validation, index, relationship, hook, schema, permission, rls, security, seed, dataset, fixture
 ---
 
 # Data Modeling — ObjectStack Data Protocol
@@ -452,6 +455,138 @@ enforces per-tenant data isolation:
 | `cdc` | Real-time sync to Kafka, webhooks, or data lakes |
 | `encryptionConfig` | GDPR / HIPAA / PCI-DSS field-level encryption |
 | `maskingRule` | PII masking for non-privileged users |
+
+---
+
+## Seed Data & Fixtures (`defineDataset()`)
+
+Object definition and its seed data live together — writing a `*.object.ts`
+almost always goes with a `*.seed.ts` (test fixtures, reference rows,
+bootstrap data). `defineDataset()` is type-safe: pass the object definition
+and TypeScript checks every record's field keys at compile time.
+
+### Quick start
+
+```typescript
+// src/data/index.ts
+import { defineDataset } from '@objectstack/spec/data';
+import { Status } from '../objects/status.object';
+import { Category } from '../objects/category.object';
+
+// Reference data — every environment
+export const statusSeed = defineDataset(Status, {
+  externalId: 'code',
+  mode: 'upsert',
+  records: [
+    { code: 'active',   label: 'Active',   color: '#2ecc71' },
+    { code: 'inactive', label: 'Inactive', color: '#95a5a6' },
+  ],
+});
+
+// Demo data — dev/test only
+export const categorySeed = defineDataset(Category, {
+  externalId: 'slug',
+  mode: 'upsert',
+  env: ['dev', 'test'],
+  records: [
+    { slug: 'electronics', name: 'Electronics' },
+  ],
+});
+
+export const SeedData = [statusSeed, categorySeed];   // parents first
+```
+
+### `Dataset` fields
+
+| Field | Default | Purpose |
+|:------|:--------|:--------|
+| `object` | derived | Auto-set from `objectDef.name` — never write manually |
+| `externalId` | `'name'` | Stable business key used for upsert / update lookup |
+| `mode` | `'upsert'` | Import strategy (see below) |
+| `env` | `['prod','dev','test']` | Environments where the dataset loads |
+| `records` | — | `Partial<Record<keyof object.fields, unknown>>[]` |
+
+Full Zod shape: `node_modules/@objectstack/spec/src/data/dataset.zod.ts`.
+
+### Import modes
+
+| Mode | Behavior | Use for |
+|:-----|:---------|:--------|
+| `upsert` (default) | Update by `externalId`, insert if missing. Idempotent. | Reference data, bootstrap rows |
+| `insert` | Insert all; fail on duplicate `externalId`. | Append-only / audit tables |
+| `update` | Update only existing rows; never create. | Patching existing config |
+| `ignore` | Insert; silently skip duplicates. | Additive bootstrap |
+| `replace` ⚠️ | Delete everything, then insert. **Data loss.** | Cache / lookup tables only — never user data |
+
+### `externalId` selection
+
+Pick a stable natural business key. **Never use `id`** — UUIDs differ
+across environments.
+
+| Scenario | Key |
+|:---------|:----|
+| Named entities (country, currency) | `'code'` / `'slug'` |
+| Users / contacts | `'email'` |
+| Externally sourced | `'external_id'` |
+| Generic | `'name'` (default) |
+
+### Relationship references
+
+For `lookup` fields, supply the **natural key** of the target record (not
+its UUID). The seed runner resolves at load time. Order datasets so parents
+appear before children in the exported array:
+
+```typescript
+const contacts = defineDataset(Contact, {
+  externalId: 'email',
+  records: [{
+    email: 'john@acme.example.com',
+    first_name: 'John',
+    account: 'Acme Corporation',   // natural key of an Account record
+  }],
+});
+```
+
+### Dynamic values (CEL)
+
+Any field value may be a CEL expression evaluated at install time against
+a single per-load pinned `now`. This is the **only** correct way to author
+time-based or identity-derived seed values — `new Date()` ships the package
+author's clock to every customer and breaks build determinism.
+
+```typescript
+import { defineDataset, cel } from '@objectstack/spec';
+
+defineDataset(Opportunity, {
+  records: [{
+    name:            'Acme Q3 Renewal',
+    close_date:      cel`daysFromNow(45)`,
+    created_at:      cel`now()`,
+    owner_id:        cel`os.user.id`,   // installer
+    organization_id: cel`os.org.id`,
+  }],
+});
+```
+
+Stdlib in seed context: `now()`, `today()`, `daysFromNow(n)`, `daysAgo(n)`,
+`isBlank(v)`, `coalesce(v, fallback)`. Scope: `os.user`, `os.org`, `os.env`.
+See **objectstack-formula** for the full contract.
+
+**Determinism gate:** two consecutive `os build` runs with no source
+changes must produce byte-identical `dist/objectstack.json`. CEL + pinned
+`now` is what guarantees that — using `Date.now()` will fail CI.
+
+### Seed best practices
+
+| Practice | Why |
+|:---------|:----|
+| Always use `defineDataset()`, never `DatasetSchema.parse()` | Lose compile-time field checking otherwise |
+| Prefer natural keys (`code` / `email` / `slug`) | Portable across environments |
+| Default to `upsert` | Idempotent re-runs |
+| Scope demo data with `env: ['dev','test']` | Keep noise out of prod |
+| Order datasets parent → child in the exported array | References resolve at load time |
+| Use `replace` only on cache/lookup tables, with comments | Data-loss footgun |
+| One `{object}.seed.ts` file per object | Readability at scale |
 
 ---
 

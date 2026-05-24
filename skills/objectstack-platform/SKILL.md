@@ -1113,7 +1113,7 @@ describe('account hooks', () => {
 ```
 
 - **Seed in tests:** call `kernel.seed(SeedData)` after create. See
-  **objectstack-seed** for env-scoped fixtures (`env: ['test']`).
+  **objectstack-data** for env-scoped fixtures (`env: ['test']`).
 - **Reset between tests:** prefer `await kernel.reset()` over recreating —
   it's an order of magnitude faster.
 - **HTTP-level tests:** mount the adapter (Hono / Express) on a random

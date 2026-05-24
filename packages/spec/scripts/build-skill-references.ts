@@ -41,6 +41,7 @@ const SKILL_MAP: Record<string, string[]> = {
     'data/validation.zod.ts',
     'data/hook.zod.ts',
     'data/datasource.zod.ts',
+    'data/dataset.zod.ts',
     'security/permission.zod.ts',
   ],
   'objectstack-query': [
@@ -104,9 +105,6 @@ const SKILL_MAP: Record<string, string[]> = {
     'kernel/plugin-loading.zod.ts',
     'kernel/feature.zod.ts',
     'kernel/metadata-plugin.zod.ts',
-  ],
-  'objectstack-seed': [
-    'data/dataset.zod.ts',
   ],
   'objectstack-i18n': [
     'system/translation.zod.ts',

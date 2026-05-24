@@ -37,7 +37,7 @@ formula / condition / predicate / dynamic-seed metadata.
 | Need | Use instead |
 |:---|:---|
 | Define a `type: 'formula'` field | objectstack-data (and embed CEL via `F\`...\``) |
-| Define seed records | objectstack-seed (use `cel\`...\`` for dynamic dates) |
+| Define seed records | objectstack-data (use `cel\`...\`` for dynamic dates) |
 | Author flow / automation step | objectstack-automation (use `P\`...\`` for `condition`) |
 | Author L2 hook body (TS code) | objectstack-data |
 | Cron schedule | objectstack-automation (`schedule.expression` is `cron` dialect) |

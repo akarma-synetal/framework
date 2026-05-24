@@ -58,13 +58,12 @@ Skills are triggered automatically based on task context:
 | Skill | Trigger Context |
 |:------|:----------------|
 | **objectstack-platform** | Project setup, defineStack(), driver/adapter selection, plugin lifecycle, DI, services, kernel hooks/events |
-| **objectstack-data** | Define objects, fields, relationships, validations, indexes, data lifecycle hooks |
+| **objectstack-data** | Define objects, fields, relationships, validations, indexes, lifecycle hooks, permissions/RLS, seed fixtures (`defineDataset`) |
 | **objectstack-query** | Filters, sorting, pagination, aggregation, ObjectQL |
 | **objectstack-ui** | Views, dashboards, apps, reports, actions, navigation |
 | **objectstack-api** | REST endpoints, authentication, service contracts |
 | **objectstack-automation** | Flows, workflows, triggers, approvals, state machines |
 | **objectstack-ai** | Agents, tools, skills, RAG pipelines, LLM config |
-| **objectstack-seed** | defineDataset(), seed fixtures, import modes, env scoping |
 | **objectstack-i18n** | Translation bundles, locale config, coverage detection |
 | **objectstack-formula** | CEL formula fields, predicates, conditions, dynamic seed values |
 

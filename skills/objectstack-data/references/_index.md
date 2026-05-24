@@ -8,6 +8,7 @@ from `node_modules` — there is no local copy in the skill bundle.
 
 ## Core schemas
 
+- `node_modules/@objectstack/spec/src/data/dataset.zod.ts` — Data Import Strategy
 - `node_modules/@objectstack/spec/src/data/datasource.zod.ts` — Driver Identifier
 - `node_modules/@objectstack/spec/src/data/field.zod.ts` — Field Type Enum
 - `node_modules/@objectstack/spec/src/data/hook.zod.ts` — Hook Lifecycle Events
