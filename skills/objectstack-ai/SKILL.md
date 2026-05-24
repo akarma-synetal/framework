@@ -219,6 +219,27 @@ Tools are the atomic operations that skills expose to agents.
 }
 ```
 
+### Auto-Exposed Actions
+
+You usually **don't author tool definitions by hand** for action invocation. Every `Action` you attach to an object via `defineObject({ actions: [...] })` is auto-exposed as a tool named `action_<actionName>` by `registerActionsAsTools()` (invoked from `AIServicePlugin`).
+
+Three action types dispatch headlessly:
+
+| `action.type` | Dispatch | Wiring |
+|:---|:---|:---|
+| `script` | `IDataEngine.executeAction(object, target, ctx)` — same as Studio's row toolbar | none |
+| `api` | HTTP call to `action.target` (`fetch`-based by default) | `AIServicePlugin({ apiActionBaseUrl, apiActionHeaders })` or custom `apiClient` |
+| `flow` | `IAutomationService.execute(target, { triggerData })` | `automation` service registered with the kernel |
+
+**Skipped automatically:**
+- UI-only types (`url`, `modal`, `form`).
+- Dangerous variants (`confirmText` set, `mode: 'delete'`, `variant: 'danger'`) — Phase 3 HITL.
+- Owner opt-outs (`aiExposed: false`).
+
+**`type:'api'` body assembly** (last wins): user params → `recordIdParam` (using `recordIdField`, default `'id'`) → `bodyExtra`. `bodyShape: { wrap: 'data' }` nests user params under `data` while keeping `recordIdParam` flat.
+
+Use `actionSkipReason(action, ctx)` (exported from `@objectstack/service-ai`) when authoring an action and you want to know *why* it isn't surfacing in chat. Studio's "AI exposure" diagnostics use the same predicate.
+
 ---
 
 ## RAG Pipeline Configuration
