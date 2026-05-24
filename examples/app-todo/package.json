@@ -18,7 +18,8 @@
     "test": "objectstack test",
     "test:ai": "tsx test/ai.test.ts",
     "test:agent": "tsx test/ai-agent.test.ts",
-    "test:action": "tsx test/ai-action.test.ts"
+    "test:action": "tsx test/ai-action.test.ts",
+    "test:llm": "tsx test/ai-llm.test.ts"
   },
   "dependencies": {
     "@objectstack/client": "workspace:*",
@@ -30,7 +31,9 @@
     "@objectstack/spec": "workspace:*"
   },
   "devDependencies": {
+    "@ai-sdk/gateway": "^3.0.0",
     "@objectstack/cli": "workspace:*",
+    "ai": "^6.0.190",
     "tsx": "^4.19.2",
     "typescript": "^6.0.3"
   }

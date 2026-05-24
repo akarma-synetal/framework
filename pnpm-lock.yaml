@@ -270,9 +270,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/spec
     devDependencies:
+      '@ai-sdk/gateway':
+        specifier: ^3.0.0
+        version: 3.0.119(zod@4.4.3)
       '@objectstack/cli':
         specifier: workspace:*
         version: link:../../packages/cli
+      ai:
+        specifier: ^6.0.190
+        version: 6.0.190(zod@4.4.3)
       tsx:
         specifier: ^4.19.2
         version: 4.22.3
