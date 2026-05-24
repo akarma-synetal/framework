@@ -1,0 +1,62 @@
+{
+  "name": "@objectstack/driver-sqlite-wasm",
+  "version": "5.2.0",
+  "license": "Apache-2.0",
+  "description": "WASM SQLite Driver for ObjectStack — runs in browser/WebContainer (StackBlitz) without native bindings",
+  "keywords": [
+    "objectstack",
+    "driver",
+    "sqlite",
+    "wasm",
+    "sql.js",
+    "stackblitz",
+    "webcontainer",
+    "browser"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup --config ../../../tsup.config.ts",
+    "dev": "tsc -w",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@objectstack/core": "workspace:*",
+    "@objectstack/driver-sql": "workspace:*",
+    "@objectstack/spec": "workspace:*",
+    "knex": "^3.2.10",
+    "nanoid": "^5.1.11",
+    "sql.js": "^1.10.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/sql.js": "^1.4.9",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  },
+  "author": "ObjectStack",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/objectstack-ai/framework.git",
+    "directory": "packages/plugins/driver-sqlite-wasm"
+  },
+  "homepage": "https://objectstack.ai/docs",
+  "bugs": "https://github.com/objectstack-ai/framework/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
