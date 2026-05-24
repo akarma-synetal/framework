@@ -4,7 +4,7 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 import { cel } from '@objectstack/spec';
 
 export const Opportunity = ObjectSchema.create({
-  name: 'opportunity',
+  name: 'crm_opportunity',
   label: 'Opportunity',
   pluralLabel: 'Opportunities',
   icon: 'trending-up',
@@ -17,7 +17,7 @@ export const Opportunity = ObjectSchema.create({
       searchable: true,
       maxLength: 200,
     }),
-    account: Field.lookup('account', {
+    account: Field.lookup('crm_account', {
       label: 'Account',
       required: true,
     }),

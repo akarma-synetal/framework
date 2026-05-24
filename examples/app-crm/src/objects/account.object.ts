@@ -3,7 +3,7 @@
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 export const Account = ObjectSchema.create({
-  name: 'account',
+  name: 'crm_account',
   label: 'Account',
   pluralLabel: 'Accounts',
   icon: 'building',

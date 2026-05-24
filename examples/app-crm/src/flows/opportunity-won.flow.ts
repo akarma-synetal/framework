@@ -18,7 +18,7 @@ export const OpportunityWonFlow: Flow = {
       type: 'start',
       label: 'On Opportunity Update',
       config: {
-        objectName: 'opportunity',
+        objectName: 'crm_opportunity',
         triggerType: 'record-after-update',
         condition: 'stage == "closed_won" && previous.stage != "closed_won"',
       },

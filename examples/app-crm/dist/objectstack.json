@@ -11,7 +11,7 @@
   },
   "objects": [
     {
-      "name": "account",
+      "name": "crm_account",
       "label": "Account",
       "pluralLabel": "Accounts",
       "description": "A company that the org sells to or supports.",
@@ -110,7 +110,7 @@
       }
     },
     {
-      "name": "contact",
+      "name": "crm_contact",
       "label": "Contact",
       "pluralLabel": "Contacts",
       "description": "A person associated with an account.",
@@ -193,7 +193,7 @@
           "searchable": false,
           "multiple": false,
           "unique": false,
-          "reference": "account",
+          "reference": "crm_account",
           "deleteBehavior": "set_null",
           "auditTrail": false,
           "hidden": false,
@@ -205,7 +205,7 @@
       }
     },
     {
-      "name": "opportunity",
+      "name": "crm_opportunity",
       "label": "Opportunity",
       "pluralLabel": "Opportunities",
       "description": "A potential sale tied to an account.",
@@ -238,7 +238,7 @@
           "searchable": false,
           "multiple": false,
           "unique": false,
-          "reference": "account",
+          "reference": "crm_account",
           "deleteBehavior": "set_null",
           "auditTrail": false,
           "hidden": false,
@@ -385,21 +385,21 @@
               "label": "Accounts",
               "icon": "building",
               "type": "object",
-              "objectName": "account"
+              "objectName": "crm_account"
             },
             {
               "id": "nav_contacts",
               "label": "Contacts",
               "icon": "user",
               "type": "object",
-              "objectName": "contact"
+              "objectName": "crm_contact"
             },
             {
               "id": "nav_opportunities",
               "label": "Opportunities",
               "icon": "trending-up",
               "type": "object",
-              "objectName": "opportunity"
+              "objectName": "crm_opportunity"
             }
           ]
         },
@@ -522,7 +522,7 @@
           "title": "Total Pipeline ($)",
           "description": "Sum of opportunity amounts across open stages.",
           "type": "metric",
-          "object": "opportunity",
+          "object": "crm_opportunity",
           "filter": {
             "stage": {
               "$nin": [
@@ -545,7 +545,7 @@
           "title": "Opportunities by Stage",
           "description": "Count of opportunities grouped by their pipeline stage.",
           "type": "bar",
-          "object": "opportunity",
+          "object": "crm_opportunity",
           "categoryField": "stage",
           "aggregate": "count",
           "layout": {
@@ -574,7 +574,7 @@
           "type": "start",
           "label": "On Opportunity Update",
           "config": {
-            "objectName": "opportunity",
+            "objectName": "crm_opportunity",
             "triggerType": "record-after-update",
             "condition": "stage == \"closed_won\" && previous.stage != \"closed_won\""
           }
@@ -621,7 +621,7 @@
   "hooks": [
     {
       "name": "opportunity_stage_probability",
-      "object": "opportunity",
+      "object": "crm_opportunity",
       "events": [
         "beforeInsert",
         "beforeUpdate"
@@ -639,7 +639,7 @@
   ],
   "data": [
     {
-      "object": "account",
+      "object": "crm_account",
       "externalId": "name",
       "mode": "upsert",
       "env": [
@@ -669,7 +669,7 @@
       ]
     },
     {
-      "object": "contact",
+      "object": "crm_contact",
       "externalId": "email",
       "mode": "upsert",
       "env": [
@@ -705,7 +705,7 @@
       ]
     },
     {
-      "object": "opportunity",
+      "object": "crm_opportunity",
       "externalId": "name",
       "mode": "upsert",
       "env": [

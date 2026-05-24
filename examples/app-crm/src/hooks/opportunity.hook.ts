@@ -8,7 +8,7 @@ import type { Hook, HookContext } from '@objectstack/spec/data';
  */
 export const OpportunityStageHook: Hook = {
   name: 'opportunity_stage_probability',
-  object: 'opportunity',
+  object: 'crm_opportunity',
   events: ['beforeInsert', 'beforeUpdate'],
   priority: 100,
   handler: async (ctx: HookContext) => {

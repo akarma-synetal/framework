@@ -12,7 +12,7 @@ describe('app-crm minimal metadata bundle', () => {
 
   it('registers the 3 core objects', () => {
     const names = (stack.objects ?? []).map((o) => o.name).sort();
-    expect(names).toEqual(['account', 'contact', 'opportunity']);
+    expect(names).toEqual(['crm_account', 'crm_contact', 'crm_opportunity']);
   });
 
   it('registers exactly one app, one dashboard, one hook, one flow', () => {

@@ -4,7 +4,7 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 import { cel } from '@objectstack/spec';
 
 export const Contact = ObjectSchema.create({
-  name: 'contact',
+  name: 'crm_contact',
   label: 'Contact',
   pluralLabel: 'Contacts',
   icon: 'user',
@@ -29,7 +29,7 @@ export const Contact = ObjectSchema.create({
       label: 'Email',
       searchable: true,
     }),
-    account: Field.lookup('account', {
+    account: Field.lookup('crm_account', {
       label: 'Account',
     }),
   },
