@@ -93,9 +93,9 @@ describe('ConversationMessageSchema', () => {
       role: 'assistant',
       content: [{ type: 'text', text: 'I am doing well, thank you!' }],
       tokens: {
-        prompt: 15,
-        completion: 8,
-        total: 23,
+        promptTokens: 15,
+        completionTokens: 8,
+        totalTokens: 23,
       },
     };
     expect(() => ConversationMessageSchema.parse(message)).not.toThrow();
@@ -494,14 +494,14 @@ describe('Real-World Conversation Examples', () => {
           timestamp: '2024-01-15T09:00:05Z',
           role: 'user',
           content: [{ type: 'text', text: 'Hi, I have an issue with my order #ORD-2024-001' }],
-          tokens: { prompt: 15, completion: 0, total: 15 },
+          tokens: { promptTokens: 15, completionTokens: 0, totalTokens: 15 },
         },
         {
           id: 'msg-2',
           timestamp: '2024-01-15T09:00:15Z',
           role: 'assistant',
           content: [{ type: 'text', text: 'Hello! I\'d be happy to help you with your order. Let me look up the details for order #ORD-2024-001.' }],
-          tokens: { prompt: 30, completion: 25, total: 55 },
+          tokens: { promptTokens: 30, completionTokens: 25, totalTokens: 55 },
         },
       ],
       tokens: {

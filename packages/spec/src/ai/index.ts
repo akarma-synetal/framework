@@ -2,37 +2,30 @@
 
 /**
  * AI Protocol Exports
- * 
- * AI/ML Capabilities
- * - Agent Configuration (Agent → Skill → Tool architecture)
- * - Tool Metadata (first-class AI tool definitions)
- * - Skill Metadata (ability groups / capability bundles)
- * - DevOps Agent (Self-iterating Development)
- * - Model Registry & Selection
- * - Model Context Protocol (MCP)
- * - RAG Pipeline
- * - Natural Language Query (NLQ)
- * - Workflow Automation
- * - Predictive Analytics
- * - Conversation Memory & Token Management
- * - Cost Tracking & Budget Management
- * - Plugin Development (AI-assisted)
- * - Runtime Operations (AIOps)
+ *
+ * Platform AI primitives. Scope is deliberately narrow — these are
+ * the schemas the runtime directly consumes. Application-level
+ * concerns (DevOps agents, predictive pipelines, AIOps, orchestration
+ * plans, NLQ services, RAG pipeline DSLs, budget enforcement, etc.)
+ * were removed in v1 because they can be built on top of these
+ * primitives and do not need a platform-blessed shape.
+ *
+ * Primitives:
+ * - Agent           — persona + skill/tool bindings
+ * - Skill           — capability bundle with context-driven activation
+ * - Tool            — Zod-typed callable surface
+ * - Conversation    — message persistence + short/long-term memory
+ * - Model Registry  — multi-provider LLM configuration
+ * - Embedding       — embedding model + vector store references
+ * - Usage           — token accounting + per-call cost
+ * - MCP             — references and bindings to external MCP servers
  */
 
 export * from './agent.zod';
 export * from './tool.zod';
 export * from './skill.zod';
-export * from './agent-action.zod';
-export * from './devops-agent.zod';
-export * from './plugin-development.zod';
-export * from './runtime-ops.zod';
-export * from './model-registry.zod';
-export * from './mcp.zod';
-export * from './rag-pipeline.zod';
-export * from './nlq.zod';
-export * from './orchestration.zod';
-export * from './predictive.zod';
 export * from './conversation.zod';
-export * from './cost.zod';
-export * from './feedback-loop.zod';
+export * from './model-registry.zod';
+export * from './embedding.zod';
+export * from './usage.zod';
+export * from './mcp.zod';

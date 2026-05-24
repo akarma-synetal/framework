@@ -1282,7 +1282,7 @@ describe('defineStack - Example-Level Strict Validation', () => {
       },
       objects: [
         {
-          name: 'task',
+          name: 'todo_task',
           label: 'Task',
           fields: {
             subject: { type: 'text', label: 'Subject', required: true },
@@ -1303,7 +1303,7 @@ describe('defineStack - Example-Level Strict Validation', () => {
       ],
       data: [
         {
-          object: 'task',
+          object: 'todo_task',
           mode: 'upsert' as const,
           externalId: 'subject',
           records: [
@@ -1317,8 +1317,8 @@ describe('defineStack - Example-Level Strict Validation', () => {
           name: 'task_overview',
           label: 'Task Overview',
           widgets: [
-            { id: 'total_tasks', title: 'Total Tasks', type: 'metric', object: 'task', aggregate: 'count', layout: { x: 0, y: 0, w: 3, h: 2 } },
-            { id: 'by_status', title: 'By Status', type: 'pie', object: 'task', categoryField: 'status', aggregate: 'count', layout: { x: 3, y: 0, w: 6, h: 4 } },
+            { id: 'total_tasks', title: 'Total Tasks', type: 'metric', object: 'todo_task', aggregate: 'count', layout: { x: 0, y: 0, w: 3, h: 2 } },
+            { id: 'by_status', title: 'By Status', type: 'pie', object: 'todo_task', categoryField: 'status', aggregate: 'count', layout: { x: 3, y: 0, w: 6, h: 4 } },
           ],
         },
       ],
@@ -1327,7 +1327,7 @@ describe('defineStack - Example-Level Strict Validation', () => {
           name: 'todo_app',
           label: 'Todo Manager',
           navigation: [
-            { id: 'nav_tasks', type: 'object' as const, label: 'Tasks', objectName: 'task' },
+            { id: 'nav_tasks', type: 'object' as const, label: 'Tasks', objectName: 'todo_task' },
             { id: 'nav_dashboard', type: 'dashboard' as const, label: 'Overview', dashboardName: 'task_overview' },
           ],
         },
@@ -1348,7 +1348,7 @@ describe('defineStack - Example-Level Strict Validation', () => {
       },
       objects: [
         {
-          name: 'account',
+          name: 'crm_account',
           label: 'Account',
           fields: {
             name: { type: 'text', label: 'Name', required: true },
@@ -1357,7 +1357,7 @@ describe('defineStack - Example-Level Strict Validation', () => {
           },
         },
         {
-          name: 'opportunity',
+          name: 'crm_opportunity',
           label: 'Opportunity',
           fields: {
             name: { type: 'text', label: 'Name', required: true },
@@ -1372,7 +1372,7 @@ describe('defineStack - Example-Level Strict Validation', () => {
       ],
       data: [
         {
-          object: 'account',
+          object: 'crm_account',
           mode: 'upsert' as const,
           externalId: 'name',
           records: [
@@ -1384,7 +1384,7 @@ describe('defineStack - Example-Level Strict Validation', () => {
         {
           name: 'pipeline_report',
           label: 'Pipeline Report',
-          objectName: 'opportunity',
+          objectName: 'crm_opportunity',
           type: 'summary' as const,
           columns: [
             { field: 'name' },
@@ -1398,7 +1398,7 @@ describe('defineStack - Example-Level Strict Validation', () => {
           name: 'sales_overview',
           label: 'Sales Overview',
           widgets: [
-            { id: 'pipeline_value', title: 'Pipeline Value', type: 'metric', object: 'opportunity', valueField: 'amount', aggregate: 'sum', layout: { x: 0, y: 0, w: 4, h: 2 } },
+            { id: 'pipeline_value', title: 'Pipeline Value', type: 'metric', object: 'crm_opportunity', valueField: 'amount', aggregate: 'sum', layout: { x: 0, y: 0, w: 4, h: 2 } },
           ],
         },
       ],
@@ -1408,8 +1408,8 @@ describe('defineStack - Example-Level Strict Validation', () => {
           label: 'Sales CRM',
           icon: 'briefcase',
           navigation: [
-            { id: 'nav_accounts', type: 'object' as const, label: 'Accounts', objectName: 'account' },
-            { id: 'nav_opportunities', type: 'object' as const, label: 'Opportunities', objectName: 'opportunity' },
+            { id: 'nav_accounts', type: 'object' as const, label: 'Accounts', objectName: 'crm_account' },
+            { id: 'nav_opportunities', type: 'object' as const, label: 'Opportunities', objectName: 'crm_opportunity' },
             { id: 'nav_dashboard', type: 'dashboard' as const, label: 'Sales Overview', dashboardName: 'sales_overview' },
             { id: 'nav_report', type: 'report' as const, label: 'Pipeline', reportName: 'pipeline_report' },
           ],
@@ -1435,5 +1435,71 @@ describe('defineStack - Example-Level Strict Validation', () => {
       ],
     };
     expect(() => defineStack(badConfig, { strict: true })).toThrow('contact');
+  });
+});
+
+describe('defineStack - Namespace Prefix Validation', () => {
+  const makeConfig = (objectName: string, namespace?: string) => ({
+    manifest: {
+      id: 'com.example.pkg',
+      version: '1.0.0',
+      type: 'app' as const,
+      name: 'Pkg',
+      ...(namespace ? { namespace } : {}),
+    },
+    objects: [
+      { name: objectName, label: 'X', fields: { title: { type: 'text' as const } } },
+    ],
+  });
+
+  it('rejects an object whose name lacks the namespace prefix', () => {
+    expect(() => defineStack(makeConfig('task', 'todo'), { strict: true }))
+      .toThrow(/namespace-prefix validation failed/);
+    expect(() => defineStack(makeConfig('task', 'todo'), { strict: true }))
+      .toThrow(/Rename it to 'todo_task'/);
+  });
+
+  it('accepts an object whose name starts with the namespace prefix', () => {
+    expect(() => defineStack(makeConfig('todo_task', 'todo'), { strict: true })).not.toThrow();
+  });
+
+  it('rejects the legacy double-underscore FQN form and suggests the single-prefix form', () => {
+    expect(() => defineStack(makeConfig('todo__task', 'todo'), { strict: true }))
+      .toThrow(/legacy FQN form/);
+    expect(() => defineStack(makeConfig('todo__task', 'todo'), { strict: true }))
+      .toThrow(/Rename it to 'todo_task'/);
+  });
+
+  it('allows sys_-prefixed names regardless of package namespace', () => {
+    expect(() => defineStack(makeConfig('sys_user', 'todo'), { strict: true })).not.toThrow();
+  });
+
+  it('skips the check when manifest.namespace is absent (legacy compatibility)', () => {
+    expect(() => defineStack(makeConfig('task'), { strict: true })).not.toThrow();
+  });
+
+  it('skips the check entirely in non-strict mode', () => {
+    expect(() => defineStack(makeConfig('task', 'todo'), { strict: false })).not.toThrow();
+  });
+
+  it('aggregates errors across multiple offending objects', () => {
+    const config = {
+      manifest: { id: 'p', version: '1.0.0', type: 'app' as const, name: 'P', namespace: 'todo' },
+      objects: [
+        { name: 'task', label: 'T', fields: { t: { type: 'text' as const } } },
+        { name: 'project', label: 'P', fields: { t: { type: 'text' as const } } },
+        { name: 'todo_label', label: 'L', fields: { t: { type: 'text' as const } } },
+      ],
+    };
+    try {
+      defineStack(config, { strict: true });
+      throw new Error('expected throw');
+    } catch (err) {
+      const msg = (err as Error).message;
+      expect(msg).toMatch(/2 issues/);
+      expect(msg).toMatch(/todo_task/);
+      expect(msg).toMatch(/todo_project/);
+      expect(msg).not.toMatch(/todo_todo_label/);
+    }
   });
 });

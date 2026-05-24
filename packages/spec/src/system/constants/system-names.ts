@@ -124,16 +124,24 @@ export const StorageNameMapping = {
   /**
    * Resolve the physical table name for an object.
    *
-   * The short name is canonical for storage. If the object's `name` is an FQN
-   * (`{namespace}__{shortName}`), the namespace prefix is stripped. Otherwise the
-   * `name` is used as-is. Per-project database isolation removes the need for a
-   * namespace-based physical prefix.
+   * The full prefixed object name IS the physical table name. Since every
+   * object in a stack is required by `defineStack()` to start with the
+   * package namespace (e.g. `todo_task`, `crm_account`), tables for
+   * different packages cannot collide even when installed into the same
+   * database.
+   *
+   * Legacy compatibility: if `object.name` is in the old FQN form
+   * `{namespace}__{shortName}` (double underscore), the namespace prefix
+   * is stripped to recover the historical table name. New code should
+   * not produce that shape — `defineStack()` validates against it.
    *
    * @param object - Object definition (at minimum `{ name: string }`)
    * @returns The physical table / collection name to use in storage operations.
    *
-   * @example resolveTableName({ name: 'account' }) // 'account'
-   * @example resolveTableName({ name: 'sys_user' })     // 'sys_user'
+   * @example resolveTableName({ name: 'todo_task' })   // 'todo_task'
+   * @example resolveTableName({ name: 'crm_account' }) // 'crm_account'
+   * @example resolveTableName({ name: 'sys_user' })    // 'sys_user'
+   * @example resolveTableName({ name: 'crm__account' }) // 'account' (legacy)
    */
   resolveTableName(object: { name: string }): string {
     const idx = object.name.indexOf('__');

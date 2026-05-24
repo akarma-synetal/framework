@@ -293,7 +293,6 @@ describe('PLURAL_TO_SINGULAR / SINGULAR_TO_PLURAL', () => {
     expect(PLURAL_TO_SINGULAR['policies']).toBe('policy');
     expect(PLURAL_TO_SINGULAR['sharingRules']).toBe('sharingRule');
     expect(PLURAL_TO_SINGULAR['analyticsCubes']).toBe('analyticsCube');
-    expect(PLURAL_TO_SINGULAR['ragPipelines']).toBe('ragPipeline');
   });
 
   it('should have a reverse map that is consistent', () => {

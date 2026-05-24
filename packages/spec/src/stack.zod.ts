@@ -39,7 +39,6 @@ import { FeatureFlagSchema } from './kernel/feature.zod';
 // AI Protocol
 import { AgentSchema } from './ai/agent.zod';
 import { SkillSchema } from './ai/skill.zod';
-import { RAGPipelineConfigSchema } from './ai/rag-pipeline.zod';
 
 // Data Protocol (additional)
 import { HookSchema } from './data/hook.zod';
@@ -242,11 +241,9 @@ export const ObjectStackDefinitionSchema = lazySchema(() => z.object({
    * - **skills**: Reusable capability bundles ("topics" in Salesforce parlance).
    *   Each skill groups related tools, declares trigger phrases for
    *   intent matching, and trigger conditions for context-aware activation.
-   * - **ragPipelines**: Retrieval pipelines wired into agent `knowledge`.
    */
   agents: z.array(AgentSchema).optional().describe('AI Agents and Assistants'),
   skills: z.array(SkillSchema).optional().describe('AI Skills (reusable capability bundles referenced by Agents)'),
-  ragPipelines: z.array(RAGPipelineConfigSchema).optional().describe('RAG Pipelines'),
 
   /**
    * ObjectQL: Data Extensions
@@ -426,6 +423,50 @@ export interface DefineStackOptions {
    * @default true
    */
   strict?: boolean;
+}
+
+/**
+ * Validate that every object name is prefixed with the package namespace.
+ *
+ * Rules:
+ * - When `manifest.namespace` is set, every `object.name` MUST start with
+ *   `${namespace}_` (single underscore). Returns one error per offender.
+ * - Names starting with `sys_` are platform-reserved and always allowed.
+ * - Names containing `__` (legacy FQN double-underscore form) are flagged
+ *   so authors migrate to the canonical single-prefix form.
+ * - When `manifest.namespace` is absent (legacy stacks), the check is
+ *   skipped — `defineStack` does not invent a prefix on the author's
+ *   behalf because doing so would silently introduce a second writing
+ *   style.
+ *
+ * The rule applies recursively to references on other metadata too
+ * (views, dashboards, reports, flows, approvals, hooks, app navigation,
+ * sharing rules, permissions) — but those are checked by the existing
+ * `validateCrossReferences` against the canonical object set, so mis-
+ * prefixed references will surface there once the objects are correct.
+ */
+function validateNamespacePrefix(config: ObjectStackDefinition): string[] {
+  const errors: string[] = [];
+  const ns = config.manifest?.namespace;
+  if (!ns || !config.objects) return errors;
+
+  const expectedPrefix = `${ns}_`;
+  for (const obj of config.objects) {
+    if (!obj.name) continue;
+    if (obj.name.startsWith('sys_')) continue;
+    if (obj.name.includes('__')) {
+      errors.push(
+        `Object '${obj.name}' uses the legacy FQN form '<ns>__<short>'. Rename it to '${expectedPrefix}${obj.name.slice(obj.name.indexOf('__') + 2)}'.`,
+      );
+      continue;
+    }
+    if (!obj.name.startsWith(expectedPrefix)) {
+      errors.push(
+        `Object '${obj.name}' is missing the package namespace prefix. Rename it to '${expectedPrefix}${obj.name}' (manifest.namespace = '${ns}').`,
+      );
+    }
+  }
+  return errors;
 }
 
 /**
@@ -740,6 +781,14 @@ export function defineStack(
     throw new Error(`${header}\n\n${lines.join('\n')}`);
   }
 
+  const nsErrors = validateNamespacePrefix(result.data);
+  if (nsErrors.length > 0) {
+    const header = `defineStack namespace-prefix validation failed (${nsErrors.length} issue${nsErrors.length === 1 ? '' : 's'}):`;
+    const lines = nsErrors.map((e) => `  ✗ ${e}`);
+    const hint = `\n\nEvery object.name must be \`\${manifest.namespace}_\${shortName}\`. This is the only supported writing style — the platform does not provide ns() helpers or factory wrappers.`;
+    throw new Error(`${header}\n\n${lines.join('\n')}${hint}`);
+  }
+
   return mergeActionsIntoObjects(result.data);
 }
 
@@ -810,7 +859,6 @@ const CONCAT_ARRAY_FIELDS = [
   'webhooks',
   'agents',
   'skills',
-  'ragPipelines',
   'hooks',
   'mappings',
   'analyticsCubes',

@@ -36,24 +36,43 @@ export const ManifestSchema = z.object({
   id: z.string().describe('Unique package identifier (reverse domain style)'),
   
   /**
-   * Short namespace identifier for metadata scoping.
+   * Short namespace identifier for metadata scoping AND the mandatory
+   * prefix of every object name in this package.
    *
-   * **Internal mechanic only.** Users and AI write objects using **short names**
-   * (e.g. `account`, `deal`). The namespace is used internally by the registry
-   * to compute a Fully Qualified Name (FQN, `{namespace}__{shortName}`) for
-   * cross-package disambiguation, marketplace publishing, and customization
-   * baseName references. It is **not** part of the physical table name and
-   * should not appear in user-facing code, queries, REST URLs, or formulas.
+   * **Authoring rule (single canonical style — no alternatives):**
+   * Every `object.name` in this stack MUST be `${namespace}_${shortName}`.
+   * AI and humans write the full prefixed name verbatim everywhere it
+   * appears (`*.object.ts`, view `data.object`, dashboard `object`,
+   * report `objectName`, flow / approval / hook references, app
+   * navigation `objectName`, seed dataset `externalId`, translation
+   * `objects.<name>` keys, permissions, sharing rules).
+   *
+   * Examples:
+   *   namespace: 'todo' → object names: 'todo_task', 'todo_project'
+   *   namespace: 'crm'  → object names: 'crm_account', 'crm_contact'
+   *
+   * `defineStack()` enforces this with a validator that lists every
+   * violation and the expected fix. The platform deliberately does NOT
+   * provide a `ns('task') → 'todo_task'` helper or a generic factory
+   * (`defineObject<'todo'>(...)`) — two writing styles cause AI to
+   * guess wrong half the time. The full prefixed literal is the only
+   * supported form.
+   *
+   * Physical storage uses the full prefixed name as the table name, so
+   * multiple packages installed in the same database cannot collide.
    *
    * Rules:
    * - 2-20 characters, lowercase letters, digits, and underscores only.
    * - Must be unique within a running instance.
-   * - Platform-reserved namespaces: "base", "system".
+   * - Platform-reserved namespaces: "base", "system", "sys".
+   * - Object names starting with `sys_` are reserved for the platform
+   *   and exempt from the namespace-prefix check (apps may reference
+   *   them but never define them).
    */
   namespace: z.string()
     .regex(/^[a-z][a-z0-9_]{1,19}$/, 'Namespace must be 2-20 chars, lowercase alphanumeric + underscore')
     .optional()
-    .describe('Short namespace identifier for metadata scoping (e.g. "crm", "todo")'),
+    .describe('Short namespace identifier; also the mandatory prefix of every object name (e.g. "todo" → object names "todo_task", "todo_project")'),
 
   /**
    * Default datasource for all objects in this package.

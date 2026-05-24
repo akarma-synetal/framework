@@ -1,7 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { z } from 'zod';
-import { TokenUsageSchema } from './cost.zod';
+import { TokenUsageSchema } from './usage.zod';
 
 /**
  * AI Conversation Memory Protocol
