@@ -1,5 +1,5 @@
 ---
-'@objectstack/driver-sqlite-wasm': major
+'@objectstack/driver-sqlite-wasm': patch
 ---
 
 Sync `@objectstack/driver-sqlite-wasm` into the v6 fixed-version group so it
