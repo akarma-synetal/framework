@@ -16,7 +16,8 @@
     "build": "objectstack build",
     "typecheck": "tsc --noEmit",
     "test": "objectstack test",
-    "test:ai": "tsx test/ai.test.ts"
+    "test:ai": "tsx test/ai.test.ts",
+    "test:agent": "tsx test/ai-agent.test.ts"
   },
   "dependencies": {
     "@objectstack/client": "workspace:*",

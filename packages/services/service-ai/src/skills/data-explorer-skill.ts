@@ -36,6 +36,7 @@ Guidelines:
 7. Never expose internal IDs unless the user explicitly asks for them.
 8. Always answer in the same language the user is using.`,
   tools: [
+    'query_data',
     'list_objects',
     'describe_object',
     'query_records',

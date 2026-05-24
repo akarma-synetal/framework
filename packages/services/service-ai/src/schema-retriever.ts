@@ -89,8 +89,15 @@ export class SchemaRetriever {
     const lines: string[] = ['## Schema context (auto-injected)'];
     for (const hit of hits) {
       const obj = hit.object;
-      const label = obj.label ? ` — ${obj.label}` : '';
-      lines.push(`### ${obj.name}${label}`);
+      // Emit `### name — Label (Plural)` so downstream consumers (system
+      // prompt for the LLM, MemoryAdapter heuristic) can score by either
+      // the machine name, the singular label, or the plural label. Real
+      // users typically say "show me my tasks", not "list todo_task".
+      const parts: string[] = [];
+      if (obj.label) parts.push(obj.label);
+      if (obj.pluralLabel && obj.pluralLabel !== obj.label) parts.push(`(${obj.pluralLabel})`);
+      const header = parts.length > 0 ? ` — ${parts.join(' ')}` : '';
+      lines.push(`### ${obj.name}${header}`);
       const fields = Object.entries(obj.fields ?? {}).slice(0, maxFieldsPerObject);
       for (const [name, field] of fields) {
         lines.push(`  - ${name}: ${describeField(field)}`);

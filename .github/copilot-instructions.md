@@ -85,8 +85,10 @@ objectstack-ai/spec/
 │       └── service-storage/
 │
 ├── apps/
-│   ├── studio/            # 🎨 Studio UI (React + Hono, web-based)
-│   ├── docs/              # 📖 Documentation site (Fumadocs + Next.js)
+│   └── docs/              # 📖 Documentation site (Fumadocs + Next.js)
+│
+│   # NOTE: Studio UI has moved to a sibling repository (`../objectui`).
+│   # Backend protocols + REST live here; do not look for Studio in this repo.
 │   └── server/            # 🚀 Production server (multi-app orchestration)
 │
 ├── examples/              # 📚 Reference implementations
@@ -268,7 +270,7 @@ When editing files matching these patterns, apply the corresponding architectura
 | `packages/services/**` | **Service Engineer** | Kernel-managed services, DI integration |
 | `packages/adapters/**` | **Integration Engineer** | Framework-specific bindings, zero business logic |
 | `packages/client*/**` | **SDK Engineer** | Public API surface, type safety, DX |
-| `apps/studio/**` | **UI Engineer** | React + Shadcn UI + Tailwind, dark mode default |
+| `../objectui/**` (sibling repo) | **Studio UI Engineer** | Studio is a separate repo. Work there, not here. |
 | `apps/docs/**` | **Documentation Engineer** | Fumadocs + Next.js, MDX content |
 | `examples/**` | **Example Author** | Minimal, runnable, follows `defineStack()` pattern |
 | `content/docs/**` | **Technical Writer** | Respect auto-gen vs hand-written boundaries |

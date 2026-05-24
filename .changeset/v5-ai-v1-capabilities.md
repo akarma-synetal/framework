@@ -46,6 +46,20 @@ non-breaking — new contract methods are optional and existing callers keep wor
   the moment `AIServicePlugin` is loaded; no user config needed. Exported as `AiTraceView`
   for advanced reuse / composition.
 
+- **`chat_with_tools` is now traced**: `AIService.chatWithTools` is wrapped in the same
+  instrumentation as `chat` / `generate_object`, so multi-step agent runs land a single
+  row in `ai_traces` with the total latency, model, and status. Inner per-iteration
+  `chat` calls remain instrumented for fine-grained debugging.
+
+- **`MemoryLLMAdapter` tool dispatch**: the in-memory adapter now recognises an injected
+  `query_data` tool and returns a `tool-call` for it, then summarises the tool result
+  on the next iteration. This lets `chatWithTools` drive the built-in `data_chat`
+  agent end-to-end without an API key — enabling deterministic CI and demo flows.
+
+- **`data_explorer` skill includes `query_data`**: the bundled capability set now lists
+  `query_data` first, so adapters that cannot drive multi-step tool calling (memory,
+  small local models) still satisfy data questions in a single shot.
+
 - **Working demo in `examples/app-todo`**: `pnpm --filter @example/app-todo test:ai` boots the
   full Todo stack, invokes `query_data` against the seeded tasks, and verifies the call lands
   in `ai_traces`. Zero API keys, ~3 seconds end-to-end. Serves as the canonical reference for

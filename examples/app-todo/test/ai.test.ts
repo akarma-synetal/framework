@@ -87,7 +87,7 @@ import { Task } from '../src/objects/task.object';
     metadata: metadata as never,
     dataEngine: ql as never,
   });
-  const raw = await handler({ request: 'list my todo_task records' });
+  const raw = await handler({ request: 'show me my tasks' });
   const parsed = JSON.parse(raw) as {
     plan?: { objectName: string; limit?: number };
     count?: number;

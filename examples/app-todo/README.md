@@ -128,6 +128,22 @@ What it does — **no API key required**:
    - Returns the records
 5. Verifies the call was auto-recorded as a row in the `ai_traces` object with `operation='generate_object'`, latency, status, and model
 
+### Agent Demo (`pnpm test:agent`)
+
+A higher-level demo that exercises the **`data_chat` built-in agent** end-to-end:
+
+```bash
+pnpm --filter @example/app-todo test:agent
+```
+
+1. Sends a natural-language user message to `AIService.chatWithTools()` (the same path the REST endpoint `POST /api/v1/ai/agents/data_chat/chat` uses)
+2. `MemoryLLMAdapter` returns a `query_data` tool call
+3. The tool registry executes it, feeds the result back
+4. The adapter summarises: `"[memory] Found 8 records for ..."`
+5. Verifies a `chat_with_tools` row was persisted in `ai_traces`
+
+This is the canonical "ask in English, get real data" loop. Swap in a real LLM adapter and the loop carries `data_chat` directly to production — no code changes.
+
 To switch to a real LLM, replace `MemoryLLMAdapter` with the auto-detected `VercelLLMAdapter` and set `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` — everything else stays the same.
 
 ## 📖 Learning Path

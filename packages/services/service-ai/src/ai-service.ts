@@ -245,6 +245,15 @@ export class AIService implements IAIService {
     messages: ModelMessage[],
     options?: ChatWithToolsOptions,
   ): Promise<AIResult> {
+    return this.instrument('chat_with_tools', options, () =>
+      this.chatWithToolsImpl(messages, options),
+    );
+  }
+
+  private async chatWithToolsImpl(
+    messages: ModelMessage[],
+    options?: ChatWithToolsOptions,
+  ): Promise<AIResult> {
     // Destructure loop-specific options so they are never forwarded to the adapter
     const { maxIterations: maxIter, onToolError, ...restOptions } = options ?? {};
     const maxIterations = maxIter ?? AIService.DEFAULT_MAX_ITERATIONS;

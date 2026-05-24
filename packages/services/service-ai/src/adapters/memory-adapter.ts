@@ -24,9 +24,82 @@ export class MemoryLLMAdapter implements LLMAdapter {
   async chat(messages: ModelMessage[], options?: AIRequestOptions): Promise<AIResult> {
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
     const userContent = lastUserMessage?.content;
-    const text = typeof userContent === 'string' ? userContent : '(complex content)';
+    const userText = typeof userContent === 'string' ? userContent : '(complex content)';
+
+    // ── Heuristic tool-calling support ──────────────────────────────────────
+    // When `chatWithTools` injects available tools and the conversation has
+    // not yet executed `query_data`, request a single call to it with the
+    // user's natural-language request. Once a `role: 'tool'` message comes
+    // back, summarise its records and stop. This lets demos/tests drive the
+    // agent end-to-end without a real LLM provider.
+    const tools = options?.tools as Array<{ name: string }> | undefined;
+    const hasQueryDataTool = Array.isArray(tools) && tools.some(t => t?.name === 'query_data');
+    const alreadyCalledQueryData = messages.some(
+      m =>
+        m.role === 'tool' &&
+        Array.isArray(m.content) &&
+        (m.content as Array<{ toolName?: string }>).some(c => c?.toolName === 'query_data'),
+    );
+
+    if (hasQueryDataTool && !alreadyCalledQueryData && lastUserMessage) {
+      const toolCallId = `memory_tc_${Date.now().toString(36)}`;
+      return {
+        content: '',
+        model: options?.model ?? 'memory',
+        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        toolCalls: [
+          {
+            type: 'tool-call',
+            toolCallId,
+            toolName: 'query_data',
+            input: { request: userText },
+          } as unknown as NonNullable<AIResult['toolCalls']>[number],
+        ],
+      };
+    }
+
+    // If a query_data result is already in the conversation, summarise it.
+    if (alreadyCalledQueryData) {
+      const lastTool = [...messages].reverse().find(m => m.role === 'tool');
+      const part = Array.isArray(lastTool?.content)
+        ? (lastTool!.content as Array<{
+            toolName?: string;
+            output?: { type?: string; value?: unknown };
+            result?: unknown;
+          }>).find(c => c?.toolName === 'query_data')
+        : undefined;
+      let payload: { records?: unknown[]; count?: number; error?: string } = {};
+      const raw =
+        part?.output && typeof part.output === 'object' && 'value' in part.output
+          ? part.output.value
+          : part?.result;
+      if (typeof raw === 'string') {
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          payload = {};
+        }
+      } else if (raw && typeof raw === 'object') {
+        payload = raw as typeof payload;
+      }
+      if (payload.error) {
+        return {
+          content: `[memory] query_data failed: ${payload.error}`,
+          model: options?.model ?? 'memory',
+          usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        };
+      }
+      const records = payload.records ?? [];
+      const count = payload.count ?? records.length;
+      return {
+        content: `[memory] Found ${count} record${count === 1 ? '' : 's'} for "${userText}".`,
+        model: options?.model ?? 'memory',
+        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+      };
+    }
+
     const content = lastUserMessage
-      ? `[memory] ${text}`
+      ? `[memory] ${userText}`
       : '[memory] (no user message)';
 
     return {
@@ -97,10 +170,31 @@ export class MemoryLLMAdapter implements LLMAdapter {
       .filter(m => m.role === 'system')
       .map(m => (typeof m.content === 'string' ? m.content : ''))
       .join('\n');
-    const headerRe = /^###\s+([a-z0-9_]+)\b/gim;
-    const candidates: string[] = [];
+
+    // Parse headers of the form `### machine_name — Label (Plural)` emitted
+    // by SchemaRetriever.renderSnippet. Capture every alias so we can match
+    // against natural-language user queries like "show me my tasks".
+    const headerRe = /^###\s+([a-z0-9_]+)(?:\s+—\s+([^\n]+))?/gim;
+    type Candidate = { name: string; aliasTokens: Set<string> };
+    const candidates: Candidate[] = [];
     for (const match of sys.matchAll(headerRe)) {
-      if (match[1]) candidates.push(match[1]);
+      const machineName = match[1];
+      if (!machineName) continue;
+      const aliasText = match[2] ?? '';
+      const aliasTokens = new Set<string>();
+      // Tokens from the snake_case machine name
+      for (const t of machineName.split(/[^a-z0-9]+/)) {
+        if (t) aliasTokens.add(t);
+      }
+      // Tokens from the label / plural label (everything after the em dash)
+      for (const t of aliasText.toLowerCase().split(/[^a-z0-9]+/)) {
+        if (t) aliasTokens.add(t);
+      }
+      // Naive stem: include singular form of plural tokens ending in "s"
+      for (const t of [...aliasTokens]) {
+        if (t.length > 3 && t.endsWith('s')) aliasTokens.add(t.slice(0, -1));
+      }
+      candidates.push({ name: machineName, aliasTokens });
     }
 
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
@@ -110,16 +204,22 @@ export class MemoryLLMAdapter implements LLMAdapter {
     const userTokens = new Set(
       userText.split(/[^a-z0-9_]+/).filter(t => t.length > 1),
     );
+    // Apply the same naive plural→singular stem to user tokens so "tasks"
+    // also looks up as "task".
+    for (const t of [...userTokens]) {
+      if (t.length > 3 && t.endsWith('s')) userTokens.add(t.slice(0, -1));
+    }
 
-    let chosen = candidates[0];
+    let chosen = candidates[0]?.name;
     let bestScore = -1;
-    for (const name of candidates) {
-      const score = name
-        .split(/[^a-z0-9]+/)
-        .reduce((acc, tok) => acc + (tok && userTokens.has(tok) ? 1 : 0), 0);
+    for (const cand of candidates) {
+      let score = 0;
+      for (const tok of cand.aliasTokens) {
+        if (userTokens.has(tok)) score += 1;
+      }
       if (score > bestScore) {
         bestScore = score;
-        chosen = name;
+        chosen = cand.name;
       }
     }
 
