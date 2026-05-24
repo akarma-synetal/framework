@@ -1,5 +1,258 @@
 # @objectstack/spec
 
+## 6.0.0
+
+### Major Changes
+
+- 629a716: # v1 AI Protocol focusing — remove application-template schemas
+
+  The `@objectstack/spec/ai` protocol is reduced to **only the primitives
+  the runtime directly consumes**. Eight schemas that described
+  application templates or product features (not platform contracts) are
+  removed; three more are slimmed to their primitive cores.
+
+  ## Removed (8 files, ~4,700 lines)
+
+  | File                           | Reason for removal                                                                |
+  | ------------------------------ | --------------------------------------------------------------------------------- |
+  | `ai/devops-agent.zod.ts`       | A specific Agent template, not a primitive. Compose with `Agent + Skill + Tool`.  |
+  | `ai/plugin-development.zod.ts` | Specific workflow; same reasoning.                                                |
+  | `ai/runtime-ops.zod.ts`        | AIOps is a vertical product, not a backend platform concern.                      |
+  | `ai/predictive.zod.ts`         | ML pipeline product (DataRobot/H2O space), orthogonal to metadata-driven backend. |
+  | `ai/agent-action.zod.ts`       | 100% conceptual overlap with `tool` + `flow`.                                     |
+  | `ai/orchestration.zod.ts`      | Multi-agent plans can be expressed as agents-as-tools. Premature.                 |
+  | `ai/nlq.zod.ts`                | NLQ is LLM-native capability + a `query_data` tool over ObjectQL, not a protocol. |
+  | `ai/feedback-loop.zod.ts`      | RLHF / training-side concern; not platform-owned.                                 |
+
+  ## Slimmed (3 files)
+
+  - **`ai/rag-pipeline.zod.ts` → `ai/embedding.zod.ts`** (318 → 80 lines).
+    Keeps `EmbeddingModelSchema` + `VectorStoreSchema` primitives.
+    Removed: chunking strategies, retrieval pipelines, rerankers,
+    document loaders, end-to-end RAG pipeline DSL. The `ragPipelines`
+    field on `defineStack()` is removed.
+  - **`ai/cost.zod.ts` → `ai/usage.zod.ts`** (431 → ~70 lines).
+    Keeps `TokenUsageSchema` + `AIUsageRecordSchema`. Model pricing is
+    the canonical `ModelPricingSchema` already exported from
+    `ai/model-registry.zod.ts`. Removed: budget definitions,
+    enforcement, alerts, allocation reports, optimization
+    recommendations.
+  - **`ai/mcp.zod.ts`** (629 → ~100 lines). Defines only how to
+    _reference_ an external MCP server and _bind_ its tools to an
+    agent. The MCP protocol itself is owned by Anthropic's published
+    spec and the `@modelcontextprotocol/sdk`; we no longer re-declare
+    transport/capability/resource/prompt/streaming/sampling shapes.
+
+  ## Migration
+
+  No production code in this repository depended on the removed
+  schemas. Downstream consumers that imported any of the removed types
+  from `@objectstack/spec/ai` must:
+
+  1. **Remove the import.** The platform no longer provides these types.
+  2. **Define your own application-level shape** in your project / plugin
+     if you still need the concept. The primitives (`Agent`, `Skill`,
+     `Tool`, `Conversation`, `Embedding`, `Usage`, `MCP{ServerRef,ToolBinding}`)
+     are sufficient to express every removed schema.
+  3. For RAG: replace `RAGPipelineConfig` with your own pipeline
+     description built on `EmbeddingModelSchema` + `VectorStoreSchema`.
+  4. For cost: replace budget enforcement with your own service built
+     on `AIUsageRecordSchema` records.
+
+  ## Why
+
+  The platform's job is to define **primitives that any AI feature can
+  be built on top of**, leveraging the metadata-driven nature of
+  ObjectStack. The removed schemas described specific product features
+  (DevOps agent, AIOps, RAG pipeline DSL, budget enforcement) that
+  should live in plugins or applications — not in the canonical
+  protocol. Shipping a 6,245-line AI protocol where 80% of it has no
+  runtime implementation creates false promises to integrators.
+
+  After this change the AI protocol is:
+
+  ```
+  ai/
+  ├── agent.zod.ts          ← who
+  ├── skill.zod.ts          ← when
+  ├── tool.zod.ts           ← what
+  ├── conversation.zod.ts   ← what to remember
+  ├── model-registry.zod.ts ← which LLMs
+  ├── embedding.zod.ts      ← embedding + vector store primitives
+  ├── usage.zod.ts          ← token + cost accounting
+  └── mcp.zod.ts            ← external ecosystem bridge
+  ```
+
+  8 files, ~1,200 lines. Every schema has a runtime implementation in
+  `@objectstack/service-ai` or `@objectstack/plugin-mcp-server`.
+
+- 944f187: # v5.0 — `project` → `environment` hard rename
+
+  The runtime concept previously called **"project"** (per-tenant business
+  workspace; Org → **Project** → Branch hierarchy; per-project ObjectKernel,
+  per-project DB, per-project artifact) is now uniformly called
+  **"environment"**.
+
+  This is a **hard rename with no aliases, deprecation shims, or compatibility
+  layer**. Upgrade requires a coordinated update of CLI, runtime, server, and any
+  clients calling the REST API.
+
+  > Note: "project" in the npm / monorepo sense (the framework itself, `package.json`,
+  > tsconfig project references, vitest `projects` config) is **unchanged**.
+
+  ## Breaking changes
+
+  ### CLI
+
+  - Flags renamed:
+    - `--project` / `-p` → `--environment` / `-e` (`os publish`, `os rollback`)
+    - `--project-id` → `--environment-id` (`os dev`)
+  - Default local env id: `proj_local` → `env_local`.
+  - Env var: `OS_PROJECT_ID` → `OS_ENVIRONMENT_ID`.
+  - Command group renamed: `os projects ...` → `os environments ...`
+    (`bind`, `create`, `list`, `show`, `switch`).
+  - Persisted auth-config key: `activeProjectId` → `activeEnvironmentId`.
+
+  ### HTTP / REST
+
+  - Scoped routes: `/api/v1/projects/:projectId/...` → `/api/v1/environments/:environmentId/...`.
+  - Cloud control-plane routes: `/api/v1/cloud/projects/...` → `/api/v1/cloud/environments/...`
+    (including `/cloud/environments/:id/artifact`, `/cloud/environments/:id/metadata`,
+    `/cloud/environments/:id/credentials/rotate`, etc.).
+  - Header: `X-Project-Id` (and lowercase `x-project-id`) → `X-Environment-Id`
+    (`x-environment-id`).
+  - Route param name in handlers: `req.params.projectId` → `req.params.environmentId`.
+  - Hostname-routing and tenant-resolution code-paths use `environmentId` end-to-end.
+
+  ### Runtime / spec
+
+  - Exported symbols (no aliases):
+    - `createSystemProjectPlugin` → `createSystemEnvironmentPlugin`
+    - `SYSTEM_PROJECT_ID` → `SYSTEM_ENVIRONMENT_ID`
+    - `ProjectArtifactSchema` → `EnvironmentArtifactSchema`
+    - `PROJECT_ARTIFACT_SCHEMA_VERSION` → `ENVIRONMENT_ARTIFACT_SCHEMA_VERSION`
+    - `ObjectOSProjectPlugin` → `ObjectOSEnvironmentPlugin`
+    - `createSingleProjectPlugin` → `createSingleEnvironmentPlugin`
+  - Plugin identifier strings:
+    - `com.objectstack.runtime.objectos-project` → `objectos-environment`
+    - `com.objectstack.studio.single-project` → `single-environment`
+    - `com.objectstack.multi-project` → `multi-environment`
+    - `com.objectstack.runtime.system-project` → `system-environment`
+  - Provisioning hook: `provisionSystemProject` → `provisionSystemEnvironment`.
+
+  ### Database / schemas
+
+  - Column renames on `sys_metadata` and `sys_metadata_history`:
+    `project_id` → `environment_id`.
+  - Column renames on `sys_activity`: `project_id` → `environment_id` (plus index).
+  - Object renames in platform-objects metadata: `sys_project` → `sys_environment`
+    (lookup targets), `sys_project_member` → `sys_environment_member`,
+    `sys_project_credential` → `sys_environment_credential`.
+  - Auth-context field: `active_project_id` → `active_environment_id`.
+  - JSON schemas under `packages/spec/json-schema/system/`:
+    `ProjectArtifact*.json` → `EnvironmentArtifact*.json` (regenerated at build).
+
+  ### Automatic forward migration
+
+  A new migration `migrateProjectIdToEnvironmentId`
+  (`packages/metadata/src/migrations/migrate-project-id-to-environment-id.ts`)
+  auto-runs from `DatabaseLoader.ensureSchema()` on bootstrap and rewrites any
+  existing `project_id` column on `sys_metadata` / `sys_metadata_history` to
+  `environment_id` (idempotent, best-effort). Existing rows are preserved.
+
+  The legacy reverse migration `migrateEnvIdToProjectId` is retained verbatim
+  for historical / disaster-recovery use; it is **not** auto-run.
+
+  ## Migration guide
+
+  ```diff
+  -os publish --project proj_xyz
+  +os publish --environment env_xyz
+
+  -curl -H "X-Project-Id: env_xyz" https://api.example.com/api/v1/data/customer
+  +curl -H "X-Environment-Id: env_xyz" https://api.example.com/api/v1/data/customer
+
+  -OS_PROJECT_ID=env_xyz os dev
+  +OS_ENVIRONMENT_ID=env_xyz os dev
+
+  -import { createSystemProjectPlugin, SYSTEM_PROJECT_ID } from "@objectstack/runtime";
+  +import { createSystemEnvironmentPlugin, SYSTEM_ENVIRONMENT_ID } from "@objectstack/runtime";
+
+  -import { ProjectArtifactSchema } from "@objectstack/spec";
+  +import { EnvironmentArtifactSchema } from "@objectstack/spec";
+  ```
+
+  If you maintain a Cloud control-plane deployment, the `cloud` repository must
+  be updated in lockstep to pick up the new plugin identifier strings
+  (`single-environment`, `multi-environment`, `objectos-environment`).
+
+### Minor Changes
+
+- dbc4f7d: feat(ai): v1 AI capabilities — ModelRegistry, structured output, tracing, schema retrieval, and `query_data` tool
+
+  This release lights up the first concrete capabilities on the slimmed AI protocol. All additions are
+  non-breaking — new contract methods are optional and existing callers keep working unchanged.
+
+  ### What's new
+
+  - **ModelRegistry** (`@objectstack/service-ai`): in-memory runtime registry for `AI.ModelConfig`.
+    Wire models via `AIServicePluginOptions.models` / `defaultModelId`. Exposes `get`, `getOrThrow`,
+    `getDefault`, `list`, and `estimateCost(modelId, usage)` for ex-post token cost computation.
+
+  - **ai_traces object + auto-tracing**: every LLM call from `AIService` (`chat`, `complete`,
+    `stream_chat`, `chat_with_tools`, `generate_object`, `embed`) is now instrumented with latency,
+    token usage, status, and (when pricing is registered) cost. The default `ObjectQLTraceRecorder`
+    is auto-wired when the runtime exposes an `IDataEngine`, persisting rows to the new `ai_traces`
+    object. Drop in a custom `TraceRecorder` via `AIServicePluginOptions.traceRecorder`, or pass
+    `null` to opt out.
+
+  - **Structured output (`IAIService.generateObject`)**: new optional method on `IAIService` and
+    `LLMAdapter` that returns a parsed, schema-validated object instead of free-form text.
+    Implemented end-to-end in `VercelLLMAdapter` (uses the AI SDK's `generateObject` — provider
+    strict-mode is automatic when supported). `MemoryLLMAdapter` ships a deterministic heuristic
+    implementation so tests and demos work without an API key.
+
+  - **SchemaRetriever**: lightweight keyword-based retriever over `IMetadataService.listObjects()`.
+    Scores by object name (×3), label/plural (×2), description (×1), field name (×2), and field
+    label (×1) with English stop-word filtering. Tokenisation splits snake_case so `todo_task` in
+    a query matches `name: 'todo_task'`. `SchemaRetriever.renderSnippet()` produces a Markdown
+    block ready to inject into a system prompt — no embeddings, no extra infra.
+
+  - **`query_data` tool**: auto-registered when AI + Metadata + Data engine are all present. Takes
+    a natural-language `request`, retrieves relevant schemas, asks the model for a structured
+    `QueryPlan` via `generateObject`, validates the plan targets a real object, and executes it
+    through `IDataEngine.find`. Returns `{ plan, count, records }`. The composed primitive that
+    closes the loop from "ask in English" → "validated SQL-shaped result".
+
+  - **Working demo in `examples/app-todo`**: `pnpm --filter @example/app-todo test:ai` boots the
+    full Todo stack, invokes `query_data` against the seeded tasks, and verifies the call lands
+    in `ai_traces`. Zero API keys, ~3 seconds end-to-end. Serves as the canonical reference for
+    wiring AI into a real app.
+
+  ### Hardening
+
+  - Strict tool schemas: nested `orderBy` and `aggregations` items in `data-tools` now declare
+    `additionalProperties: false` + `required`, matching the top-level contract and making them
+    safe for provider strict mode.
+
+  ### Breaking-ish
+
+  - `TraceOperation` values are now snake_case (`stream_chat`, `chat_with_tools`, `generate_object`)
+    to match the project's data-value convention and so the `ai_traces.operation` select validates.
+    Custom `TraceRecorder` implementations that hard-code the old camelCase names need to be
+    updated. The values are an internal observability artefact — no public protocol surface
+    exposes them.
+
+  ### Notes
+
+  - `zod` is now a direct dependency of `@objectstack/service-ai` (previously transitive via `ai`)
+    because contract signatures and the new tool definition use `z.ZodType` types directly.
+  - All new methods on `IAIService` / `LLMAdapter` are optional — existing custom adapters and
+    callers continue to work without changes.
+  - 12 new unit tests cover `ModelRegistry` (cost math, defaults, throwing lookups) and
+    `SchemaRetriever` (scoring, snake_case tokenisation, limits, snippet rendering).
+    Full suite: 323/323 ✓.
+
 ## 5.2.0
 
 ### Minor Changes
