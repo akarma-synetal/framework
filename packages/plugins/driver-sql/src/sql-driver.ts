@@ -141,6 +141,8 @@ export class SqlDriver implements IDataDriver {
   protected config: Knex.Config;
   protected jsonFields: Record<string, string[]> = {};
   protected booleanFields: Record<string, string[]> = {};
+  protected dateFields: Record<string, Set<string>> = {};
+  protected datetimeFields: Record<string, Set<string>> = {};
   protected tablesWithTimestamps: Set<string> = new Set();
   /**
    * Autonumber field configs per table, captured during initObjects.
@@ -1019,6 +1021,12 @@ export class SqlDriver implements IDataDriver {
           if (type === 'boolean') {
             booleanCols.push(name);
           }
+          if (type === 'date') {
+            (this.dateFields[tableName] ??= new Set()).add(name);
+          }
+          if (type === 'datetime') {
+            (this.datetimeFields[tableName] ??= new Set()).add(name);
+          }
           if (type === 'auto_number' || type === 'autonumber') {
             const fmt = typeof field.format === 'string' && field.format
               ? field.format
@@ -1247,8 +1255,81 @@ export class SqlDriver implements IDataDriver {
 
   // ── Filter helpers ──────────────────────────────────────────────────────────
 
+  /**
+   * Resolve the underlying table name for a Knex query builder so we can
+   * look up column type metadata (date/datetime maps populated during
+   * `initObjects`). Returns null when the builder is not table-scoped yet.
+   */
+  protected tableNameForBuilder(builder: any): string | null {
+    const t = builder?._single?.table;
+    if (typeof t === 'string') return t;
+    return null;
+  }
+
+  /**
+   * Normalise a filter value for a single column so the comparison the
+   * driver sends to SQLite matches the on-disk representation.
+   *
+   * The platform stores `Field.datetime()` values as INTEGER milliseconds
+   * (the result of passing a JS `Date` through better-sqlite3) but date
+   * macros like `{last_quarter_start}` expand to an ISO `YYYY-MM-DD` string
+   * client-side. Without coercion the SQL becomes `published_at >= '2026-…'`
+   * which collapses to a TEXT-vs-INTEGER affinity compare and never
+   * matches. We translate the ISO/Date/numeric inputs into the storage
+   * type so the comparison works.
+   *
+   * For `Field.date()` we keep ISO TEXT but normalise Date objects to
+   * `YYYY-MM-DD` for the same reason.
+   */
+  protected coerceFilterValue(table: string | null, field: string, value: any): any {
+    if (value == null || !table) return value;
+    if (Array.isArray(value)) return value.map((v) => this.coerceFilterValue(table, field, v));
+
+    const isDatetime = this.datetimeFields[table]?.has(field);
+    const isDate = this.dateFields[table]?.has(field);
+    if (!isDatetime && !isDate) return value;
+
+    const toMs = (v: any): number | null => {
+      if (v instanceof Date) return v.getTime();
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+      if (typeof v === 'string') {
+        const trimmed = v.trim();
+        if (trimmed === '') return null;
+        if (/^-?\d+$/.test(trimmed)) {
+          const n = Number(trimmed);
+          if (Number.isFinite(n)) return n;
+        }
+        // Treat bare YYYY-MM-DD as start-of-day UTC; full ISO is parsed
+        // as-is so timezones round-trip correctly.
+        const iso = /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? `${trimmed}T00:00:00.000Z` : trimmed;
+        const n = Date.parse(iso);
+        return Number.isFinite(n) ? n : null;
+      }
+      return null;
+    };
+
+    if (isDatetime) {
+      const ms = toMs(value);
+      return ms == null ? value : ms;
+    }
+
+    // Field.date — normalise to YYYY-MM-DD.
+    if (value instanceof Date) {
+      const y = value.getUTCFullYear();
+      const m = String(value.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(value.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
+    }
+    return value;
+  }
+
   protected applyFilters(builder: Knex.QueryBuilder, filters: any) {
     if (!filters) return;
+    const table = this.tableNameForBuilder(builder);
 
     if (!Array.isArray(filters) && typeof filters === 'object') {
       const hasMongoOperators = Object.keys(filters).some(
@@ -1260,13 +1341,13 @@ export class SqlDriver implements IDataDriver {
       );
 
       if (hasMongoOperators) {
-        this.applyFilterCondition(builder, filters);
+        this.applyFilterCondition(builder, filters, 'and', table);
         return;
       }
 
       for (const [key, value] of Object.entries(filters)) {
         if (['limit', 'offset', 'fields', 'orderBy'].includes(key)) continue;
-        builder.where(key, value as any);
+        builder.where(key, this.coerceFilterValue(table, key, value) as any);
       }
       return;
     }
@@ -1288,6 +1369,7 @@ export class SqlDriver implements IDataDriver {
 
         if (isCriterion) {
           const field = this.mapSortField(fieldRaw);
+          const coerced = this.coerceFilterValue(table, field, value);
           const apply = (b: any) => {
             const method = nextJoin === 'or' ? 'orWhere' : 'where';
             const methodIn = nextJoin === 'or' ? 'orWhereIn' : 'whereIn';
@@ -1300,19 +1382,19 @@ export class SqlDriver implements IDataDriver {
 
             switch (op) {
               case '=':
-                b[method](field, value);
+                b[method](field, coerced);
                 break;
               case '!=':
-                b[method](field, '<>', value);
+                b[method](field, '<>', coerced);
                 break;
               case 'in':
-                b[methodIn](field, value);
+                b[methodIn](field, coerced);
                 break;
               case 'nin':
-                b[methodNotIn](field, value);
+                b[methodNotIn](field, coerced);
                 break;
               default:
-                b[method](field, op, value);
+                b[method](field, op, coerced);
             }
           };
           apply(builder);
@@ -1328,15 +1410,16 @@ export class SqlDriver implements IDataDriver {
     }
   }
 
-  protected applyFilterCondition(builder: Knex.QueryBuilder, condition: any, logicalOp: 'and' | 'or' = 'and') {
+  protected applyFilterCondition(builder: Knex.QueryBuilder, condition: any, logicalOp: 'and' | 'or' = 'and', tableHint?: string | null) {
     if (!condition || typeof condition !== 'object') return;
+    const table = tableHint ?? this.tableNameForBuilder(builder);
 
     for (const [key, value] of Object.entries(condition)) {
       if (key === '$and' && Array.isArray(value)) {
         builder.where((qb) => {
           for (const sub of value) {
             qb.where((subQb) => {
-              this.applyFilterCondition(subQb, sub, 'and');
+              this.applyFilterCondition(subQb, sub, 'and', table);
             });
           }
         });
@@ -1345,7 +1428,7 @@ export class SqlDriver implements IDataDriver {
         (builder as any)[method]((qb: any) => {
           for (const sub of value) {
             qb.orWhere((subQb: any) => {
-              this.applyFilterCondition(subQb, sub, 'or');
+              this.applyFilterCondition(subQb, sub, 'or', table);
             });
           }
         });
@@ -1353,46 +1436,47 @@ export class SqlDriver implements IDataDriver {
         const field = this.mapSortField(key);
         for (const [op, opValue] of Object.entries(value as Record<string, any>)) {
           const method = logicalOp === 'or' ? 'orWhere' : 'where';
+          const coerced = this.coerceFilterValue(table, field, opValue);
           switch (op) {
             case '$eq':
-              (builder as any)[method](field, opValue);
+              (builder as any)[method](field, coerced);
               break;
             case '$ne':
-              (builder as any)[method](field, '<>', opValue);
+              (builder as any)[method](field, '<>', coerced);
               break;
             case '$gt':
-              (builder as any)[method](field, '>', opValue);
+              (builder as any)[method](field, '>', coerced);
               break;
             case '$gte':
-              (builder as any)[method](field, '>=', opValue);
+              (builder as any)[method](field, '>=', coerced);
               break;
             case '$lt':
-              (builder as any)[method](field, '<', opValue);
+              (builder as any)[method](field, '<', coerced);
               break;
             case '$lte':
-              (builder as any)[method](field, '<=', opValue);
+              (builder as any)[method](field, '<=', coerced);
               break;
             case '$in': {
               const mIn = logicalOp === 'or' ? 'orWhereIn' : 'whereIn';
-              (builder as any)[mIn](field, opValue as any[]);
+              (builder as any)[mIn](field, coerced as any[]);
               break;
             }
             case '$nin': {
               const mNotIn = logicalOp === 'or' ? 'orWhereNotIn' : 'whereNotIn';
-              (builder as any)[mNotIn](field, opValue as any[]);
+              (builder as any)[mNotIn](field, coerced as any[]);
               break;
             }
             case '$contains':
               (builder as any)[method](field, 'like', `%${opValue}%`);
               break;
             default:
-              (builder as any)[method](field, opValue);
+              (builder as any)[method](field, coerced);
           }
         }
       } else {
         const field = this.mapSortField(key);
         const method = logicalOp === 'or' ? 'orWhere' : 'where';
-        (builder as any)[method](field, value as any);
+        (builder as any)[method](field, this.coerceFilterValue(table, field, value) as any);
       }
     }
   }
