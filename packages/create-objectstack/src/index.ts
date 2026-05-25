@@ -1,642 +1,286 @@
-// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+// Copyright (c) 2026 ObjectStack contributors. Apache-2.0 license.
+
+/**
+ * create-objectstack — scaffold a new ObjectStack environment.
+ *
+ * Two template sources:
+ *
+ *   1. Bundled `blank` template
+ *      Lives at `dist/templates/blank/` (copied from `src/templates/blank/`
+ *      by tsup `onSuccess`). Cloned via recursive fs copy. Always available
+ *      offline.
+ *
+ *   2. Remote content templates (`todo`, `compliance`, `content`,
+ *      `contracts`, `procurement`)
+ *      Fetched as a single tarball from the sibling repo
+ *      `objectstack-ai/templates` on GitHub, then the `packages/<name>/`
+ *      subtree is extracted. Requires network.
+ *
+ * After the files land in `targetDir`, four files are rewritten with the
+ * user-supplied project name:
+ *   - package.json              .name
+ *   - objectstack.manifest.json .name + .displayName
+ *   - objectstack.config.ts     manifest.id and manifest.name string literals
+ *   - README.md                 first H1
+ *
+ * Finally we run `<pm> install` and (best-effort) install the ObjectStack
+ * skills bundle via `npx skills add objectstack-ai/framework --all`.
+ */
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import fs from 'fs';
-import path from 'path';
-import { execSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { pipeline } from 'node:stream/promises';
+import { createGunzip } from 'node:zlib';
+import { createWriteStream, createReadStream } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+// eslint-disable-next-line import/no-unresolved
+import * as tar from 'tar';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const TEMPLATES_DIR = path.resolve(__dirname, 'templates');
+const BUNDLED_TEMPLATES_DIR = path.resolve(__dirname, 'templates');
+
+const REMOTE_REPO = 'objectstack-ai/templates';
+const REMOTE_BRANCH = 'main';
+const REMOTE_TARBALL_URL = `https://codeload.github.com/${REMOTE_REPO}/tar.gz/refs/heads/${REMOTE_BRANCH}`;
 
 // ─── Template Registry ──────────────────────────────────────────────
 
-type TemplateFiles = Record<string, (name: string) => string>;
+type TemplateSource =
+  | { kind: 'bundled'; dir: string }
+  | { kind: 'remote'; pkg: string };
 
-interface Template {
+interface TemplateInfo {
   description: string;
-  files: TemplateFiles;
+  source: TemplateSource;
 }
 
-const TEMPLATES: Record<string, Template> = {
-  'minimal-api': {
-    description: 'Server + memory driver + 1 object + REST API',
-    files: {
-      'objectstack.config.ts': (name) => `import { defineStack } from '@objectstack/spec';
-import * as objects from './src/objects';
-
-export default defineStack({
-  manifest: {
-    id: 'com.example.${name}',
-    namespace: '${name}',
-    version: '0.1.0',
-    type: 'app',
-    name: '${toTitleCase(name)}',
-    description: '${toTitleCase(name)} — built with ObjectStack',
+const TEMPLATES: Record<string, TemplateInfo> = {
+  blank: {
+    description: 'Minimal starter — one object, REST API, ready to extend',
+    source: { kind: 'bundled', dir: 'blank' },
   },
-
-  objects: Object.values(objects),
-
-  api: {
-    rest: { enabled: true, basePath: '/api' },
+  todo: {
+    description: 'Universal task & project management starter',
+    source: { kind: 'remote', pkg: 'todo' },
   },
-});
-`,
-      'package.json': (name) => JSON.stringify({
-        name,
-        version: '0.1.0',
-        private: true,
-        type: 'module',
-        scripts: {
-          dev: 'objectstack dev',
-          start: 'objectstack serve',
-          build: 'objectstack compile',
-          validate: 'objectstack validate',
-          typecheck: 'tsc --noEmit',
-        },
-        dependencies: {
-          '@objectstack/spec': '^3.0.0',
-          '@objectstack/runtime': '^3.0.0',
-          '@objectstack/driver-memory': '^3.0.0',
-          '@objectstack/plugin-hono-server': '^3.0.0',
-        },
-        devDependencies: {
-          '@objectstack/cli': '^3.0.0',
-          'typescript': '^5.3.0',
-        },
-      }, null, 2) + '\n',
-      'tsconfig.json': () => JSON.stringify({
-        compilerOptions: {
-          target: 'ES2022',
-          module: 'ESNext',
-          moduleResolution: 'bundler',
-          strict: true,
-          esModuleInterop: true,
-          skipLibCheck: true,
-          outDir: 'dist',
-          rootDir: '.',
-          declaration: true,
-        },
-        include: ['*.ts', 'src/**/*'],
-        exclude: ['dist', 'node_modules'],
-      }, null, 2) + '\n',
-      'src/objects/task.ts': () => `import * as Data from '@objectstack/spec/data';
-
-const task: Data.Object = {
-  name: 'task',
-  label: 'Task',
-  ownership: 'own',
-  fields: {
-    title: {
-      type: 'text',
-      label: 'Title',
-      required: true,
-    },
-    description: {
-      type: 'textarea',
-      label: 'Description',
-    },
-    status: {
-      type: 'select',
-      label: 'Status',
-      options: [
-        { label: 'Open', value: 'open' },
-        { label: 'In Progress', value: 'in_progress' },
-        { label: 'Done', value: 'done' },
-      ],
-      defaultValue: 'open',
-    },
-    due_date: {
-      type: 'date',
-      label: 'Due Date',
-    },
+  compliance: {
+    description: 'Compliance posture & evidence management (SOC2 / ISO27001)',
+    source: { kind: 'remote', pkg: 'compliance' },
   },
-};
-
-export default task;
-`,
-      'src/objects/index.ts': () => `export { default as task } from './task';
-`,
-      '.gitignore': () => `node_modules/
-dist/
-*.tsbuildinfo
-`,
-      'README.md': (name) => `# ${toTitleCase(name)}
-
-Built with [ObjectStack](https://objectstack.com).
-
-## Quick Start
-
-\`\`\`bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Validate configuration
-npm run validate
-\`\`\`
-
-## Project Structure
-
-- \`objectstack.config.ts\` — Stack definition (objects, API, settings)
-- \`src/objects/\` — Object definitions
-- \`dist/\` — Compiled output
-
-## Learn More
-
-- [ObjectStack Documentation](https://objectstack.com/docs)
-`,
-    },
+  content: {
+    description: 'Content marketing pipeline — editorial calendar & channel ROI',
+    source: { kind: 'remote', pkg: 'content' },
   },
-
-  'full-stack': {
-    description: 'Server + UI + auth + 3 CRM objects',
-    files: {
-      'objectstack.config.ts': (name) => `import { defineStack } from '@objectstack/spec';
-import * as objects from './src/objects';
-import * as apps from './src/apps';
-
-export default defineStack({
-  manifest: {
-    id: 'com.example.${name}',
-    namespace: '${name}',
-    version: '0.1.0',
-    type: 'app',
-    name: '${toTitleCase(name)}',
-    description: '${toTitleCase(name)} CRM — built with ObjectStack',
+  contracts: {
+    description: 'Post-signature CLM — approvals, obligations, renewals',
+    source: { kind: 'remote', pkg: 'contracts' },
   },
-
-  objects: Object.values(objects),
-  apps: Object.values(apps),
-
-  api: {
-    rest: { enabled: true, basePath: '/api' },
+  procurement: {
+    description: 'Source-to-pay — vendors, POs, receipts, invoice matching',
+    source: { kind: 'remote', pkg: 'procurement' },
   },
-});
-`,
-      'package.json': (name) => JSON.stringify({
-        name,
-        version: '0.1.0',
-        private: true,
-        type: 'module',
-        scripts: {
-          dev: 'objectstack dev',
-          start: 'objectstack serve',
-          build: 'objectstack compile',
-          validate: 'objectstack validate',
-          typecheck: 'tsc --noEmit',
-        },
-        dependencies: {
-          '@objectstack/spec': '^3.0.0',
-          '@objectstack/runtime': '^3.0.0',
-          '@objectstack/driver-memory': '^3.0.0',
-          '@objectstack/plugin-hono-server': '^3.0.0',
-          '@objectstack/plugin-auth': '^3.0.0',
-        },
-        devDependencies: {
-          '@objectstack/cli': '^3.0.0',
-          'typescript': '^5.3.0',
-        },
-      }, null, 2) + '\n',
-      'tsconfig.json': () => JSON.stringify({
-        compilerOptions: {
-          target: 'ES2022',
-          module: 'ESNext',
-          moduleResolution: 'bundler',
-          strict: true,
-          esModuleInterop: true,
-          skipLibCheck: true,
-          outDir: 'dist',
-          rootDir: '.',
-          declaration: true,
-        },
-        include: ['*.ts', 'src/**/*'],
-        exclude: ['dist', 'node_modules'],
-      }, null, 2) + '\n',
-      'src/objects/contact.ts': () => `import * as Data from '@objectstack/spec/data';
-
-const contact: Data.Object = {
-  name: 'contact',
-  label: 'Contact',
-  ownership: 'own',
-  fields: {
-    first_name: {
-      type: 'text',
-      label: 'First Name',
-      required: true,
-    },
-    last_name: {
-      type: 'text',
-      label: 'Last Name',
-      required: true,
-    },
-    email: {
-      type: 'text',
-      label: 'Email',
-    },
-    phone: {
-      type: 'text',
-      label: 'Phone',
-    },
-    company: {
-      type: 'lookup',
-      label: 'Company',
-      reference: 'company',
-    },
-  },
-};
-
-export default contact;
-`,
-      'src/objects/company.ts': () => `import * as Data from '@objectstack/spec/data';
-
-const company: Data.Object = {
-  name: 'company',
-  label: 'Company',
-  ownership: 'own',
-  fields: {
-    name: {
-      type: 'text',
-      label: 'Company Name',
-      required: true,
-    },
-    website: {
-      type: 'text',
-      label: 'Website',
-    },
-    industry: {
-      type: 'select',
-      label: 'Industry',
-      options: [
-        { label: 'Technology', value: 'technology' },
-        { label: 'Finance', value: 'finance' },
-        { label: 'Healthcare', value: 'healthcare' },
-        { label: 'Other', value: 'other' },
-      ],
-    },
-  },
-};
-
-export default company;
-`,
-      'src/objects/deal.ts': () => `import * as Data from '@objectstack/spec/data';
-
-const deal: Data.Object = {
-  name: 'deal',
-  label: 'Deal',
-  ownership: 'own',
-  fields: {
-    name: {
-      type: 'text',
-      label: 'Deal Name',
-      required: true,
-    },
-    amount: {
-      type: 'number',
-      label: 'Amount',
-    },
-    stage: {
-      type: 'select',
-      label: 'Stage',
-      options: [
-        { label: 'Prospecting', value: 'prospecting' },
-        { label: 'Qualification', value: 'qualification' },
-        { label: 'Proposal', value: 'proposal' },
-        { label: 'Closed Won', value: 'closed_won' },
-        { label: 'Closed Lost', value: 'closed_lost' },
-      ],
-      defaultValue: 'prospecting',
-    },
-    contact: {
-      type: 'lookup',
-      label: 'Contact',
-      reference: 'contact',
-    },
-    company: {
-      type: 'lookup',
-      label: 'Company',
-      reference: 'company',
-    },
-    close_date: {
-      type: 'date',
-      label: 'Close Date',
-    },
-  },
-};
-
-export default deal;
-`,
-      'src/objects/index.ts': () => `export { default as contact } from './contact';
-export { default as company } from './company';
-export { default as deal } from './deal';
-`,
-      'src/views/contact_list.ts': () => `import * as UI from '@objectstack/spec/ui';
-
-const contactList: UI.View = {
-  name: 'contact_list',
-  label: 'All Contacts',
-  object: 'contact',
-  type: 'list',
-  columns: ['first_name', 'last_name', 'email', 'phone', 'company'],
-};
-
-export default contactList;
-`,
-      'src/views/company_list.ts': () => `import * as UI from '@objectstack/spec/ui';
-
-const companyList: UI.View = {
-  name: 'company_list',
-  label: 'All Companies',
-  object: 'company',
-  type: 'list',
-  columns: ['name', 'website', 'industry'],
-};
-
-export default companyList;
-`,
-      'src/views/deal_list.ts': () => `import * as UI from '@objectstack/spec/ui';
-
-const dealList: UI.View = {
-  name: 'deal_list',
-  label: 'All Deals',
-  object: 'deal',
-  type: 'list',
-  columns: ['name', 'amount', 'stage', 'contact', 'close_date'],
-};
-
-export default dealList;
-`,
-      'src/apps/crm.ts': () => `import * as UI from '@objectstack/spec/ui';
-
-const crm: UI.App = {
-  name: 'crm',
-  label: 'CRM',
-  description: 'Customer Relationship Management',
-  navigation: [
-    { type: 'object', object: 'contact', label: 'Contacts' },
-    { type: 'object', object: 'company', label: 'Companies' },
-    { type: 'object', object: 'deal', label: 'Deals' },
-  ],
-};
-
-export default crm;
-`,
-      'src/apps/index.ts': () => `export { default as crm } from './crm';
-`,
-      '.gitignore': () => `node_modules/
-dist/
-*.tsbuildinfo
-`,
-      'README.md': (name) => `# ${toTitleCase(name)}
-
-A full-stack CRM application built with [ObjectStack](https://objectstack.com).
-
-## Quick Start
-
-\`\`\`bash
-npm install
-npm run dev
-\`\`\`
-
-## Project Structure
-
-- \`objectstack.config.ts\` — Stack definition
-- \`src/objects/\` — Data objects (Contact, Company, Deal)
-- \`src/views/\` — List views
-- \`src/apps/crm.ts\` — CRM app with navigation
-
-## Learn More
-
-- [ObjectStack Documentation](https://objectstack.com/docs)
-`,
-    },
-  },
-
-  plugin: {
-    description: 'Plugin skeleton with test setup',
-    files: {
-      'objectstack.config.ts': (name) => `import { defineStack } from '@objectstack/spec';
-import * as objects from './src/objects';
-
-export default defineStack({
-  manifest: {
-    id: 'com.objectstack.plugin-${name}',
-    namespace: 'plugin_${name}',
-    version: '0.1.0',
-    type: 'plugin',
-    name: '${toTitleCase(name)} Plugin',
-    description: 'ObjectStack Plugin: ${toTitleCase(name)}',
-  },
-
-  objects: Object.values(objects),
-});
-`,
-      'package.json': (name) => JSON.stringify({
-        name: `@objectstack/plugin-${name}`,
-        version: '0.1.0',
-        description: `ObjectStack Plugin: ${toTitleCase(name)}`,
-        main: 'dist/index.js',
-        types: 'dist/index.d.ts',
-        type: 'module',
-        scripts: {
-          build: 'tsc',
-          dev: 'tsc --watch',
-          test: 'vitest run',
-          validate: 'objectstack validate',
-          typecheck: 'tsc --noEmit',
-        },
-        keywords: ['objectstack', 'plugin', name],
-        author: '',
-        license: 'MIT',
-        dependencies: {
-          '@objectstack/spec': '^3.0.0',
-        },
-        devDependencies: {
-          '@types/node': '^22.0.0',
-          'typescript': '^5.3.0',
-          'vitest': '^4.0.0',
-        },
-      }, null, 2) + '\n',
-      'tsconfig.json': () => JSON.stringify({
-        compilerOptions: {
-          target: 'ES2022',
-          module: 'ESNext',
-          moduleResolution: 'bundler',
-          strict: true,
-          esModuleInterop: true,
-          skipLibCheck: true,
-          outDir: 'dist',
-          rootDir: '.',
-          declaration: true,
-        },
-        include: ['*.ts', 'src/**/*'],
-        exclude: ['dist', 'node_modules'],
-      }, null, 2) + '\n',
-      'src/index.ts': (name) => `/**
- * ${toTitleCase(name)} Plugin for ObjectStack
- *
- * Entry point — re-exports all plugin metadata.
- */
-export * as objects from './objects';
-`,
-      'src/objects/sample.ts': (name) => `import * as Data from '@objectstack/spec/data';
-
-const sample: Data.Object = {
-  name: '${name}_sample',
-  label: '${toTitleCase(name)} Sample',
-  ownership: 'own',
-  fields: {
-    name: {
-      type: 'text',
-      label: 'Name',
-      required: true,
-    },
-  },
-};
-
-export default sample;
-`,
-      'src/objects/index.ts': () => `export { default as sample } from './sample';
-`,
-      'test/sample.test.ts': (name) => `import { describe, it, expect } from 'vitest';
-import sample from '../src/objects/sample';
-
-describe('${name} plugin', () => {
-  it('should export a valid sample object', () => {
-    expect(sample).toBeDefined();
-    expect(sample.name).toBe('${name}_sample');
-    expect(sample.fields).toHaveProperty('name');
-  });
-});
-`,
-      '.gitignore': () => `node_modules/
-dist/
-*.tsbuildinfo
-`,
-      'README.md': (name) => `# @objectstack/plugin-${name}
-
-ObjectStack Plugin: ${toTitleCase(name)}
-
-## Installation
-
-\`\`\`bash
-npm install @objectstack/plugin-${name}
-\`\`\`
-
-## Usage
-
-\`\`\`typescript
-import { defineStack } from '@objectstack/spec';
-
-export default defineStack({
-  plugins: [
-    '@objectstack/plugin-${name}',
-  ],
-});
-\`\`\`
-
-## Development
-
-\`\`\`bash
-# Run tests
-npm test
-
-# Build
-npm run build
-
-# Validate metadata
-npm run validate
-\`\`\`
-
-## License
-
-MIT
-`,
-    },
-  },
-};
-
-// ─── Shared AI Configuration Files ──────────────────────────────────
-// These files are added to every template so third-party developers
-// get AI-assisted development (Copilot + Claude) out of the box.
-// Templates are maintained as standalone files in src/templates/ for
-// easy editing — no need to modify TypeScript code.
-
-function readTemplate(filename: string): string {
-  return fs.readFileSync(path.join(TEMPLATES_DIR, filename), 'utf-8');
-}
-
-const AI_CONFIG_FILES: TemplateFiles = {
-  '.github/copilot-instructions.md': (name) =>
-    readTemplate('copilot-instructions.md')
-      .replaceAll('{{PROJECT_NAME}}', name)
-      .replaceAll('{{PROJECT_TITLE}}', toTitleCase(name)),
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────
-
-function toCamelCase(str: string): string {
-  return str.replace(/[-_]([a-z])/g, (_, c) => c.toUpperCase());
-}
 
 function toTitleCase(str: string): string {
   return str.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// ─── Formatting (matches @objectstack/cli style) ────────────────────
-
 function printHeader(title: string) {
   console.log(chalk.bold(`\n◆ ${title}`));
   console.log(chalk.dim('─'.repeat(40)));
 }
-
 function printKV(key: string, value: string) {
   console.log(`  ${chalk.dim(key + ':')} ${chalk.white(value)}`);
 }
+function printSuccess(msg: string) { console.log(chalk.green(`  ✓ ${msg}`)); }
+function printError(msg: string)   { console.log(chalk.red(`  ✗ ${msg}`)); }
+function printStep(msg: string)    { console.log(chalk.yellow(`  → ${msg}`)); }
+function printWarning(msg: string) { console.log(chalk.yellow(`  ⚠ ${msg}`)); }
 
-function printSuccess(msg: string) {
-  console.log(chalk.green(`  ✓ ${msg}`));
+function detectPackageManager(): string {
+  try {
+    execSync('pnpm --version', { stdio: 'ignore' });
+    return 'pnpm';
+  } catch {
+    return 'npm';
+  }
 }
 
-function printError(msg: string) {
-  console.log(chalk.red(`  ✗ ${msg}`));
+// ─── Loading: bundled (fs copy) ─────────────────────────────────────
+
+function copyDir(src: string, dest: string, collected: string[], rel = '') {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    const relPath = rel ? `${rel}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      copyDir(srcPath, destPath, collected, relPath);
+    } else if (entry.isFile()) {
+      fs.copyFileSync(srcPath, destPath);
+      collected.push(relPath);
+    }
+  }
 }
 
-function printStep(msg: string) {
-  console.log(chalk.yellow(`  → ${msg}`));
+function loadBundled(templateDir: string, targetDir: string): string[] {
+  const src = path.join(BUNDLED_TEMPLATES_DIR, templateDir);
+  if (!fs.existsSync(src)) {
+    throw new Error(`Bundled template missing on disk: ${src}`);
+  }
+  const collected: string[] = [];
+  copyDir(src, targetDir, collected);
+  return collected;
 }
 
-function printWarning(msg: string) {
-  console.log(chalk.yellow(`  ⚠ ${msg}`));
+// ─── Loading: remote (GitHub tarball) ───────────────────────────────
+
+async function downloadTarball(url: string, destFile: string): Promise<void> {
+  const res = await fetch(url, { redirect: 'follow' });
+  if (!res.ok || !res.body) {
+    throw new Error(`Download failed: ${url} (${res.status})`);
+  }
+  const out = createWriteStream(destFile);
+  // node 18+: res.body is a web ReadableStream — pipe via async iterator
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for await (const chunk of res.body as any) {
+    out.write(chunk);
+  }
+  await new Promise<void>((resolve, reject) => {
+    out.end((err: unknown) => (err ? reject(err as Error) : resolve()));
+  });
+}
+
+async function loadRemote(pkgName: string, targetDir: string): Promise<string[]> {
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'create-objectstack-'));
+  try {
+    const tarball = path.join(tmp, 'templates.tar.gz');
+    printStep(`Fetching template "${pkgName}" from ${REMOTE_REPO}@${REMOTE_BRANCH}…`);
+    await downloadTarball(REMOTE_TARBALL_URL, tarball);
+
+    // GitHub tarballs nest everything under `<repo>-<branch>/`. The package we
+    // want lives at `<repo>-<branch>/packages/<pkgName>/...`. We extract only
+    // that subtree, stripping the leading 3 path components so the contents
+    // of `packages/<pkgName>/` land directly in `targetDir`.
+    fs.mkdirSync(targetDir, { recursive: true });
+    const collected: string[] = [];
+    await pipeline(
+      createReadStream(tarball),
+      createGunzip(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tar.extract({
+        cwd: targetDir,
+        strip: 3,
+        filter: (p: string) => {
+          // p looks like: "templates-main/packages/<pkg>/..."
+          const parts = p.split('/');
+          return parts[1] === 'packages' && parts[2] === pkgName && parts.length > 3;
+        },
+        onentry: (entry: { path: string; type: string }) => {
+          if (entry.type === 'File') {
+            // entry.path is the original archive path; strip the 3 leading
+            // components ("templates-main/packages/<pkg>/") so the reported
+            // file matches what actually lands on disk.
+            const parts = entry.path.split('/').slice(3);
+            if (parts.length > 0) collected.push(parts.join('/'));
+          }
+        },
+      } as any),
+    );
+    if (collected.length === 0) {
+      throw new Error(
+        `Template "${pkgName}" not found in ${REMOTE_REPO}@${REMOTE_BRANCH} ` +
+          `(expected packages/${pkgName}/).`,
+      );
+    }
+    return collected;
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
+  }
+}
+
+// ─── Field-aware rewrites ───────────────────────────────────────────
+
+function rewriteProjectIdentity(targetDir: string, projectName: string) {
+  const title = toTitleCase(projectName);
+
+  // package.json — set .name
+  const pkgPath = path.join(targetDir, 'package.json');
+  if (fs.existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      pkg.name = projectName;
+      fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+    } catch {
+      // leave the file alone if it isn't valid JSON
+    }
+  }
+
+  // objectstack.manifest.json — set .name and .displayName
+  const manifestPath = path.join(targetDir, 'objectstack.manifest.json');
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.name = projectName;
+      m.displayName = title;
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2) + '\n');
+    } catch {
+      // ignore
+    }
+  }
+
+  // objectstack.config.ts — rewrite manifest.id and manifest.name string
+  // literals. Conservative: only touches the first occurrence of each key.
+  const configPath = path.join(targetDir, 'objectstack.config.ts');
+  if (fs.existsSync(configPath)) {
+    let cfg = fs.readFileSync(configPath, 'utf8');
+    cfg = cfg.replace(/(\bid:\s*)(['"`])[^'"`]*\2/, `$1$2${projectName}$2`);
+    cfg = cfg.replace(/(\bname:\s*)(['"`])[^'"`]*\2/, `$1$2${title}$2`);
+    fs.writeFileSync(configPath, cfg);
+  }
+
+  // README.md — rewrite first H1
+  const readmePath = path.join(targetDir, 'README.md');
+  if (fs.existsSync(readmePath)) {
+    let md = fs.readFileSync(readmePath, 'utf8');
+    md = md.replace(/^#\s+.*$/m, `# ${title}`);
+    fs.writeFileSync(readmePath, md);
+  }
 }
 
 // ─── CLI Program ────────────────────────────────────────────────────
 
 const program = new Command()
   .name('create-objectstack')
-  .description('Create a new ObjectStack project')
-  .version('3.0.0')
-  .argument('[name]', 'Project name (defaults to current directory name)')
+  .description('Create a new ObjectStack environment')
+  .version('6.2.0')
+  .argument('[name]', 'Environment name (defaults to current directory name)')
   .option(
     '-t, --template <template>',
-    'Project template: minimal-api, full-stack, plugin',
-    'minimal-api',
+    `Template: ${Object.keys(TEMPLATES).join(', ')}`,
+    'blank',
   )
   .option('--skip-install', 'Skip dependency installation')
-  .action(async (name: string | undefined, options: { template: string; skipInstall?: boolean }) => {
-    // Banner
+  .option('--skip-skills', 'Skip installing ObjectStack AI skills')
+  .action(async (
+    name: string | undefined,
+    options: { template: string; skipInstall?: boolean; skipSkills?: boolean },
+  ) => {
     console.log('');
     console.log(chalk.bold.cyan('  ╔═══════════════════════════════════╗'));
-    console.log(chalk.bold.cyan('  ║') + chalk.bold('   ◆ Create ObjectStack ') + chalk.dim('v3.0') + chalk.bold.cyan('       ║'));
+    console.log(chalk.bold.cyan('  ║') + chalk.bold('   ◆ Create ObjectStack ') + chalk.dim('v6.x') + chalk.bold.cyan('       ║'));
     console.log(chalk.bold.cyan('  ╚═══════════════════════════════════╝'));
 
-    printHeader('New Project');
+    printHeader('New Environment');
 
-    // Resolve template
     const template = TEMPLATES[options.template];
     if (!template) {
       printError(`Unknown template: ${options.template}`);
@@ -644,18 +288,16 @@ const program = new Command()
       process.exit(1);
     }
 
-    // Resolve project name and directory
     const cwd = process.cwd();
     const projectName = name || path.basename(cwd);
     const targetDir = name ? path.resolve(cwd, name) : cwd;
     const isCurrentDir = targetDir === cwd;
 
-    printKV('Project', projectName);
+    printKV('Environment', projectName);
     printKV('Template', `${options.template} — ${template.description}`);
     printKV('Directory', targetDir);
     console.log('');
 
-    // Guard: if creating in a sub-directory, check it doesn't already exist
     if (!isCurrentDir && fs.existsSync(targetDir)) {
       const existing = fs.readdirSync(targetDir);
       if (existing.length > 0) {
@@ -664,42 +306,30 @@ const program = new Command()
       }
     }
 
-    const createdFiles: string[] = [];
-
     try {
-      // Ensure target directory exists
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
+      fs.mkdirSync(targetDir, { recursive: true });
+
+      let createdFiles: string[];
+      if (template.source.kind === 'bundled') {
+        createdFiles = loadBundled(template.source.dir, targetDir);
+      } else {
+        createdFiles = await loadRemote(template.source.pkg, targetDir);
       }
 
-      // Merge template files with shared AI configuration files
-      const allFiles: TemplateFiles = { ...template.files, ...AI_CONFIG_FILES };
+      rewriteProjectIdentity(targetDir, projectName);
 
-      // Write every file defined by the template + AI config
-      for (const [filePath, contentFn] of Object.entries(allFiles)) {
-        const fullPath = path.join(targetDir, filePath);
-        const dir = path.dirname(fullPath);
-
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
-        }
-
-        fs.writeFileSync(fullPath, contentFn(projectName));
-        createdFiles.push(filePath);
-      }
-
-      // Summary
       console.log(chalk.bold('  Created files:'));
-      for (const f of createdFiles) {
+      for (const f of createdFiles.slice(0, 20)) {
         console.log(chalk.green(`    + ${f}`));
+      }
+      if (createdFiles.length > 20) {
+        console.log(chalk.dim(`    … and ${createdFiles.length - 20} more`));
       }
       console.log('');
 
-      // Install dependencies
       if (!options.skipInstall) {
         printStep('Installing dependencies...');
         try {
-          // Detect package manager — prefer pnpm, fall back to npm
           const pm = detectPackageManager();
           execSync(`${pm} install`, { stdio: 'inherit', cwd: targetDir });
           console.log('');
@@ -709,8 +339,7 @@ const program = new Command()
         }
       }
 
-      // Install ObjectStack AI skills via the standard skills CLI
-      if (!options.skipInstall) {
+      if (!options.skipInstall && !options.skipSkills) {
         printStep('Installing AI skills for your coding agent...');
         try {
           execSync('npx -y skills add objectstack-ai/framework --all', {
@@ -721,16 +350,15 @@ const program = new Command()
         } catch {
           printWarning(
             'Skills installation skipped. Run manually:\n' +
-            '    npx skills add objectstack-ai/framework',
+              '    npx skills add objectstack-ai/framework',
           );
           console.log('');
         }
       }
 
-      printSuccess('Project created!');
+      printSuccess('Environment created!');
       console.log('');
 
-      // Next steps
       console.log(chalk.bold('  Next steps:'));
       if (!isCurrentDir) {
         console.log(chalk.dim(`    cd ${name}`));
@@ -740,29 +368,17 @@ const program = new Command()
       }
       console.log(chalk.dim('    npm run dev           # Start development server'));
       console.log(chalk.dim('    npm run validate      # Check configuration'));
-      if (options.skipInstall) {
+      if (options.skipInstall || options.skipSkills) {
         console.log('');
         console.log(chalk.bold('  AI Skills (recommended):'));
         console.log(chalk.dim('    npx skills add objectstack-ai/framework'));
       }
       console.log('');
-
-    } catch (error: any) {
-      printError(error.message || String(error));
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      printError(msg);
       process.exit(1);
     }
   });
-
-/**
- * Detect available package manager (pnpm > npm).
- */
-function detectPackageManager(): string {
-  try {
-    execSync('pnpm --version', { stdio: 'ignore' });
-    return 'pnpm';
-  } catch {
-    return 'npm';
-  }
-}
 
 program.parse();

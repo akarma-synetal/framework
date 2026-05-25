@@ -1,6 +1,6 @@
 {
   "name": "create-objectstack",
-  "version": "6.1.1",
+  "version": "6.2.0",
   "description": "Create a new ObjectStack project — npx create-objectstack",
   "bin": {
     "create-objectstack": "./bin/create-objectstack.js"
@@ -20,10 +20,12 @@
   "license": "Apache-2.0",
   "dependencies": {
     "chalk": "^5.6.2",
-    "commander": "^14.0.3"
+    "commander": "^14.0.3",
+    "tar": "^7.4.3"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
+    "@types/tar": "^6.1.13",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3"
   },
