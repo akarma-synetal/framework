@@ -5,9 +5,11 @@ description: >
   Apps (navigation), Pages, Dashboards, Reports, Charts, Actions. Use when
   the user is adding `*.view.ts` / `*.app.ts` / `*.dashboard.ts` /
   `*.action.ts` files or designing a Studio-rendered UI surface. Do not use
-  for: data schema (see objectstack-data), the React renderer
-  implementation (lives in `packages/client-react`, not metadata), or
-  Studio's own admin UI (that ships with the platform). CEL expressions in
+  for: data schema (see objectstack-data), interactive screen flows /
+  wizards (those are `*.flow.ts` with `type: 'screen'` — see
+  objectstack-automation), the React renderer implementation (lives in
+  `packages/client-react`, not metadata), or Studio's own admin UI (that
+  ships with the platform). CEL expressions in
   visibility/conditional rules: load objectstack-formula alongside.
 license: Apache-2.0
 compatibility: Requires @objectstack/spec Zod schemas (v4+)
@@ -228,54 +230,11 @@ export const CrmApp = App.create({
 
 ---
 
-## Dashboard Design
+## Dashboards
 
-Dashboards use a grid layout with configurable widgets:
-
-```typescript
-{
-  name: 'support_metrics',
-  label: 'Support Metrics',
-  layout: {
-    columns: 12,
-    rowHeight: 80,
-  },
-  widgets: [
-    {
-      type: 'metric',
-      title: 'Open Cases',
-      position: { x: 0, y: 0, w: 3, h: 1 },
-      config: {
-        object: 'support_case',
-        function: 'count',
-        filter: [{ field: 'status', operator: 'not_equals', value: 'closed' }],
-      },
-    },
-    {
-      type: 'chart',
-      title: 'Cases by Priority',
-      position: { x: 3, y: 0, w: 5, h: 3 },
-      config: {
-        chartType: 'bar',
-        object: 'support_case',
-        groupBy: 'priority',
-        function: 'count',
-      },
-    },
-    {
-      type: 'list',
-      title: 'Recent Cases',
-      position: { x: 8, y: 0, w: 4, h: 3 },
-      config: {
-        object: 'support_case',
-        columns: ['subject', 'status', 'created_at'],
-        sort: 'created_at desc',
-        limit: 10,
-      },
-    },
-  ],
-}
-```
+Dashboards are a grid of widgets (`columns` × `rowHeight`) sharing a
+`dateRange` scrubber and `globalFilters`. Each widget declares an `object`,
+an `aggregate` measure or chart spec, and a `layout: {x,y,w,h}`.
 
 ### Widget Types
 
@@ -286,6 +245,10 @@ Dashboards use a grid layout with configurable widgets:
 | `list` | Embedded list view (mini table) |
 | `calendar` | Embedded calendar widget |
 | `custom` | Custom component (HTML / React) |
+
+See the **Production Pattern** section below for the full
+`Dashboard` shape with `refreshInterval`, header actions, date range,
+global filters, and widget options.
 
 ---
 

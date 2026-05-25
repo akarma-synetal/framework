@@ -123,7 +123,7 @@ variables: {
 {
   name: 'escalate_overdue_cases',
   type: 'schedule',
-  schedule: '0 9 * * *',    // daily at 09:00
+  schedule: cron`0 9 * * *`,    // daily at 09:00
   nodes: [
     {
       id: 'start',
@@ -378,8 +378,10 @@ Triggers fire automatically when data events occur.
 }
 ```
 
-> **`OLD`** and **`NEW`** are special variables available in update triggers,
-> representing the record before and after the change.
+> **`previous`** and **`record`** are the CEL variables available in update
+> triggers — `previous.x` is the value before the change, `record.x` is the
+> value after. (Salesforce-flavor `OLD` / `NEW` were removed in M9.5 and now
+> evaluate to `null`.) See [objectstack-formula](../objectstack-formula/SKILL.md).
 
 ---
 
