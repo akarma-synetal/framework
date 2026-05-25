@@ -29,3 +29,4 @@ export * from './animation.zod';
 export * from './notification.zod';
 export * from './dnd.zod';
 export * from './sharing.zod';
+export * from './portal.zod';
