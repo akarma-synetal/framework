@@ -73,7 +73,7 @@ delegates the rest to plugins.
 │  • Search router  → adapter.search   │    │      (dev/test only)         │
 │  • Permission wrapper (RLS filter)   │    │  • plugin-knowledge-ragflow  │
 │  • Event sync (record.* → upsert)    │    │      (reference impl, REST)  │
-│  • Audit + metrics                   │    │  • plugin-knowledge-llama…   │
+│  • Audit + metrics                   │    │  • plugin-knowledge-turso    │
 │                                      │    │  • plugin-knowledge-dify     │
 │  Registers `knowledge` service       │    │  • plugin-knowledge-pgvector │
 └──────────────────────────────────────┘    └──────────────────────────────┘
@@ -179,6 +179,7 @@ Adapters ship as standalone npm packages, registered via the standard
 import { knowledgeServicePlugin } from '@objectstack/service-knowledge';
 import { knowledgeMemoryPlugin } from '@objectstack/plugin-knowledge-memory';
 import { knowledgeRagflowPlugin } from '@objectstack/plugin-knowledge-ragflow';
+import { KnowledgeTursoPlugin, OpenAIEmbeddingProvider } from '@objectstack/plugin-knowledge-turso';
 
 defineStack({
   plugins: [
