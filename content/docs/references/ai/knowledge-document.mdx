@@ -1,0 +1,87 @@
+---
+title: Knowledge Document
+description: Knowledge Document protocol schemas
+---
+
+{/* ⚠️  AUTO-GENERATED — DO NOT EDIT. Run build-docs.ts to regenerate. Hand-written docs go in content/docs/guides/. */}
+
+Knowledge Document / Chunk / Hit — canonical shapes shared by every
+
+`IKnowledgeAdapter` implementation.
+
+The framework does **not** prescribe chunk strategy or vector
+
+format. Adapters are free to chunk however they like; the framework
+
+only requires they round-trip these shapes when talking to the
+
+`IKnowledgeService`.
+
+See `content/docs/protocol/knowledge.mdx` for the full design.
+
+<Callout type="info">
+**Source:** `packages/spec/src/ai/knowledge-document.zod.ts`
+</Callout>
+
+## TypeScript Usage
+
+```typescript
+import { KnowledgeChunk, KnowledgeDocument, KnowledgeHit } from '@objectstack/spec/ai';
+import type { KnowledgeChunk, KnowledgeDocument, KnowledgeHit } from '@objectstack/spec/ai';
+
+// Validate data
+const result = KnowledgeChunk.parse(data);
+```
+
+---
+
+## KnowledgeChunk
+
+### Properties
+
+| Property | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| **id** | `string` | ✅ |  |
+| **documentId** | `string` | ✅ |  |
+| **index** | `integer` | ✅ |  |
+| **content** | `string` | ✅ |  |
+| **metadata** | `Record<string, any>` | optional |  |
+
+
+---
+
+## KnowledgeDocument
+
+### Properties
+
+| Property | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| **id** | `string` | ✅ | Document id |
+| **sourceId** | `string` | ✅ | Owning KnowledgeSource id |
+| **sourceRecordId** | `string` | optional |  |
+| **content** | `string` | ✅ |  |
+| **title** | `string` | optional |  |
+| **metadata** | `Record<string, any>` | optional |  |
+| **permissions** | `string[]` | optional |  |
+
+
+---
+
+## KnowledgeHit
+
+### Properties
+
+| Property | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| **chunkId** | `string` | ✅ |  |
+| **documentId** | `string` | ✅ |  |
+| **sourceId** | `string` | ✅ |  |
+| **sourceRecordId** | `string` | optional |  |
+| **score** | `number` | ✅ |  |
+| **snippet** | `string` | ✅ |  |
+| **title** | `string` | optional |  |
+| **metadata** | `Record<string, any>` | optional |  |
+
+
+---
+

@@ -4,6 +4,8 @@
     "agent",
     "conversation",
     "embedding",
+    "knowledge-document",
+    "knowledge-source",
     "mcp",
     "model-registry",
     "skill",

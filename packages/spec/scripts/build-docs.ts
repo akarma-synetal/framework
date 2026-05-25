@@ -158,9 +158,18 @@ function generateMarkdown(schemaName: string, schema: any, category: string, zod
   // Add schema heading
   md += `## ${schemaName}\n\n`;
   
+  // Escape MDX-unsafe characters in description text. MDX parses `<` as JSX,
+  // so any raw `<title>` / `<meta>` / etc. inside a Zod `.describe()` string
+  // breaks the docs build. Wrap inline tag-like fragments in backticks so they
+  // render as code rather than being parsed as JSX.
+  const escapeMdxDescription = (raw: string): string =>
+    raw
+      .replace(/\{[^}]*\}/g, (m: string) => `\`${m}\``)
+      .replace(/<[^`>][^>]*>/g, (m: string) => `\`${m}\``);
+
   // Add description with better formatting
   if (mainDef.description) {
-    md += `${mainDef.description.replace(/\{[^}]*\}/g, (m: string) => `\`${m}\``)}\n\n`;
+    md += `${escapeMdxDescription(mainDef.description)}\n\n`;
   }
 
   const renderProperties = (props: any, required: Set<string> = new Set()) => {
@@ -168,9 +177,9 @@ function generateMarkdown(schemaName: string, schema: any, category: string, zod
       t += `| Property | Type | Required | Description |\n`;
       t += `| :--- | :--- | :--- | :--- |\n`;
       for (const [key, prop] of Object.entries(props) as [string, any][]) {
-          const typeStr = formatType(prop).replace(/\|/g, '\\|'); 
+          const typeStr = formatType(prop).replace(/\|/g, '\\|');
           const isReq = required.has(key) ? '✅' : 'optional';
-          let desc = (prop.description || '').replace(/\n/g, ' ').replace(/\{[^}]*\}/g, (m: string) => `\`${m}\``);
+          let desc = escapeMdxDescription((prop.description || '').replace(/\n/g, ' '));
           t += `| **${key}** | \`${typeStr}\` | ${isReq} | ${desc} |\n`;
       }
       return t + '\n';
