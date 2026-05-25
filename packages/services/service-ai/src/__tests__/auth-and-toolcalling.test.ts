@@ -77,7 +77,7 @@ describe('Route Auth/Permissions Metadata', () => {
 
   it('should declare ai:conversations permission for conversation routes', () => {
     const convRoutes = routes.filter(r => r.path.includes('/conversations'));
-    expect(convRoutes.length).toBe(4);
+    expect(convRoutes.length).toBe(5);
     for (const route of convRoutes) {
       expect(route.permissions).toContain('ai:conversations');
     }
@@ -240,6 +240,59 @@ describe('Conversation Ownership Enforcement', () => {
       user: makeUser('user_a'),
     });
     expect(response.status).toBe(204);
+  });
+
+  it('should allow owner to GET their own conversation with messages', async () => {
+    const createRoute = getRoute('POST', '/api/v1/ai/conversations');
+    const addMsgRoute = getRoute('POST', '/api/v1/ai/conversations/:id/messages');
+    const getRoute_ = getRoute('GET', '/api/v1/ai/conversations/:id');
+
+    const created = await createRoute.handler({ body: {}, user: makeUser('user_a') });
+    const convId = (created.body as any).id;
+    await addMsgRoute.handler({
+      params: { id: convId },
+      body: { role: 'user', content: 'Hello' },
+      user: makeUser('user_a'),
+    });
+
+    const response = await getRoute_.handler({
+      params: { id: convId },
+      user: makeUser('user_a'),
+    });
+    expect(response.status).toBe(200);
+    expect((response.body as any).id).toBe(convId);
+    expect((response.body as any).messages).toBeDefined();
+    expect((response.body as any).messages.length).toBeGreaterThan(0);
+  });
+
+  it('should reject GET on another user conversation', async () => {
+    const createRoute = getRoute('POST', '/api/v1/ai/conversations');
+    const getRoute_ = getRoute('GET', '/api/v1/ai/conversations/:id');
+
+    const created = await createRoute.handler({ body: {}, user: makeUser('user_a') });
+    const convId = (created.body as any).id;
+
+    const response = await getRoute_.handler({
+      params: { id: convId },
+      user: makeUser('user_b'),
+    });
+    expect(response.status).toBe(403);
+    expect((response.body as any).error).toContain('do not have access');
+  });
+
+  it('should return 404 when GETting non-existent conversation', async () => {
+    const getRoute_ = getRoute('GET', '/api/v1/ai/conversations/:id');
+    const response = await getRoute_.handler({
+      params: { id: 'non_existent' },
+      user: makeUser('user_a'),
+    });
+    expect(response.status).toBe(404);
+  });
+
+  it('should return 400 when GET missing id param', async () => {
+    const getRoute_ = getRoute('GET', '/api/v1/ai/conversations/:id');
+    const response = await getRoute_.handler({ params: {}, user: makeUser('user_a') });
+    expect(response.status).toBe(400);
   });
 
   it('should return 404 when adding message to non-existent conversation (with user context)', async () => {

@@ -15,8 +15,8 @@ importers:
         specifier: ^2.31.0
         version: 2.31.0(@types/node@25.9.1)
       '@object-ui/console':
-        specifier: ^6.0.0
-        version: 6.0.0
+        specifier: ^6.0.1
+        version: 6.0.1
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
@@ -36,8 +36,8 @@ importers:
   apps/account:
     dependencies:
       '@object-ui/i18n':
-        specifier: ^6.0.0
-        version: 6.0.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+        specifier: ^6.0.1
+        version: 6.0.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
       '@objectstack/client':
         specifier: workspace:*
         version: link:../../packages/client
@@ -419,11 +419,11 @@ importers:
         specifier: ^3.0.120
         version: 3.0.120(zod@4.4.3)
       '@object-ui/console':
-        specifier: ^6.0.0
-        version: 6.0.0
+        specifier: ^6.0.1
+        version: 6.0.1
       '@object-ui/studio':
-        specifier: ^6.0.0
-        version: 6.0.0
+        specifier: ^6.0.1
+        version: 6.0.1
       '@objectstack/client':
         specifier: workspace:*
         version: link:../client
@@ -3161,16 +3161,16 @@ packages:
     engines: {node: ^14.18.0 || >=16.10.0, npm: '>=5.10.0'}
     hasBin: true
 
-  '@object-ui/console@6.0.0':
-    resolution: {integrity: sha512-iMBG/hB/4C/FWR4c6SnXfbE8Syze/Aq/zc3v6Ra9RWOxVr6VpKbEz8YL1+aiDJNAzQ/x6JBTifGJgZVOZih26w==}
+  '@object-ui/console@6.0.1':
+    resolution: {integrity: sha512-aHf3VOVEB+RVH3NTQEeicjeQdVpzL0pTw6gCZyNuHNR0MvA68KgMUSScDp0ALm8x7Aj/4mIwzDoLPO2LPTr+Rw==}
 
-  '@object-ui/i18n@6.0.0':
-    resolution: {integrity: sha512-vhfwkHDyPaBoLVwV7+YJm8AvMqG0RWM5i3eMiqONC6PiH+uMJPfcgo2DtbY70bSJWTtrcVB7IYmHPDfUuh2uIw==}
+  '@object-ui/i18n@6.0.1':
+    resolution: {integrity: sha512-2ldvFDr7NcGcFdA1KqEM6nCmOk/orZhCiYF/DvNxah3JPUXR3bUrlyGK6JNK991RdRJiKR/G8UziIHwdzquQRg==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
-  '@object-ui/studio@6.0.0':
-    resolution: {integrity: sha512-7tq+8ildY2gbdQTvGTueIp4VjWX15CZPw6mDQ29ZVeQzHEzfEYUpIWeJy+w3DCZUJwbHhVV2zhmiiDXHT1b27w==}
+  '@object-ui/studio@6.0.1':
+    resolution: {integrity: sha512-Y6NGDAMkMfVDktwA8EUdrcr6djhTL/M8FXmrohj9A/hGArTaTYiO2GS+XqSJsogPRNVvtGlsMTWsWYqkwlL2Og==}
 
   '@oclif/core@4.11.4':
     resolution: {integrity: sha512-URwiQ5ALx/sJ2iH4vzXEd+H4K6NAI7LRs6Jag3hrgKEpGmaE6alfRC8qjO4GIgb6A3ACaJumqP9twi/M9ywdHQ==}
@@ -9916,9 +9916,9 @@ snapshots:
     dependencies:
       consola: 3.4.2
 
-  '@object-ui/console@6.0.0': {}
+  '@object-ui/console@6.0.1': {}
 
-  '@object-ui/i18n@6.0.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)':
+  '@object-ui/i18n@6.0.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)':
     dependencies:
       i18next: 26.2.0(typescript@6.0.3)
       react: 19.2.6
@@ -9928,7 +9928,7 @@ snapshots:
       - react-native
       - typescript
 
-  '@object-ui/studio@6.0.0': {}
+  '@object-ui/studio@6.0.1': {}
 
   '@oclif/core@4.11.4':
     dependencies:

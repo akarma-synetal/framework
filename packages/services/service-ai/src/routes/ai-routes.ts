@@ -362,6 +362,32 @@ export function buildAIRoutes(
       },
     },
     {
+      method: 'GET',
+      path: '/api/v1/ai/conversations/:id',
+      description: 'Get a conversation with its full message history',
+      auth: true,
+      permissions: ['ai:conversations'],
+      handler: async (req) => {
+        const id = req.params?.id;
+        if (!id) {
+          return { status: 400, body: { error: 'conversation id is required' } };
+        }
+        try {
+          const conversation = await conversationService.get(id);
+          if (!conversation) {
+            return { status: 404, body: { error: `Conversation "${id}" not found` } };
+          }
+          if (req.user?.userId && conversation.userId && conversation.userId !== req.user.userId) {
+            return { status: 403, body: { error: 'You do not have access to this conversation' } };
+          }
+          return { status: 200, body: conversation };
+        } catch (err) {
+          logger.error('[AI Route] GET /conversations/:id error', err instanceof Error ? err : undefined);
+          return { status: 500, body: { error: 'Internal AI service error' } };
+        }
+      },
+    },
+    {
       method: 'POST',
       path: '/api/v1/ai/conversations/:id/messages',
       description: 'Add message to a conversation',
