@@ -15,6 +15,7 @@ import { DatasetSchema } from './data/dataset.zod';
 
 // UI Protocol
 import { AppSchema } from './ui/app.zod';
+import { PortalSchema } from './ui/portal.zod';
 import { ViewSchema } from './ui/view.zod';
 import { PageSchema } from './ui/page.zod';
 import { DashboardSchema } from './ui/dashboard.zod';
@@ -198,6 +199,7 @@ export const ObjectStackDefinitionSchema = lazySchema(() => z.object({
    * Apps, Menus, Pages, and Visualizations.
    */
   apps: z.array(AppSchema).optional().describe('Applications'),
+  portals: z.array(PortalSchema).optional().describe('External-user UI portals (projections of apps/views/actions)'),
   views: z.array(ViewSchema).optional().describe('List Views'),
   pages: z.array(PageSchema).optional().describe('Custom Pages'),
   dashboards: z.array(DashboardSchema).optional().describe('Dashboards'),
