@@ -489,7 +489,7 @@ describe('AI Routes', () => {
 
   it('should build all expected routes', () => {
     const routes = buildAIRoutes(service, service.conversationService, silentLogger);
-    expect(routes.length).toBe(8);
+    expect(routes.length).toBe(9);
 
     const paths = routes.map(r => `${r.method} ${r.path}`);
     expect(paths).toContain('POST /api/v1/ai/chat');
@@ -498,6 +498,7 @@ describe('AI Routes', () => {
     expect(paths).toContain('GET /api/v1/ai/models');
     expect(paths).toContain('POST /api/v1/ai/conversations');
     expect(paths).toContain('GET /api/v1/ai/conversations');
+    expect(paths).toContain('GET /api/v1/ai/conversations/:id');
     expect(paths).toContain('POST /api/v1/ai/conversations/:id/messages');
     expect(paths).toContain('DELETE /api/v1/ai/conversations/:id');
   });
@@ -716,7 +717,7 @@ describe('AI Routes', () => {
   it('DELETE /api/v1/ai/conversations/:id should delete conversation', async () => {
     const routes = buildAIRoutes(service, service.conversationService, silentLogger);
     const createRoute = routes.find(r => r.method === 'POST' && r.path === '/api/v1/ai/conversations')!;
-    const deleteRoute = routes.find(r => r.path === '/api/v1/ai/conversations/:id')!;
+    const deleteRoute = routes.find(r => r.method === 'DELETE' && r.path === '/api/v1/ai/conversations/:id')!;
 
     const created = await createRoute.handler({ body: {} });
     const convId = (created.body as any).id;
