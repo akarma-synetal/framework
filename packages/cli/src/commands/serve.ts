@@ -949,6 +949,36 @@ export default class Serve extends Command {
         }
       }
 
+      // 5b-ii. Auto-register RuntimeConfigPlugin so the Console / Studio SPA
+      // can fetch `/api/v1/runtime/config` at boot. Without it the SPA
+      // 404s on the endpoint, falls back to defaults (installLocal:false),
+      // and the marketplace Install button prompts "install to cloud"
+      // instead of installing into the local `objectstack dev` runtime.
+      //
+      // For a vanilla user stack (objectstack dev) this runtime IS the
+      // install target: cloudUrl='' (stay on same origin so the SPA hits
+      // the proxied marketplace) and installLocal=true.
+      const hasRuntimeConfig = plugins.some(
+        (p: any) => p?.name === 'com.objectstack.runtime.runtime-config'
+          || p?.constructor?.name === 'RuntimeConfigPlugin'
+          || p?.name === 'com.objectstack.studio.runtime-config'
+          || p?.name === 'com.objectstack.studio.single-environment'
+      );
+      if (!hasRuntimeConfig) {
+        try {
+          const runtimePkg = '@objectstack/runtime';
+          const { RuntimeConfigPlugin } = await import(/* webpackIgnore: true */ runtimePkg);
+          await kernel.use(new RuntimeConfigPlugin({
+            controlPlaneUrl: '',
+            singleEnvironment: true,
+            installLocal: true,
+          }));
+          trackPlugin('RuntimeConfig');
+        } catch (err: any) {
+          console.warn(chalk.yellow(`  ⚠ RuntimeConfigPlugin auto-inject failed: ${err?.message ?? err}`));
+        }
+      }
+
       // 5c. Auto-register AuthPlugin (and paired Security/Audit) when the
       // 'auth' tier is enabled and no auth plugin is already configured.
       // The Studio + Account portals expect /api/v1/auth/* to be served by

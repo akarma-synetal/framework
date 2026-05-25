@@ -33,11 +33,19 @@ import { resolveCloudUrl } from './cloud-url.js';
 export interface RuntimeConfigPluginConfig {
     /**
      * Upstream cloud base URL. Falls back to `resolveCloudUrl()` (reads
-     * `OS_CLOUD_URL` / built-in default) when omitted.
+     * `OS_CLOUD_URL` / built-in default) when omitted. Pass an explicit
+     * empty string to declare "this runtime IS the cloud" (same-origin
+     * for marketplace + install).
      */
     controlPlaneUrl?: string;
     /** Override the `features.installLocal` flag. Default: false. */
     installLocal?: boolean;
+    /**
+     * Report this runtime as a single-environment deployment (CLI
+     * `objectstack dev` / `os serve`). Defaults to `false` for
+     * multi-tenant ObjectOS.
+     */
+    singleEnvironment?: boolean;
 }
 
 export class RuntimeConfigPlugin implements Plugin {
@@ -46,10 +54,16 @@ export class RuntimeConfigPlugin implements Plugin {
 
     private readonly cloudUrl: string;
     private readonly installLocal: boolean;
+    private readonly singleEnvironment: boolean;
 
     constructor(config: RuntimeConfigPluginConfig = {}) {
-        this.cloudUrl = resolveCloudUrl(config.controlPlaneUrl) ?? '';
+        // An explicit empty string means "stay on this origin" — bypass the
+        // resolver which would otherwise fall back to the default cloud URL.
+        this.cloudUrl = config.controlPlaneUrl === ''
+            ? ''
+            : (resolveCloudUrl(config.controlPlaneUrl) ?? '');
         this.installLocal = !!config.installLocal;
+        this.singleEnvironment = !!config.singleEnvironment;
     }
 
     init = async (_ctx: PluginContext): Promise<void> => {};
@@ -70,7 +84,7 @@ export class RuntimeConfigPlugin implements Plugin {
             const rawApp = httpServer.getRawApp();
             const payload = {
                 cloudUrl: this.cloudUrl,
-                singleEnvironment: false,
+                singleEnvironment: this.singleEnvironment,
                 features: {
                     installLocal: this.installLocal,
                     marketplace: true,

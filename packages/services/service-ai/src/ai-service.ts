@@ -133,6 +133,24 @@ export class AIService implements IAIService {
   }
 
   /**
+   * Best-effort persistence of a single chat message to the conversation
+   * store. Failures are logged at warn level and swallowed — chat requests
+   * must never fail because the history write failed. Mirrors the
+   * precedent set by `ObjectQLTraceRecorder.record`.
+   */
+  private async persistMessage(conversationId: string, message: ModelMessage): Promise<void> {
+    try {
+      await this.conversationService.addMessage(conversationId, message);
+    } catch (err) {
+      this.logger.warn('[AI] persist message failed', {
+        conversationId,
+        role: (message as { role?: string }).role,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
    * Run an adapter call and emit a trace event.
    *
    * Records both success and failure. Tracing failures never escape — the
@@ -287,6 +305,7 @@ export class AIService implements IAIService {
     } = options ?? {};
     const maxIterations = maxIter ?? AIService.DEFAULT_MAX_ITERATIONS;
     const registeredTools = this.toolRegistry.getAll();
+    const conversationId = toolExecutionContext?.conversationId;
 
     // Merge registered tools with any explicitly provided tools
     const mergedTools = [
@@ -303,6 +322,16 @@ export class AIService implements IAIService {
 
     // Working copy of the conversation
     const conversation = [...messages];
+
+    // Persist the inbound user turn when a conversationId is supplied.
+    // Only the last message is written — callers are assumed to pass
+    // prior history alongside the new turn; we don't diff.
+    if (conversationId && messages.length > 0) {
+      const last = messages[messages.length - 1];
+      if (last && (last as { role?: string }).role === 'user') {
+        await this.persistMessage(conversationId, last);
+      }
+    }
 
     // Track errors across iterations for diagnostics
     const toolErrors: Array<{ iteration: number; toolName: string; error: string }> = [];
@@ -321,6 +350,12 @@ export class AIService implements IAIService {
       // If the model did not request any tool calls we're done
       if (!result.toolCalls || result.toolCalls.length === 0) {
         this.logger.debug('[AI] chatWithTools finished', { iteration, content: result.content.slice(0, 80) });
+        if (conversationId) {
+          await this.persistMessage(conversationId, {
+            role: 'assistant',
+            content: result.content,
+          } as ModelMessage);
+        }
         return result;
       }
 
@@ -333,10 +368,14 @@ export class AIService implements IAIService {
       const assistantContent: Array<{ type: 'text'; text: string } | ToolCallPart> = [];
       if (result.content) assistantContent.push({ type: 'text', text: result.content });
       assistantContent.push(...result.toolCalls);
-      conversation.push({
+      const assistantTurn = {
         role: 'assistant',
         content: assistantContent,
-      } as ModelMessage);
+      } as ModelMessage;
+      conversation.push(assistantTurn);
+      if (conversationId) {
+        await this.persistMessage(conversationId, assistantTurn);
+      }
 
       // Execute all tool calls in parallel, threading the per-request
       // execution context so handlers can attribute work to the actor
@@ -367,10 +406,14 @@ export class AIService implements IAIService {
         }
 
         // Append each tool result as a `role: 'tool'` message
-        conversation.push({
+        const toolTurn = {
           role: 'tool',
           content: [tr],
-        } as ModelMessage);
+        } as ModelMessage;
+        conversation.push(toolTurn);
+        if (conversationId) {
+          await this.persistMessage(conversationId, toolTurn);
+        }
       }
 
       if (abortedByCallback) {
@@ -393,6 +436,12 @@ export class AIService implements IAIService {
       tools: undefined,
       toolChoice: undefined,
     });
+    if (conversationId) {
+      await this.persistMessage(conversationId, {
+        role: 'assistant',
+        content: finalResult.content,
+      } as ModelMessage);
+    }
     return finalResult;
   }
 
@@ -415,6 +464,7 @@ export class AIService implements IAIService {
     } = options ?? {};
     const maxIterations = maxIter ?? AIService.DEFAULT_MAX_ITERATIONS;
     const registeredTools = this.toolRegistry.getAll();
+    const conversationId = toolExecutionContext?.conversationId;
 
     const mergedTools = [
       ...registeredTools,
@@ -430,12 +480,25 @@ export class AIService implements IAIService {
     const conversation = [...messages];
     let abortedByCallback = false;
 
+    if (conversationId && messages.length > 0) {
+      const last = messages[messages.length - 1];
+      if (last && (last as { role?: string }).role === 'user') {
+        await this.persistMessage(conversationId, last);
+      }
+    }
+
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       // Use non-streaming chat for intermediate tool-call rounds
       const result = await this.adapter.chat(conversation, chatOptions);
 
       if (!result.toolCalls || result.toolCalls.length === 0) {
         // Final round — return the probed result without an extra model call
+        if (conversationId) {
+          await this.persistMessage(conversationId, {
+            role: 'assistant',
+            content: result.content,
+          } as ModelMessage);
+        }
         yield textDeltaPart('stream', result.content);
         yield finishPart(result);
         return;
@@ -449,10 +512,14 @@ export class AIService implements IAIService {
       const assistantContent: Array<{ type: 'text'; text: string } | ToolCallPart> = [];
       if (result.content) assistantContent.push({ type: 'text', text: result.content });
       assistantContent.push(...result.toolCalls);
-      conversation.push({
+      const assistantTurn = {
         role: 'assistant',
         content: assistantContent,
-      } as ModelMessage);
+      } as ModelMessage;
+      conversation.push(assistantTurn);
+      if (conversationId) {
+        await this.persistMessage(conversationId, assistantTurn);
+      }
 
       const toolResults: ToolExecutionResult[] = await this.toolRegistry.executeAll(
         result.toolCalls,
@@ -477,10 +544,14 @@ export class AIService implements IAIService {
           toolName: tr.toolName,
           output: tr.output,
         } as TextStreamPart<ToolSet>;
-        conversation.push({
+        const toolTurn = {
           role: 'tool',
           content: [tr],
-        } as ModelMessage);
+        } as ModelMessage;
+        conversation.push(toolTurn);
+        if (conversationId) {
+          await this.persistMessage(conversationId, toolTurn);
+        }
       }
 
       if (abortedByCallback) {
@@ -496,6 +567,12 @@ export class AIService implements IAIService {
     }
     const finalOptions = { ...chatOptions, tools: undefined, toolChoice: undefined };
     const result = await this.adapter.chat(conversation, finalOptions);
+    if (conversationId) {
+      await this.persistMessage(conversationId, {
+        role: 'assistant',
+        content: result.content,
+      } as ModelMessage);
+    }
     yield textDeltaPart('stream', result.content);
     yield finishPart(result);
   }

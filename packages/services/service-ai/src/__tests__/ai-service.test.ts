@@ -354,6 +354,126 @@ describe('AIService', () => {
     const result = await service.chat([{ role: 'user', content: 'test' }]);
     expect(result.content).toBe('custom response');
   });
+
+  // ─── Auto-persist chat history when conversationId is supplied ───
+
+  it('chatWithTools auto-persists user + assistant turns when conversationId is provided', async () => {
+    const conversationService = new InMemoryConversationService();
+    const adapter: LLMAdapter = {
+      name: 'persist-test',
+      chat: async () => ({ content: 'hello back', model: 'test' }),
+      complete: async () => ({ content: '' }),
+    };
+    const service = new AIService({ adapter, conversationService, logger: silentLogger });
+    const conv = await conversationService.create();
+
+    await service.chatWithTools(
+      [{ role: 'user', content: 'hi' }],
+      { toolExecutionContext: { conversationId: conv.id } },
+    );
+
+    const after = await conversationService.get(conv.id);
+    expect(after?.messages).toHaveLength(2);
+    expect(after?.messages[0].role).toBe('user');
+    expect(after?.messages[1].role).toBe('assistant');
+    expect(after?.messages[1].content).toBe('hello back');
+  });
+
+  it('chatWithTools persists assistant + tool turns across iterations', async () => {
+    const conversationService = new InMemoryConversationService();
+    const toolRegistry = new ToolRegistry();
+    toolRegistry.register(
+      { name: 'echo', description: 'echo', parameters: {} as any },
+      async (input: any) => ({ ok: true, input }),
+    );
+
+    let calls = 0;
+    const adapter: LLMAdapter = {
+      name: 'tool-persist-test',
+      chat: async () => {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            content: '',
+            model: 'test',
+            toolCalls: [
+              { type: 'tool-call' as const, toolCallId: 'tc_1', toolName: 'echo', input: { x: 1 } },
+            ],
+          };
+        }
+        return { content: 'done', model: 'test' };
+      },
+      complete: async () => ({ content: '' }),
+    };
+    const service = new AIService({ adapter, conversationService, toolRegistry, logger: silentLogger });
+    const conv = await conversationService.create();
+
+    await service.chatWithTools(
+      [{ role: 'user', content: 'use echo' }],
+      { toolExecutionContext: { conversationId: conv.id } },
+    );
+
+    const after = await conversationService.get(conv.id);
+    expect(after?.messages).toHaveLength(4);
+    expect(after?.messages.map(m => m.role)).toEqual(['user', 'assistant', 'tool', 'assistant']);
+  });
+
+  it('streamChatWithTools auto-persists user + assistant turns when conversationId is provided', async () => {
+    const conversationService = new InMemoryConversationService();
+    const adapter: LLMAdapter = {
+      name: 'stream-persist-test',
+      chat: async () => ({ content: 'streamed reply', model: 'test' }),
+      complete: async () => ({ content: '' }),
+    };
+    const service = new AIService({ adapter, conversationService, logger: silentLogger });
+    const conv = await conversationService.create();
+
+    const events: TextStreamPart<ToolSet>[] = [];
+    for await (const ev of service.streamChatWithTools(
+      [{ role: 'user', content: 'hi' }],
+      { toolExecutionContext: { conversationId: conv.id } },
+    )) {
+      events.push(ev);
+    }
+
+    const after = await conversationService.get(conv.id);
+    expect(after?.messages).toHaveLength(2);
+    expect(after?.messages[0].role).toBe('user');
+    expect(after?.messages[1].role).toBe('assistant');
+    expect(after?.messages[1].content).toBe('streamed reply');
+  });
+
+  it('does not persist when conversationId is omitted', async () => {
+    const conversationService = new InMemoryConversationService();
+    const spy = vi.spyOn(conversationService, 'addMessage');
+    const adapter: LLMAdapter = {
+      name: 'no-persist-test',
+      chat: async () => ({ content: 'reply', model: 'test' }),
+      complete: async () => ({ content: '' }),
+    };
+    const service = new AIService({ adapter, conversationService, logger: silentLogger });
+
+    await service.chatWithTools([{ role: 'user', content: 'hi' }]);
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('swallows persistence errors and still returns the assistant reply', async () => {
+    const conversationService = new InMemoryConversationService();
+    vi.spyOn(conversationService, 'addMessage').mockRejectedValue(new Error('boom'));
+    const adapter: LLMAdapter = {
+      name: 'persist-fail-test',
+      chat: async () => ({ content: 'still ok', model: 'test' }),
+      complete: async () => ({ content: '' }),
+    };
+    const service = new AIService({ adapter, conversationService, logger: silentLogger });
+
+    const result = await service.chatWithTools(
+      [{ role: 'user', content: 'hi' }],
+      { toolExecutionContext: { conversationId: 'missing-id' } },
+    );
+    expect(result.content).toBe('still ok');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────
