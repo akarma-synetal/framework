@@ -240,6 +240,79 @@ export interface IAIService {
      * @returns Final AI result after all tool calls have been resolved
      */
     chatWithTools?(messages: ModelMessage[], options?: ChatWithToolsOptions): Promise<AIResult>;
+
+    /**
+     * Persist a proposed AI-initiated action that requires human approval
+     * before execution. Used by the actions-as-tools runtime when the
+     * picked action is dangerous (delete / danger variant / has
+     * `confirmText`) and `enableActionApproval` is on.
+     *
+     * Implementations write a row to `ai_pending_actions` and return
+     * its id. The caller (the tool handler) immediately returns a
+     * `{ status: 'pending_approval' }` envelope to the LLM.
+     */
+    proposePendingAction?(input: ProposePendingActionInput): Promise<{ id: string }>;
+
+    /**
+     * Approve a previously-proposed pending action and re-dispatch it
+     * via the same handler that would have run had approval not been
+     * required. Updates the row to `executed` (or `failed`) and returns
+     * the outcome.
+     */
+    approvePendingAction?(
+        id: string,
+        actorId: string,
+    ): Promise<{ status: 'executed' | 'failed'; result?: unknown; error?: string }>;
+
+    /**
+     * Reject a pending action. The row transitions to `rejected` and the
+     * optional `reason` is stored so the next LLM turn can surface it.
+     */
+    rejectPendingAction?(id: string, actorId: string, reason?: string): Promise<void>;
+
+    /**
+     * Inbox query: list pending (or filtered) action proposals. Used by
+     * Studio's pending-actions view.
+     */
+    listPendingActions?(filter?: {
+        status?: PendingActionStatus | PendingActionStatus[];
+        conversationId?: string;
+        objectName?: string;
+        limit?: number;
+    }): Promise<PendingActionRow[]>;
+}
+
+/** Lifecycle of a pending action proposal. */
+export type PendingActionStatus = 'pending' | 'approved' | 'executed' | 'failed' | 'rejected';
+
+/** Input for {@link IAIService.proposePendingAction}. */
+export interface ProposePendingActionInput {
+    objectName: string;
+    actionName: string;
+    toolName: string;
+    toolInput: Record<string, unknown>;
+    conversationId?: string;
+    messageId?: string;
+    proposedBy?: string;
+}
+
+/** Stored row shape returned by {@link IAIService.listPendingActions}. */
+export interface PendingActionRow {
+    id: string;
+    object_name: string;
+    action_name: string;
+    tool_name: string;
+    tool_input: string;
+    status: PendingActionStatus;
+    result?: string;
+    error?: string;
+    rejection_reason?: string;
+    conversation_id?: string;
+    message_id?: string;
+    proposed_by?: string;
+    decided_by?: string;
+    proposed_at: string;
+    decided_at?: string;
 }
 
 /**

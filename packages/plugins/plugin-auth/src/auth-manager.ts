@@ -154,6 +154,7 @@ export class AuthManager {
   private async createAuthInstance(): Promise<Auth<any>> {
     const { betterAuth } = await import('better-auth');
     const plugins = await this.buildPluginList();
+    const passwordHasher = await this.resolvePasswordHasher();
     const betterAuthConfig: BetterAuthOptions = {
       // Base configuration
       secret: this.config.secret || this.generateSecret(),
@@ -217,6 +218,7 @@ export class AuthManager {
       // Email and password configuration
       emailAndPassword: {
         enabled: this.config.emailAndPassword?.enabled ?? true,
+        ...(passwordHasher ? { password: passwordHasher } : {}),
         ...(this.config.emailAndPassword?.disableSignUp != null
           ? { disableSignUp: this.config.emailAndPassword.disableSignUp } : {}),
         ...(this.config.emailAndPassword?.requireEmailVerification != null
@@ -358,6 +360,42 @@ export class AuthManager {
     };
 
     return betterAuth(betterAuthConfig);
+  }
+
+  /**
+   * Detect WebContainer (StackBlitz) and swap in a pure-JS scrypt hasher.
+   *
+   * better-auth defaults to `@better-auth/utils/password.node`, which calls
+   * `node:crypto.scrypt`. WebContainer polyfills that API incompletely and
+   * signup throws `TypeError: y.run is not a function`. The pure-JS variant
+   * at `@better-auth/utils/password` uses `@noble/hashes/scrypt` with
+   * identical params (N=16384, r=16, p=1, dkLen=64) and emits the same
+   * `{salt}:{keyHex}` format, so existing hashes remain verifiable.
+   *
+   * Returns `undefined` outside WebContainer so production deployments keep
+   * the native (fast) hasher and never load the JS fallback.
+   */
+  private async resolvePasswordHasher(): Promise<
+    { hash: (password: string) => Promise<string>; verify: (args: { hash: string; password: string }) => Promise<boolean> } | undefined
+  > {
+    const isWebContainer =
+      typeof globalThis !== 'undefined' &&
+      (Boolean((globalThis as any).process?.versions?.webcontainer) ||
+        Boolean((globalThis as any).process?.env?.SHELL?.includes?.('jsh')) ||
+        Boolean((globalThis as any).process?.env?.STACKBLITZ));
+    if (!isWebContainer) return undefined;
+    try {
+      const mod = await import('@better-auth/utils/password');
+      return {
+        hash: (password: string) => mod.hashPassword(password),
+        verify: ({ hash, password }) => mod.verifyPassword(hash, password),
+      };
+    } catch (err: any) {
+      console.warn(
+        `[AuthManager] WebContainer detected but pure-JS password hasher unavailable: ${err?.message ?? err}. Falling back to default.`,
+      );
+      return undefined;
+    }
   }
 
   /**

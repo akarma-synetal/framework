@@ -37,7 +37,7 @@ const result = Skill.parse(data);
 | **label** | `string` | ✅ | Skill display name |
 | **description** | `string` | optional | Skill description |
 | **instructions** | `string` | optional | LLM instructions when skill is active |
-| **tools** | `string[]` | ✅ | Tool names belonging to this skill |
+| **tools** | `string[]` | ✅ | Tool names belonging to this skill (supports trailing wildcard, e.g. `action_*`) |
 | **triggerPhrases** | `string[]` | optional | Phrases that activate this skill |
 | **triggerConditions** | `Object[]` | optional | Programmatic activation conditions |
 | **permissions** | `string[]` | optional | Required permissions or roles |

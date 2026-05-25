@@ -9,9 +9,10 @@ import { buildAIRoutes } from './routes/ai-routes.js';
 import { buildAgentRoutes } from './routes/agent-routes.js';
 import { buildAssistantRoutes } from './routes/assistant-routes.js';
 import { buildToolRoutes } from './routes/tool-routes.js';
+import { buildPendingActionRoutes } from './routes/pending-action-routes.js';
 import { ObjectQLConversationService } from './conversation/objectql-conversation-service.js';
-import { AiConversationObject, AiMessageObject, AiTraceObject } from './objects/index.js';
-import { AiTraceView } from './views/index.js';
+import { AiConversationObject, AiMessageObject, AiPendingActionObject, AiTraceObject } from './objects/index.js';
+import { AiTraceView, AiPendingActionView } from './views/index.js';
 import { registerDataTools } from './tools/data-tools.js';
 import { registerMetadataTools } from './tools/metadata-tools.js';
 import { registerQueryDataTool } from './tools/query-data.tool.js';
@@ -70,6 +71,18 @@ export interface AIServicePluginOptions {
    * caller's session token so server-side authorization still applies.
    */
   apiActionHeaders?: Record<string, string>;
+  /**
+   * Opt into Human-In-The-Loop approval for dangerous actions exposed
+   * as AI tools. When `true`, actions with `confirmText`, `mode:'delete'`,
+   * or `variant:'danger'` are still registered as tools — but invoking
+   * them enqueues an `ai_pending_actions` row and returns
+   * `{ status: 'pending_approval' }` instead of running. A human
+   * operator approves via Studio's pending-actions inbox to execute.
+   *
+   * Defaults to `false` (safer: dangerous actions stay invisible to LLM
+   * until an operator explicitly enables this routing).
+   */
+  enableActionApproval?: boolean;
 }
 
 /**
@@ -261,21 +274,23 @@ export class AIServicePlugin implements Plugin {
 
     // Trace recorder — explicit > auto-detect IDataEngine > NullTraceRecorder
     let traceRecorder: TraceRecorder | undefined;
+    let dataEngine: IDataEngine | undefined;
+    try {
+      const engine = ctx.getService<IDataEngine>('data');
+      if (engine && typeof engine.insert === 'function') {
+        dataEngine = engine;
+      }
+    } catch {
+      // No data engine — pending-action queue will be a no-op.
+    }
     if (this.options.traceRecorder === null) {
       // Explicit opt-out
       ctx.logger.debug('[AI] Tracing disabled (traceRecorder=null)');
     } else if (this.options.traceRecorder) {
       traceRecorder = this.options.traceRecorder;
-    } else {
-      try {
-        const engine = ctx.getService<IDataEngine>('data');
-        if (engine && typeof engine.insert === 'function') {
-          traceRecorder = new ObjectQLTraceRecorder(engine, { logger: ctx.logger });
-          ctx.logger.info('[AI] Using ObjectQLTraceRecorder (IDataEngine detected)');
-        }
-      } catch {
-        // No data engine — leave undefined → NullTraceRecorder
-      }
+    } else if (dataEngine) {
+      traceRecorder = new ObjectQLTraceRecorder(dataEngine, { logger: ctx.logger });
+      ctx.logger.info('[AI] Using ObjectQLTraceRecorder (IDataEngine detected)');
     }
 
     const config: AIServiceConfig = {
@@ -284,6 +299,7 @@ export class AIServicePlugin implements Plugin {
       conversationService,
       modelRegistry,
       traceRecorder,
+      dataEngine,
     };
 
     this.service = new AIService(config);
@@ -303,8 +319,8 @@ export class AIServicePlugin implements Plugin {
       type: 'plugin',
       scope: 'project',
       namespace: 'ai',
-      objects: [AiConversationObject, AiMessageObject, AiTraceObject],
-      views: [AiTraceView],
+      objects: [AiConversationObject, AiMessageObject, AiTraceObject, AiPendingActionObject],
+      views: [AiTraceView, AiPendingActionView],
     });
 
     if (this.options.debug) {
@@ -385,6 +401,8 @@ export class AIServicePlugin implements Plugin {
                 automation,
                 apiBaseUrl,
                 apiHeaders,
+                enableActionApproval: this.options.enableActionApproval ?? false,
+                aiService: this.service,
               },
             );
             if (registered.length > 0) {
@@ -624,6 +642,11 @@ export class AIServicePlugin implements Plugin {
     const toolRoutes = buildToolRoutes(this.service, ctx.logger);
     routes.push(...toolRoutes);
     ctx.logger.info(`[AI] Tool routes registered (${toolRoutes.length} routes)`);
+
+    // Build HITL pending-action routes
+    const pendingRoutes = buildPendingActionRoutes(this.service, ctx.logger);
+    routes.push(...pendingRoutes);
+    ctx.logger.info(`[AI] Pending-action routes registered (${pendingRoutes.length} routes)`);
 
     // Build agent routes if metadata service is available
     if (metadataService) {

@@ -11,8 +11,12 @@ import type {
   GenerateObjectOptions,
   IAIService,
   IAIConversationService,
+  IDataEngine,
   ChatWithToolsOptions,
   LLMAdapter,
+  PendingActionRow,
+  PendingActionStatus,
+  ProposePendingActionInput,
 } from '@objectstack/spec/contracts';
 import type { Logger } from '@objectstack/spec/contracts';
 import type { z } from 'zod';
@@ -64,6 +68,13 @@ export interface AIServiceConfig {
   modelRegistry?: ModelRegistry;
   /** Trace recorder for per-call observability. Defaults to no-op. */
   traceRecorder?: TraceRecorder;
+  /**
+   * Data engine used to persist `ai_pending_actions` rows for the
+   * actions-as-tools HITL queue. Optional — when omitted, the
+   * `proposePendingAction` / `approvePendingAction` methods throw if
+   * called. Wired by `AIServicePlugin` after the data driver is up.
+   */
+  dataEngine?: IDataEngine;
 }
 
 /**
@@ -88,6 +99,18 @@ export class AIService implements IAIService {
   readonly conversationService: IAIConversationService;
   readonly modelRegistry?: ModelRegistry;
   readonly traceRecorder: TraceRecorder;
+  /**
+   * Map of tool-name → dispatcher used to re-run an approved pending
+   * action. Populated by `registerActionsAsTools()` when action
+   * approval is enabled. Kept private because callers should go
+   * through `approvePendingAction()`.
+   */
+  private readonly pendingDispatchers = new Map<
+    string,
+    (input: Record<string, unknown>) => Promise<unknown>
+  >();
+  /** Data engine for `ai_pending_actions` persistence. */
+  private readonly dataEngine?: IDataEngine;
 
   constructor(config: AIServiceConfig = {}) {
     this.adapter = config.adapter ?? new MemoryLLMAdapter();
@@ -96,6 +119,7 @@ export class AIService implements IAIService {
     this.conversationService = config.conversationService ?? new InMemoryConversationService();
     this.modelRegistry = config.modelRegistry;
     this.traceRecorder = config.traceRecorder ?? new NullTraceRecorder();
+    this.dataEngine = config.dataEngine;
 
     this.logger.info(
       `[AI] Service initialized with adapter="${this.adapter.name}", ` +
@@ -456,4 +480,158 @@ export class AIService implements IAIService {
     yield textDeltaPart('stream', result.content);
     yield finishPart(result);
   }
+
+  // ── HITL: pending-action queue ─────────────────────────────────
+
+  /**
+   * Register a dispatcher callback for a tool. Called by
+   * `registerActionsAsTools()` when action approval is enabled so the
+   * approval handler can re-run the exact same code path the LLM
+   * would have triggered.
+   */
+  registerPendingActionDispatcher(
+    toolName: string,
+    dispatch: (input: Record<string, unknown>) => Promise<unknown>,
+  ): void {
+    this.pendingDispatchers.set(toolName, dispatch);
+  }
+
+  async proposePendingAction(input: ProposePendingActionInput): Promise<{ id: string }> {
+    if (!this.dataEngine) {
+      throw new Error('proposePendingAction requires a dataEngine — wire it via AIServiceConfig.');
+    }
+    const id = `pa_${cryptoRandomId()}`;
+    const row = {
+      id,
+      conversation_id: input.conversationId ?? null,
+      message_id: input.messageId ?? null,
+      object_name: input.objectName,
+      action_name: input.actionName,
+      tool_name: input.toolName,
+      tool_input: JSON.stringify(input.toolInput ?? {}),
+      status: 'pending',
+      proposed_by: input.proposedBy ?? 'ai_agent',
+      proposed_at: new Date().toISOString(),
+    };
+    await this.dataEngine.insert('ai_pending_actions', row);
+    this.logger.info(
+      `[AI] pending action proposed: ${id} (${input.toolName} on ${input.objectName})`,
+    );
+    return { id };
+  }
+
+  async approvePendingAction(
+    id: string,
+    actorId: string,
+  ): Promise<{ status: 'executed' | 'failed'; result?: unknown; error?: string }> {
+    if (!this.dataEngine) {
+      throw new Error('approvePendingAction requires a dataEngine.');
+    }
+    const row = await this.loadPendingRow(id);
+    if (row.status !== 'pending') {
+      throw new Error(`pending action ${id} is already ${row.status}`);
+    }
+    const dispatch = this.pendingDispatchers.get(row.tool_name);
+    if (!dispatch) {
+      throw new Error(
+        `no dispatcher registered for tool '${row.tool_name}' — was the AI plugin restarted without re-registering actions?`,
+      );
+    }
+    await this.dataEngine.update(
+      'ai_pending_actions',
+      {
+        id,
+        status: 'approved',
+        decided_by: actorId,
+        decided_at: new Date().toISOString(),
+      },
+      { where: { id } },
+    );
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = row.tool_input ? (JSON.parse(row.tool_input) as Record<string, unknown>) : {};
+    } catch {
+      parsed = {};
+    }
+    try {
+      const out = await dispatch(parsed);
+      await this.dataEngine.update(
+        'ai_pending_actions',
+        { id, status: 'executed', result: JSON.stringify(out ?? null) },
+        { where: { id } },
+      );
+      this.logger.info(`[AI] pending action ${id} executed by ${actorId}`);
+      return { status: 'executed', result: out };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await this.dataEngine.update(
+        'ai_pending_actions',
+        { id, status: 'failed', error: msg },
+        { where: { id } },
+      );
+      this.logger.warn(`[AI] pending action ${id} failed after approval: ${msg}`);
+      return { status: 'failed', error: msg };
+    }
+  }
+
+  async rejectPendingAction(id: string, actorId: string, reason?: string): Promise<void> {
+    if (!this.dataEngine) {
+      throw new Error('rejectPendingAction requires a dataEngine.');
+    }
+    const row = await this.loadPendingRow(id);
+    if (row.status !== 'pending') {
+      throw new Error(`pending action ${id} is already ${row.status}`);
+    }
+    await this.dataEngine.update(
+      'ai_pending_actions',
+      {
+        id,
+        status: 'rejected',
+        decided_by: actorId,
+        decided_at: new Date().toISOString(),
+        rejection_reason: reason ?? null,
+      },
+      { where: { id } },
+    );
+    this.logger.info(`[AI] pending action ${id} rejected by ${actorId}`);
+  }
+
+  async listPendingActions(filter?: {
+    status?: PendingActionStatus | PendingActionStatus[];
+    conversationId?: string;
+    objectName?: string;
+    limit?: number;
+  }): Promise<PendingActionRow[]> {
+    if (!this.dataEngine) return [];
+    const where: Record<string, unknown> = {};
+    if (filter?.status) {
+      where.status = Array.isArray(filter.status) ? { in: filter.status } : filter.status;
+    }
+    if (filter?.conversationId) where.conversation_id = filter.conversationId;
+    if (filter?.objectName) where.object_name = filter.objectName;
+    const rows = (await this.dataEngine.find('ai_pending_actions', {
+      where,
+      limit: filter?.limit ?? 100,
+      orderBy: [{ field: 'proposed_at', order: 'desc' }],
+    })) as PendingActionRow[];
+    return rows;
+  }
+
+  private async loadPendingRow(id: string): Promise<PendingActionRow> {
+    const rows = (await this.dataEngine!.find('ai_pending_actions', {
+      where: { id },
+      limit: 1,
+    })) as PendingActionRow[];
+    const row = rows[0];
+    if (!row) throw new Error(`pending action ${id} not found`);
+    return row;
+  }
+}
+
+function cryptoRandomId(): string {
+  // crypto.randomUUID is available in Node 16+ and modern browsers; fall
+  // back to a timestamp+random pair for environments that lack it.
+  const g = globalThis as { crypto?: { randomUUID?: () => string } };
+  if (g.crypto?.randomUUID) return g.crypto.randomUUID();
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }

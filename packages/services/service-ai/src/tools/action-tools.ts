@@ -86,6 +86,35 @@ export interface ActionToolsContext {
   principal?: { id: string; name?: string };
   /** Tool-name prefix (default: `action_`). Keeps namespace separate from data tools. */
   toolPrefix?: string;
+  /**
+   * AI service used to enqueue HITL approvals for dangerous actions.
+   * When supplied together with `enableActionApproval: true`, actions
+   * that would otherwise be skipped on safety grounds (`confirmText`,
+   * `mode:'delete'`, `variant:'danger'`) are registered as tools whose
+   * handler proposes a pending action and returns
+   * `{ status: 'pending_approval' }` instead of executing.
+   */
+  aiService?: {
+    proposePendingAction?: (input: {
+      objectName: string;
+      actionName: string;
+      toolName: string;
+      toolInput: Record<string, unknown>;
+      conversationId?: string;
+      messageId?: string;
+      proposedBy?: string;
+    }) => Promise<{ id: string }>;
+    registerPendingActionDispatcher?: (
+      toolName: string,
+      dispatch: (input: Record<string, unknown>) => Promise<unknown>,
+    ) => void;
+  };
+  /**
+   * Opt into the HITL approval queue for dangerous actions. Default
+   * is `false` (safer: dangerous actions stay invisible to the LLM
+   * until an operator explicitly enables approval routing).
+   */
+  enableActionApproval?: boolean;
 }
 
 /**
@@ -127,9 +156,27 @@ interface ActionInvocationResult {
  * UI types (`url`, `modal`, `form`) remain skipped — they have no
  * headless invocation path.
  */
+/**
+ * True when an action is "dangerous" and should be routed through the
+ * HITL approval queue (rather than dispatched directly). Exported so
+ * Studio's AI-exposure surface can highlight which actions require
+ * approval.
+ */
+export function actionRequiresApproval(action: Action): boolean {
+  return Boolean(
+    action.confirmText || action.mode === 'delete' || action.variant === 'danger',
+  );
+}
+
 export function actionSkipReason(
   action: Action,
-  ctx?: { automation?: IAutomationService; apiClient?: ApiActionClient; apiBaseUrl?: string },
+  ctx?: {
+    automation?: IAutomationService;
+    apiClient?: ApiActionClient;
+    apiBaseUrl?: string;
+    enableActionApproval?: boolean;
+    aiService?: ActionToolsContext['aiService'];
+  },
 ): string | null {
   if (action.aiExposed === false) {
     return 'opted-out via aiExposed:false';
@@ -156,10 +203,18 @@ export function actionSkipReason(
       return 'no apiClient or apiBaseUrl configured';
     }
   }
-  // Safety: dangerous actions require explicit human approval.
-  if (action.confirmText) return 'requires confirmation (confirmText set)';
-  if (action.mode === 'delete') return "mode='delete' — destructive";
-  if (action.variant === 'danger') return "variant='danger' — destructive";
+  // Safety: dangerous actions normally require explicit human approval.
+  // When the caller has opted in to the HITL queue (and wired aiService),
+  // we *register* them and route to the queue instead of skipping.
+  if (actionRequiresApproval(action)) {
+    const approvalReady =
+      ctx?.enableActionApproval === true && Boolean(ctx?.aiService?.proposePendingAction);
+    if (!approvalReady) {
+      if (action.confirmText) return 'requires confirmation (confirmText set)';
+      if (action.mode === 'delete') return "mode='delete' — destructive";
+      if (action.variant === 'danger') return "variant='danger' — destructive";
+    }
+  }
   return null;
 }
 
@@ -332,7 +387,12 @@ export function actionToToolDefinition(
   allObjects: Map<string, ObjectDef>,
   toolPrefix = 'action_',
 ): AIToolDefinition | null {
-  if (actionSkipReason(action) !== null) return null;
+  // NOTE: skip eligibility is decided by the caller (registerActionsAsTools)
+  // with full context (apiClient, automation, HITL approval wiring). This
+  // function only checks the *structural* invariants that make a
+  // definition impossible to build.
+  if (action.aiExposed === false) return null;
+  if (action.type === 'url' || action.type === 'modal' || action.type === 'form') return null;
   return {
     name: actionToolName(action, toolPrefix),
     description: describeAction(action, ownerObject),
@@ -433,6 +493,49 @@ function createActionToolHandler(
     // Strip recordId from params before forwarding so handlers receive only
     // user-collected fields (mirroring the Studio modal-submit shape).
     const { recordId: _omit, ...userParams } = args as Record<string, unknown>;
+
+    // ── HITL routing ──────────────────────────────────────────────
+    // When the action is dangerous AND approval is wired, persist a
+    // pending request and return the "pending" envelope instead of
+    // dispatching. The dispatcher itself was pre-registered with
+    // aiService.registerPendingActionDispatcher() at registration time
+    // so approval re-runs the exact same code path.
+    if (
+      ctx.enableActionApproval &&
+      actionRequiresApproval(action) &&
+      ctx.aiService?.proposePendingAction
+    ) {
+      try {
+        const toolName = `${ctx.toolPrefix ?? 'action_'}${action.name}`;
+        const { id } = await ctx.aiService.proposePendingAction({
+          objectName: objectName!,
+          actionName: action.name,
+          toolName,
+          toolInput: args as Record<string, unknown>,
+          proposedBy: principal.id,
+        });
+        const pending: ActionInvocationResult & {
+          status?: string;
+          pendingActionId?: string;
+        } = {
+          ok: true,
+          action: action.name,
+          objectName,
+          recordId,
+          status: 'pending_approval',
+          pendingActionId: id,
+          message:
+            `Action '${action.name}' is destructive and requires human approval. ` +
+            `Proposal queued as ${id}. ` +
+            `An operator must approve via Studio's pending-actions inbox before it runs. ` +
+            `Do NOT call this tool again for the same intent — wait for the operator.`,
+        };
+        return JSON.stringify(pending);
+      } catch (err) {
+        result.error = `Failed to enqueue approval: ${err instanceof Error ? err.message : String(err)}`;
+        return JSON.stringify(result);
+      }
+    }
 
     try {
       let out: unknown;
@@ -641,6 +744,8 @@ export async function registerActionsAsTools(
         automation: context.automation,
         apiClient: context.apiClient,
         apiBaseUrl: context.apiBaseUrl,
+        enableActionApproval: context.enableActionApproval,
+        aiService: context.aiService,
       });
       if (reason !== null) {
         skipped.push({ action: normalized.name, reason });
@@ -656,8 +761,39 @@ export async function registerActionsAsTools(
         continue;
       }
 
-      registry.register(definition, createActionToolHandler(normalized, context));
+      const handler = createActionToolHandler(normalized, context);
+      registry.register(definition, handler);
       registered.push(definition.name);
+
+      // Pre-register the *bypass-approval* dispatcher under the same tool
+      // name so AIService.approvePendingAction can re-run the action by
+      // looking up the dispatcher and invoking it with the original input.
+      if (
+        context.enableActionApproval &&
+        actionRequiresApproval(normalized) &&
+        context.aiService?.registerPendingActionDispatcher
+      ) {
+        // Build a parallel context with approval *disabled* so the handler
+        // executes directly instead of re-queuing.
+        const bypassCtx: ActionToolsContext = {
+          ...context,
+          enableActionApproval: false,
+        };
+        const directHandler = createActionToolHandler(normalized, bypassCtx);
+        context.aiService.registerPendingActionDispatcher(
+          definition.name,
+          async (input) => {
+            const raw = await directHandler(input);
+            // Handlers return a JSON string envelope; parse for the
+            // approval pathway so the row's `result` is structured.
+            try {
+              return typeof raw === 'string' ? JSON.parse(raw) : raw;
+            } catch {
+              return raw;
+            }
+          },
+        );
+      }
     }
   }
 

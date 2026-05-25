@@ -283,3 +283,92 @@ describe('registerActionsAsTools — api + flow dispatch', () => {
     expect(parsed.error).toMatch(/smtp down/);
   });
 });
+
+describe('actionRequiresApproval + HITL queue routing', () => {
+  it('skips dangerous actions when approval is NOT wired', () => {
+    const a = baseAction({ mode: 'delete' });
+    // No approval ctx → skipped
+    expect(actionSkipReason(a)).toMatch(/delete/);
+    expect(actionSkipReason(a, { enableActionApproval: false })).toMatch(/delete/);
+  });
+
+  it('registers dangerous actions when approval IS wired', () => {
+    const a = baseAction({ mode: 'delete' });
+    expect(
+      actionSkipReason(a, {
+        enableActionApproval: true,
+        aiService: { proposePendingAction: async () => ({ id: 'x' }) },
+      }),
+    ).toBeNull();
+  });
+
+  it('routes invocation to proposePendingAction + pre-registers dispatcher', async () => {
+    const reg = new ToolRegistry();
+    const propose = vi.fn(async (input: unknown) => {
+      void input;
+      return { id: 'pa_42' };
+    });
+    const dispatchers = new Map<string, (input: unknown) => Promise<unknown>>();
+    const registerDispatcher = vi.fn((name: string, fn: (input: unknown) => Promise<unknown>) => {
+      dispatchers.set(name, fn);
+    });
+
+    let executed = false;
+    const action = baseAction({
+      name: 'delete_task',
+      mode: 'delete',
+      type: 'script',
+      target: 'deleteTaskHandler',
+      locations: [],
+      params: [],
+    } as Partial<Action>);
+    const objects = [{ name: 'task', label: 'Task', fields: {}, actions: [action] }];
+
+    const { registered, skipped } = await registerActionsAsTools(reg, {
+      metadata: { listObjects: async () => objects } as never,
+      dataEngine: {
+        find: async () => [],
+        executeAction: async () => {
+          executed = true;
+          return { deleted: true };
+        },
+      } as never,
+      enableActionApproval: true,
+      aiService: {
+        proposePendingAction: propose,
+        registerPendingActionDispatcher: registerDispatcher,
+      },
+    } as never);
+
+    expect(skipped).toEqual([]);
+    expect(registered).toEqual(['action_delete_task']);
+    expect(registerDispatcher).toHaveBeenCalledWith('action_delete_task', expect.any(Function));
+
+    // LLM invokes the tool → should NOT execute, should queue.
+    const r = await reg.execute({
+      type: 'tool-call',
+      toolCallId: 't1',
+      toolName: 'action_delete_task',
+      input: { recordId: 'rec_1' },
+    } as never);
+    const env = JSON.parse((r.output as { value: string }).value);
+    expect(env.status).toBe('pending_approval');
+    expect(env.pendingActionId).toBe('pa_42');
+    expect(executed).toBe(false);
+    expect(propose).toHaveBeenCalledTimes(1);
+    const proposeArg = propose.mock.calls[0][0] as any;
+    expect(proposeArg.objectName).toBe('task');
+    expect(proposeArg.actionName).toBe('delete_task');
+    expect(proposeArg.toolName).toBe('action_delete_task');
+    expect(proposeArg.toolInput).toEqual({ recordId: 'rec_1' });
+
+    // Approval pathway: registered dispatcher should bypass HITL.
+    const dispatcher = dispatchers.get('action_delete_task');
+    expect(dispatcher).toBeDefined();
+    const result = await dispatcher!({ recordId: 'rec_1' });
+    expect(executed).toBe(true);
+    // Dispatcher returns parsed envelope (helps AIService store structured result).
+    expect((result as any).ok).toBe(true);
+    expect((result as any).result).toEqual({ deleted: true });
+  });
+});

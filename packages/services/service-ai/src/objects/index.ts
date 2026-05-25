@@ -9,3 +9,4 @@
 export { AiConversationObject } from './ai-conversation.object.js';
 export { AiMessageObject } from './ai-message.object.js';
 export { AiTraceObject } from './ai-trace.object.js';
+export { AiPendingActionObject } from './ai-pending-action.object.js';

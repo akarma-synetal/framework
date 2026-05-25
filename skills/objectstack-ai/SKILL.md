@@ -233,12 +233,29 @@ Three action types dispatch headlessly:
 
 **Skipped automatically:**
 - UI-only types (`url`, `modal`, `form`).
-- Dangerous variants (`confirmText` set, `mode: 'delete'`, `variant: 'danger'`) — Phase 3 HITL.
+- Dangerous variants (`confirmText` set, `mode: 'delete'`, `variant: 'danger'`) — **unless** the plugin is started with `enableActionApproval: true`, in which case they route through the HITL approval queue (see below).
 - Owner opt-outs (`aiExposed: false`).
 
 **`type:'api'` body assembly** (last wins): user params → `recordIdParam` (using `recordIdField`, default `'id'`) → `bodyExtra`. `bodyShape: { wrap: 'data' }` nests user params under `data` while keeping `recordIdParam` flat.
 
-Use `actionSkipReason(action, ctx)` (exported from `@objectstack/service-ai`) when authoring an action and you want to know *why* it isn't surfacing in chat. Studio's "AI exposure" diagnostics use the same predicate.
+Use `actionSkipReason(action, ctx)` (exported from `@objectstack/service-ai`) when authoring an action and you want to know *why* it isn't surfacing in chat. Studio's "AI exposure" diagnostics use the same predicate. Pair with `actionRequiresApproval(action)` to know whether a registered action will be routed through HITL.
+
+### Human-In-The-Loop approval
+
+```ts
+kernel.use(new AIServicePlugin({
+  enableActionApproval: true,   // opt in; default is false
+  apiActionBaseUrl: process.env.OS_AI_ACTION_API_BASE_URL,
+}));
+```
+
+Flow:
+1. LLM picks `action_delete_task` → runtime persists an `ai_pending_actions` row and returns `{ status: 'pending_approval', pendingActionId }`.
+2. Operator triages via Studio's **AI Pending Actions** inbox (or the REST endpoints: `GET/POST /api/v1/ai/pending-actions/...`).
+3. Approve → service re-runs the action via the pre-registered bypass-approval dispatcher; row transitions to `executed` / `failed`.
+4. Reject → row transitions to `rejected` with an optional reason.
+
+Programmatic API on `IAIService`: `proposePendingAction`, `approvePendingAction`, `rejectPendingAction`, `listPendingActions`. All are optional (returns clear error when no `IDataEngine` is wired).
 
 ---
 
