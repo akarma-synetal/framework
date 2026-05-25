@@ -236,7 +236,7 @@ export const OpportunityDiscountApproval = ApprovalProcess.create({
   description: 'High-value opportunities (> 100k) require manager + director sign-off.',
 
   // Auto-submit + record locking — Phase B autopilot
-  entryCriteria: 'record.amount > 100000',     // CEL predicate
+  entryCriteria: P`record.amount > 100000`,    // CEL predicate
   lockRecord: true,
   approvalStatusField: 'approval_status',       // mirrors pending|approved|rejected|recalled
 
@@ -325,7 +325,7 @@ director sign-off for amounts > 500k):
 ```typescript
 {
   name: 'director_signoff',
-  entryCriteria: 'record.amount > 500000',
+  entryCriteria: P`record.amount > 500000`,
   approvers: [{ type: 'role', value: 'sales_director' }],
   behavior: 'first_response',
   rejectionBehavior: 'back_to_previous',
