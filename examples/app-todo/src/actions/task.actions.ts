@@ -111,6 +111,11 @@ export const DeleteCompletedAction: Action = {
   type: 'script',
   target: 'deleteCompletedTasks',
   locations: ['list_toolbar'],
+  // Destructive + irreversible — flag as danger so Studio paints it red
+  // and the AI tool runtime routes through the HITL approval queue when
+  // `enableActionApproval` is on.
+  variant: 'danger',
+  confirmText: 'Permanently delete all completed tasks? This cannot be undone.',
   successMessage: 'Completed tasks deleted!',
   refreshAfter: true,
 };

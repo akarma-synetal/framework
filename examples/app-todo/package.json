@@ -19,6 +19,8 @@
     "test:ai": "tsx test/ai.test.ts",
     "test:agent": "tsx test/ai-agent.test.ts",
     "test:action": "tsx test/ai-action.test.ts",
+    "test:hitl": "tsx test/ai-hitl.test.ts",
+    "test:hitl:llm": "tsx test/ai-hitl-llm.test.ts",
     "test:llm": "tsx test/ai-llm.test.ts"
   },
   "dependencies": {

@@ -15,8 +15,6 @@ metadata:
   domain: query
   tags: query, filter, sort, paginate, aggregate, ObjectQL, full-text
 ---
-  tags: query, filter, sort, pagination, aggregation, search, ObjectQL, DSL
----
 
 # Query Design — ObjectStack Query DSL
 

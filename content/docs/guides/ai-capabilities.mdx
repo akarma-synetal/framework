@@ -433,6 +433,47 @@ The queue is exposed via four REST endpoints (`GET`, `GET/:id`, `POST/:id/approv
 
 **Why a dedicated queue (not the multi-step `IApprovalService`)?** AI tool-call HITL is ephemeral: subject is the proposed *call*, not a stable record state; there's no predefined process; operators expect single-click yes/no. The pending-action queue is a thin write log + dispatcher map that delivers that UX without dragging in process-engine overhead.
 
+#### End-to-end example
+
+Two runnable demos live in `examples/app-todo/test/`:
+
+- **`ai-hitl.test.ts`** — drives the tool registry directly (no LLM dependency). Asserts the full lifecycle: `variant:'danger'` action registered as a tool → invocation returns `pending_approval` without executing → row persisted → `approvePendingAction(id, actor)` re-runs the handler → row transitions to `executed`. Reject path is also covered.
+
+  ```bash
+  pnpm --filter @example/app-todo test:hitl
+  ```
+
+- **`ai-hitl-llm.test.ts`** — same scenario but with a real model behind Vercel AI Gateway. The LLM is given the auto-generated tool description and asked to "delete all completed tasks"; the framework returns `pending_approval` so the model summarises the wait instead of retrying. After we call approve from the test, the deletion completes.
+
+  ```bash
+  AI_GATEWAY_API_KEY=vck_... pnpm --filter @example/app-todo test:hitl:llm
+  ```
+
+  Gated on `AI_GATEWAY_API_KEY` (or `OPENAI_API_KEY`); exits 0 with a notice if no key is provided, so it can be wired into CI without leaking spend.
+
+A trimmed view of the integration path:
+
+```typescript
+// 1. Plugin boots with approval gating enabled
+new AIServicePlugin({
+  adapter: new VercelLLMAdapter({ model }),
+  enableActionApproval: true, // ← opt-in
+})
+
+// 2. LLM picks the gated tool — handler short-circuits to pending
+const result = await aiService.toolRegistry.execute({
+  type: 'tool-call',
+  toolName: 'action_delete_completed',
+  input: {},
+} as never);
+const envelope = JSON.parse((result.output as { value: string }).value);
+// → { ok: true, status: 'pending_approval', pendingActionId: 'pa_...' }
+
+// 3. Operator approves (REST or programmatic)
+const outcome = await ai.approvePendingAction(envelope.pendingActionId, 'alice@example.com');
+// → { status: 'executed', result: <handler return> }
+```
+
 ---
 
 ## RAG Pipelines

@@ -422,8 +422,18 @@ function buildHandlerEngineAdapter(engine: IDataEngine): {
       engine.update(object, { ...data, id }, { where: { id } }),
     insert: (object, data) => engine.insert(object, data),
     find: (object, where) => engine.find(object, { where }),
-    delete: (object, ids) =>
-      engine.delete(object, { where: { id: ids.length === 1 ? ids[0] : { $in: ids } } }),
+    delete: async (object, ids) => {
+      if (!Array.isArray(ids) || ids.length === 0) return 0;
+      // Loop scalar deletes — engine.delete prioritises a scalar `id`
+      // extracted from `where.id` over the `multi:true` branch, so passing
+      // `{ where: { id: { $in: [...] } } }` breaks at the driver layer.
+      let count = 0;
+      for (const id of ids) {
+        await engine.delete(object, { where: { id } });
+        count++;
+      }
+      return count;
+    },
   };
 }
 
@@ -786,11 +796,27 @@ export async function registerActionsAsTools(
             const raw = await directHandler(input);
             // Handlers return a JSON string envelope; parse for the
             // approval pathway so the row's `result` is structured.
+            let parsed: unknown = raw;
             try {
-              return typeof raw === 'string' ? JSON.parse(raw) : raw;
+              parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
             } catch {
-              return raw;
+              parsed = raw;
             }
+            // Surface handler-level failures as exceptions so the
+            // approval row flips to `failed` (not silently `executed`).
+            if (
+              parsed &&
+              typeof parsed === 'object' &&
+              'ok' in parsed &&
+              (parsed as { ok?: unknown }).ok === false
+            ) {
+              const errMsg =
+                (parsed as { error?: unknown }).error != null
+                  ? String((parsed as { error?: unknown }).error)
+                  : 'action handler reported failure';
+              throw new Error(errMsg);
+            }
+            return parsed;
           },
         );
       }

@@ -360,6 +360,7 @@ function pickActionTool(
     'send', 'notify',
     'publish', 'unpublish',
     'mark',
+    'delete', 'remove', 'purge', 'destroy', 'erase',
   ]);
   const hasActionVerb = [...userTokens].some(t => ACTION_VERBS.has(t));
   if (!hasActionVerb) return null;
