@@ -27,10 +27,49 @@
  */
 
 import type { Plugin, PluginContext } from '@objectstack/core';
+import { createHmac, randomUUID } from 'node:crypto';
 import type { KernelManager } from './kernel-manager.js';
 import type { EnvironmentDriverRegistry } from './environment-registry.js';
 
 const AUTH_PREFIX = '/api/v1/auth';
+
+/**
+ * HMAC-SHA256 + base64 + percent-encode the resulting `value.signature`
+ * payload — replicates `serializeSignedCookie` from `better-call` so the
+ * env's better-auth `getSignedCookie` validator accepts the cookie we
+ * write here (without pulling better-call into runtime's deps).
+ */
+function signSessionCookieValue(rawToken: string, secret: string): string {
+    const signature = createHmac('sha256', secret).update(rawToken).digest('base64');
+    return encodeURIComponent(`${rawToken}.${signature}`);
+}
+
+/**
+ * Serialize a Set-Cookie header value matching better-auth's session-cookie
+ * attributes. Attributes come from `authCookies.sessionToken.attributes`.
+ */
+function buildSetCookieHeader(
+    name: string,
+    encodedValue: string,
+    attrs: Record<string, any> | undefined,
+    maxAgeSec: number,
+): string {
+    const parts: string[] = [`${name}=${encodedValue}`];
+    const a = attrs ?? {};
+    if (a.path) parts.push(`Path=${a.path}`); else parts.push('Path=/');
+    if (Number.isFinite(maxAgeSec) && maxAgeSec > 0) parts.push(`Max-Age=${Math.floor(maxAgeSec)}`);
+    if (a.domain) parts.push(`Domain=${a.domain}`);
+    if (a.sameSite) {
+        const ss = String(a.sameSite);
+        parts.push(`SameSite=${ss.charAt(0).toUpperCase() + ss.slice(1)}`);
+    } else {
+        parts.push('SameSite=Lax');
+    }
+    if (a.secure) parts.push('Secure');
+    if (a.httpOnly !== false) parts.push('HttpOnly');
+    if (a.partitioned) parts.push('Partitioned');
+    return parts.join('; ');
+}
 
 // AuthCapableManager interface removed — unused (pickHandler uses duck typing on `any`).
 
@@ -159,6 +198,154 @@ export class AuthProxyPlugin implements Plugin {
                             return c.json({ hasOwner: (count ?? 0) > 0 });
                         } catch {
                             return c.json({ hasOwner: true });
+                        }
+                    }
+
+                    // ── sso-handoff-issue ─────────────────────────────
+                    // POST /api/v1/auth/sso-handoff-issue
+                    //
+                    // Called server-to-server by cloud's `sso_as_owner`
+                    // action. Cloud control plane (createCloudStack) has
+                    // no kernel-manager, so it cannot write into the env's
+                    // better-auth verification table itself — this endpoint
+                    // does it locally where the env kernel lives.
+                    //
+                    // Auth: `Authorization: Bearer <OS_CLOUD_API_KEY>` must
+                    // match `process.env.OS_CLOUD_API_KEY` on the env
+                    // runtime. The same secret is shared between cloud and
+                    // every env runtime (cloud uses it to verify env →
+                    // cloud calls; we reuse it for the reverse direction).
+                    //
+                    // Body: { email, name?, by?, envId? } — payload that
+                    // sso-exchange will JSON.parse from the verification
+                    // value. Returns { token, expiresAt, ttlSec }.
+                    if (c.req.method === 'POST' && subPath === 'sso-handoff-issue') {
+                        try {
+                            const expected = (process.env.OS_CLOUD_API_KEY ?? '').trim();
+                            if (!expected) {
+                                return c.json({ error: 'sso_handoff_disabled', reason: 'OS_CLOUD_API_KEY unset on env runtime' }, 503);
+                            }
+                            const authz = c.req.header('authorization') ?? '';
+                            const provided = authz.toLowerCase().startsWith('bearer ')
+                                ? authz.slice(7).trim()
+                                : '';
+                            if (!provided || provided !== expected) {
+                                return c.json({ error: 'unauthorized' }, 401);
+                            }
+
+                            if (typeof authSvc?.getAuthContext !== 'function') {
+                                return c.json({ error: 'auth_service_unavailable' }, 503);
+                            }
+                            const handoffAuthCtx: any = await authSvc.getAuthContext();
+                            const internal = handoffAuthCtx?.internalAdapter;
+                            if (!internal?.createVerificationValue) {
+                                return c.json({ error: 'verification_api_unavailable' }, 503);
+                            }
+
+                            let body: any = {};
+                            try { body = await c.req.json(); } catch { body = {}; }
+                            const email = String(body?.email ?? '').toLowerCase().trim();
+                            if (!email) return c.json({ error: 'email_required' }, 400);
+                            const name = body?.name == null ? null : String(body.name);
+                            const by = body?.by == null ? 'service' : String(body.by);
+                            const envIdInBody = body?.envId == null ? null : String(body.envId);
+
+                            const handoff = randomUUID().replace(/-/g, '')
+                                + randomUUID().replace(/-/g, '');
+                            const ttlSec = 60;
+                            const expiresAt = new Date(Date.now() + ttlSec * 1000);
+                            await internal.createVerificationValue({
+                                identifier: `sso-handoff:${handoff}`,
+                                value: JSON.stringify({ email, name, by, envId: envIdInBody ?? environmentId }),
+                                expiresAt,
+                            });
+                            return c.json({
+                                token: handoff,
+                                expiresAt: expiresAt.toISOString(),
+                                ttlSec,
+                            });
+                        } catch (err: any) {
+                            ctx.logger?.error?.('[AuthProxyPlugin] sso-handoff-issue failed', err instanceof Error ? err : new Error(String(err)));
+                            return c.json({ error: 'sso_handoff_issue_failed', message: String(err?.message ?? err) }, 500);
+                        }
+                    }
+
+                    // ── sso-exchange ───────────────────────────────────
+                    // GET /api/v1/auth/sso-exchange?token=<handoff>&next=/
+                    //
+                    // Consumes a single-use handoff token previously written
+                    // by the cloud `sso_as_owner` action (via the
+                    // sso-handoff-issue endpoint above), finds-or-creates
+                    // the user in the env by email, mints a fresh better-auth
+                    // session, sets the signed session cookie and 302s to
+                    // `next`. If the user has no credential account yet, we
+                    // redirect to /_console/system/profile?recovery_needed=true
+                    // so they can configure a disaster-recovery local password.
+                    if (c.req.method === 'GET' && subPath === 'sso-exchange') {
+                        try {
+                            const token = (url.searchParams.get('token') ?? '').trim();
+                            const nextRaw = url.searchParams.get('next') ?? '/';
+                            const next = nextRaw.startsWith('/') ? nextRaw : '/';
+                            if (!token) return c.text('missing token', 400);
+
+                            if (typeof authSvc?.getAuthContext !== 'function') {
+                                return c.text('auth service unavailable', 503);
+                            }
+                            const authCtx: any = await authSvc.getAuthContext();
+                            const internal = authCtx?.internalAdapter;
+                            if (!internal?.consumeVerificationValue) {
+                                return c.text('verification API unavailable', 503);
+                            }
+
+                            const consumed = await internal.consumeVerificationValue(`sso-handoff:${token}`);
+                            if (!consumed) return c.text('invalid or expired token', 401);
+                            const expiresAt = consumed?.expiresAt ? new Date(consumed.expiresAt).getTime() : 0;
+                            if (!expiresAt || expiresAt < Date.now()) return c.text('expired token', 401);
+
+                            let payload: { email?: string; name?: string | null } = {};
+                            try { payload = JSON.parse(String(consumed.value)); } catch { payload = { email: String(consumed.value) }; }
+                            const email = String(payload.email ?? '').toLowerCase().trim();
+                            if (!email) return c.text('handoff missing email', 400);
+
+                            const found = await internal.findUserByEmail(email, { includeAccounts: true });
+                            let userId: string | undefined = found?.user?.id;
+                            let hasCredentialAccount = (found?.accounts ?? []).some((a: any) => a.providerId === 'credential' && a.password);
+
+                            if (!userId) {
+                                const created = await internal.createUser({
+                                    email,
+                                    name: payload.name ?? email,
+                                    emailVerified: true,
+                                });
+                                userId = created?.id;
+                                hasCredentialAccount = false;
+                            }
+                            if (!userId) return c.text('failed to provision user', 500);
+
+                            const session = await internal.createSession(userId, false);
+                            const rawToken: string | undefined = session?.token;
+                            const sessionExpiresAt = session?.expiresAt ? new Date(session.expiresAt) : new Date(Date.now() + 7 * 24 * 3600 * 1000);
+                            if (!rawToken) return c.text('failed to mint session', 500);
+
+                            const secret: string = authCtx?.secret ?? '';
+                            if (!secret) return c.text('auth secret unavailable', 503);
+                            const cookieName: string = authCtx?.authCookies?.sessionToken?.name ?? 'better-auth.session_token';
+                            const cookieAttrs = authCtx?.authCookies?.sessionToken?.attributes ?? {};
+                            const encoded = signSessionCookieValue(rawToken, secret);
+                            const maxAgeSec = Math.max(60, Math.floor((sessionExpiresAt.getTime() - Date.now()) / 1000));
+                            const setCookie = buildSetCookieHeader(cookieName, encoded, cookieAttrs, maxAgeSec);
+
+                            const finalNext = hasCredentialAccount
+                                ? next
+                                : `/_console/system/profile?recovery_needed=true&next=${encodeURIComponent(next)}`;
+                            const headers = new Headers();
+                            headers.set('Set-Cookie', setCookie);
+                            headers.set('Location', finalNext);
+                            headers.set('Cache-Control', 'no-store');
+                            return new Response(null, { status: 302, headers });
+                        } catch (err: any) {
+                            ctx.logger?.error?.('[AuthProxyPlugin] sso-exchange failed', err instanceof Error ? err : new Error(String(err)));
+                            return c.text(`sso-exchange failed: ${err?.message ?? String(err)}`, 500);
                         }
                     }
 
