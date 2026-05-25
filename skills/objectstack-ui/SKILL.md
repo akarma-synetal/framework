@@ -450,11 +450,24 @@ export const SalesDashboard: Dashboard = {
       filter: { stage: { $nin: ['closed_won', 'closed_lost'] } },
       valueField: 'amount', aggregate: 'sum',
       layout: { x: 0, y: 0, w: 3, h: 2 },
-      options: {
-        icon: 'DollarSign', format: '0,0',
-        trend: { value: 8.4, direction: 'up', label: 'vs last quarter' },
-      },
+      options: { icon: 'DollarSign', format: '0,0' },
+      // Period-over-period: renderer fetches the prior quarter and
+      // surfaces a secondary value + delta arrow automatically.
+      compareTo: 'previousPeriod',
       actionType: 'url', actionUrl: '/objects/opportunity?filter=open',
+    },
+
+    // Chart widget with comparison overlay (M2). The renderer issues a
+    // second query with the time window shifted by `compareTo` and
+    // overlays it as a muted/dashed series.
+    {
+      id: 'revenue_vs_last_year', type: 'line',
+      title: 'Revenue — This Year vs Last',
+      object: 'order',
+      filter: { closed_at: { $gte: '{current_year_start}', $lte: '{current_year_end}' } },
+      categoryField: 'closed_at', valueField: 'total', aggregate: 'sum',
+      compareTo: 'previousYear',
+      layout: { x: 3, y: 0, w: 9, h: 4 },
     },
   ],
 };
@@ -464,6 +477,29 @@ export const SalesDashboard: Dashboard = {
 > resolved at request time. Avoid baking absolute dates into definitions.
 > The full list of supported date placeholders is documented in
 > [Date Macros](#date-macros--filter-placeholders) below.
+
+### Period-over-period — `compareTo`
+
+Set `compareTo` on any data-bound widget to add a second query against a
+shifted time window. The renderer derives the comparison automatically;
+no second `filter` is required.
+
+| Value | Behaviour |
+|:--|:--|
+| `'previousPeriod'` | Inspect the widget `filter` for date-macro tokens (`{current_month_start}`, `{last_7_days}`, …) and shift the window back by one period of the same kind. |
+| `'previousYear'`   | Shift the resolved filter window back by one calendar year. |
+| `{ offset: '7d' }` | Shift by an explicit duration. Units: `d` (days), `w` (weeks), `M` (months), `y` (years). |
+
+* **Metric widgets** — the prior-period value renders as a small caption
+  beneath the headline number, alongside a green/red delta arrow.
+  Authors should *not* hand-author `options.trend` when `compareTo` is
+  set; the renderer wins and overwrites it.
+* **Chart widgets** — the comparison series is appended after the
+  primary series with `variant: 'comparison'` and styled as a muted /
+  dashed overlay. Single-series charts (bar / line / area) get an
+  automatic second series; multi-series pivots are not yet supported.
+* **Requirements** — `compareTo` is a no-op when the filter contains no
+  resolvable date macros and no global `dateRange` is configured.
 
 ---
 

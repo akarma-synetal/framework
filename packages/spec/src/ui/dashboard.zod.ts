@@ -142,7 +142,32 @@ export const DashboardWidgetSchema = lazySchema(() => z.object({
   
   /** Data Filter (MongoDB-style FilterCondition) */
   filter: FilterConditionSchema.optional().describe('Data filter criteria'),
-  
+
+  /**
+   * Period-over-period comparison primitive.
+   *
+   * When set, the renderer runs a second query against a shifted time
+   * window and surfaces the delta (metric widgets show a secondary
+   * value + arrow; chart widgets render a muted/dashed overlay series).
+   *
+   * - `'previousPeriod'` — auto-detect the comparison window from the
+   *   widget's `filter` date macros (e.g. `{current_month_start}` →
+   *   `{last_month_start}`). Falls back to no comparison when the
+   *   filter contains no resolvable date range.
+   * - `'previousYear'` — shift the resolved filter window back by one
+   *   calendar year.
+   * - `{ offset: '7d' | '1M' | '1y' }` — shift by an explicit
+   *   ISO-8601-like duration. Units: `d` (days), `w` (weeks),
+   *   `M` (months), `y` (years).
+   */
+  compareTo: z.union([
+    z.literal('previousPeriod'),
+    z.literal('previousYear'),
+    z.object({
+      offset: z.string().regex(/^\d+[dwMy]$/, 'Offset must match <N>(d|w|M|y), e.g. "7d", "1M", "1y"'),
+    }),
+  ]).optional().describe('Period-over-period comparison window'),
+
   /** Category Field (X-Axis / Group By) */
   categoryField: z.string().optional().describe('Field for grouping (X-Axis)'),
   

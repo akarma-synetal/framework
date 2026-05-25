@@ -124,6 +124,24 @@ export const ChartSeriesSchema = lazySchema(() => z.object({
   
   /** Axis binding */
   yAxis: z.enum(['left', 'right']).default('left').describe('Bind to specific Y-Axis'),
+
+  /**
+   * Series role.
+   *
+   * - `'primary'` (default) — normal styling using the chart palette.
+   * - `'comparison'` — secondary period-over-period overlay; renderers
+   *   render it muted (lower opacity, dashed stroke for line/area,
+   *   lighter fill for bars) so it visually backgrounds against the
+   *   primary series. Pair with `DashboardWidget.compareTo` on data-
+   *   bound charts; for hand-authored series, set it directly.
+   */
+  variant: z.enum(['primary', 'comparison']).default('primary').optional().describe('Series visual role'),
+
+  /** Override stroke dash pattern (e.g. "4 4" for dashed lines). */
+  dashArray: z.string().optional().describe('SVG stroke-dasharray override'),
+
+  /** Override series opacity (0–1). */
+  opacity: z.number().min(0).max(1).optional().describe('Series opacity override'),
 }));
 
 /**
