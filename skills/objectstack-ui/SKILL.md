@@ -380,7 +380,10 @@ export const LeadDetailPage: Page = {
 > **Variable substitution** — `{first_name}`, `{current_user.first_name}`,
 > `{current_quarter_start}` etc. resolve from the page's `variables` block,
 > the bound record, and the runtime context. Declare `variables: [...]` at
-> the page root for any non-record value.
+> the page root for any non-record value. For relative-date placeholders
+> (`{today}`, `{30_days_ago}`, `{N_<unit>_(ago|from_now)}` …) see the
+> [Date Macros](#date-macros--filter-placeholders) reference below — the
+> full token list is published as `DATE_MACRO_TOKENS` in `@objectstack/spec`.
 
 > **Actions in header** — pass full `Action` objects into
 > `page:header.properties.actions`; do **not** create a sibling action node.
@@ -459,6 +462,58 @@ export const SalesDashboard: Dashboard = {
 
 > **Tokens in filters:** `{current_quarter_start}`, `{current_user.id}` are
 > resolved at request time. Avoid baking absolute dates into definitions.
+> The full list of supported date placeholders is documented in
+> [Date Macros](#date-macros--filter-placeholders) below.
+
+---
+
+## Date Macros — Filter Placeholders
+
+Dashboards, reports, list-view filters, and other UI metadata can embed
+relative-date placeholders that are resolved on the client just before
+the request leaves the browser. The canonical contract is published as
+[`DATE_MACRO_TOKENS`](../../packages/spec/src/data/date-macros.zod.ts) in
+`@objectstack/spec`; the resolver lives in `@object-ui/core`
+(`resolveDateMacros`). Keep the two in lockstep.
+
+Both `{token}` and `${token}` forms are accepted.
+
+### Fixed tokens (36)
+
+| Category | Tokens |
+|:--|:--|
+| Instants | `today`, `yesterday`, `tomorrow`, `now` |
+| Current period | `current_week_start` / `_end`, `current_month_start` / `_end`, `current_quarter_start` / `_end`, `current_year_start` / `_end` |
+| Last period | `last_week_start` / `_end`, `last_month_start` / `_end`, `last_quarter_start` / `_end`, `last_year_start` / `_end` |
+| Next period | `next_week_start`, `next_month_start`, `next_quarter_start`, `next_year_start` |
+| Bare aliases | `week_start`, `week_end`, `month_start`, `month_end`, `quarter_start`, `quarter_end`, `year_start`, `year_end` (same as `current_*`) |
+
+### Parameterised tokens — `{N_<unit>_(ago|from_now)}`
+
+`N` is any positive integer; `<unit>` is one of
+`minute(s) | hour(s) | day(s) | week(s) | month(s) | year(s)`.
+`minute`/`hour` resolve to a full ISO timestamp; coarser units resolve to
+`YYYY-MM-DD`.
+
+```
+{30_days_ago}       {7_days_from_now}     {1_day_ago}
+{2_weeks_ago}       {6_months_from_now}   {1_year_ago}
+{15_minutes_ago}    {2_hours_from_now}
+```
+
+### DO / DON'T
+
+* **DO** type-check tokens against the spec — `isDateMacroToken(tok)` from
+  `@objectstack/spec` returns `false` for anything unsupported.
+* **DO** prefer `Field.datetime()` for "near-now" filters (minute/hour
+  precision); driver-sql automatically coerces ISO macros to the stored
+  ms-epoch representation.
+* **DON'T** invent tokens. Unknown placeholders silently pass through as
+  literal strings — the resulting SQL compares text against
+  `'{my_made_up_token}'` and matches zero rows.
+* **DON'T** combine multiple tokens inside one value without resolution
+  semantics (`'{today}-{tomorrow}'` is fine; `{today_or_tomorrow}` is
+  not — there is no such token).
 
 ---
 
