@@ -260,12 +260,18 @@ importers:
       '@objectstack/objectql':
         specifier: workspace:^
         version: link:../../packages/objectql
+      '@objectstack/plugin-knowledge-memory':
+        specifier: workspace:*
+        version: link:../../packages/plugins/plugin-knowledge-memory
       '@objectstack/runtime':
         specifier: workspace:^
         version: link:../../packages/runtime
       '@objectstack/service-ai':
         specifier: workspace:*
         version: link:../../packages/services/service-ai
+      '@objectstack/service-knowledge':
+        specifier: workspace:*
+        version: link:../../packages/services/service-knowledge
       '@objectstack/spec':
         specifier: workspace:*
         version: link:../../packages/spec

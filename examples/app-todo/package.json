@@ -21,15 +21,18 @@
     "test:action": "tsx test/ai-action.test.ts",
     "test:hitl": "tsx test/ai-hitl.test.ts",
     "test:hitl:llm": "tsx test/ai-hitl-llm.test.ts",
-    "test:llm": "tsx test/ai-llm.test.ts"
+    "test:llm": "tsx test/ai-llm.test.ts",
+    "test:knowledge:llm": "tsx test/ai-knowledge-llm.test.ts"
   },
   "dependencies": {
     "@objectstack/client": "workspace:*",
     "@objectstack/driver-sqlite-wasm": "workspace:^",
     "@objectstack/metadata": "workspace:*",
     "@objectstack/objectql": "workspace:^",
+    "@objectstack/plugin-knowledge-memory": "workspace:*",
     "@objectstack/runtime": "workspace:^",
     "@objectstack/service-ai": "workspace:*",
+    "@objectstack/service-knowledge": "workspace:*",
     "@objectstack/spec": "workspace:*"
   },
   "devDependencies": {
