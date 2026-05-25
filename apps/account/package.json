@@ -1,6 +1,6 @@
 {
   "name": "@objectstack/account",
-  "version": "6.5.1",
+  "version": "6.5.0",
   "description": "ObjectStack Account - End-user account & organization self-service portal",
   "license": "Apache-2.0",
   "type": "module",
@@ -19,7 +19,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@object-ui/i18n": "^6.0.1",
+    "@object-ui/i18n": "^6.0.2",
     "@objectstack/client": "workspace:*",
     "@objectstack/client-react": "workspace:*",
     "@objectstack/spec": "workspace:*",

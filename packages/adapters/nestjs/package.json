@@ -1,6 +1,6 @@
 {
   "name": "@objectstack/nestjs",
-  "version": "6.5.1",
+  "version": "6.5.0",
   "license": "Apache-2.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,8 +15,8 @@
     "@objectstack/runtime": "workspace:^"
   },
   "devDependencies": {
-    "@nestjs/common": "^11.1.23",
-    "@nestjs/core": "^11.1.23",
+    "@nestjs/common": "^11.1.24",
+    "@nestjs/core": "^11.1.24",
     "@objectstack/runtime": "workspace:*",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"

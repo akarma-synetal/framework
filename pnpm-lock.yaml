@@ -15,8 +15,8 @@ importers:
         specifier: ^2.31.0
         version: 2.31.0(@types/node@25.9.1)
       '@object-ui/console':
-        specifier: ^6.0.1
-        version: 6.0.1
+        specifier: ^6.0.2
+        version: 6.0.2
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
@@ -36,8 +36,8 @@ importers:
   apps/account:
     dependencies:
       '@object-ui/i18n':
-        specifier: ^6.0.1
-        version: 6.0.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+        specifier: ^6.0.2
+        version: 6.0.2(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
       '@objectstack/client':
         specifier: workspace:*
         version: link:../../packages/client
@@ -347,11 +347,11 @@ importers:
   packages/adapters/nestjs:
     devDependencies:
       '@nestjs/common':
-        specifier: ^11.1.23
-        version: 11.1.23(reflect-metadata@0.2.2)(rxjs@7.8.2)
+        specifier: ^11.1.24
+        version: 11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core':
-        specifier: ^11.1.23
-        version: 11.1.23(@nestjs/common@11.1.23(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+        specifier: ^11.1.24
+        version: 11.1.24(@nestjs/common@11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@objectstack/runtime':
         specifier: workspace:*
         version: link:../../runtime
@@ -419,11 +419,11 @@ importers:
         specifier: ^3.0.120
         version: 3.0.120(zod@4.4.3)
       '@object-ui/console':
-        specifier: ^6.0.1
-        version: 6.0.1
+        specifier: ^6.0.2
+        version: 6.0.2
       '@object-ui/studio':
-        specifier: ^6.0.1
-        version: 6.0.1
+        specifier: ^6.0.2
+        version: 6.0.2
       '@objectstack/client':
         specifier: workspace:*
         version: link:../client
@@ -3047,8 +3047,8 @@ packages:
   '@neon-rs/load@0.0.4':
     resolution: {integrity: sha512-kTPhdZyTQxB+2wpiRcFWrDcejc4JI6tkPuS7UZCG4l6Zvc5kU/gGQ/ozvHTh1XR5tS+UlfAfGuPajjzQjCiHCw==}
 
-  '@nestjs/common@11.1.23':
-    resolution: {integrity: sha512-qKgEqwQXHIVu8TwiISmgbTrGHAFBsseP86KNolBZwAiHQryinJ5FPiDpp0ZJBBryY+WEMnsqaCa4TSxVuQEWug==}
+  '@nestjs/common@11.1.24':
+    resolution: {integrity: sha512-9zHxaDDM+oXW9As6UsP5yYB+UqczBmpeSCIFWdPEtEukMnZhxODG1BBjaUcdBB8Sc1uzojSJSJlp3yFp853t1g==}
     peerDependencies:
       class-transformer: '>=0.4.1'
       class-validator: '>=0.13.2'
@@ -3060,8 +3060,8 @@ packages:
       class-validator:
         optional: true
 
-  '@nestjs/core@11.1.23':
-    resolution: {integrity: sha512-Yd+mVFUilw4A6PzV7tyfiW+zrG2wmRXnFZVmNQA+fl1N0k6km4bhhNboxjLu//dzl+XiZI5AsOHHOTegzvOgNQ==}
+  '@nestjs/core@11.1.24':
+    resolution: {integrity: sha512-K4bzT+lEdd0Hhcsw3jtk56QAW6s6skK3ViN7hIROSN0kUf4ROwWEAKopJID6yhPQxB45kDtP2wEcjzE8171J3g==}
     engines: {node: '>= 20'}
     peerDependencies:
       '@nestjs/common': ^11.0.0
@@ -3161,16 +3161,16 @@ packages:
     engines: {node: ^14.18.0 || >=16.10.0, npm: '>=5.10.0'}
     hasBin: true
 
-  '@object-ui/console@6.0.1':
-    resolution: {integrity: sha512-aHf3VOVEB+RVH3NTQEeicjeQdVpzL0pTw6gCZyNuHNR0MvA68KgMUSScDp0ALm8x7Aj/4mIwzDoLPO2LPTr+Rw==}
+  '@object-ui/console@6.0.2':
+    resolution: {integrity: sha512-2rDRFjx6pnu3Y6b+1yGEdzdXeHmSlbaHPEa5SJLqZwO6aL3kQo/YBHFE/b5Jo1U9Hk4KfOliY0YfDXlJewgGDA==}
 
-  '@object-ui/i18n@6.0.1':
-    resolution: {integrity: sha512-2ldvFDr7NcGcFdA1KqEM6nCmOk/orZhCiYF/DvNxah3JPUXR3bUrlyGK6JNK991RdRJiKR/G8UziIHwdzquQRg==}
+  '@object-ui/i18n@6.0.2':
+    resolution: {integrity: sha512-mdxOJnecQkrnnXDjAxuorXxmSNg6EPlJlUXUU4eTdf/5Ncu9BfMROyodgjbmLE2gESVu++aFpIvKNn7N9eKjFQ==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
-  '@object-ui/studio@6.0.1':
-    resolution: {integrity: sha512-Y6NGDAMkMfVDktwA8EUdrcr6djhTL/M8FXmrohj9A/hGArTaTYiO2GS+XqSJsogPRNVvtGlsMTWsWYqkwlL2Og==}
+  '@object-ui/studio@6.0.2':
+    resolution: {integrity: sha512-RoEZNvX3XDpZJ35eFzl1jD201kQZnHeyDm3r4tFDC/LE7JtcZWH9kjHO5/Wi6OhCilNiy8XKqkzd/yRrjk+NYQ==}
 
   '@oclif/core@4.11.4':
     resolution: {integrity: sha512-URwiQ5ALx/sJ2iH4vzXEd+H4K6NAI7LRs6Jag3hrgKEpGmaE6alfRC8qjO4GIgb6A3ACaJumqP9twi/M9ywdHQ==}
@@ -7987,11 +7987,11 @@ packages:
     resolution: {integrity: sha512-azl+t0z7pw/z958Gy9svOTuzqIk6xq+NSheJzn5MMWtWTFywIacg2wUlzKFGtt3cthx0r2SxMK0yzJOR0IES7Q==}
     engines: {node: '>=14.0.0'}
 
-  tldts-core@7.1.2:
-    resolution: {integrity: sha512-26EbERPLf5wkNFKW+7egxArSPN1Nqipe/PIe1nvhpNu8HqQeY2pYdOeQk4sAiADv/e03VzHkLY0PPohKv1JMAQ==}
+  tldts-core@7.2.0:
+    resolution: {integrity: sha512-3+5Dl9UnrwprXI8slMwHISvKoMwSo74tr4MOtlOXRZtrw+y/EYx9H4prgmRR0cNdP8xL1YPRR0VVrmkpTUcEKg==}
 
-  tldts@7.1.2:
-    resolution: {integrity: sha512-RUX5sQm8bl03ycwQ6nSgJiKw9FZWhA8GBzxX6X1lsG3xKzFIW+lYLLpM30FQbDD6XjTWa/VkF15VxjnAMWYJAQ==}
+  tldts@7.2.0:
+    resolution: {integrity: sha512-qQP9R4GNm4Vhw15edex5E9ExMV6qj0VetA5ycNc+rdfIv2WtOOd9GIHmnZKHD768IZS77bNmUVE9e3IEekaXZg==}
     hasBin: true
 
   tmp@0.2.5:
@@ -9844,7 +9844,7 @@ snapshots:
 
   '@neon-rs/load@0.0.4': {}
 
-  '@nestjs/common@11.1.23(reflect-metadata@0.2.2)(rxjs@7.8.2)':
+  '@nestjs/common@11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
       file-type: 21.3.4
       iterare: 1.2.1
@@ -9856,9 +9856,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@nestjs/core@11.1.23(@nestjs/common@11.1.23(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)':
+  '@nestjs/core@11.1.24(@nestjs/common@11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
-      '@nestjs/common': 11.1.23(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/common': 11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nuxt/opencollective': 0.4.1
       fast-safe-stringify: 2.1.1
       iterare: 1.2.1
@@ -9916,9 +9916,9 @@ snapshots:
     dependencies:
       consola: 3.4.2
 
-  '@object-ui/console@6.0.1': {}
+  '@object-ui/console@6.0.2': {}
 
-  '@object-ui/i18n@6.0.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)':
+  '@object-ui/i18n@6.0.2(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)':
     dependencies:
       i18next: 26.2.0(typescript@6.0.3)
       react: 19.2.6
@@ -9928,7 +9928,7 @@ snapshots:
       - react-native
       - typescript
 
-  '@object-ui/studio@6.0.1': {}
+  '@object-ui/studio@6.0.2': {}
 
   '@oclif/core@4.11.4':
     dependencies:
@@ -15128,11 +15128,11 @@ snapshots:
 
   tinyspy@4.0.4: {}
 
-  tldts-core@7.1.2: {}
+  tldts-core@7.2.0: {}
 
-  tldts@7.1.2:
+  tldts@7.2.0:
     dependencies:
-      tldts-core: 7.1.2
+      tldts-core: 7.2.0
 
   tmp@0.2.5: {}
 
@@ -15154,7 +15154,7 @@ snapshots:
 
   tough-cookie@6.0.1:
     dependencies:
-      tldts: 7.1.2
+      tldts: 7.2.0
 
   tr46@5.1.1:
     dependencies:
