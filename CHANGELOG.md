@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — `@object-ui/*` upgraded to v6.0
+
+Bundled UI assets (`@object-ui/console`, `@object-ui/studio`,
+`@object-ui/i18n`) bumped from `5.4.2` → `6.0.0` across the workspace
+(`@objectstack/cli`, `@objectstack/account`, root devDep). The v6
+release ships a new UI shell — refreshed sidebar, redesigned record
+header, updated design tokens. The ObjectStack protocol surface is
+unchanged; only pages rendered through the CLI's `studio` / `console`
+mounts look different.
+
+### Changed — Knowledge adapter packages renamed (no `plugin-` prefix)
+
+The three Knowledge Protocol adapter packages dropped the `plugin-`
+prefix to match `driver-*` brevity and form a clean `knowledge-*`
+family alongside the `@objectstack/service-knowledge` orchestrator:
+
+| Old | New |
+|---|---|
+| `@objectstack/plugin-knowledge-memory` | `@objectstack/knowledge-memory` |
+| `@objectstack/plugin-knowledge-ragflow` | `@objectstack/knowledge-ragflow` |
+| `@objectstack/plugin-knowledge-turso` | `@objectstack/knowledge-turso` |
+
+`@objectstack/service-knowledge` is unchanged — services keep the
+`service-*` namespace. The `.changeset/config.json` `fixed` group now
+includes all four knowledge packages so they version together.
+
+The packages had not yet been published, so this is a rename-only
+change with no upgrade path required for external consumers.
+
+### Added — Knowledge Protocol end-to-end smoke test
+
+New `examples/app-todo/test/ai-knowledge-llm.test.ts` proves the
+permission-aware retrieval loop end-to-end: seed 5 `todo_task` rows
+across two owners, register `task_notes` as a Knowledge source over
+that object, reindex via `KnowledgeMemoryPlugin`, then run
+`KnowledgeService.search` as Alice / Bob / system. Each actor sees
+only the rows their `ExecutionContext` is permitted to read — proving
+the RLS re-check in `KnowledgeService.applyPermissionFilter` is
+engaged. When `AI_GATEWAY_API_KEY` is present, the test also runs a
+real LLM through `ai.chatWithTools` and asserts the assistant invokes
+`search_knowledge` and never leaks the other owner's rows. Run via
+`pnpm --filter @example/app-todo test:knowledge:llm`.
+
 ### Changed — Studio sidebar: registry-driven Workspaces group
 
 The hardcoded "Public forms" entry that lived inside the Overview block

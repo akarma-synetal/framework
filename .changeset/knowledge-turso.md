@@ -12,4 +12,4 @@ Add `@objectstack/knowledge-turso` — production-grade knowledge adapter backed
 
 **Why:** memory adapter is for tests, RAGFlow adapter is for teams that already run RAGFlow. Turso is the sweet spot for ObjectStack apps that want a real vector store with **zero new infrastructure** — it's the same libSQL the platform already uses for data.
 
-See `packages/plugins/plugin-knowledge-turso/README.md` for the full reference.
+See `packages/plugins/knowledge-turso/README.md` for the full reference.

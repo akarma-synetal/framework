@@ -69,13 +69,13 @@ delegates the rest to plugins.
 │  @objectstack/service-knowledge      │    │  Adapter plugins (one per    │
 │                                      │    │  backend, npm-published)     │
 │  • Source registry (metadata)        │    │                              │
-│  • Ingest router → adapter.upsert    │    │  • plugin-knowledge-memory   │
+│  • Ingest router → adapter.upsert    │    │  • knowledge-memory   │
 │  • Search router  → adapter.search   │    │      (dev/test only)         │
-│  • Permission wrapper (RLS filter)   │    │  • plugin-knowledge-ragflow  │
+│  • Permission wrapper (RLS filter)   │    │  • knowledge-ragflow  │
 │  • Event sync (record.* → upsert)    │    │      (reference impl, REST)  │
-│  • Audit + metrics                   │    │  • plugin-knowledge-turso    │
-│                                      │    │  • plugin-knowledge-dify     │
-│  Registers `knowledge` service       │    │  • plugin-knowledge-pgvector │
+│  • Audit + metrics                   │    │  • knowledge-turso    │
+│                                      │    │  • knowledge-dify     │
+│  Registers `knowledge` service       │    │  • knowledge-pgvector │
 └──────────────────────────────────────┘    └──────────────────────────────┘
               ▲
               │ consumes
@@ -274,16 +274,16 @@ up.
 | `IKnowledgeService` contract | ✅ | search / index / delete / reindex |
 | `IKnowledgeAdapter` contract | ✅ | upsert / search / delete / healthCheck |
 | `service-knowledge` orchestrator | ✅ | Adapter routing, RLS wrapper, sync |
-| `plugin-knowledge-memory` | ✅ | In-process; deterministic fake embedder |
-| `plugin-knowledge-ragflow` | ✅ | Minimal REST adapter (datasets + chunks + retrieval) |
+| `knowledge-memory` | ✅ | In-process; deterministic fake embedder |
+| `knowledge-ragflow` | ✅ | Minimal REST adapter (datasets + chunks + retrieval) |
 | `search_knowledge` AI tool | ✅ | Threads `ToolExecutionContext` |
 | Event-driven sync for `object` sources | ✅ (sync) | MVP synchronous; queue in Phase 2 |
 | Studio source-management UI | ⏳ Phase 2 |  |
 | Async indexer (queue) | ⏳ Phase 2 |  |
 | Audit + metrics | ⏳ Phase 2 |  |
-| `plugin-knowledge-llamaindex` | ⏳ Phase 2 |  |
-| `plugin-knowledge-dify` | ⏳ Phase 3 / community |  |
-| `plugin-knowledge-pgvector` | ⏳ Phase 3 |  |
+| `knowledge-llamaindex` | ⏳ Phase 2 |  |
+| `knowledge-dify` | ⏳ Phase 3 / community |  |
+| `knowledge-pgvector` | ⏳ Phase 3 |  |
 
 ### 7.1 Non-goals for Phase 1
 

@@ -3,7 +3,7 @@
 /**
  * PoC: validate Turso/libSQL native vector search end-to-end.
  *
- * Goal — confirm before building `plugin-knowledge-turso`:
+ * Goal — confirm before building `knowledge-turso`:
  *   1. `F32_BLOB(N)` columns + `libsql_vector_idx` create successfully on cloud Turso.
  *   2. `vector_distance_cos()` returns sane ordering for a tiny corpus.
  *   3. ANN index actually accelerates queries (vs full scan).
