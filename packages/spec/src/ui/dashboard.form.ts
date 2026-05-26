@@ -21,7 +21,7 @@ export const dashboardForm = defineForm({
         { field: 'columns', type: 'number', helpText: 'Number of grid columns (default 12)' },
         { field: 'gap', type: 'number', helpText: 'Grid gap in Tailwind spacing units' },
         { field: 'refreshInterval', type: 'number', helpText: 'Auto-refresh interval (seconds)' },
-        { field: 'header', widget: 'json', helpText: 'Dashboard header config (title, subtitle, actions)' },
+        { field: 'header', widget: 'object-fields', helpText: 'Dashboard header config (title, subtitle, actions)' },
       ],
     },
     {
@@ -34,15 +34,15 @@ export const dashboardForm = defineForm({
     {
       label: 'Filters',
       fields: [
-        { field: 'dateRange', widget: 'json', helpText: 'Default date range selector' },
+        { field: 'dateRange', widget: 'object-fields', helpText: 'Default date range selector' },
         { field: 'globalFilters', widget: 'master-detail', helpText: 'Filters applied to all widgets' },
       ],
     },
     {
       label: 'Advanced',
       fields: [
-        { field: 'aria', widget: 'json', helpText: 'Accessibility labels' },
-        { field: 'performance', widget: 'json', helpText: 'Caching and optimization config' },
+        { field: 'aria', widget: 'object-fields', helpText: 'Accessibility labels' },
+        { field: 'performance', widget: 'object-fields', helpText: 'Caching and optimization config' },
       ],
     },
   ],
