@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { useSession } from '@/hooks/useSession';
 import { SocialSignInButtons } from '@/components/auth/social-sign-in-buttons';
 import { AuthShell } from '@/components/auth/auth-shell';
+import { LegalLinks } from '@/components/auth/legal-links';
 
 export const Route = createFileRoute('/register')({
   validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
@@ -221,11 +222,7 @@ function RegisterPage() {
               </form>
             </CardContent>
           </Card>
-          <p className="px-6 text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a]:hover:text-primary">
-            {t('legal.agreementPrefix')}{' '}
-            <a href="#">{t('legal.termsOfService')}</a> {t('legal.and')}{' '}
-            <a href="#">{t('legal.privacyPolicy')}</a>.
-          </p>
+          <LegalLinks termsUrl={features?.termsUrl} privacyUrl={features?.privacyUrl} />
         </div>
       )}
     </AuthShell>

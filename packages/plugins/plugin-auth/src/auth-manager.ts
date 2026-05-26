@@ -1220,6 +1220,22 @@ export class AuthManager {
     const multiOrgEnabled = String(
       (globalThis as any)?.process?.env?.OS_MULTI_ORG_ENABLED ?? 'true',
     ).toLowerCase() !== 'false';
+
+    // Legal links shown beneath the login / register cards. ObjectStack is
+    // a developer tool — the framework itself has no Terms of Service or
+    // Privacy Policy to advertise on customer-facing surfaces. Operators
+    // who deploy ObjectStack and want to surface *their own* legal docs
+    // opt in via `OS_TERMS_URL` and `OS_PRIVACY_URL` (or omit them, in
+    // which case the SPA hides the entire fine-print block).
+    const rawTermsUrl = (globalThis as any)?.process?.env?.OS_TERMS_URL;
+    const rawPrivacyUrl = (globalThis as any)?.process?.env?.OS_PRIVACY_URL;
+    const termsUrl = typeof rawTermsUrl === 'string' && rawTermsUrl.trim() !== ''
+      ? rawTermsUrl.trim()
+      : undefined;
+    const privacyUrl = typeof rawPrivacyUrl === 'string' && rawPrivacyUrl.trim() !== ''
+      ? rawPrivacyUrl.trim()
+      : undefined;
+
     const features = {
       twoFactor: pluginConfig.twoFactor ?? false,
       passkeys: pluginConfig.passkeys ?? false,
@@ -1228,6 +1244,8 @@ export class AuthManager {
       multiOrgEnabled,
       oidcProvider: pluginConfig.oidcProvider ?? false,
       deviceAuthorization: pluginConfig.deviceAuthorization ?? false,
+      ...(termsUrl ? { termsUrl } : {}),
+      ...(privacyUrl ? { privacyUrl } : {}),
     };
 
     return {

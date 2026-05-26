@@ -71,6 +71,20 @@ export interface AuthFeatures {
   signUpDisabled?: boolean;
   oidcProvider?: boolean;
   deviceAuthorization?: boolean;
+  /**
+   * Optional URL to the deployment's Terms of Service document. When set
+   * (via `OS_TERMS_URL` on the server), the auth pages render a "Terms
+   * of Service" link beneath the form. Left undefined for vanilla
+   * ObjectStack deployments — the framework itself has no ToS to
+   * advertise on customer-facing surfaces.
+   */
+  termsUrl?: string;
+  /**
+   * Optional URL to the deployment's Privacy Policy document. Mirrors
+   * {@link termsUrl} but for the privacy link. Configured via
+   * `OS_PRIVACY_URL`.
+   */
+  privacyUrl?: string;
 }
 
 export interface SessionState {
