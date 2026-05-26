@@ -109,6 +109,7 @@ export const SETUP_APP: App = {
         { id: 'nav_settings_hub', type: 'url', label: 'All Settings', url: '/apps/setup/system/settings', icon: 'settings-2' },
         { id: 'nav_settings_mail', type: 'url', label: 'Email', url: '/apps/setup/system/settings/mail', icon: 'mail' },
         { id: 'nav_settings_branding', type: 'url', label: 'Branding', url: '/apps/setup/system/settings/branding', icon: 'palette' },
+        { id: 'nav_settings_ai', type: 'url', label: 'AI', url: '/apps/setup/system/settings/ai', icon: 'sparkles' },
         { id: 'nav_settings_feature_flags', type: 'url', label: 'Feature Flags', url: '/apps/setup/system/settings/feature_flags', icon: 'flag' },
       ],
     },

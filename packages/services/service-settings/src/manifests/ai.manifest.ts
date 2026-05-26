@@ -1,0 +1,180 @@
+// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+
+import type { SettingsManifest } from '@objectstack/spec/system';
+import type { SettingsActionHandler } from '../settings-service.types.js';
+
+// Visibility expressions are written as inline strings here for
+// readability. The spec's ExpressionInputSchema accepts a bare string
+// and normalises it at parse time, but the inferred TypeScript output
+// type expects `{ dialect, source }` objects. Build the manifest as
+// `unknown` first, then cast — keeps the manifest source compact.
+//
+// The actual LLM adapter selection still happens in
+// `@objectstack/service-ai`'s plugin (env-var driven by default).
+// This manifest gives operators a UI to inspect and override those
+// env-derived defaults without redeploying; the AIServicePlugin can
+// later prefer settings over env when implemented. Until then this
+// manifest is the canonical surface for "what AI provider is wired,
+// and which API key is in use" — a request operators repeatedly need
+// answered during onboarding and incident response.
+const manifest = {
+  namespace: 'ai',
+  version: 1,
+  label: 'AI',
+  icon: 'Sparkles',
+  description:
+    'LLM provider, model, and credentials used by the platform AI service. ' +
+    'Provider SDK packages (e.g. @ai-sdk/openai) must be installed on the host ' +
+    'for the chosen provider to be loadable at runtime.',
+  scope: 'global',
+  readPermission: 'setup.access',
+  writePermission: 'setup.write',
+  category: 'Infrastructure',
+  order: 30,
+  specifiers: [
+    // ── Provider selection ────────────────────────────────────────
+    { type: 'group', id: 'provider', label: 'Provider', required: false,
+      description: 'Choose the LLM backend. Memory mode echoes input — useful for tests but never for production.' },
+    { type: 'select', key: 'provider', label: 'Provider', required: true, default: 'memory',
+      options: [
+        { value: 'memory', label: 'Memory (echo — testing only)' },
+        { value: 'gateway', label: 'Vercel AI Gateway' },
+        { value: 'openai', label: 'OpenAI' },
+        { value: 'anthropic', label: 'Anthropic' },
+        { value: 'google', label: 'Google Generative AI' },
+      ],
+    },
+
+    // ── Vercel AI Gateway ─────────────────────────────────────────
+    { type: 'group', id: 'gateway', label: 'Vercel AI Gateway', required: false,
+      visible: "${data.provider === 'gateway'}",
+      description: 'Multi-provider router. The model spec follows `provider/model`, e.g. `openai/gpt-4o`.' },
+    { type: 'text', key: 'gateway_model', label: 'Gateway model', required: true,
+      description: 'Forwarded as AI_GATEWAY_MODEL. Example: openai/gpt-4o',
+      visible: "${data.provider === 'gateway'}" },
+    { type: 'password', key: 'gateway_api_key', label: 'Gateway API key',
+      required: false, encrypted: true,
+      description: 'Optional — required only if the gateway enforces auth.',
+      visible: "${data.provider === 'gateway'}" },
+
+    // ── OpenAI ───────────────────────────────────────────────────
+    { type: 'group', id: 'openai', label: 'OpenAI', required: false,
+      visible: "${data.provider === 'openai'}" },
+    { type: 'password', key: 'openai_api_key', label: 'OpenAI API key',
+      required: true, encrypted: true,
+      description: 'Forwarded as OPENAI_API_KEY. Stored encrypted at rest.',
+      visible: "${data.provider === 'openai'}" },
+    { type: 'text', key: 'openai_model', label: 'Model', required: false, default: 'gpt-4o',
+      description: 'Default model id. Per-agent overrides take precedence.',
+      visible: "${data.provider === 'openai'}" },
+    { type: 'text', key: 'openai_base_url', label: 'Base URL', required: false,
+      description: 'Override for Azure OpenAI or self-hosted gateways. Leave blank for api.openai.com.',
+      visible: "${data.provider === 'openai'}" },
+
+    // ── Anthropic ────────────────────────────────────────────────
+    { type: 'group', id: 'anthropic', label: 'Anthropic', required: false,
+      visible: "${data.provider === 'anthropic'}" },
+    { type: 'password', key: 'anthropic_api_key', label: 'Anthropic API key',
+      required: true, encrypted: true,
+      description: 'Forwarded as ANTHROPIC_API_KEY. Stored encrypted at rest.',
+      visible: "${data.provider === 'anthropic'}" },
+    { type: 'text', key: 'anthropic_model', label: 'Model', required: false,
+      default: 'claude-sonnet-4-20250514',
+      visible: "${data.provider === 'anthropic'}" },
+
+    // ── Google Generative AI ─────────────────────────────────────
+    { type: 'group', id: 'google', label: 'Google', required: false,
+      visible: "${data.provider === 'google'}" },
+    { type: 'password', key: 'google_api_key', label: 'Google API key',
+      required: true, encrypted: true,
+      description: 'Forwarded as GOOGLE_GENERATIVE_AI_API_KEY. Stored encrypted at rest.',
+      visible: "${data.provider === 'google'}" },
+    { type: 'text', key: 'google_model', label: 'Model', required: false,
+      default: 'gemini-2.0-flash',
+      visible: "${data.provider === 'google'}" },
+
+    // ── Generation defaults ──────────────────────────────────────
+    { type: 'group', id: 'defaults', label: 'Generation defaults', required: false,
+      description: 'Applied when an agent or chat request does not specify its own value.',
+      visible: "${data.provider !== 'memory'}" },
+    { type: 'slider', key: 'temperature', label: 'Temperature',
+      required: false, default: 0.7, min: 0, max: 2, step: 0.1,
+      description: '0 = deterministic, 2 = highly creative.',
+      visible: "${data.provider !== 'memory'}" },
+    { type: 'number', key: 'max_tokens', label: 'Max output tokens',
+      required: false, default: 4096, min: 1, max: 1048576,
+      description: 'Hard cap on tokens generated per response.',
+      visible: "${data.provider !== 'memory'}" },
+    { type: 'number', key: 'request_timeout_ms', label: 'Request timeout (ms)',
+      required: false, default: 60000, min: 1000, max: 600000,
+      visible: "${data.provider !== 'memory'}" },
+
+    // ── Observability ────────────────────────────────────────────
+    { type: 'group', id: 'observability', label: 'Observability', required: false },
+    { type: 'toggle', key: 'trace_enabled', label: 'Record traces',
+      required: false, default: true,
+      description: 'Persist prompt/response traces to sys_ai_trace for debugging and replay.' },
+    { type: 'toggle', key: 'log_prompts', label: 'Log full prompts',
+      required: false, default: false,
+      description: 'Include rendered prompts (not just metadata) in trace rows. ⚠ May leak PII — disable in regulated environments.' },
+
+    // ── Probe ────────────────────────────────────────────────────
+    { type: 'action_button', id: 'test', label: 'Test connection',
+      required: false, icon: 'Plug',
+      handler: { kind: 'http', method: 'POST', url: '/api/settings/ai/test' } },
+  ],
+};
+
+/** AI — provider / model / credentials configuration. */
+export const aiSettingsManifest = manifest as unknown as SettingsManifest;
+
+/**
+ * Built-in fallback action handler for `ai/test`. The real
+ * implementation that issues a live `chat()` round-trip lives in
+ * `@objectstack/service-ai` and overrides this stub via
+ * `registerAction` on `kernel:ready` (mirrors the storage pattern).
+ *
+ * This fallback only validates the form so the button is still useful
+ * when the AI plugin is absent (e.g. in a unit-test kernel that mounts
+ * settings only).
+ */
+export const aiTestActionHandler: SettingsActionHandler = async ({ values, payload }) => {
+  // The Settings UI may POST the current (possibly unsaved) form state
+  // as `{ values: {...} }`. Prefer those over the persisted snapshot so
+  // operators can validate edits before hitting "Save".
+  const overrides =
+    payload && typeof payload === 'object' && payload !== null && 'values' in payload
+      ? ((payload as { values?: Record<string, unknown> }).values ?? {})
+      : {};
+  const merged: Record<string, unknown> = { ...values, ...overrides };
+  const provider = String(merged.provider ?? 'memory');
+  values = merged;
+  if (provider === 'memory') {
+    return {
+      ok: true,
+      severity: 'warning',
+      message: 'Memory provider is an echo stub — no external call to validate. Switch to a real provider for production.',
+    };
+  }
+  if (provider === 'gateway') {
+    if (!values.gateway_model) {
+      return { ok: false, severity: 'error', message: 'Gateway model is required (e.g. openai/gpt-4o).' };
+    }
+    return {
+      ok: true,
+      severity: 'info',
+      message: `Vercel AI Gateway configured (model=${values.gateway_model}). Mount @objectstack/service-ai to exercise live calls.`,
+    };
+  }
+  const keyField = `${provider}_api_key`;
+  if (!values[keyField]) {
+    return { ok: false, severity: 'error', message: `${provider} API key is required.` };
+  }
+  const modelField = `${provider}_model`;
+  const model = values[modelField] ?? '(default)';
+  return {
+    ok: true,
+    severity: 'info',
+    message: `${provider} configured (model=${model}). Mount @objectstack/service-ai to exercise live calls.`,
+  };
+};
