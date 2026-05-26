@@ -1,8 +1,9 @@
-# ADR-0012: Notification Platform — Four Built-in Channels on a Generalized Outbox
+# ADR-0012: Messaging Platform — Outbound Notifications on a Generalized Outbox
 
-**Status**: Draft (2026-05-25)
+**Status**: Draft (2026-05-25 · scope-revised 2026-05-26)
 **Authors**: Platform team — surfaced from GitHub Issue #1292 ("[P0] notification: no outbound notification channel")
-**Consumers**: `@objectstack/spec` (new `notification/` domain), `@objectstack/service-notification` (new), `@objectstack/plugin-notification-inbox` (new), `@objectstack/plugin-notification-email` (replaces `plugin-email`), `@objectstack/plugin-notification-webhook` (extracted from `plugin-webhooks`), `@objectstack/plugin-notification-push` (new), every flow that has a `notify` node, every template that ships notification rules
+**Consumers**: `@objectstack/spec` (new `messaging/` domain), `@objectstack/service-messaging` (new), `@objectstack/plugin-notification-inbox` (new), `@objectstack/plugin-notification-email` (replaces `plugin-email`), `@objectstack/plugin-notification-webhook` (extracted from `plugin-webhooks`), `@objectstack/plugin-notification-push` (new), every flow that has a `notify` node, every template that ships notification rules
+**Sibling**: [ADR-0013 — Bidirectional Messaging & Conversational Channels](./0013-bidirectional-messaging.md)
 
 ---
 
@@ -10,17 +11,36 @@
 
 The `notify` node in every flow today resolves a recipient list and then drops the message on the floor — there is no transport. Issue #1292 documents this as a P0 gap across 7 templates (contracts / procurement / compliance / content / todo / hotcrm / helpdesk).
 
-We already own most of the infrastructure: `plugin-webhooks` ships a durable outbox, exponential retry, HMAC signing, idempotency, dead-letter queue, and cluster-coordinated dispatch (per-partition `cluster.lock`, TTL 5× tick). The missing pieces are (a) a channel-agnostic generalization of that dispatcher, (b) four built-in channels people actually expect (`inbox` / `email` / `webhook` / `push`), (c) a topic + preference matrix so users can opt out, and (d) an email transport sub-system that supports both private-deploy SMTP and SaaS providers.
+This ADR covers the **outbound half** of a broader Messaging Platform. We extract the outbox / retry / cluster-lock / signing machinery from `plugin-webhooks` into `@objectstack/service-messaging`, ship four built-in **outbound** channels (`inbox` / `email` / `webhook` / `push`), and define the `MessagingChannel` interface so the conversational channels in ADR-0013 (Slack, Lark, Telegram, …) plug in without re-architecting.
 
 This ADR proposes:
 
-1. **Extract** the outbox/retry/lock/signing machinery from `plugin-webhooks` into `@objectstack/service-notification`.
+1. **Extract** the outbox/retry/lock/signing machinery from `plugin-webhooks` into `@objectstack/service-messaging`.
 2. **Ship four built-in channels**: `inbox` (always on), `email`, `webhook` (the existing one, now a channel implementation), `push` (APNs + FCM).
 3. **Email becomes a transport sub-system**: SMTP is mandatory baseline (required for air-gapped / on-prem); SendGrid / SES / Resend / Postmark / Aliyun / Tencent register as `EmailTransport` plugins.
-4. **Absorb `plugin-email`** into `plugin-notification-email`. Keep `ctx.email.send(...)` as a low-level API for special cases (OTP, password reset) that must bypass user preferences; wrap it as a `NotificationChannel` so flow `notify` nodes get retry/outbox for free.
-5. **Other channels (Feishu / DingTalk / WeCom / Slack / SMS / Telegram) ship as community plugins**, all implementing the same `NotificationChannel` interface — no special casing.
+4. **Absorb `plugin-email`** into `plugin-notification-email`. Keep `ctx.email.send(...)` as a low-level API for special cases (OTP, password reset) that must bypass user preferences; wrap it as a `MessagingChannel` so flow `notify` nodes get retry/outbox for free.
+5. **Other channels (Feishu / DingTalk / WeCom / Slack / SMS / Telegram) ship as plugins**, all implementing the same `MessagingChannel` interface — no special casing. **Bidirectional behaviour (inbound + session) is covered by ADR-0013, not here.**
 
-Net effect: the `notify` node stops being a no-op; users get a real Inbox; templates that already reference channels in their flow YAML start working without code changes; and the door is open for plugin-based channel extension.
+Net effect: the `notify` node stops being a no-op; users get a real Inbox; templates that already reference channels in their flow YAML start working without code changes; and the `MessagingChannel` seam stays stable when ADR-0013 lands the inbound half.
+
+---
+
+## Scope split with ADR-0013
+
+This ADR is intentionally **outbound-only**. Anything bidirectional is in ADR-0013.
+
+| Concern | This ADR (0012) | ADR-0013 |
+|:---|:---|:---|
+| `notify` flow node → user gets email/push/inbox/webhook | ✓ | — |
+| Reliable delivery (outbox, retry, dead-letter, cluster-lock) | ✓ | reused |
+| Per-user preference matrix, mute, quiet hours | ✓ | reused |
+| Multi-account per channel | ✓ (schema in M1, single-account UX) | first-class UX |
+| User sends a message in Slack/Lark → flow / object hook fires | — | ✓ |
+| Session continuity (reply lands in original thread) | — | ✓ |
+| `sessionKey` / inbound dedup / target resolver | — | ✓ |
+| IM channels (Slack, Lark, Telegram, WeCom, DingTalk) | interface-compatible only | implementation here |
+
+The interfaces below are deliberately shaped so 0013 only *fills in optional fields* — no breaking change to 0012's outbound implementations.
 
 ---
 
@@ -92,12 +112,12 @@ Pattern: the ones that ship to end-users (Salesforce, ServiceNow, Linear, Slack,
 
 * **Fix #1292** — `notify` nodes in shipped templates actually deliver to humans, without per-template wiring.
 * **Four built-in channels**: `inbox` (always on, in-app), `email` (SMTP + SaaS transports), `webhook` (B2B integration), `push` (APNs + FCM).
-* **One delivery substrate** — outbox / retry / cluster-lock / dead-letter / signing live in `service-notification`; every channel inherits them.
+* **One delivery substrate** — outbox / retry / cluster-lock / dead-letter / signing live in `service-messaging`; every channel inherits them.
 * **Topic + Preference matrix** — users opt out per topic per channel (Slack/Linear pattern); platform-default policies for system-critical topics that cannot be muted (e.g. password reset).
 * **Renderer per channel** — same notification, channel-specific body (MJML for email, card JSON for Feishu, 4 KB JSON for push). Plain string is the fallback.
-* **Plugin extension** — Feishu / DingTalk / WeCom / Slack / SMS / Telegram / domestic push vendors ship as `NotificationChannel` plugins with zero core change.
+* **Plugin extension** — Feishu / DingTalk / WeCom / Slack / SMS / Telegram / domestic push vendors ship as `MessagingChannel` plugins with zero core change.
 * **Email transport sub-system** — SMTP is mandatory and ships in core (private deploy unblock); SendGrid is the SaaS baseline; SES / Resend / Postmark / Aliyun / Tencent register as `EmailTransport` plugins.
-* **Absorb `plugin-email`** — keep `ctx.email.send(...)` as a low-level escape hatch for system mail (OTP / password reset that must bypass preferences), but wrap it as a `NotificationChannel` so flow `notify` reuses outbox/retry.
+* **Absorb `plugin-email`** — keep `ctx.email.send(...)` as a low-level escape hatch for system mail (OTP / password reset that must bypass preferences), but wrap it as a `MessagingChannel` so flow `notify` reuses outbox/retry.
 * **Operational parity with webhook** — every channel exposes the same observability surface (`sys_*_delivery` table, dead-letter UI, retry button, metrics).
 
 ## Non-Goals
@@ -142,8 +162,8 @@ Pattern: the ones that ship to end-users (Salesforce, ServiceNow, Linear, Slack,
 │   sys_notification_delivery   (pending→in_flight→success/failed/│
 │                                dead, partition_key, attempts)   │
 │   DeliveryMiddleware chain    (digest, quiet-hours, dedup)      │
-│   NotificationChannel impls   (inbox, email, webhook, push, …)  │
-│   service-notification dispatcher  (cluster.lock per partition) │
+│   MessagingChannel impls   (inbox, email, webhook, push, …)  │
+│   service-messaging dispatcher  (cluster.lock per partition) │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -156,13 +176,13 @@ Pattern: the ones that ship to end-users (Salesforce, ServiceNow, Linear, Slack,
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-Every layer has a stable seam. A custom channel (e.g. `plugin-notification-feishu`) plugs in at Layer 4 by implementing `NotificationChannel`. A custom resolver plugs in at Layer 3. A custom renderer plugs in between Layer 2 and Layer 4.
+Every layer has a stable seam. A custom channel (e.g. `plugin-notification-feishu`) plugs in at Layer 4 by implementing `MessagingChannel`. A custom resolver plugs in at Layer 3. A custom renderer plugs in between Layer 2 and Layer 4.
 
-### 2. The `NotificationChannel` interface
+### 2. The `MessagingChannel` interface
 
 ```ts
 // packages/spec/src/notification/channel.zod.ts
-export interface NotificationChannel {
+export interface MessagingChannel {
   /** Stable id: 'inbox' | 'email' | 'webhook' | 'push' | 'feishu' | ... */
   readonly id: string;
 
@@ -203,22 +223,53 @@ export interface NotificationChannel {
    *   'permanent'         → dead-letter immediately
    *   'invalid_recipient' → mark address as bad (suppress / invalidate device)
    *   'rate_limited'      → respect Retry-After header
+   *   'duplicate'         → provider reported "already delivered" (idempotency hit); mark
+   *                         success without writing a new external row. Used by IM
+   *                         providers that dedupe on (channel, request_id).
    */
   classifyError(err: unknown): ErrorClass;
+
+  // ─── Optional, filled in by ADR-0013 bidirectional channels ──────────────
+  //
+  // Outbound-only channels (email/inbox/webhook/push) leave these undefined.
+  // Slack/Lark/Telegram/… set them so the same MessagingChannel registration
+  // works for both directions. The dispatcher only invokes them when present;
+  // adding them never breaks an outbound-only impl.
+
+  /**
+   * Inbound surface — see ADR-0013. The channel owns its own HTTP/WebSocket
+   * route registration and signature verification; what it hands back to the
+   * platform is a normalised `InboundMessage` envelope.
+   */
+  readonly inbound?: {
+    verifyAndParse(req: HttpRequest, accountConfig: unknown): Promise<InboundMessage | null>;
+    /** Optional: per-event-id dedup window override (default 24h). */
+    dedupTtlSec?: number;
+  };
+
+  /**
+   * Session continuity — see ADR-0013. Lets the channel encode a `sessionKey`
+   * (e.g. `slack:T01:C0123:thread:1700000.123`) for replies to land in the
+   * original thread / DM / room.
+   */
+  readonly sessions?: {
+    buildSessionKey(msg: InboundMessage): string;
+    decodeSessionKey(key: string): unknown;
+  };
 }
 ```
 
-The four built-in channels each implement this; everything they do that is *not* in this interface (retry, lock, signing, outbox writes) is handled by `service-notification`.
+The four built-in channels each implement this; everything they do that is *not* in this interface (retry, lock, signing, outbox writes) is handled by `service-messaging`.
 
-### 3. `service-notification` — the extracted core
+### 3. `service-messaging` — the extracted core
 
-Created by lifting `dispatcher.ts` / outbox state machine / cluster lock from `plugin-webhooks` and rewriting them against the abstract `NotificationChannel`:
+Created by lifting `dispatcher.ts` / outbox state machine / cluster lock from `plugin-webhooks` and rewriting them against the abstract `MessagingChannel`:
 
 ```
-packages/services/service-notification/
+packages/services/service-messaging/
 ├── dispatcher.ts          (was plugin-webhooks/src/dispatcher.ts)
 ├── outbox.ts              (state machine for sys_notification_delivery)
-├── channel-registry.ts    (DI registration point for NotificationChannel)
+├── channel-registry.ts    (DI registration point for MessagingChannel)
 ├── device-registry.ts     (sys_user_device CRUD + invalidation hooks)
 ├── transport-registry.ts  (for sub-channels like EmailTransport)
 ├── renderer-registry.ts   (per-channel renderer lookup)
@@ -231,6 +282,20 @@ packages/services/service-notification/
 ```
 
 The dispatcher is no longer webhook-aware. It pulls a `pending` delivery row, calls `channelRegistry.get(row.channel_id).send(...)`, applies `classifyError`, writes the next state. `plugin-webhooks` keeps only its HTTP-specific code (signing, receiver auth, the configurable URL list) and registers itself as the `webhook` channel.
+
+### 3.1 Forward-compat seams for ADR-0013
+
+Even though this ADR is outbound-only, we deliberately reserve three seams now so that ADR-0013's bidirectional channels (Slack, Lark, Telegram, …) plug in without any breaking change to the schema or to the four built-in channels. Adding them later would force a data migration.
+
+| Seam | Where it lives in M1 | Used in M1? | Used by ADR-0013 |
+|:---|:---|:---|:---|
+| `sys_channel_account` table | service-messaging | One implicit "default" row per `(channel_id, environment_id)`. The email/webhook/push channels read/write transparently. | Multi-row per channel: one row per Slack workspace, one per Lark tenant, etc. Each row owns its own OAuth tokens and capability flags. |
+| `Address.account_id` column | spec/messaging — present on every Address row | Always points at the default account. | Routes outbound replies back to the workspace the inbound message came from. |
+| `Address.session_key` and `Address.reply_to_message_id` | spec/messaging — present, NULL for outbound-only channels | Always NULL. | Encodes "reply in the same thread"; the channel uses it in `send()`. |
+| Optional `inbound` / `sessions` blocks on `MessagingChannel` | spec/messaging — declared, undefined for built-ins | Never invoked by M1 dispatcher. | The receiver process scans `channelRegistry` for channels where `inbound` is defined, mounts their HTTP route, and feeds `verifyAndParse` output to `emitInbound(...)`. |
+| `messaging.inbound` flow trigger | flow engine — registered but never fired in M1 | None. | ADR-0013 fires it once an inbound message has been normalised, signature-verified, and deduped. |
+
+These cost ~5 columns and one empty table in M1. They are non-negotiable: introducing them in 0013 instead would force every channel impl, every delivery row, and every account credential to be migrated atomically, which is the kind of change we should never need.
 
 ### 4. Built-in channel implementations
 
@@ -365,8 +430,8 @@ Templates live in `sys_notification_template (topic, channel, version, body, loc
 The existing `plugin-email` is **not** deleted in M1. It is renamed and refactored:
 
 1. **Rename package** `@objectstack/plugin-email` → `@objectstack/plugin-notification-email`. Keep `@objectstack/plugin-email` as a deprecated alias that re-exports (M1 only; removed in next major).
-2. **Keep `ctx.email.send(...)`** as the low-level API for system-critical mail (OTP, password reset, magic links). This bypasses the preference matrix because `mandatory:true` topics shouldn't even get there. Implementation routes through the same `service-notification` outbox so retries are inherited.
-3. **Wrap with `NotificationChannel`**: register a `'email'` channel that internally calls the same transport sub-system; `notify` nodes in flows go through topic/preference/render and then end up in the same outbox row.
+2. **Keep `ctx.email.send(...)`** as the low-level API for system-critical mail (OTP, password reset, magic links). This bypasses the preference matrix because `mandatory:true` topics shouldn't even get there. Implementation routes through the same `service-messaging` outbox so retries are inherited.
+3. **Wrap with `MessagingChannel`**: register a `'email'` channel that internally calls the same transport sub-system; `notify` nodes in flows go through topic/preference/render and then end up in the same outbox row.
 4. **Migrate tables**: `sys_email` (sent log) and `sys_email_template` stay, with `sys_email.delivery_id` FK added to tie back to `sys_notification_delivery`. Add new `sys_email_suppression` and `sys_email_transport`.
 5. **Existing transports** (`log`, `resend`, `postmark`) move into `transport-registry` unchanged; new `smtp` and `sendgrid` join them.
 
@@ -379,7 +444,7 @@ Per CLAUDE.md Prime Directive 8 ("one Zod source per metadata type"), every conc
 
 | File | Purpose |
 |:---|:---|
-| `channel.zod.ts` | `NotificationChannelSchema` (channel descriptor + capabilities) |
+| `channel.zod.ts` | `MessagingChannelSchema` (channel descriptor + capabilities) |
 | `transport.zod.ts` | `EmailTransportSchema` (and future per-channel transport descriptors) |
 | `template.zod.ts` | `NotificationTemplateSchema` (per topic × channel × locale × version) |
 | `topic.zod.ts` | `NotificationTopicSchema` (catalog + mandatory flag + default channels) |
@@ -388,7 +453,7 @@ Per CLAUDE.md Prime Directive 8 ("one Zod source per metadata type"), every conc
 | `delivery.zod.ts` | `NotificationDeliverySchema` (outbox row: state machine, attempts, partition_key) |
 | `device.zod.ts` | `UserDeviceSchema` (push device registry with vendor discriminator) |
 | `email-suppression.zod.ts` | `EmailSuppressionSchema` (bounce + unsubscribe list) |
-| `renderer.zod.ts` | `RendererDescriptorSchema` (registry entry; runtime interface lives in `service-notification`) |
+| `renderer.zod.ts` | `RendererDescriptorSchema` (registry entry; runtime interface lives in `service-messaging`) |
 | `recipient-resolver.zod.ts` | `RecipientResolverDescriptorSchema` (registry entry; resolver impl is runtime code) |
 | `middleware.zod.ts` | `DeliveryMiddlewareDescriptorSchema` (digest/quiet-hours/dedup stubs) |
 | `index.ts` | Re-exports under `Notification` namespace |
@@ -399,13 +464,13 @@ These join the existing namespace exports as `import { Notification } from '@obj
 
 | Table | Owner | Purpose |
 |:---|:---|:---|
-| `sys_notification` | service-notification | One row per emitted notification (pre-fan-out). Holds payload, topic, severity, dedup_key. |
-| `sys_notification_topic` | service-notification | Catalog of known topics. Seeded from `defineTopic(...)` in plugins. |
-| `sys_notification_template` | service-notification | Per topic × channel × locale × version. MJML for email, JSON for others. |
-| `sys_notification_subscription` | service-notification | Who is subscribed to which topic (system-wide, role-based, or explicit). |
-| `sys_notification_preference` | service-notification | User × topic × channel toggles. |
-| `sys_notification_delivery` | service-notification | The outbox. State machine + partition_key + attempts. |
-| `sys_notification_receipt` | service-notification | Per-channel read/clicked/dismissed. Populated by inbox UI + webhook callbacks where supported. |
+| `sys_notification` | service-messaging | One row per emitted notification (pre-fan-out). Holds payload, topic, severity, dedup_key. |
+| `sys_notification_topic` | service-messaging | Catalog of known topics. Seeded from `defineTopic(...)` in plugins. |
+| `sys_notification_template` | service-messaging | Per topic × channel × locale × version. MJML for email, JSON for others. |
+| `sys_notification_subscription` | service-messaging | Who is subscribed to which topic (system-wide, role-based, or explicit). |
+| `sys_notification_preference` | service-messaging | User × topic × channel toggles. |
+| `sys_notification_delivery` | service-messaging | The outbox. State machine + partition_key + attempts. |
+| `sys_notification_receipt` | service-messaging | Per-channel read/clicked/dismissed. Populated by inbox UI + webhook callbacks where supported. |
 | `sys_inbox_message` | plugin-notification-inbox | User-facing in-app messages. Indexed by `(user_id, created_at desc)`. |
 | `sys_user_device` | plugin-notification-push | Push device registry. |
 | `sys_email` | plugin-notification-email | Sent-log (existed; gains `delivery_id` FK). |
@@ -414,6 +479,9 @@ These join the existing namespace exports as `import { Notification } from '@obj
 | `sys_email_transport` | plugin-notification-email | Per-environment transport selection + provider config. |
 | `sys_webhook` | plugin-notification-webhook | Existed (renamed seam unchanged). |
 | `sys_webhook_delivery` | plugin-notification-webhook | Existed; transitions to using `sys_notification_delivery` view in M2. |
+| `sys_channel_account` | service-messaging | **Forward-compat seam for ADR-0013.** Multi-account-per-channel descriptor: `(id, channel_id, environment_id, credentials_ref, capabilities_json)`. In M1 the email/webhook/push channels write exactly one row per env (the implicit "default account") so behaviour is unchanged. ADR-0013 channels (Slack workspace, Lark tenant, …) write N rows. The `Address` shape gains an `account_id` column from day 1 so we never need a data migration. |
+
+> The `sys_channel_account` table is intentionally introduced in this ADR even though M1 only uses it in single-row "default account" mode. Introducing it later would force a data migration on every existing channel row. See §3.1.
 
 ### 12. Wire-up — how a `notify` node ends up delivered
 
@@ -421,7 +489,7 @@ These join the existing namespace exports as `import { Notification } from '@obj
 flow.notify({ topic: 'contract.approval_requested', recipients: ['role:approver'], payload: {...} })
     │
     ▼
-service-notification.emit(notification)
+service-messaging.emit(notification)
     │  writes sys_notification row, sets dedup_key
     ▼
 RecipientResolver.resolve('role:approver', ctx) → [user_42, user_57]
@@ -445,7 +513,7 @@ dispatcher loop:
 
 ### 13. Observability
 
-Every channel gets the same Studio surface (built once in `service-notification`):
+Every channel gets the same Studio surface (built once in `service-messaging`):
 
 * **Deliveries view** — filter by channel / topic / state / time range; columns: state, attempts, last_error, next_retry_at, partition_key.
 * **Dead-letter inspector** — view payload, replay button, bulk-replay.
@@ -460,12 +528,12 @@ Every channel gets the same Studio surface (built once in `service-notification`
 ### M1 — close #1292 (target: this release)
 
 * `packages/spec/src/notification/` with the 12 Zod files above.
-* `packages/services/service-notification/` extracted from `plugin-webhooks` dispatcher.
+* `packages/services/service-messaging/` extracted from `plugin-webhooks` dispatcher.
 * `plugin-notification-inbox` — writes `sys_inbox_message`, fires realtime ping.
 * `plugin-notification-email` — absorbs `plugin-email`; ships `smtp` + `sendgrid` transports + existing `log`/`resend`/`postmark` migrated.
 * `plugin-notification-webhook` — `plugin-webhooks` becomes a channel implementation; no functional change for existing receivers.
 * `plugin-notification-push` — APNs HTTP/2 + FCM HTTP v1; `sys_user_device` lifecycle.
-* `notify` flow node wired to `service-notification.emit(...)`.
+* `notify` flow node wired to `service-messaging.emit(...)`.
 * `defineTopic(...)` builder + seeded catalog for the 7 shipped templates.
 * Recipient resolver: explicit list + `role:*` + `owner_of:*` (anything else falls back to `[]`).
 * `DeliveryMiddleware` interface present, no-op middlewares registered.
@@ -481,13 +549,14 @@ Every channel gets the same Studio surface (built once in `service-notification`
 * Bounce ingestion endpoints for SES / Resend / Postmark / SendGrid → `sys_email_suppression`.
 * List-Unsubscribe header + one-click unsubscribe endpoint.
 
-### M3 — long-tail channels & advanced
+### M3 — long-tail outbound channels
 
-* `plugin-notification-feishu` / `dingtalk` / `wecom` / `slack` (community-owned).
 * `plugin-notification-sms` with Twilio / Aliyun-SMS / Tencent-SMS transports.
 * Domestic push: HMS / Xiaomi / OPPO / VIVO as channel plugins.
 * Inbound email parsing (`EmailIngest`) — separate ADR.
 * Escalation policies + on-call schedules (depends on `service-oncall`).
+
+> **IM channels moved to ADR-0013.** Slack / Feishu / Lark / DingTalk / WeCom / Telegram are inherently bidirectional — shipping them as outbound-only would force a redesign once we add chat. They are now covered in [ADR-0013](./0013-bidirectional-messaging.md), which targets Slack first.
 
 ---
 
@@ -495,7 +564,7 @@ Every channel gets the same Studio surface (built once in `service-notification`
 
 | #1292 checklist item | M1 deliverable |
 |:---|:---|
-| `notify` node emits a real delivery | `service-notification.emit(...)` writes `sys_notification` + fans out `sys_notification_delivery` rows |
+| `notify` node emits a real delivery | `service-messaging.emit(...)` writes `sys_notification` + fans out `sys_notification_delivery` rows |
 | Inbox channel works | `plugin-notification-inbox` + `sys_inbox_message` + `GET /api/v1/notifications/inbox` |
 | Email channel works on private deploys | `smtp` transport ships in core; `email_transport: { id: 'smtp', ... }` in env manifest |
 | Email channel works on cloud | `sendgrid` transport ships in core; SES/Resend/Postmark as transport plugins |
@@ -504,7 +573,7 @@ Every channel gets the same Studio surface (built once in `service-notification`
 | User can opt out | `sys_notification_preference` matrix; mandatory topics bypass |
 | Failures don't disappear | Outbox + retry schedule + dead-letter + Studio inspector |
 | Templates render per channel | `sys_notification_template (topic, channel, locale, version)` + `RendererRegistry` |
-| Plugins can add channels | Public `NotificationChannel` interface + `channel-registry.register(...)` |
+| Plugins can add channels | Public `MessagingChannel` interface + `channel-registry.register(...)` |
 | Plugins can add email providers | Public `EmailTransport` interface + `transport-registry.register(...)` |
 
 ---
@@ -525,10 +594,33 @@ Every channel gets the same Studio surface (built once in `service-notification`
 
 Adopt the design above. Specifically:
 
-* **Four built-in channels**: `inbox`, `email`, `webhook`, `push` — all implementing `NotificationChannel`.
-* **One generalized dispatcher** in `@objectstack/service-notification`, extracted from `plugin-webhooks`.
+* **Four built-in outbound channels**: `inbox`, `email`, `webhook`, `push` — all implementing `MessagingChannel`.
+* **One generalized dispatcher** in `@objectstack/service-messaging`, extracted from `plugin-webhooks`.
 * **Email transport sub-system**: `smtp` and `sendgrid` in core; others as `EmailTransport` plugins.
 * **`plugin-email` absorbed** into `plugin-notification-email` with a deprecated alias for one major.
-* **All other channels via plugin** implementing the same interface; no special casing.
+* **All other outbound channels via plugin** implementing the same interface; no special casing.
+* **Forward-compat seams reserved now** (`sys_channel_account`, `Address.account_id` / `session_key` / `reply_to_message_id`, optional `inbound`/`sessions` blocks on `MessagingChannel`, `messaging.inbound` flow trigger) so ADR-0013 lands without schema migrations.
+* **Bidirectional / conversational channels deferred to [ADR-0013](./0013-bidirectional-messaging.md)** — including the M3 IM channels that earlier drafts of this ADR placed here.
 
-This closes #1292 in M1 without locking us into ServiceNow-style monoliths or Stripe-style "punt to the client" minimalism. The seams are stable enough for the M2/M3 enhancements without re-architecting.
+This closes #1292 in M1 without locking us into ServiceNow-style monoliths or Stripe-style "punt to the client" minimalism. The seams are stable enough for the M2 enhancements and for ADR-0013 to land without re-architecting.
+
+---
+
+## 14. Relationship to ADR-0013 (Bidirectional Messaging)
+
+ADR-0013 is the *inbound* and *conversational* half of the Messaging Platform. The split is:
+
+```
+                       ADR-0012 (this ADR)              ADR-0013
+                       ─────────────────                ────────
+  Owns interface       MessagingChannel (full)          MessagingChannel.inbound / sessions
+  Owns service         service-messaging dispatcher     service-messaging receiver
+  Owns DB              outbox + delivery + preference   sys_inbound_event + session registry
+  Channels shipped     inbox, email, webhook, push      slack (first), then lark/telegram
+  Direction            platform → user                  user → platform (and reply)
+  Reuses from sibling  —                                outbox/retry/cluster-lock/dispatcher
+```
+
+Both ADRs share **one** `MessagingChannel` interface and **one** dispatcher. A channel may implement only `send()` (this ADR) or both `send()` and `inbound.verifyAndParse()` (ADR-0013). The dispatcher does not care.
+
+If you read 0012 in isolation, treat the optional fields above as "do not implement, ignore on read". If you read 0013, treat 0012's outbox, retry, cluster-lock, preference matrix, and dead-letter as **prerequisites** — 0013 does not re-implement them.

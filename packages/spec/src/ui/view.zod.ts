@@ -6,6 +6,7 @@ import { ExpressionInputSchema } from '../shared/expression.zod';
 import { I18nLabelSchema, AriaPropsSchema } from './i18n.zod';
 import { SharingConfigSchema } from './sharing.zod';
 import { ResponsiveConfigSchema, PerformanceConfigSchema } from './responsive.zod';
+import { FieldType, SelectOptionSchema } from '../data/field.zod';
 
 /**
  * HTTP Method Enum & HTTP Request Schema
@@ -517,10 +518,48 @@ export const ListViewSchema = lazySchema(() => z.object({
 
 /**
  * Form Field Configuration Schema
- * Detailed configuration for individual form fields
+ * Detailed configuration for individual form fields.
+ * 
+ * Reuses Data.FieldType and related constraints from the Data protocol to avoid duplication.
+ * The `type` field auto-infers widget rendering; explicit `widget` overrides are only needed
+ * for custom components.
+ * 
+ * @example Auto-inferred select widget
+ * { field: 'status', type: 'select', options: [{ label: 'Open', value: 'open' }] }
+ * 
+ * @example Lookup field with reference
+ * { field: 'account_id', type: 'lookup', reference: 'account', label: 'Account' }
+ * 
+ * @example Custom widget override
+ * { field: 'filter', widget: 'filter-builder' }
  */
 export const FormFieldSchema = lazySchema(() => z.object({
+  /** Field name (snake_case) */
   field: z.string().describe('Field name (snake_case)'),
+  
+  /** Field type — reuses Data.FieldType. When set, widget is auto-inferred (can be overridden). */
+  type: FieldType.optional().describe('Field type (auto-infers widget if omitted)'),
+  
+  /** Select/multiselect options — only needed when type=select/multiselect/radio/checkboxes */
+  options: z.array(SelectOptionSchema).optional().describe('Options for select/multiselect/radio/checkboxes fields'),
+  
+  /** Reference object for lookup/master_detail fields */
+  reference: z.string().optional().describe('Target object name for lookup/master_detail fields'),
+  
+  /** Text constraints */
+  maxLength: z.number().optional().describe('Maximum character length (for text/textarea/email/url/phone)'),
+  minLength: z.number().optional().describe('Minimum character length'),
+  
+  /** Number constraints */
+  min: z.number().optional().describe('Minimum value (for number/currency/percent/slider)'),
+  max: z.number().optional().describe('Maximum value'),
+  precision: z.number().optional().describe('Total digits (for number/currency)'),
+  scale: z.number().optional().describe('Decimal places'),
+  
+  /** Multi-value flag */
+  multiple: z.boolean().optional().describe('Allow multiple values (for select/lookup/file/image)'),
+  
+  /** UI overrides */
   label: I18nLabelSchema.optional().describe('Display label override'),
   placeholder: I18nLabelSchema.optional().describe('Placeholder text'),
   helpText: I18nLabelSchema.optional().describe('Help/hint text'),
@@ -528,7 +567,10 @@ export const FormFieldSchema = lazySchema(() => z.object({
   required: z.boolean().optional().describe('Required override'),
   hidden: z.boolean().optional().describe('Hidden override'),
   colSpan: z.number().int().min(1).max(4).optional().describe('Column span in grid layout (1-4)'),
-  widget: z.string().optional().describe('Custom widget/component name'),
+  
+  /** Custom widget override — only needed when auto-inference is insufficient */
+  widget: z.string().optional().describe('Custom widget/component name (overrides type-based inference)'),
+  
   dependsOn: z.string().optional().describe('Parent field name for cascading'),
   visibleOn: ExpressionInputSchema.optional().describe('Visibility predicate (CEL).'),
 }));
