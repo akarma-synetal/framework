@@ -47,6 +47,21 @@ export interface SessionData {
   activeOrganizationId?: string | null;
 }
 
+export interface AuthFeatures {
+  twoFactor?: boolean;
+  passkeys?: boolean;
+  magicLink?: boolean;
+  organization?: boolean;
+  /**
+   * When `false`, the server-side `beforeCreateOrganization` hook blocks
+   * creation of new organizations. The org plugin endpoints (list, update,
+   * invite-accept) still work — only fresh creation is forbidden.
+   */
+  multiOrgEnabled?: boolean;
+  oidcProvider?: boolean;
+  deviceAuthorization?: boolean;
+}
+
 export interface SessionState {
   user: SessionUser | null;
   session: SessionData | null;
@@ -65,6 +80,11 @@ export interface SessionState {
    */
   organizationsFetched: boolean;
   reloadOrganizations: () => Promise<void>;
+  /**
+   * Public auth feature flags surfaced by `GET /api/v1/auth/config`.
+   * `null` until the first fetch completes.
+   */
+  features: AuthFeatures | null;
 }
 
 export interface Organization {
@@ -139,6 +159,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationsLoading, setOrganizationsLoading] = useState(false);
   const [organizationsFetched, setOrganizationsFetched] = useState(false);
+  const [features, setFeatures] = useState<AuthFeatures | null>(null);
+
+  useEffect(() => {
+    if (!client?.auth?.getConfig) return;
+    let cancelled = false;
+    client.auth
+      .getConfig()
+      .then((res: any) => {
+        if (cancelled) return;
+        const f = res?.features ?? res?.data?.features ?? null;
+        setFeatures(f);
+      })
+      .catch(() => {
+        if (!cancelled) setFeatures(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [client]);
 
   const reloadOrganizations = useCallback(async () => {
     if (!client?.organizations) return;
@@ -235,6 +274,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       organizationsLoading,
       organizationsFetched,
       reloadOrganizations,
+      features,
     }),
     [
       user,
@@ -248,6 +288,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       organizationsLoading,
       organizationsFetched,
       reloadOrganizations,
+      features,
     ],
   );
 

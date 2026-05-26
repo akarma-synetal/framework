@@ -1162,11 +1162,15 @@ export class AuthManager {
 
     // Extract enabled features
     const pluginConfig: Partial<AuthPluginConfig> = this.config.plugins ?? {};
+    const multiOrgEnabled = String(
+      (globalThis as any)?.process?.env?.OS_MULTI_ORG_ENABLED ?? 'true',
+    ).toLowerCase() !== 'false';
     const features = {
       twoFactor: pluginConfig.twoFactor ?? false,
       passkeys: pluginConfig.passkeys ?? false,
       magicLink: pluginConfig.magicLink ?? false,
       organization: pluginConfig.organization ?? true,
+      multiOrgEnabled,
       oidcProvider: pluginConfig.oidcProvider ?? false,
       deviceAuthorization: pluginConfig.deviceAuthorization ?? false,
     };

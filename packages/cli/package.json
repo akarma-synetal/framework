@@ -42,6 +42,7 @@
     "@ai-sdk/gateway": "^3.0.120",
     "@object-ui/console": "^6.1.0",
     "@object-ui/studio": "^6.1.0",
+    "@objectstack/account": "workspace:*",
     "@objectstack/client": "workspace:*",
     "@objectstack/core": "workspace:*",
     "@objectstack/driver-memory": "workspace:^",

@@ -17,9 +17,10 @@ export const Route = createFileRoute('/organizations/')({
 function OrgsListPage() {
   const { t } = useObjectTranslation();
   const { organizations, loading } = useOrganizations();
-  const { session, setActiveOrganization } = useSession();
+  const { session, setActiveOrganization, features } = useSession();
   const navigate = useNavigate();
   const activeId = session?.activeOrganizationId ?? undefined;
+  const canCreateOrg = features?.multiOrgEnabled !== false;
 
   const handleSelect = async (id: string) => {
     try {
@@ -53,13 +54,15 @@ function OrgsListPage() {
             title={t('organizations.title')}
             description={t('organizations.description')}
             actions={
-              <Button
-                onClick={() => navigate({ to: '/organizations/new' })}
-                className="bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:opacity-95 hover:shadow-md hover:shadow-primary/30"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                {t('organizations.newOrganization')}
-              </Button>
+              canCreateOrg ? (
+                <Button
+                  onClick={() => navigate({ to: '/organizations/new' })}
+                  className="bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:opacity-95 hover:shadow-md hover:shadow-primary/30"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('organizations.newOrganization')}
+                </Button>
+              ) : null
             }
           />
 
@@ -76,13 +79,15 @@ function OrgsListPage() {
               <p className="mb-4 text-sm text-muted-foreground">
                 {t('organizations.emptyDescription')}
               </p>
-              <Button
-                onClick={() => navigate({ to: '/organizations/new' })}
-                className="bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/20"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                {t('organizations.createOrganization')}
-              </Button>
+              {canCreateOrg && (
+                <Button
+                  onClick={() => navigate({ to: '/organizations/new' })}
+                  className="bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/20"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('organizations.createOrganization')}
+                </Button>
+              )}
             </Card>
           )}
 

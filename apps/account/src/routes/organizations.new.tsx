@@ -1,7 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useObjectTranslation } from '@object-ui/i18n';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,10 +27,18 @@ function NewOrgPage() {
   const { t } = useObjectTranslation();
   const navigate = useNavigate();
   const { create, creating } = useCreateOrganization();
-  const { setActiveOrganization, reloadOrganizations } = useSession();
+  const { setActiveOrganization, reloadOrganizations, features } = useSession();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugDirty, setSlugDirty] = useState(false);
+
+  // Server-side `beforeCreateOrganization` hook also blocks this, but
+  // bouncing early avoids a confusing form-then-error round trip.
+  useEffect(() => {
+    if (features && features.multiOrgEnabled === false) {
+      navigate({ to: '/organizations' });
+    }
+  }, [features, navigate]);
 
   const handleNameChange = (value: string) => {
     setName(value);

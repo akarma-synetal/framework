@@ -424,6 +424,9 @@ importers:
       '@object-ui/studio':
         specifier: ^6.1.0
         version: 6.1.0
+      '@objectstack/account':
+        specifier: workspace:*
+        version: link:../../apps/account
       '@objectstack/client':
         specifier: workspace:*
         version: link:../client
