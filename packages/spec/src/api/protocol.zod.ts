@@ -145,9 +145,29 @@ export const GetMetaTypesRequestSchema = lazySchema(() => z.object({}));
 
 /**
  * Get Metadata Types Response
+ *
+ * Phase 3a-1: returns the bare `types` array (for backwards compatibility)
+ * plus rich per-type `entries` describing label, domain, file patterns, and
+ * runtime capability flags. Admin UIs (Metadata Directory, Resource list,
+ * Quick Find) consume `entries`; legacy code that only needs the type list
+ * keeps using `types`.
  */
 export const GetMetaTypesResponseSchema = lazySchema(() => z.object({
   types: z.array(z.string()).describe('Available metadata type names (e.g., "object", "plugin", "view")'),
+  entries: z.array(z.object({
+    type: z.string().describe('Singular type identifier'),
+    label: z.string().describe('Human-readable label'),
+    description: z.string().optional().describe('Brief description'),
+    filePatterns: z.array(z.string()).describe('Glob patterns used to discover artifacts of this type'),
+    supportsOverlay: z.boolean().describe('Loader can merge per-org overlays on top of artifact'),
+    allowOrgOverride: z.boolean().describe('Per-org overlay writes accepted at runtime (may be env-elevated)'),
+    allowRuntimeCreate: z.boolean().describe('New artifacts of this type can be created via runtime API'),
+    supportsVersioning: z.boolean().describe('History is tracked for this type'),
+    executionPinned: z.boolean().describe('Runtime transactions pin a specific historical version_hash (ADR-0009)'),
+    loadOrder: z.number().int().describe('Loading priority (lower = earlier)'),
+    domain: z.enum(['data', 'ui', 'automation', 'system', 'security', 'ai']).describe('Protocol domain'),
+    overrideSource: z.enum(['registry', 'env']).describe('Whether allowOrgOverride is set in the static registry or via OBJECTSTACK_METADATA_WRITABLE env var'),
+  })).optional().describe('Enriched per-type registry entries (Phase 3a)'),
 }));
 
 /**

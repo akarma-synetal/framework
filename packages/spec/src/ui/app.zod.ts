@@ -136,7 +136,32 @@ export const ActionNavItemSchema = lazySchema(() => BaseNavItemSchema.extend({
 }));
 
 /**
- * 7. Group Navigation Item
+ * 7. Component Navigation Item
+ * Navigates to a built-in front-end component registered in the runtime's
+ * `ComponentRegistry` (e.g. `metadata:directory`, `metadata:resource`,
+ * `setup:permission_matrix`). Unlike `page` (which resolves a user-defined
+ * Page metadata record) and `url` (external link), `component` targets
+ * a first-party UI shipped with the platform — typically admin/setup
+ * surfaces that have no row in any data store.
+ *
+ * `params` are passed verbatim to the component as React props, so the
+ * same component (e.g. `metadata:resource`) can be reused across many
+ * nav entries with different `type` parameters.
+ *
+ * @example
+ * ```ts
+ * { id: 'nav_objects', type: 'component', label: 'Objects',
+ *   componentRef: 'metadata:resource', params: { type: 'object' } }
+ * ```
+ */
+export const ComponentNavItemSchema = lazySchema(() => BaseNavItemSchema.extend({
+  type: z.literal('component'),
+  componentRef: z.string().describe('Component registry key (e.g. "metadata:directory")'),
+  params: z.record(z.string(), z.unknown()).optional().describe('Props passed to the component'),
+}));
+
+/**
+ * 8. Group Navigation Item
  * A container for child navigation items (Sub-menu).
  * Does not perform navigation itself.
  */
@@ -160,6 +185,7 @@ export const NavigationItemSchema: z.ZodType<any> = z.lazy(() =>
     UrlNavItemSchema,
     ReportNavItemSchema,
     ActionNavItemSchema,
+    ComponentNavItemSchema,
     GroupNavItemSchema.extend({
       children: z.array(NavigationItemSchema).describe('Child navigation items'),
     })
@@ -427,4 +453,5 @@ export type PageNavItem = z.infer<typeof PageNavItemSchema>;
 export type UrlNavItem = z.infer<typeof UrlNavItemSchema>;
 export type ReportNavItem = z.infer<typeof ReportNavItemSchema>;
 export type ActionNavItem = z.infer<typeof ActionNavItemSchema>;
+export type ComponentNavItem = z.infer<typeof ComponentNavItemSchema>;
 export type GroupNavItem = z.infer<typeof GroupNavItemSchema> & { children: NavigationItem[] };

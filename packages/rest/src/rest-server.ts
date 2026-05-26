@@ -185,6 +185,7 @@ function sendError(res: any, error: any, object?: string): void {
         res.status(error.status).json({
             error: safeMsg,
             ...(error.code ? { code: error.code } : {}),
+            ...(Array.isArray(error.issues) ? { issues: error.issues } : {}),
         });
         return;
     }
@@ -1404,6 +1405,37 @@ export class RestServer {
 
         // GET /meta/:type/:name - Get specific item
         if (metadata.endpoints.item !== false) {
+            // Phase 3a-references: /meta/:type/:name/references must be
+            // registered BEFORE /meta/:type/:name so the more-specific
+            // path wins under any first-match router strategy.
+            this.routeManager.register({
+                method: 'GET',
+                path: `${metaPath}/:type/:name/references`,
+                handler: async (req: any, res: any) => {
+                    try {
+                        const environmentId = isScoped ? req.params?.environmentId : undefined;
+                        const p = await this.resolveProtocol(environmentId, req);
+                        if (typeof (p as any).findReferencesToMeta !== 'function') {
+                            res.json({ references: [] });
+                            return;
+                        }
+                        const result = await (p as any).findReferencesToMeta({
+                            type: req.params.type,
+                            name: req.params.name,
+                            ...(environmentId ? { environmentId } : {}),
+                        });
+                        res.json(result);
+                    } catch (error: any) {
+                        logError("[REST] Unhandled error:", error);
+                        sendError(res, error);
+                    }
+                },
+                metadata: {
+                    summary: 'List metadata items that reference this item',
+                    tags: ['metadata'],
+                },
+            });
+
             this.routeManager.register({
                 method: 'GET',
                 path: `${metaPath}/:type/:name`,
@@ -1411,6 +1443,22 @@ export class RestServer {
                     try {
                         const environmentId = isScoped ? req.params?.environmentId : undefined;
                         const p = await this.resolveProtocol(environmentId, req);
+
+                        // Phase 3a-layered-get: opt-in 3-state view when client
+                        // asks for `?layers=true` (or any non-empty value).
+                        // Skips the cache path entirely — layered view is a
+                        // diagnostic endpoint, not on the hot read path.
+                        const wantLayered = req.query?.layers !== undefined && req.query?.layers !== '';
+                        if (wantLayered && typeof (p as any).getMetaItemLayered === 'function') {
+                            const layered = await (p as any).getMetaItemLayered({
+                                type: req.params.type,
+                                name: req.params.name,
+                                ...(environmentId ? { environmentId } : {}),
+                            });
+                            res.json(layered);
+                            return;
+                        }
+
                         // Check if cached version is available
                         if (metadata.enableCache && p.getMetaItemCached) {
                             const cacheRequest = {
@@ -1511,6 +1559,13 @@ export class RestServer {
                     const actorHeader = req.headers?.['x-actor'] ?? req.headers?.['X-Actor']
                         ?? req.user?.id ?? req.userId;
                     const actor = typeof actorHeader === 'string' ? actorHeader : undefined;
+                    // Phase 3a-destructive: `?force=true` opts past the
+                    // destructive-change safety check. Accept any truthy
+                    // string ('true', '1', 'yes') for resilience.
+                    const forceRaw = req.query?.force;
+                    const force = typeof forceRaw === 'string'
+                        ? ['true', '1', 'yes', 'on'].includes(forceRaw.toLowerCase())
+                        : !!forceRaw;
 
                     const result = await p.saveMetaItem({
                         type: req.params.type,
@@ -1519,6 +1574,7 @@ export class RestServer {
                         ...(environmentId ? { environmentId } : {}),
                         ...(parentVersion !== undefined ? { parentVersion } : {}),
                         ...(actor ? { actor } : {}),
+                        ...(force ? { force: true } : {}),
                     } as any);
                     res.json(result);
                 } catch (error: any) {

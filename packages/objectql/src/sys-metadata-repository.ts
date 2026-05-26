@@ -65,6 +65,7 @@ import type {
   HistoryOptions,
 } from '@objectstack/metadata-core';
 import { DEFAULT_METADATA_TYPE_REGISTRY } from '@objectstack/spec/kernel';
+import { PLURAL_TO_SINGULAR, SINGULAR_TO_PLURAL } from '@objectstack/spec/shared';
 
 /**
  * Sub-set of the ObjectQL engine shape we depend on. Kept narrow so
@@ -121,6 +122,36 @@ const OVERLAY_ALLOWED_TYPES: ReadonlySet<string> = new Set(
     .filter((e) => e.allowOrgOverride)
     .map((e) => e.type),
 );
+
+/**
+ * Phase 3a-env-writable: parse `OBJECTSTACK_METADATA_WRITABLE` (comma-
+ * separated singular type names). Memoised; tests can reset via
+ * {@link resetEnvWritableMetadataTypes}. Mirrors the same helper in
+ * ObjectStackProtocolImplementation — both gates must consult the same
+ * elevated set so the env-var escape hatch is applied consistently
+ * regardless of which write path a caller takes.
+ */
+let _envWritableMetadataTypes: Set<string> | null = null;
+function envWritableMetadataTypes(): ReadonlySet<string> {
+  if (_envWritableMetadataTypes !== null) return _envWritableMetadataTypes;
+  const raw = (typeof process !== 'undefined' && process?.env?.OBJECTSTACK_METADATA_WRITABLE) || '';
+  const set = new Set<string>();
+  for (const tok of raw.split(',')) {
+    const t = tok.trim();
+    if (!t) continue;
+    const singular = PLURAL_TO_SINGULAR[t] ?? t;
+    set.add(singular);
+    const plural = SINGULAR_TO_PLURAL[singular];
+    if (plural) set.add(plural);
+  }
+  _envWritableMetadataTypes = set;
+  return set;
+}
+
+/** Test hook — clear the memoised env-writable cache. */
+export function resetEnvWritableMetadataTypes(): void {
+  _envWritableMetadataTypes = null;
+}
 
 export class SysMetadataRepository implements MetadataRepository {
   private readonly engine: SysMetadataEngine;
@@ -574,15 +605,26 @@ export class SysMetadataRepository implements MetadataRepository {
   }
 
   private assertAllowed(type: string): void {
-    if (!OVERLAY_ALLOWED_TYPES.has(type)) {
-      const err: any = new Error(
-        `[not_overridable] '${type}' is not allowOrgOverride in the registry. ` +
-        `Allowed: ${Array.from(OVERLAY_ALLOWED_TYPES).join(', ')}.`,
-      );
-      err.code = 'not_overridable';
-      err.status = 403;
-      throw err;
-    }
+    const singular = PLURAL_TO_SINGULAR[type] ?? type;
+    const allowedByRegistry = OVERLAY_ALLOWED_TYPES.has(singular) || OVERLAY_ALLOWED_TYPES.has(type);
+    if (allowedByRegistry) return;
+
+    // Phase 3a-env-writable: env-var escape hatch.
+    const env = envWritableMetadataTypes();
+    if (env.has(singular) || env.has(type)) return;
+
+    const allowed = [
+      ...OVERLAY_ALLOWED_TYPES,
+      ...envWritableMetadataTypes(),
+    ];
+    const err: any = new Error(
+      `[not_overridable] '${type}' is not allowOrgOverride in the registry. ` +
+      `Allowed: ${Array.from(new Set(allowed)).join(', ') || '(none)'}. ` +
+      `Set OBJECTSTACK_METADATA_WRITABLE to enable additional types at runtime.`,
+    );
+    err.code = 'not_overridable';
+    err.status = 403;
+    throw err;
   }
 
   private whereFor(ref: Pick<MetaRef, 'type' | 'name'>): Record<string, unknown> {

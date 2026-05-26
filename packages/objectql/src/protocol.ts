@@ -142,6 +142,195 @@ const SERVICE_CONFIG: Record<string, { route: string; plugin: string }> = {
     search:       { route: '/api/v1/search', plugin: 'plugin-search' },
 };
 
+/**
+ * Phase 3a-references: hand-curated reference path registry.
+ *
+ * Maps a *target* metadata type to the list of *source* type+path tuples
+ * that may point at it. Used by {@link findReferencesToMeta} to scan all
+ * loaded metadata and surface "what depends on this?" before a user
+ * deletes or renames an artifact.
+ *
+ * Path syntax:
+ *   - `'foo'`            → item.foo
+ *   - `'foo.bar'`        → item.foo.bar
+ *   - `'foo[]'`          → each element of array item.foo
+ *   - `'foo[].bar'`      → bar of each element of array item.foo
+ *   - `'foo{}'`          → each value of Record item.foo
+ *   - `'foo{}.bar'`      → bar of each value of Record item.foo
+ *
+ * Coverage is intentionally narrow — covers the highest-value references
+ * for MVP. Add more entries as new editors are built.
+ */
+const REFERENCE_PATHS: Record<string, Array<{ fromType: string; paths: string[]; kind: string }>> = {
+    object: [
+        { fromType: 'view', paths: ['object', 'objectName'], kind: 'view' },
+        { fromType: 'dashboard', paths: ['widgets[].object', 'widgets[].objectName'], kind: 'dashboard widget' },
+        { fromType: 'flow', paths: ['object', 'context.object', 'trigger.object', 'targetObject'], kind: 'flow' },
+        { fromType: 'workflow', paths: ['object', 'targetObject'], kind: 'workflow' },
+        { fromType: 'permission', paths: ['objects[].name', 'objects[].object'], kind: 'permission' },
+        { fromType: 'app', paths: ['navItems[].objectName', 'navItems[].object', 'tabs[].objectName', 'tabs[].object'], kind: 'app nav' },
+        { fromType: 'page', paths: ['object', 'objectName'], kind: 'page' },
+        { fromType: 'report', paths: ['object', 'objectName'], kind: 'report' },
+        { fromType: 'action', paths: ['object', 'objectName'], kind: 'action' },
+        { fromType: 'validation', paths: ['object', 'objectName'], kind: 'validation' },
+        { fromType: 'hook', paths: ['object', 'objectName'], kind: 'hook' },
+        { fromType: 'object', paths: ['fields[].referenceTo', 'fields{}.referenceTo', 'fields{}.reference'], kind: 'field reference' },
+    ],
+    view: [
+        { fromType: 'dashboard', paths: ['widgets[].view', 'widgets[].viewName'], kind: 'dashboard widget' },
+        { fromType: 'app', paths: ['navItems[].viewName', 'tabs[].viewName'], kind: 'app nav' },
+        { fromType: 'page', paths: ['viewName'], kind: 'page' },
+    ],
+    tool: [
+        { fromType: 'agent', paths: ['tools[]', 'tools[].name'], kind: 'agent tool' },
+    ],
+    skill: [
+        { fromType: 'agent', paths: ['skills[]', 'skills[].name'], kind: 'agent skill' },
+    ],
+    flow: [
+        { fromType: 'app', paths: ['navItems[].flowName', 'tabs[].flowName'], kind: 'app nav' },
+    ],
+    dashboard: [
+        { fromType: 'app', paths: ['navItems[].dashboardName', 'tabs[].dashboardName'], kind: 'app nav' },
+    ],
+    page: [
+        { fromType: 'app', paths: ['navItems[].pageName', 'tabs[].pageName'], kind: 'app nav' },
+    ],
+};
+
+/**
+ * Extract one or more string values from `item` at `path`. Supports
+ * `'a.b'` (nested object access) and `'a[].b'` (array element access).
+ * Returns an empty array if any segment is missing.
+ */
+function extractPathValues(item: unknown, path: string): string[] {
+    if (!item || typeof item !== 'object') return [];
+    const segments = path.split('.');
+    let current: unknown[] = [item];
+    for (const rawSeg of segments) {
+        let kind: 'value' | 'array' | 'record' = 'value';
+        let seg = rawSeg;
+        if (seg.endsWith('[]')) {
+            kind = 'array';
+            seg = seg.slice(0, -2);
+        } else if (seg.endsWith('{}')) {
+            kind = 'record';
+            seg = seg.slice(0, -2);
+        }
+        const next: unknown[] = [];
+        for (const node of current) {
+            if (!node || typeof node !== 'object') continue;
+            let value: unknown;
+            if (seg === '') {
+                value = node;
+            } else {
+                value = (node as Record<string, unknown>)[seg];
+            }
+            if (value === undefined || value === null) continue;
+            if (kind === 'array') {
+                if (Array.isArray(value)) {
+                    for (const v of value) next.push(v);
+                }
+            } else if (kind === 'record') {
+                if (Array.isArray(value)) {
+                    for (const v of value) next.push(v);
+                } else if (typeof value === 'object') {
+                    for (const v of Object.values(value as Record<string, unknown>)) next.push(v);
+                }
+            } else {
+                next.push(value);
+            }
+        }
+        current = next;
+        if (current.length === 0) return [];
+    }
+    // Coerce final values to strings, dropping non-string non-object leaves.
+    const out: string[] = [];
+    for (const v of current) {
+        if (typeof v === 'string' && v.length > 0) out.push(v);
+        else if (v && typeof v === 'object' && 'name' in (v as any) && typeof (v as any).name === 'string') {
+            out.push((v as any).name);
+        }
+    }
+    return out;
+}
+
+/**
+ * Phase 3a-destructive: detect changes between an existing object schema
+ * and an incoming overlay that would break runtime data — removed fields,
+ * field type narrowing, required toggled on without a default. Returned
+ * issues are surfaced as HTTP 409 `destructive_change` unless the caller
+ * sets `force: true`, letting the admin UI render a warning dialog before
+ * proceeding.
+ *
+ * Scope is intentionally narrow for MVP: covers the most common
+ * data-loss footguns for `object` and `field` types. Subsequent passes
+ * can layer in relationship changes, enum-value removals, etc.
+ */
+function detectDestructiveObjectChanges(prev: any, next: any): Array<{
+    code: string;
+    field?: string;
+    message: string;
+}> {
+    if (!prev || typeof prev !== 'object' || !next || typeof next !== 'object') return [];
+    const prevFields = (prev.fields && typeof prev.fields === 'object') ? prev.fields as Record<string, any> : {};
+    const nextFields = (next.fields && typeof next.fields === 'object') ? next.fields as Record<string, any> : {};
+
+    const issues: Array<{ code: string; field?: string; message: string }> = [];
+
+    // Removed fields — silently dropping a column is a data-loss event.
+    for (const fname of Object.keys(prevFields)) {
+        // Skip system fields — those are managed by applySystemFields and
+        // re-injected on every registerObject call; they will look "removed"
+        // in any user-supplied overlay.
+        if (prevFields[fname]?.system) continue;
+        if (!(fname in nextFields)) {
+            issues.push({
+                code: 'field_removed',
+                field: fname,
+                message: `Field '${fname}' removed — existing data in this column will become inaccessible.`,
+            });
+        }
+    }
+
+    // Field type changes — narrowing or incompatible conversions.
+    const TYPE_COMPATIBILITY: Record<string, Set<string>> = {
+        text: new Set(['textarea', 'markdown', 'html', 'code']),
+        number: new Set([]),
+        boolean: new Set([]),
+        date: new Set(['datetime']),
+        datetime: new Set(['date']),
+    };
+    for (const fname of Object.keys(nextFields)) {
+        const prevField = prevFields[fname];
+        const nextField = nextFields[fname];
+        if (!prevField) continue; // brand-new field — non-destructive
+        const prevType = prevField.type;
+        const nextType = nextField.type;
+        if (prevType && nextType && prevType !== nextType) {
+            const compatible = TYPE_COMPATIBILITY[prevType]?.has(nextType);
+            if (!compatible) {
+                issues.push({
+                    code: 'field_type_change',
+                    field: fname,
+                    message: `Field '${fname}' type changed from '${prevType}' to '${nextType}' — existing values may not convert cleanly.`,
+                });
+            }
+        }
+        // required toggled on without a default — new inserts will start
+        // to fail validation, and any null rows already in the table will
+        // fail on next save.
+        if (!prevField.required && nextField.required && nextField.defaultValue === undefined) {
+            issues.push({
+                code: 'field_required_no_default',
+                field: fname,
+                message: `Field '${fname}' is now required but has no default value — existing rows with null values may fail validation.`,
+            });
+        }
+    }
+    return issues;
+}
+
 export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
     private engine: ObjectQL;
     private getServicesRegistry?: () => Map<string, any>;
@@ -409,7 +598,57 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         }
 
         const allTypes = Array.from(new Set([...schemaTypes, ...runtimeTypes]));
-        return { types: allTypes };
+
+        // Phase 3a-1: enrich response with per-type registry metadata so admin
+        // UI can render directory pages, filter by domain, decide which types
+        // expose write actions, etc. Existing clients keep working — the
+        // `types: string[]` field is preserved alongside the new `entries`.
+        //
+        // Phase 3a-env-writable: `OBJECTSTACK_METADATA_WRITABLE` env var (comma
+        // separated singular type names) flips `allowOrgOverride` on listed
+        // types so admins can self-serve. The same env var is consulted by
+        // `isOverlayAllowed()` at write time — they must stay in sync.
+        const writableOverrides = ObjectStackProtocolImplementation.envWritableTypes();
+        const registryByType = new Map(
+            DEFAULT_METADATA_TYPE_REGISTRY.map((e) => [e.type, e] as const)
+        );
+
+        const entries = allTypes.map((type) => {
+            const singular = (PLURAL_TO_SINGULAR[type] ?? type) as string;
+            const base = registryByType.get(singular as any);
+            if (base) {
+                const isEnvOverridden = writableOverrides.has(singular);
+                return {
+                    ...base,
+                    type: singular,
+                    allowOrgOverride: base.allowOrgOverride || isEnvOverridden,
+                    overrideSource: isEnvOverridden && !base.allowOrgOverride
+                        ? 'env' as const
+                        : 'registry' as const,
+                };
+            }
+            // Runtime-registered type with no registry entry — synthesise a
+            // minimal descriptor so the UI can still surface it.
+            return {
+                type: singular,
+                label: singular,
+                description: undefined,
+                filePatterns: [],
+                supportsOverlay: false,
+                allowOrgOverride: writableOverrides.has(singular),
+                allowRuntimeCreate: true,
+                supportsVersioning: false,
+                executionPinned: false,
+                loadOrder: 1000,
+                domain: 'system' as const,
+                overrideSource: writableOverrides.has(singular) ? 'env' as const : 'registry' as const,
+            };
+        }).sort((a, b) => {
+            if (a.domain !== b.domain) return a.domain.localeCompare(b.domain);
+            return a.type.localeCompare(b.type);
+        });
+
+        return { types: allTypes, entries };
     }
 
     async getMetaItems(request: { type: string; packageId?: string; organizationId?: string }) {
@@ -655,6 +894,112 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             type: request.type,
             name: request.name,
             item
+        };
+    }
+
+    /**
+     * Phase 3a-layered-get: return the 3 layers of a metadata item
+     * separately — `code` (artifact-loaded baseline), `overlay` (per-org
+     * customisation row, if any), and `effective` (what `getMetaItem`
+     * would return, i.e. overlay-wins merge).
+     *
+     * Drives the "Code default vs Overlay vs Effective" diff tab in the
+     * generic Metadata Resource Edit page. Admins can see exactly what
+     * was customised and reset selectively.
+     *
+     * `code` is null if no artifact baseline exists; `overlay` is null if
+     * no sys_metadata row exists for the requested scope; `effective` is
+     * never null when either layer exists.
+     */
+    async getMetaItemLayered(request: {
+        type: string;
+        name: string;
+        packageId?: string;
+        organizationId?: string;
+    }): Promise<{
+        type: string;
+        name: string;
+        code: unknown | null;
+        overlay: unknown | null;
+        overlayScope: 'org' | 'env' | null;
+        effective: unknown | null;
+    }> {
+        const orgId = request.organizationId;
+
+        // ── code layer: MetadataService.get + registry, BYPASSING overlay ──
+        let code: unknown | null = null;
+        try {
+            const services = this.getServicesRegistry?.();
+            const metadataService = services?.get('metadata');
+            if (metadataService && typeof metadataService.get === 'function') {
+                let fromService = await metadataService.get(request.type, request.name);
+                if (fromService === undefined || fromService === null) {
+                    const alt = PLURAL_TO_SINGULAR[request.type] ?? SINGULAR_TO_PLURAL[request.type];
+                    if (alt) fromService = await metadataService.get(alt, request.name);
+                }
+                if (fromService !== undefined && fromService !== null) code = fromService;
+            }
+        } catch {
+            // ignore
+        }
+        if (code === null) {
+            let regItem = this.engine.registry.getItem(request.type, request.name);
+            if (regItem === undefined) {
+                const alt = PLURAL_TO_SINGULAR[request.type] ?? SINGULAR_TO_PLURAL[request.type];
+                if (alt) regItem = this.engine.registry.getItem(alt, request.name);
+            }
+            if (regItem !== undefined) code = regItem;
+        }
+
+        // ── overlay layer: sys_metadata row (org-scoped wins, then env-wide) ──
+        let overlay: unknown | null = null;
+        let overlayScope: 'org' | 'env' | null = null;
+        try {
+            const findOverlay = async (oid: string | null) => {
+                const where: Record<string, unknown> = {
+                    type: request.type,
+                    name: request.name,
+                    state: 'active',
+                    organization_id: oid,
+                };
+                let rec = await this.engine.findOne('sys_metadata', { where });
+                if (!rec) {
+                    const alt = PLURAL_TO_SINGULAR[request.type] ?? SINGULAR_TO_PLURAL[request.type];
+                    if (alt) {
+                        rec = await this.engine.findOne('sys_metadata', {
+                            where: { ...where, type: alt },
+                        });
+                    }
+                }
+                return rec;
+            };
+            if (orgId) {
+                const rec = await findOverlay(orgId);
+                if (rec) {
+                    overlay = typeof rec.metadata === 'string' ? JSON.parse(rec.metadata) : rec.metadata;
+                    overlayScope = 'org';
+                }
+            }
+            if (overlay === null) {
+                const rec = await findOverlay(null);
+                if (rec) {
+                    overlay = typeof rec.metadata === 'string' ? JSON.parse(rec.metadata) : rec.metadata;
+                    overlayScope = 'env';
+                }
+            }
+        } catch {
+            // DB unavailable — overlay stays null
+        }
+
+        const effective: unknown | null = overlay ?? code;
+
+        return {
+            type: request.type,
+            name: request.name,
+            code,
+            overlay,
+            overlayScope,
+            effective,
         };
     }
 
@@ -1786,11 +2131,48 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         return out;
     })();
 
+    /**
+     * Phase 3a-env-writable: parse `OBJECTSTACK_METADATA_WRITABLE` once.
+     * Comma-separated singular type names. When the env var is set, the
+     * listed types get treated as `allowOrgOverride: true` regardless of
+     * their static registry entry. This is the runtime escape hatch admins
+     * use to enable Studio-side editing of types whose protocol-level flag
+     * is still false (object, field, permission, …).
+     *
+     * Memoised at first call. Tests can override by clearing the cache via
+     * {@link ObjectStackProtocolImplementation.resetEnvWritableCache}.
+     */
+    private static _envWritableTypes: Set<string> | null = null;
+    private static envWritableTypes(): ReadonlySet<string> {
+        if (this._envWritableTypes !== null) return this._envWritableTypes;
+        const raw = (typeof process !== 'undefined' && process?.env?.OBJECTSTACK_METADATA_WRITABLE) || '';
+        const set = new Set<string>();
+        for (const tok of raw.split(',')) {
+            const t = tok.trim();
+            if (!t) continue;
+            const singular = PLURAL_TO_SINGULAR[t] ?? t;
+            set.add(singular);
+            const plural = SINGULAR_TO_PLURAL[singular];
+            if (plural) set.add(plural);
+        }
+        this._envWritableTypes = set;
+        return set;
+    }
+
+    /** Test hook — clear the memoised env-writable cache. */
+    static resetEnvWritableCache(): void {
+        this._envWritableTypes = null;
+    }
+
     /** Normalize plural→singular before consulting the allow-list. */
     private static isOverlayAllowed(type: string): boolean {
         const singular = PLURAL_TO_SINGULAR[type] ?? type;
-        return ObjectStackProtocolImplementation.OVERLAY_ALLOWED_TYPES.has(singular)
-            || ObjectStackProtocolImplementation.OVERLAY_ALLOWED_TYPES.has(type);
+        if (this.OVERLAY_ALLOWED_TYPES.has(singular)
+            || this.OVERLAY_ALLOWED_TYPES.has(type)) {
+            return true;
+        }
+        const env = this.envWritableTypes();
+        return env.has(singular) || env.has(type);
     }
 
     /**
@@ -1815,7 +2197,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         }
     }
 
-    async saveMetaItem(request: { type: string, name: string, item?: any, organizationId?: string, parentVersion?: string | null, actor?: string }) {
+    async saveMetaItem(request: { type: string, name: string, item?: any, organizationId?: string, parentVersion?: string | null, actor?: string, force?: boolean }) {
         if (!request.item) {
             throw new Error('Item data is required');
         }
@@ -1829,12 +2211,48 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             const allowed = Array.from(ObjectStackProtocolImplementation.OVERLAY_ALLOWED_TYPES).join(', ');
             const err = new Error(
                 `[not_overridable] Metadata type '${request.type}' has not opted into per-org overlay writes. `
-                + `Set allowOrgOverride: true on its DEFAULT_METADATA_TYPE_REGISTRY entry to enable. `
+                + `Set allowOrgOverride: true on its DEFAULT_METADATA_TYPE_REGISTRY entry to enable, `
+                + `or set the OBJECTSTACK_METADATA_WRITABLE env var (comma-separated singular type names) to opt in at runtime. `
                 + `Currently allowed: ${allowed}. See docs/adr/0005-metadata-customization-overlay.md.`
             );
             (err as any).code = 'not_overridable';
             (err as any).status = 403;
             throw err;
+        }
+
+        // Phase 3a-destructive: for object/field writes, diff against the
+        // current schema and 409 if the change would drop data — unless the
+        // caller has acknowledged the risk with `force: true`. The admin UI
+        // surfaces the structured `issues` payload in a confirmation dialog.
+        const singularType = PLURAL_TO_SINGULAR[request.type] ?? request.type;
+        if (!request.force && (singularType === 'object' || singularType === 'field')) {
+            try {
+                const existing = await this.getMetaItem({
+                    type: request.type,
+                    name: request.name,
+                    ...(request.organizationId ? { organizationId: request.organizationId } : {}),
+                } as any);
+                const prev = (existing as any)?.item;
+                if (prev) {
+                    const issues = detectDestructiveObjectChanges(prev, request.item);
+                    if (issues.length > 0) {
+                        const summary = issues.slice(0, 3).map((i) => i.message).join('; ');
+                        const err = new Error(
+                            `[destructive_change] ${request.type}/${request.name} would drop or transform existing data: ${summary}`
+                            + (issues.length > 3 ? ` (+${issues.length - 3} more)` : '')
+                            + ` — re-submit with ?force=true to proceed.`
+                        );
+                        (err as any).code = 'destructive_change';
+                        (err as any).status = 409;
+                        (err as any).issues = issues;
+                        throw err;
+                    }
+                }
+            } catch (err: any) {
+                if (err?.code === 'destructive_change') throw err;
+                // Other errors during the diff lookup are non-fatal —
+                // they just skip the safety check.
+            }
         }
 
         // Spec-conformance check: if a Zod schema is registered for this
@@ -2291,6 +2709,90 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             }
         }
         return { loaded, errors };
+    }
+
+    // ==========================================
+    // Metadata References (Phase 3a-references)
+    // ==========================================
+
+    /**
+     * Scan all loaded metadata for references pointing at the given
+     * `{type, name}` target. Returns one row per referring artifact with
+     * the path that produced the hit, so the admin UI can render an
+     * "Used by" panel before destructive actions (rename / delete /
+     * type-narrowing).
+     *
+     * Coverage is driven by the hand-curated {@link REFERENCE_PATHS}
+     * registry. Types not present in the registry simply return no hits
+     * — the engine never throws.
+     */
+    async findReferencesToMeta(request: {
+        type: string;
+        name: string;
+        organizationId?: string;
+    }): Promise<{
+        references: Array<{
+            type: string;
+            name: string;
+            label?: string;
+            path: string;
+            kind: string;
+        }>;
+    }> {
+        const singularTarget = PLURAL_TO_SINGULAR[request.type] ?? request.type;
+        const targetName = request.name;
+        const matchers = REFERENCE_PATHS[singularTarget];
+        if (!matchers || matchers.length === 0) {
+            return { references: [] };
+        }
+
+        const seen = new Set<string>(); // dedup key: `${fromType}|${itemName}|${path}`
+        const out: Array<{ type: string; name: string; label?: string; path: string; kind: string }> = [];
+
+        // Walk distinct source types in parallel.
+        await Promise.all(
+            matchers.map(async (matcher) => {
+                let items: unknown[] = [];
+                try {
+                    const result = await this.getMetaItems({
+                        type: matcher.fromType,
+                        ...(request.organizationId ? { organizationId: request.organizationId } : {}),
+                    });
+                    items = (result?.items ?? []) as unknown[];
+                } catch {
+                    return;
+                }
+                for (const raw of items) {
+                    if (!raw || typeof raw !== 'object') continue;
+                    const sourceName = (raw as any).name as string | undefined;
+                    if (!sourceName) continue;
+                    // Don't list an item as a reference to itself unless the
+                    // self-reference is meaningful (e.g. object→field path).
+                    const isSelfReference = matcher.fromType === singularTarget && sourceName === targetName;
+                    for (const path of matcher.paths) {
+                        const values = extractPathValues(raw, path);
+                        if (!values.includes(targetName)) continue;
+                        if (isSelfReference && !path.includes('[]') && !path.includes('{}')) continue;
+                        const key = `${matcher.fromType}|${sourceName}|${path}`;
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        const label = (raw as any).label as string | undefined;
+                        out.push({
+                            type: matcher.fromType,
+                            name: sourceName,
+                            ...(label ? { label } : {}),
+                            path,
+                            kind: matcher.kind,
+                        });
+                    }
+                }
+            }),
+        );
+
+        // Stable sort: by type, then by name.
+        out.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+
+        return { references: out };
     }
 
     // ==========================================

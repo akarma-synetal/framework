@@ -78,32 +78,40 @@ export const SETUP_APP: App = {
     },
     {
       // Data Model — typed browse + edit for the schema metadata that
-      // drives every other surface. The grid entries use named
-      // `sys_metadata` list views (`only_objects` / `only_fields`) so
-      // admins land in a focused, filtered list instead of the raw
-      // "All Metadata" debug table (which stays under Advanced). The
-      // rich visual designer (object / field editor) lives in objectui's
-      // plugin-designer and is reached via a record-level action; this
-      // nav group is the entry point to that flow.
+      // drives every other surface. Phase 3b: the Objects + Fields nav
+      // entries now use the new `component` nav variant to route to
+      // first-party metadata admin pages (`metadata:resource`) instead
+      // of grids over `sys_metadata`. The new pages render the 3-state
+      // overlay (code · overlay · effective), surface References, and
+      // gate destructive saves behind a confirmation dialog. The raw
+      // `sys_metadata` grid remains available under Advanced for
+      // debugging.
       id: 'group_data_model',
       type: 'group',
       label: 'Data Model',
       icon: 'database',
       children: [
         {
+          id: 'nav_metadata_directory',
+          type: 'component',
+          label: 'All Metadata Types',
+          componentRef: 'metadata:directory',
+          icon: 'layers',
+        },
+        {
           id: 'nav_objects',
-          type: 'object',
+          type: 'component',
           label: 'Objects',
-          objectName: 'sys_metadata',
-          viewName: 'only_objects',
+          componentRef: 'metadata:resource',
+          params: { type: 'object' },
           icon: 'box',
         },
         {
           id: 'nav_fields',
-          type: 'object',
+          type: 'component',
           label: 'Fields',
-          objectName: 'sys_metadata',
-          viewName: 'only_fields',
+          componentRef: 'metadata:resource',
+          params: { type: 'field' },
           icon: 'columns',
         },
       ],
