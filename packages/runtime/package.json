@@ -20,7 +20,13 @@
   },
   "dependencies": {
     "@objectstack/core": "workspace:*",
+    "@objectstack/driver-memory": "workspace:*",
+    "@objectstack/driver-sql": "workspace:*",
+    "@objectstack/driver-sqlite-wasm": "workspace:*",
+    "@objectstack/driver-turso": "workspace:*",
     "@objectstack/formula": "workspace:*",
+    "@objectstack/metadata": "workspace:*",
+    "@objectstack/objectql": "workspace:*",
     "@objectstack/observability": "workspace:*",
     "@objectstack/plugin-auth": "workspace:*",
     "@objectstack/plugin-security": "workspace:*",
@@ -32,14 +38,10 @@
     "quickjs-emscripten": "^0.32.0",
     "zod": "^4.4.3"
   },
+  "optionalDependencies": {
+    "@objectstack/driver-mongodb": "workspace:*"
+  },
   "devDependencies": {
-    "@objectstack/driver-memory": "workspace:*",
-    "@objectstack/driver-mongodb": "workspace:*",
-    "@objectstack/driver-sql": "workspace:*",
-    "@objectstack/driver-sqlite-wasm": "workspace:*",
-    "@objectstack/driver-turso": "workspace:*",
-    "@objectstack/metadata": "workspace:*",
-    "@objectstack/objectql": "workspace:*",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   },

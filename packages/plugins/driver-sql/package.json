@@ -23,6 +23,21 @@
     "knex": "^3.2.10",
     "nanoid": "^5.1.11"
   },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.10.0"
+  },
+  "peerDependencies": {
+    "mysql2": "^3.0.0",
+    "pg": "^8.0.0",
+    "sqlite3": "^5.0.0",
+    "tedious": "^18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "mysql2": { "optional": true },
+    "pg": { "optional": true },
+    "sqlite3": { "optional": true },
+    "tedious": { "optional": true }
+  },
   "devDependencies": {
     "@types/node": "^25.9.1",
     "better-sqlite3": "^12.10.0",
