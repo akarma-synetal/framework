@@ -13,7 +13,7 @@ import type {
 } from '@objectstack/spec/api';
 import type { MetadataCacheRequest, MetadataCacheResponse, ServiceInfo, ApiRoutes, WellKnownCapabilities } from '@objectstack/spec/api';
 import type { IFeedService } from '@objectstack/spec/contracts';
-import { parseFilterAST, isFilterAST } from '@objectstack/spec/data';
+import { parseFilterAST, isFilterAST, objectForm } from '@objectstack/spec/data';
 import { PLURAL_TO_SINGULAR, SINGULAR_TO_PLURAL } from '@objectstack/spec/shared';
 import { ListViewSchema, FormViewSchema, DashboardSchema, AppSchema, PageSchema, ReportSchema, reportForm, viewForm, appForm, dashboardForm, type FormView } from '@objectstack/spec/ui';
 import { RoleSchema, roleForm } from '@objectstack/spec/identity';
@@ -57,6 +57,7 @@ const TYPE_TO_SCHEMA: Record<string, z.ZodTypeAny> = {
  * `role`, `permission`, `email_template`).
  */
 const TYPE_TO_FORM: Record<string, FormView> = {
+    object: objectForm,
     report: reportForm,
     view: viewForm,
     app: appForm,
@@ -696,6 +697,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 return {
                     ...base,
                     type: singular,
+                    schemaId: singular, // API client expects schemaId field
                     allowOrgOverride: base.allowOrgOverride || isEnvOverridden,
                     overrideSource: isEnvOverridden && !base.allowOrgOverride
                         ? 'env' as const
@@ -708,6 +710,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             // minimal descriptor so the UI can still surface it.
             return {
                 type: singular,
+                schemaId: singular, // API client expects schemaId field
                 label: singular,
                 description: undefined,
                 filePatterns: [],
