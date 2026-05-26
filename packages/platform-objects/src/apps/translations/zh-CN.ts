@@ -14,6 +14,9 @@ export const zhCN: TranslationData = {
       description: '平台设置与管理',
       navigation: {
         group_overview: { label: '总览' },
+        group_apps: { label: '应用' },
+        nav_marketplace_browse: { label: '浏览应用市场' },
+        nav_marketplace_installed: { label: '已安装应用' },
         group_people_org: { label: '人员与组织' },
         group_access_control: { label: '访问控制' },
         group_approvals: { label: '审批' },

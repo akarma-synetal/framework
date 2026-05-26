@@ -28,6 +28,7 @@ export const en: TranslationData = {
       navigation: {
         // Groups
         group_overview: { label: 'Overview' },
+        group_apps: { label: 'Apps' },
         group_people_org: { label: 'People & Organization' },
         group_access_control: { label: 'Access Control' },
         group_approvals: { label: 'Approvals' },
@@ -37,6 +38,10 @@ export const en: TranslationData = {
 
         // Overview
         nav_system_overview: { label: 'System Overview' },
+
+        // Apps / Marketplace
+        nav_marketplace_browse: { label: 'Browse Marketplace' },
+        nav_marketplace_installed: { label: 'Installed Apps' },
 
         // People & Organization
         nav_users: { label: 'Users' },

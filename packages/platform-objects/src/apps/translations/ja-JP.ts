@@ -14,6 +14,9 @@ export const jaJP: TranslationData = {
       description: 'プラットフォーム設定と管理',
       navigation: {
         group_overview: { label: '概要' },
+        group_apps: { label: 'アプリ' },
+        nav_marketplace_browse: { label: 'マーケットプレイスを閲覧' },
+        nav_marketplace_installed: { label: 'インストール済みアプリ' },
         group_people_org: { label: 'ユーザーと組織' },
         group_access_control: { label: 'アクセス制御' },
         group_approvals: { label: '承認' },

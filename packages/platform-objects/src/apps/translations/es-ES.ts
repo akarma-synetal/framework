@@ -14,6 +14,9 @@ export const esES: TranslationData = {
       description: 'Configuración y administración de la plataforma',
       navigation: {
         group_overview: { label: 'Resumen' },
+        group_apps: { label: 'Aplicaciones' },
+        nav_marketplace_browse: { label: 'Explorar Marketplace' },
+        nav_marketplace_installed: { label: 'Aplicaciones instaladas' },
         group_people_org: { label: 'Personas y Organización' },
         group_access_control: { label: 'Control de Acceso' },
         group_approvals: { label: 'Aprobaciones' },

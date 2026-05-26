@@ -47,18 +47,17 @@ export const SETUP_APP: App = {
       ],
     },
     {
-      // App Marketplace — browse + install packages contributed by
-      // `@objectstack/service-tenant` (control plane). Gated on
-      // `requiresObject: 'sys_package'` so single-environment runtimes
-      // without the tenant service don't show an empty marketplace
-      // (the React pages live in objectui's app-shell and are
-      // unconditionally mounted at `/apps/setup/system/marketplace`,
-      // but the nav group only appears when the catalog backend exists).
+      // App Marketplace — browse + install packages. The browse page is
+      // always available: single-environment runtimes use the
+      // `MarketplaceProxy` plugin to browse the remote catalog;
+      // control-plane (cloud) deployments add `sys_package_installation`
+      // to track per-env installs. The "Installed Apps" entry is gated
+      // on that object so it only appears when the catalog backend
+      // exposes installations (i.e. control-plane / multi-tenant).
       id: 'group_apps',
       type: 'group',
       label: 'Apps',
       icon: 'package',
-      requiresObject: 'sys_package',
       children: [
         {
           id: 'nav_marketplace_browse',
@@ -66,7 +65,6 @@ export const SETUP_APP: App = {
           label: 'Browse Marketplace',
           url: '/apps/setup/system/marketplace',
           icon: 'store',
-          requiresObject: 'sys_package',
         },
         {
           id: 'nav_marketplace_installed',
@@ -75,6 +73,38 @@ export const SETUP_APP: App = {
           url: '/apps/setup/system/marketplace/installed',
           icon: 'package-check',
           requiresObject: 'sys_package_installation',
+        },
+      ],
+    },
+    {
+      // Data Model — typed browse + edit for the schema metadata that
+      // drives every other surface. The grid entries use named
+      // `sys_metadata` list views (`only_objects` / `only_fields`) so
+      // admins land in a focused, filtered list instead of the raw
+      // "All Metadata" debug table (which stays under Advanced). The
+      // rich visual designer (object / field editor) lives in objectui's
+      // plugin-designer and is reached via a record-level action; this
+      // nav group is the entry point to that flow.
+      id: 'group_data_model',
+      type: 'group',
+      label: 'Data Model',
+      icon: 'database',
+      children: [
+        {
+          id: 'nav_objects',
+          type: 'object',
+          label: 'Objects',
+          objectName: 'sys_metadata',
+          viewName: 'only_objects',
+          icon: 'box',
+        },
+        {
+          id: 'nav_fields',
+          type: 'object',
+          label: 'Fields',
+          objectName: 'sys_metadata',
+          viewName: 'only_fields',
+          icon: 'columns',
         },
       ],
     },
