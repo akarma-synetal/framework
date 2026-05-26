@@ -17,6 +17,7 @@ export * from './app.zod';
 export * from './view.zod';
 export * from './dashboard.zod';
 export * from './report.zod';
+export { reportForm } from './report.form';
 export * from './action.zod';
 export * from './page.zod';
 export * from './widget.zod';

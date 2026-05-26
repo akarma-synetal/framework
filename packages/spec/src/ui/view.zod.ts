@@ -36,6 +36,19 @@ export const ViewDataSchema = lazySchema(() => z.discriminatedUnion('provider', 
     provider: z.literal('value'),
     items: z.array(z.unknown()).describe('Static data array'),
   }),
+  /**
+   * Schema-bound data source — used by standalone forms whose data is
+   * shaped by a JSON Schema (or Zod-derived schema) rather than by an
+   * ObjectQL object. Powers the metadata editor, action input dialogs,
+   * and any Form that is not bound to a CRUD object.
+   */
+  z.object({
+    provider: z.literal('schema'),
+    /** Schema identifier (e.g. metadata type name "report"). Resolved at runtime against /meta entries. */
+    schemaId: z.string().describe('Schema identifier — typically the metadata type name'),
+    /** Optional inline JSON Schema; when omitted the runtime resolves schemaId from the server. */
+    schema: z.record(z.string(), z.unknown()).optional().describe('Inline JSON Schema (Draft 2020-12). Optional when schemaId is resolvable.'),
+  }),
 ]));
 
 /**
@@ -659,6 +672,51 @@ export const ViewSchema = lazySchema(() => z.object({
  */
 export function defineView(config: z.input<typeof ViewSchema>): View {
   return ViewSchema.parse(config);
+}
+
+/**
+ * Type-safe factory for a standalone {@link FormView} bound to a JSON Schema
+ * rather than to an ObjectQL object.
+ *
+ * Use this for forms that edit **metadata** (e.g. `report.form.ts`,
+ * `dashboard.form.ts`), **action inputs**, or **flow screens** — anywhere the
+ * data shape is described by a Zod-derived JSON Schema instead of an Object
+ * field set.
+ *
+ * The returned FormView is validated at definition time; the runtime form
+ * renderer (`@object-ui/plugin-form`) inspects `data.provider === 'schema'`
+ * and pulls field metadata from the resolved JSON Schema instead of from
+ * ObjectQL.
+ *
+ * @example
+ * ```ts
+ * export const reportForm = defineForm({
+ *   schemaId: 'report',
+ *   type: 'tabbed',
+ *   sections: [
+ *     { label: 'Basics', columns: 2, fields: [
+ *       { field: 'name' },
+ *       { field: 'label' },
+ *       { field: 'objectName', widget: 'ref:object' },
+ *       { field: 'type' },
+ *     ]},
+ *     { label: 'Columns', fields: [{ field: 'columns', widget: 'master-detail' }] },
+ *     { label: 'Advanced', collapsible: true, collapsed: true, fields: [
+ *       { field: 'filter', widget: 'filter-builder' },
+ *       { field: 'chart', widget: 'chart-config' },
+ *     ]},
+ *   ],
+ * });
+ * ```
+ */
+export function defineForm(
+  config: Omit<z.input<typeof FormViewSchema>, 'data'> & { schemaId: string },
+): FormView {
+  const { schemaId, ...rest } = config;
+  return FormViewSchema.parse({
+    ...rest,
+    data: { provider: 'schema', schemaId },
+  });
 }
 
 export type View = z.infer<typeof ViewSchema>;

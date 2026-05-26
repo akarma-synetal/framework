@@ -15,7 +15,7 @@ import type { MetadataCacheRequest, MetadataCacheResponse, ServiceInfo, ApiRoute
 import type { IFeedService } from '@objectstack/spec/contracts';
 import { parseFilterAST, isFilterAST } from '@objectstack/spec/data';
 import { PLURAL_TO_SINGULAR, SINGULAR_TO_PLURAL } from '@objectstack/spec/shared';
-import { ListViewSchema, FormViewSchema, DashboardSchema, AppSchema, PageSchema, ReportSchema } from '@objectstack/spec/ui';
+import { ListViewSchema, FormViewSchema, DashboardSchema, AppSchema, PageSchema, ReportSchema, reportForm, type FormView } from '@objectstack/spec/ui';
 import { RoleSchema } from '@objectstack/spec/identity';
 import { PermissionSetSchema } from '@objectstack/spec/security';
 import { EmailTemplateSchema } from '@objectstack/spec/system';
@@ -43,6 +43,21 @@ const TYPE_TO_SCHEMA: Record<string, z.ZodTypeAny> = {
     tool: ToolSchema,
     skill: SkillSchema,
     agent: AgentSchema,
+};
+
+/**
+ * Canonical {@link FormView} layout per metadata type. Populated alongside
+ * {@link TYPE_TO_SCHEMA} and surfaced as `entry.form` from {@link getMetaTypes}
+ * so the generic form renderer in `@object-ui/plugin-form` can lay the
+ * editor out as sections/tabs/wizards with widget hints instead of falling
+ * back to a flat property list.
+ *
+ * Types without an entry here render with the auto-generated single-section
+ * layout derived from their JSON Schema (acceptable for simple types like
+ * `role`, `permission`, `email_template`).
+ */
+const TYPE_TO_FORM: Record<string, FormView> = {
+    report: reportForm,
 };
 
 /**
@@ -669,6 +684,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 ? ListViewSchema
                 : TYPE_TO_SCHEMA[singular];
             const schema = zodSchema ? toJsonSchemaSafe(zodSchema) : undefined;
+            const form = TYPE_TO_FORM[singular];
 
             const base = registryByType.get(singular as any);
             if (base) {
@@ -681,6 +697,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                         ? 'env' as const
                         : 'registry' as const,
                     schema,
+                    form,
                 };
             }
             // Runtime-registered type with no registry entry — synthesise a
@@ -699,6 +716,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 domain: 'system' as const,
                 overrideSource: writableOverrides.has(singular) ? 'env' as const : 'registry' as const,
                 schema,
+                form,
             };
         }).sort((a, b) => {
             if (a.domain !== b.domain) return a.domain.localeCompare(b.domain);
