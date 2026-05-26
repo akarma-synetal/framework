@@ -489,7 +489,7 @@ describe('AI Routes', () => {
 
   it('should build all expected routes', () => {
     const routes = buildAIRoutes(service, service.conversationService, silentLogger);
-    expect(routes.length).toBe(9);
+    expect(routes.length).toBe(10);
 
     const paths = routes.map(r => `${r.method} ${r.path}`);
     expect(paths).toContain('POST /api/v1/ai/chat');
@@ -500,6 +500,7 @@ describe('AI Routes', () => {
     expect(paths).toContain('GET /api/v1/ai/conversations');
     expect(paths).toContain('GET /api/v1/ai/conversations/:id');
     expect(paths).toContain('POST /api/v1/ai/conversations/:id/messages');
+    expect(paths).toContain('PATCH /api/v1/ai/conversations/:id');
     expect(paths).toContain('DELETE /api/v1/ai/conversations/:id');
   });
 

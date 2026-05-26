@@ -469,6 +469,17 @@ export interface IAIConversationService {
     addMessage(conversationId: string, message: ModelMessage): Promise<AIConversation>;
 
     /**
+     * Update mutable conversation fields (title, metadata).
+     * @param conversationId - Conversation to update
+     * @param patch - Fields to change. Only provided keys are written.
+     * @returns The updated conversation
+     */
+    update(
+        conversationId: string,
+        patch: { title?: string; metadata?: Record<string, unknown> },
+    ): Promise<AIConversation>;
+
+    /**
      * Delete a conversation
      * @param conversationId - Conversation to delete
      */

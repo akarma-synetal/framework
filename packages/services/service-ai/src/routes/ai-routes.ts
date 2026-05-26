@@ -13,7 +13,7 @@ import { normalizeMessage, validateMessageContent } from './message-utils.js';
  */
 export interface RouteDefinition {
   /** HTTP method */
-  method: 'GET' | 'POST' | 'DELETE';
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   /** Path pattern (e.g. '/api/v1/ai/chat') */
   path: string;
   /** Human-readable description */
@@ -425,6 +425,58 @@ export function buildAIRoutes(
             return { status: 404, body: { error: msg } };
           }
           logger.error('[AI Route] POST /conversations/:id/messages error', err instanceof Error ? err : undefined);
+          return { status: 500, body: { error: 'Internal AI service error' } };
+        }
+      },
+    },
+    {
+      method: 'PATCH',
+      path: '/api/v1/ai/conversations/:id',
+      description: 'Update mutable conversation fields (title, metadata)',
+      auth: true,
+      permissions: ['ai:conversations'],
+      handler: async (req) => {
+        const id = req.params?.id;
+        if (!id) {
+          return { status: 400, body: { error: 'conversation id is required' } };
+        }
+        const body = (req.body ?? {}) as { title?: unknown; metadata?: unknown };
+        const patch: { title?: string; metadata?: Record<string, unknown> } = {};
+        if (body.title !== undefined) {
+          if (typeof body.title !== 'string') {
+            return { status: 400, body: { error: 'title must be a string' } };
+          }
+          patch.title = body.title;
+        }
+        if (body.metadata !== undefined) {
+          if (typeof body.metadata !== 'object' || body.metadata === null || Array.isArray(body.metadata)) {
+            return { status: 400, body: { error: 'metadata must be an object' } };
+          }
+          patch.metadata = body.metadata as Record<string, unknown>;
+        }
+        if (patch.title === undefined && patch.metadata === undefined) {
+          return { status: 400, body: { error: 'at least one of title or metadata is required' } };
+        }
+
+        try {
+          if (req.user?.userId) {
+            const existing = await conversationService.get(id);
+            if (!existing) {
+              return { status: 404, body: { error: `Conversation "${id}" not found` } };
+            }
+            if (existing.userId && existing.userId !== req.user.userId) {
+              return { status: 403, body: { error: 'You do not have access to this conversation' } };
+            }
+          }
+
+          const conversation = await conversationService.update(id, patch);
+          return { status: 200, body: conversation };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('not found')) {
+            return { status: 404, body: { error: msg } };
+          }
+          logger.error('[AI Route] PATCH /conversations/:id error', err instanceof Error ? err : undefined);
           return { status: 500, body: { error: 'Internal AI service error' } };
         }
       },

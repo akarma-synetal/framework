@@ -77,7 +77,7 @@ describe('Route Auth/Permissions Metadata', () => {
 
   it('should declare ai:conversations permission for conversation routes', () => {
     const convRoutes = routes.filter(r => r.path.includes('/conversations'));
-    expect(convRoutes.length).toBe(5);
+    expect(convRoutes.length).toBe(6);
     for (const route of convRoutes) {
       expect(route.permissions).toContain('ai:conversations');
     }

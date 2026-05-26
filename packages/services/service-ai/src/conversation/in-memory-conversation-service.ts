@@ -86,6 +86,20 @@ export class InMemoryConversationService implements IAIConversationService {
     return conversation;
   }
 
+  async update(
+    conversationId: string,
+    patch: { title?: string; metadata?: Record<string, unknown> },
+  ): Promise<AIConversation> {
+    const conversation = this.store.get(conversationId);
+    if (!conversation) {
+      throw new Error(`Conversation "${conversationId}" not found`);
+    }
+    if (patch.title !== undefined) conversation.title = patch.title;
+    if (patch.metadata !== undefined) conversation.metadata = patch.metadata;
+    conversation.updatedAt = new Date().toISOString();
+    return conversation;
+  }
+
   async delete(conversationId: string): Promise<void> {
     this.store.delete(conversationId);
   }

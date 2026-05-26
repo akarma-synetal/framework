@@ -96,7 +96,7 @@ export interface DispatcherPluginConfig {
  * Minimal interface — matches the shape produced by `buildAIRoutes()`.
  */
 interface RouteDefinition {
-    method: 'GET' | 'POST' | 'DELETE';
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
     path: string;
     description: string;
     handler: (req: any) => Promise<any>;
@@ -182,6 +182,9 @@ function mountRouteOnServer(
         return true;
     } else if (m === 'delete' && typeof server.delete === 'function') {
         server.delete(routePath, handler);
+        return true;
+    } else if (m === 'patch' && typeof server.patch === 'function') {
+        server.patch(routePath, handler);
         return true;
     }
     return false;

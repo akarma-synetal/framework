@@ -216,6 +216,29 @@ export class ObjectQLConversationService implements IAIConversationService {
     return (await this.get(conversationId))!;
   }
 
+  async update(
+    conversationId: string,
+    patch: { title?: string; metadata?: Record<string, unknown> },
+  ): Promise<AIConversation> {
+    const row: DbConversationRow | null = await this.engine.findOne(CONVERSATIONS_OBJECT, {
+      where: { id: conversationId },
+    });
+    if (!row) {
+      throw new Error(`Conversation "${conversationId}" not found`);
+    }
+
+    const now = new Date().toISOString();
+    const updates: Record<string, unknown> = { id: conversationId, updated_at: now };
+    if (patch.title !== undefined) updates.title = patch.title;
+    if (patch.metadata !== undefined) updates.metadata = JSON.stringify(patch.metadata);
+
+    await this.engine.update(CONVERSATIONS_OBJECT, updates, {
+      where: { id: conversationId },
+    });
+
+    return (await this.get(conversationId))!;
+  }
+
   async delete(conversationId: string): Promise<void> {
     // Delete messages first (child records)
     await this.engine.delete(MESSAGES_OBJECT, {
