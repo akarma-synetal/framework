@@ -4,78 +4,60 @@ import { Dashboard } from '@objectstack/spec/ui';
 
 /**
  * System Overview Dashboard
- * 
- * Provides at-a-glance monitoring of platform health and key metrics:
- * - Active user sessions
- * - Audit activity (recent events)
- * - Package installation status
- * - Platform configuration
+ *
+ * Unified sysadmin landing dashboard. Replaces the previous
+ * `system_overview` + `security_overview` split — the two dashboards
+ * had significant widget overlap (sys_audit_log pies, sys_session
+ * counts, recent-events tables) and the security cut did not justify
+ * a separate nav entry.
+ *
+ * Layout (4 rows on a 12-col grid):
+ *   1. Platform KPIs       — users / orgs / sessions / packages
+ *   2. Security KPIs       — login / permission / config audit counts
+ *   3. Distribution charts — audit events by action + by user
+ *   4. Recent audit events table
  */
 export const SystemOverviewDashboard = Dashboard.create({
   name: 'system_overview',
   label: 'System Overview',
-  description: 'Platform health, sessions, and audit activity',
+  description: 'Platform health, security activity, and recent audit events',
 
-  // 12-column grid matches the widget `w` values below (3, 6, 12). Without
-  // this, the renderer falls back to a 4-column grid and `w: 3` becomes 75%
-  // width per metric — so KPI cards stack vertically instead of forming a
-  // 4-up row.
+  // 12-column grid matches the widget `w` values below.
   columns: 12,
   gap: 4,
 
   widgets: [
-    // ── Active Sessions Widget ──────────────────────────────────────
-    {
-      id: 'widget_active_sessions',
-      title: 'Active Sessions',
-      type: 'metric',
-      object: 'sys_session',
-      layout: {
-        x: 0,
-        y: 0,
-        w: 3,
-        h: 2,
-      },
-      aggregate: 'count',
-      colorVariant: 'blue',
-      description: 'Number of currently active user sessions',
-    },
-
-    // ── Total Users Widget ──────────────────────────────────────────
+    // ── Row 1: Platform KPIs ────────────────────────────────────────
     {
       id: 'widget_total_users',
       title: 'Total Users',
       type: 'metric',
       object: 'sys_user',
-      layout: {
-        x: 3,
-        y: 0,
-        w: 3,
-        h: 2,
-      },
+      layout: { x: 0, y: 0, w: 3, h: 2 },
       aggregate: 'count',
       colorVariant: 'teal',
       description: 'Total registered users in the system',
     },
-
-    // ── Organizations Widget ────────────────────────────────────────
     {
       id: 'widget_organizations',
       title: 'Organizations',
       type: 'metric',
       object: 'sys_organization',
-      layout: {
-        x: 6,
-        y: 0,
-        w: 3,
-        h: 2,
-      },
+      layout: { x: 3, y: 0, w: 3, h: 2 },
       aggregate: 'count',
       colorVariant: 'orange',
       description: 'Total organizations on the platform',
     },
-
-    // ── Packages Installed Widget ───────────────────────────────────
+    {
+      id: 'widget_active_sessions',
+      title: 'Active Sessions',
+      type: 'metric',
+      object: 'sys_session',
+      layout: { x: 6, y: 0, w: 3, h: 2 },
+      aggregate: 'count',
+      colorVariant: 'blue',
+      description: 'Number of currently active user sessions',
+    },
     {
       id: 'widget_packages_installed',
       title: 'Packages Installed',
@@ -84,58 +66,80 @@ export const SystemOverviewDashboard = Dashboard.create({
       // Cloud-only object — only registered when service-tenant is loaded.
       // Hide this widget gracefully in single-environment runtimes.
       requiresObject: 'sys_package_installation',
-      layout: {
-        x: 9,
-        y: 0,
-        w: 3,
-        h: 2,
-      },
+      layout: { x: 9, y: 0, w: 3, h: 2 },
       filter: { status: 'installed' },
       aggregate: 'count',
       colorVariant: 'success',
       description: 'Active package installations across projects',
     },
 
-    // ── Audit Actions by Type ───────────────────────────────────────
+    // ── Row 2: Security KPIs ────────────────────────────────────────
+    // The `sys_audit_log.action` enum doesn't distinguish failed vs
+    // successful logins (both fold into `action='login'`). Surfacing a
+    // total Login Events count is honest; a "Failed Logins" widget will
+    // need a richer enum or a separate detail field first.
+    {
+      id: 'widget_login_events',
+      title: 'Login Events',
+      type: 'metric',
+      object: 'sys_audit_log',
+      layout: { x: 0, y: 2, w: 4, h: 2 },
+      filter: { action: 'login' },
+      aggregate: 'count',
+      colorVariant: 'blue',
+      description: 'Authentication events recorded by the audit log',
+    },
+    {
+      id: 'widget_permission_changes',
+      title: 'Permission Changes',
+      type: 'metric',
+      object: 'sys_audit_log',
+      layout: { x: 4, y: 2, w: 4, h: 2 },
+      filter: { action: 'permission_change' },
+      aggregate: 'count',
+      colorVariant: 'warning',
+      description: 'Recent permission and role modifications',
+    },
+    {
+      id: 'widget_config_changes',
+      title: 'Config Changes',
+      type: 'metric',
+      object: 'sys_audit_log',
+      layout: { x: 8, y: 2, w: 4, h: 2 },
+      filter: { action: 'config_change' },
+      aggregate: 'count',
+      colorVariant: 'blue',
+      description: 'System configuration modifications',
+    },
+
+    // ── Row 3: Distribution charts ──────────────────────────────────
     // Note: relative date filters like `NOW() - INTERVAL 7 DAY` are not
     // currently substituted by the analytics layer (see
     // service-analytics/strategies/filter-normalizer.ts). The dashboard's
     // `globalFilters` date-range bar at the bottom is the supported way
-    // to scope this widget.
+    // to scope these widgets.
     {
-      id: 'widget_audit_actions',
-      title: 'Audit Actions',
+      id: 'widget_events_by_type',
+      title: 'Audit Events by Action',
       description: 'Distribution of audit events by action type',
       type: 'pie',
       object: 'sys_audit_log',
-      layout: {
-        x: 0,
-        y: 2,
-        w: 6,
-        h: 4,
-      },
+      layout: { x: 0, y: 4, w: 6, h: 4 },
       categoryField: 'action',
       aggregate: 'count',
     },
-
-    // ── Session Status Overview ─────────────────────────────────────
     {
-      id: 'widget_active_orgs',
-      title: 'Sessions by Organization',
-      description: 'Active sessions grouped by organization',
+      id: 'widget_events_by_user',
+      title: 'Events by User',
+      description: 'Activity distribution across users',
       type: 'bar',
-      object: 'sys_session',
-      layout: {
-        x: 6,
-        y: 2,
-        w: 6,
-        h: 4,
-      },
-      categoryField: 'active_organization_id',
+      object: 'sys_audit_log',
+      layout: { x: 6, y: 4, w: 6, h: 4 },
+      categoryField: 'user_id',
       aggregate: 'count',
     },
 
-    // ── Recent Audit Log (Table) ────────────────────────────────────
+    // ── Row 4: Recent audit events table ────────────────────────────
     // `type: 'table'` renders the underlying rows directly, so this
     // panel actually shows the latest events instead of just repeating
     // the total-count metric. `valueField`/`aggregate` are intentionally
@@ -143,15 +147,10 @@ export const SystemOverviewDashboard = Dashboard.create({
     {
       id: 'widget_recent_events',
       title: 'Recent Audit Events',
-      description: 'Latest platform events',
+      description: 'Latest platform events (login, permission, config, …)',
       type: 'table',
       object: 'sys_audit_log',
-      layout: {
-        x: 0,
-        y: 6,
-        w: 12,
-        h: 4,
-      },
+      layout: { x: 0, y: 8, w: 12, h: 4 },
       options: {
         columns: ['created_at', 'user_id', 'action', 'object_name', 'record_id'],
         sort: [{ field: 'created_at', order: 'desc' }],

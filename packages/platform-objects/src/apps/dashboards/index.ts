@@ -6,4 +6,3 @@
  */
 
 export { SystemOverviewDashboard } from './system_overview.dashboard.js';
-export { SecurityOverviewDashboard } from './security_overview.dashboard.js';

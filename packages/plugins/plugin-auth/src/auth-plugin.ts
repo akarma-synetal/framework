@@ -6,7 +6,6 @@ import { AuthConfig } from '@objectstack/spec/system';
 import {
   SETUP_APP,
   SystemOverviewDashboard,
-  SecurityOverviewDashboard,
   SetupAppTranslations,
 } from '@objectstack/platform-objects/apps';
 import { AuthManager } from './auth-manager.js';
@@ -151,7 +150,7 @@ export class AuthPlugin implements Plugin {
       // (e.g. legacy `users.view` had phone/status/active columns that do
       // not exist on sys_user). Schema-embedded listViews is the single
       // source of truth.
-      dashboards: [SystemOverviewDashboard, SecurityOverviewDashboard],
+      dashboards: [SystemOverviewDashboard],
     });
 
     ctx.logger.info('Auth Plugin initialized successfully');

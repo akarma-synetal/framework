@@ -22,7 +22,6 @@ export const zhCN: TranslationData = {
         group_advanced: { label: '高级' },
 
         nav_system_overview: { label: '系统概览' },
-        nav_security_overview: { label: '安全概览' },
 
         nav_users: { label: '用户' },
         nav_departments: { label: '部门' },
@@ -64,29 +63,18 @@ export const zhCN: TranslationData = {
   dashboards: {
     system_overview: {
       label: '系统概览',
-      description: '平台运行状况、会话与审计活动',
+      description: '平台运行状况、安全活动与最近审计事件',
       widgets: {
-        widget_active_sessions: { title: '活跃会话', description: '当前活跃用户会话数量' },
         widget_total_users: { title: '用户总数', description: '系统中已注册的用户总数' },
         widget_organizations: { title: '组织数', description: '平台上的组织总数' },
+        widget_active_sessions: { title: '活跃会话', description: '当前活跃用户会话数量' },
         widget_packages_installed: { title: '已安装包', description: '项目中已激活的安装包数' },
-        widget_audit_actions: { title: '审计操作', description: '按操作类型分布的审计事件' },
-        widget_active_orgs: { title: '按组织划分会话', description: '按组织分组的活跃会话' },
-        widget_recent_events: { title: '最近审计事件', description: '最新的平台事件' },
-      },
-    },
-
-    security_overview: {
-      label: '安全概览',
-      description: '安全事件、身份认证与审计追踪',
-      widgets: {
         widget_login_events: { title: '登录事件', description: '审计日志中记录的认证事件' },
         widget_permission_changes: { title: '权限变更', description: '最近的权限和角色修改' },
         widget_config_changes: { title: '配置变更', description: '系统配置修改' },
-        widget_active_sessions: { title: '活跃会话', description: '当前活跃用户会话' },
-        widget_events_by_type: { title: '按类型分布的审计事件', description: '安全与审计事件分布' },
+        widget_events_by_type: { title: '按操作分布的审计事件', description: '审计事件按操作类型分布' },
         widget_events_by_user: { title: '按用户分布的事件', description: '用户活动分布' },
-        widget_recent_security_events: { title: '最近安全事件', description: '最新的权限与配置变更' },
+        widget_recent_events: { title: '最近审计事件', description: '最新的平台事件（登录、权限、配置等）' },
       },
     },
   },

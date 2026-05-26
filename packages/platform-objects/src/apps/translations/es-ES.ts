@@ -22,7 +22,6 @@ export const esES: TranslationData = {
         group_advanced: { label: 'Avanzado' },
 
         nav_system_overview: { label: 'Resumen del Sistema' },
-        nav_security_overview: { label: 'Resumen de Seguridad' },
 
         nav_users: { label: 'Usuarios' },
         nav_departments: { label: 'Departamentos' },
@@ -64,29 +63,18 @@ export const esES: TranslationData = {
   dashboards: {
     system_overview: {
       label: 'Resumen del Sistema',
-      description: 'Estado de la plataforma, sesiones y actividad de auditoría',
+      description: 'Estado de la plataforma, actividad de seguridad y eventos de auditoría recientes',
       widgets: {
-        widget_active_sessions: { title: 'Sesiones Activas', description: 'Número de sesiones de usuario activas en este momento' },
         widget_total_users: { title: 'Usuarios Totales', description: 'Total de usuarios registrados en el sistema' },
         widget_organizations: { title: 'Organizaciones', description: 'Total de organizaciones en la plataforma' },
+        widget_active_sessions: { title: 'Sesiones Activas', description: 'Número de sesiones de usuario activas en este momento' },
         widget_packages_installed: { title: 'Paquetes Instalados', description: 'Instalaciones de paquetes activas en los proyectos' },
-        widget_audit_actions: { title: 'Acciones de Auditoría', description: 'Distribución de eventos de auditoría por tipo de acción' },
-        widget_active_orgs: { title: 'Sesiones por Organización', description: 'Sesiones activas agrupadas por organización' },
-        widget_recent_events: { title: 'Eventos de Auditoría Recientes', description: 'Últimos eventos de la plataforma' },
-      },
-    },
-
-    security_overview: {
-      label: 'Resumen de Seguridad',
-      description: 'Eventos de seguridad, autenticación y registros de auditoría',
-      widgets: {
         widget_login_events: { title: 'Eventos de Inicio de Sesión', description: 'Eventos de autenticación registrados por el log de auditoría' },
         widget_permission_changes: { title: 'Cambios de Permisos', description: 'Modificaciones recientes de permisos y roles' },
         widget_config_changes: { title: 'Cambios de Configuración', description: 'Modificaciones de configuración del sistema' },
-        widget_active_sessions: { title: 'Sesiones Activas', description: 'Sesiones de usuario actualmente activas' },
-        widget_events_by_type: { title: 'Eventos de Auditoría por Tipo', description: 'Distribución de eventos de seguridad y auditoría' },
+        widget_events_by_type: { title: 'Eventos de Auditoría por Acción', description: 'Distribución de eventos de auditoría por tipo de acción' },
         widget_events_by_user: { title: 'Eventos por Usuario', description: 'Distribución de actividad entre usuarios' },
-        widget_recent_security_events: { title: 'Eventos de Seguridad Recientes', description: 'Últimos cambios de permisos y configuración' },
+        widget_recent_events: { title: 'Eventos de Auditoría Recientes', description: 'Últimos eventos de la plataforma (inicio de sesión, permisos, configuración, …)' },
       },
     },
   },

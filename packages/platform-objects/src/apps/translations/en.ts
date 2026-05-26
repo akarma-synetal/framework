@@ -15,7 +15,6 @@ import { enObjects } from './en.objects.generated.js';
  *   - `apps.setup.label` / `description`
  *   - `apps.setup.navigation.<id>.label` for every group AND leaf
  *   - `dashboards.system_overview.*`
- *   - `dashboards.security_overview.*`
  *
  * Object-level labels (Users, Roles, Audit Logs, …) are owned by the
  * sys_* object schemas themselves and translated separately.
@@ -38,7 +37,6 @@ export const en: TranslationData = {
 
         // Overview
         nav_system_overview: { label: 'System Overview' },
-        nav_security_overview: { label: 'Security Overview' },
 
         // People & Organization
         nav_users: { label: 'Users' },
@@ -86,12 +84,8 @@ export const en: TranslationData = {
   dashboards: {
     system_overview: {
       label: 'System Overview',
-      description: 'Platform health, sessions, and audit activity',
+      description: 'Platform health, security activity, and recent audit events',
       widgets: {
-        widget_active_sessions: {
-          title: 'Active Sessions',
-          description: 'Number of currently active user sessions',
-        },
         widget_total_users: {
           title: 'Total Users',
           description: 'Total registered users in the system',
@@ -100,29 +94,14 @@ export const en: TranslationData = {
           title: 'Organizations',
           description: 'Total organizations on the platform',
         },
+        widget_active_sessions: {
+          title: 'Active Sessions',
+          description: 'Number of currently active user sessions',
+        },
         widget_packages_installed: {
           title: 'Packages Installed',
           description: 'Active package installations across projects',
         },
-        widget_audit_actions: {
-          title: 'Audit Actions',
-          description: 'Distribution of audit events by action type',
-        },
-        widget_active_orgs: {
-          title: 'Sessions by Organization',
-          description: 'Active sessions grouped by organization',
-        },
-        widget_recent_events: {
-          title: 'Recent Audit Events',
-          description: 'Latest platform events',
-        },
-      },
-    },
-
-    security_overview: {
-      label: 'Security Overview',
-      description: 'Security events, authentication, and audit trails',
-      widgets: {
         widget_login_events: {
           title: 'Login Events',
           description: 'Authentication events recorded by the audit log',
@@ -135,21 +114,17 @@ export const en: TranslationData = {
           title: 'Config Changes',
           description: 'System configuration modifications',
         },
-        widget_active_sessions: {
-          title: 'Active Sessions',
-          description: 'Currently active user sessions',
-        },
         widget_events_by_type: {
-          title: 'Audit Events by Type',
-          description: 'Distribution of security and audit events',
+          title: 'Audit Events by Action',
+          description: 'Distribution of audit events by action type',
         },
         widget_events_by_user: {
           title: 'Events by User',
           description: 'Activity distribution across users',
         },
-        widget_recent_security_events: {
-          title: 'Recent Security Events',
-          description: 'Latest permission and config changes',
+        widget_recent_events: {
+          title: 'Recent Audit Events',
+          description: 'Latest platform events (login, permission, config, …)',
         },
       },
     },

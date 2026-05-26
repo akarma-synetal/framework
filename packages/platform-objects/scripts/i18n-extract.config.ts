@@ -85,7 +85,6 @@ import { SysSetting, SysSecret, SysSettingAudit } from '../src/system/index.js';
 import { SETUP_APP } from '../src/apps/setup.app.js';
 import {
   SystemOverviewDashboard,
-  SecurityOverviewDashboard,
 } from '../src/apps/dashboards/index.js';
 import { SetupAppTranslations } from '../src/apps/translations/index.js';
 
@@ -155,7 +154,7 @@ export default defineStack({
   ] as any,
 
   apps: [SETUP_APP] as any,
-  dashboards: [SystemOverviewDashboard, SecurityOverviewDashboard] as any,
+  dashboards: [SystemOverviewDashboard] as any,
 
   translations: [SetupAppTranslations],
 });

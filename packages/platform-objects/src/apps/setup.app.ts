@@ -44,7 +44,6 @@ export const SETUP_APP: App = {
       icon: 'layout-dashboard',
       children: [
         { id: 'nav_system_overview', type: 'dashboard', label: 'System Overview', dashboardName: 'system_overview', icon: 'activity' },
-        { id: 'nav_security_overview', type: 'dashboard', label: 'Security Overview', dashboardName: 'security_overview', icon: 'shield' },
       ],
     },
     {
