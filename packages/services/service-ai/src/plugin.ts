@@ -83,6 +83,14 @@ export interface AIServicePluginOptions {
    * until an operator explicitly enables this routing).
    */
   enableActionApproval?: boolean;
+  /**
+   * Bind to the `ai` settings namespace and rebuild the LLM adapter on
+   * every `settings:changed` event. When enabled (default), operators
+   * can edit provider/credentials/model via the Setup app and the
+   * change applies live without restart. Disable to lock the adapter
+   * to whatever was resolved at boot (constructor option or env var).
+   */
+  bindToSettings?: boolean;
 }
 
 /**
@@ -119,6 +127,84 @@ export class AIServicePlugin implements Plugin {
 
   constructor(options: AIServicePluginOptions = {}) {
     this.options = options;
+  }
+
+  /**
+   * Build an LLM adapter from a provider/key/model triple. Used both
+   * by the boot-time auto-detect path and by the live `settings:changed`
+   * rebuild path. Returns `null` if the requested provider cannot be
+   * loaded or required credentials are missing.
+   */
+  private async buildAdapterFromValues(
+    ctx: PluginContext,
+    values: Record<string, unknown>,
+  ): Promise<{ adapter: LLMAdapter; description: string } | null> {
+    const provider = String(values.provider ?? 'memory');
+
+    if (provider === 'memory') {
+      return { adapter: new MemoryLLMAdapter(), description: 'MemoryLLMAdapter (echo mode)' };
+    }
+
+    if (provider === 'gateway') {
+      const gatewayModel = String(values.gateway_model ?? '').trim();
+      if (!gatewayModel) return null;
+      try {
+        const gatewayPkg = '@ai-sdk/gateway';
+        const { gateway } = await import(/* webpackIgnore: true */ gatewayPkg);
+        return {
+          adapter: new VercelLLMAdapter({ model: gateway(gatewayModel) }),
+          description: `Vercel AI Gateway (model: ${gatewayModel})`,
+        };
+      } catch (err) {
+        ctx.logger.warn(
+          `[AI] Failed to load @ai-sdk/gateway for provider=gateway`,
+          err instanceof Error ? { error: err.message } : undefined,
+        );
+        return null;
+      }
+    }
+
+    const providerSpecs: Record<string, { pkg: string; factory: string; defaultModel: string; displayName: string }> = {
+      openai: { pkg: '@ai-sdk/openai', factory: 'openai', defaultModel: 'gpt-4o', displayName: 'OpenAI' },
+      anthropic: { pkg: '@ai-sdk/anthropic', factory: 'anthropic', defaultModel: 'claude-sonnet-4-20250514', displayName: 'Anthropic' },
+      google: { pkg: '@ai-sdk/google', factory: 'google', defaultModel: 'gemini-2.0-flash', displayName: 'Google' },
+    };
+    const spec = providerSpecs[provider];
+    if (!spec) return null;
+
+    const apiKey = String(values[`${provider}_api_key`] ?? '').trim();
+    if (!apiKey) return null;
+
+    // The Vercel-style provider SDKs read credentials from environment
+    // variables. To honor the settings-supplied key without forcing the
+    // operator to also set the env var, mirror it onto process.env for
+    // the duration of the adapter construction.
+    const envKey =
+      provider === 'openai' ? 'OPENAI_API_KEY'
+      : provider === 'anthropic' ? 'ANTHROPIC_API_KEY'
+      : 'GOOGLE_GENERATIVE_AI_API_KEY';
+    process.env[envKey] = apiKey;
+
+    try {
+      const mod = await import(/* webpackIgnore: true */ spec.pkg);
+      const factory = mod[spec.factory] ?? mod.default;
+      if (typeof factory !== 'function') return null;
+      const modelId = String(values[`${provider}_model`] ?? '').trim() || spec.defaultModel;
+      // For OpenAI, prefer the Chat Completions API. See note in detectAdapter().
+      const useChatApi = provider === 'openai' && typeof (factory as any).chat === 'function';
+      const model = useChatApi ? (factory as any).chat(modelId) : factory(modelId);
+      const apiSuffix = useChatApi ? ' [chat-completions]' : '';
+      return {
+        adapter: new VercelLLMAdapter({ model }),
+        description: `${spec.displayName} (model: ${modelId})${apiSuffix}`,
+      };
+    } catch (err) {
+      ctx.logger.warn(
+        `[AI] Failed to load ${spec.pkg} for provider=${provider}`,
+        err instanceof Error ? { error: err.message } : undefined,
+      );
+      return null;
+    }
   }
 
   /**
@@ -677,6 +763,120 @@ export class AIServicePlugin implements Plugin {
       `tools=${this.service.toolRegistry.size}, ` +
       `routes=${routes.length}`,
     );
+
+    // ── Bind to the `ai` settings namespace ───────────────────────
+    // Apply persisted settings (provider/keys/model) once, then
+    // subscribe to live changes so admin edits in the Setup app
+    // swap the adapter without restart. Mirrors the storage pattern.
+    if (this.options.bindToSettings !== false) {
+      ctx.hook('kernel:ready', async () => {
+        await this.bindSettings(ctx);
+      });
+    }
+  }
+
+  /**
+   * Resolve the `settings` service, apply any persisted `ai` values,
+   * subscribe to changes, and register the live `ai/test` action
+   * (overrides the manifest's fallback stub).
+   */
+  private async bindSettings(ctx: PluginContext): Promise<void> {
+    if (!this.service) return;
+    let settings: any;
+    try {
+      settings = ctx.getService<any>('settings');
+    } catch {
+      return; // settings service not mounted — env-only mode stays in effect
+    }
+    if (!settings || typeof settings.getNamespace !== 'function') return;
+
+    const applySettings = async (): Promise<void> => {
+      if (!this.service) return;
+      try {
+        const payload = await settings.getNamespace('ai');
+        const values: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(payload.values as Record<string, any>)) {
+          values[k] = v?.value;
+        }
+        const provider = String(values.provider ?? 'memory');
+        // memory provider is the manifest default; treat it as "no override"
+        // so the env-detected adapter chosen at init stays in place.
+        if (provider === 'memory') return;
+        const built = await this.buildAdapterFromValues(ctx, values);
+        if (!built) {
+          ctx.logger.warn(
+            `[AI] Settings provider=${provider} could not be applied (missing credentials or package). ` +
+              `Adapter unchanged (current="${this.service.adapterName}").`,
+          );
+          return;
+        }
+        this.service.setAdapter(built.adapter);
+        ctx.logger.info(`[AI] Adapter rebuilt from settings: ${built.description}`);
+      } catch (err: any) {
+        ctx.logger.warn('[AI] Failed to apply ai settings: ' + (err?.message ?? err));
+      }
+    };
+
+    await applySettings();
+    if (typeof settings.subscribe === 'function') {
+      settings.subscribe('ai', () => { void applySettings(); });
+      ctx.logger.info('[AI] Bound to settings:changed for namespace=ai');
+    }
+
+    // Override the manifest's fallback test handler with a live
+    // round-trip against a temporary adapter built from the posted
+    // (possibly unsaved) form values.
+    if (typeof settings.registerAction === 'function') {
+      settings.registerAction('ai', 'test', async ({ values, payload }: any) => {
+        const overrides =
+          payload && typeof payload === 'object' && payload !== null && 'values' in payload
+            ? (payload as { values?: Record<string, unknown> }).values ?? {}
+            : {};
+        const merged: Record<string, unknown> = { ...(values ?? {}), ...overrides };
+        const provider = String(merged.provider ?? 'memory');
+        if (provider === 'memory') {
+          return {
+            ok: true,
+            severity: 'warning',
+            message: 'Memory provider is an echo stub — no external call to validate. Switch to a real provider for production.',
+          };
+        }
+        let built;
+        try {
+          built = await this.buildAdapterFromValues(ctx, merged);
+        } catch (err: any) {
+          return { ok: false, severity: 'error', message: err?.message ?? String(err) };
+        }
+        if (!built) {
+          return {
+            ok: false,
+            severity: 'error',
+            message: `Could not build adapter for provider=${provider}. Check API key and that the provider SDK package is installed.`,
+          };
+        }
+        const started = Date.now();
+        try {
+          const result = await built.adapter.chat(
+            [{ role: 'user', content: 'ping' }],
+            { maxTokens: 8 },
+          );
+          const latency = Date.now() - started;
+          const preview = String((result as any)?.text ?? '').slice(0, 60);
+          return {
+            ok: true,
+            severity: 'info',
+            message: `${built.description} responded in ${latency}ms${preview ? ` — "${preview}"` : ''}.`,
+          };
+        } catch (err: any) {
+          return {
+            ok: false,
+            severity: 'error',
+            message: `${built.description} request failed: ${err?.message ?? String(err)}`,
+          };
+        }
+      });
+      ctx.logger.info('[AI] Registered live settings action ai/test');
+    }
   }
 
   async destroy(): Promise<void> {

@@ -38,8 +38,15 @@
     "zod": "^4.4.3"
   },
   "optionalDependencies": {
-    "@objectstack/driver-mongodb": "workspace:*",
+    "@objectstack/driver-mongodb": "workspace:*"
+  },
+  "peerDependencies": {
     "@objectstack/driver-turso": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@objectstack/driver-turso": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "typescript": "^6.0.3",

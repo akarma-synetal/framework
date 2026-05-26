@@ -42,6 +42,7 @@ export * from './approval-service.js';
 export * from './package-service.js';
 export * from './knowledge-service.js';
 export * from './knowledge-adapter.js';
+export * from './embedder.js';
 
 // Provisioning & Deployment
 export * from './turso-platform.js';

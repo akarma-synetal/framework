@@ -1,0 +1,40 @@
+{
+  "name": "@objectstack/embedder-openai",
+  "version": "6.6.0",
+  "license": "Apache-2.0",
+  "description": "OpenAI-compatible embedder for ObjectStack — works against OpenAI, 阿里通义 DashScope, 智谱 BigModel, 硅基流动 SiliconFlow, 火山引擎 Doubao, MiniMax, Ollama, and any drop-in OpenAI-shape endpoint.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup --config ../../../tsup.config.ts",
+    "dev": "tsc -w",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@objectstack/spec": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  },
+  "keywords": [
+    "objectstack",
+    "embedder",
+    "embedding",
+    "openai",
+    "rag",
+    "vector",
+    "dashscope",
+    "zhipu",
+    "siliconflow",
+    "ollama"
+  ]
+}

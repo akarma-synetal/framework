@@ -86,10 +86,13 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "@objectstack/core": "workspace:^"
-  },
-  "optionalDependencies": {
+    "@objectstack/core": "workspace:^",
     "@objectstack/driver-turso": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@objectstack/driver-turso": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@oclif/plugin-help": "^6.2.49",

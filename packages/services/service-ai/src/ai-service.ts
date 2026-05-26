@@ -93,7 +93,7 @@ export interface AIServiceConfig {
  * the {@link AIServicePlugin}.
  */
 export class AIService implements IAIService {
-  private readonly adapter: LLMAdapter;
+  private adapter: LLMAdapter;
   private readonly logger: Logger;
   readonly toolRegistry: ToolRegistry;
   readonly conversationService: IAIConversationService;
@@ -130,6 +130,20 @@ export class AIService implements IAIService {
   /** The name of the active LLM adapter. */
   get adapterName(): string {
     return this.adapter.name;
+  }
+
+  /**
+   * Hot-swap the LLM adapter. Used by AIServicePlugin when the `ai`
+   * settings namespace changes (provider/key/model edited via Setup UI).
+   * In-flight requests bound to the previous adapter complete normally;
+   * subsequent calls go through the new adapter.
+   */
+  setAdapter(next: LLMAdapter): void {
+    const prev = this.adapter.name;
+    this.adapter = next;
+    if (prev !== next.name) {
+      this.logger.info(`[AI] LLM adapter swapped: ${prev} → ${next.name}`);
+    }
   }
 
   /**
