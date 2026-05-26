@@ -15,9 +15,53 @@ import type { MetadataCacheRequest, MetadataCacheResponse, ServiceInfo, ApiRoute
 import type { IFeedService } from '@objectstack/spec/contracts';
 import { parseFilterAST, isFilterAST } from '@objectstack/spec/data';
 import { PLURAL_TO_SINGULAR, SINGULAR_TO_PLURAL } from '@objectstack/spec/shared';
-import { ListViewSchema, FormViewSchema, DashboardSchema } from '@objectstack/spec/ui';
+import { ListViewSchema, FormViewSchema, DashboardSchema, AppSchema, PageSchema, ReportSchema } from '@objectstack/spec/ui';
+import { RoleSchema } from '@objectstack/spec/identity';
+import { PermissionSetSchema } from '@objectstack/spec/security';
+import { EmailTemplateSchema } from '@objectstack/spec/system';
+import { ToolSchema, SkillSchema, AgentSchema } from '@objectstack/spec/ai';
 import { DEFAULT_METADATA_TYPE_REGISTRY } from '@objectstack/spec/kernel';
 import { z } from 'zod';
+
+/**
+ * Canonical Zod schema per metadata type, used both for save-time validation
+ * (via {@link resolveOverlaySchema}) and to emit JSON Schemas in
+ * `getMetaTypes()` so generic UI editors can render real forms.
+ *
+ * Note: `view` is handled separately because it discriminates on the `type`
+ * property between {@link ListViewSchema} and {@link FormViewSchema}.
+ */
+const TYPE_TO_SCHEMA: Record<string, z.ZodTypeAny> = {
+    dashboard: DashboardSchema,
+    app: AppSchema,
+    page: PageSchema,
+    report: ReportSchema,
+    role: RoleSchema,
+    permission: PermissionSetSchema,
+    profile: PermissionSetSchema,
+    email_template: EmailTemplateSchema,
+    tool: ToolSchema,
+    skill: SkillSchema,
+    agent: AgentSchema,
+};
+
+/**
+ * Convert a Zod schema to a JSON Schema, returning `undefined` if conversion
+ * fails (e.g. unsupported constructs). Cached per schema reference.
+ */
+const _jsonSchemaCache = new WeakMap<z.ZodTypeAny, Record<string, unknown> | null>();
+function toJsonSchemaSafe(schema: z.ZodTypeAny): Record<string, unknown> | undefined {
+    const cached = _jsonSchemaCache.get(schema);
+    if (cached !== undefined) return cached ?? undefined;
+    try {
+        const result = z.toJSONSchema(schema, { unrepresentable: 'any' }) as Record<string, unknown>;
+        _jsonSchemaCache.set(schema, result);
+        return result;
+    } catch {
+        _jsonSchemaCache.set(schema, null);
+        return undefined;
+    }
+}
 
 /**
  * Zod schemas used to validate overlay items before they are persisted into
@@ -615,6 +659,17 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
 
         const entries = allTypes.map((type) => {
             const singular = (PLURAL_TO_SINGULAR[type] ?? type) as string;
+            // Phase 3a-schema: emit a JSON Schema per type so the generic
+            // metadata admin UI can render real forms (no more raw-JSON
+            // textareas for new resources). The `view` type discriminates
+            // between list / form variants — we ship the ListView schema as
+            // the default since most views are list views; FormView is
+            // resolved at save time by resolveOverlaySchema().
+            const zodSchema = singular === 'view'
+                ? ListViewSchema
+                : TYPE_TO_SCHEMA[singular];
+            const schema = zodSchema ? toJsonSchemaSafe(zodSchema) : undefined;
+
             const base = registryByType.get(singular as any);
             if (base) {
                 const isEnvOverridden = writableOverrides.has(singular);
@@ -625,6 +680,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     overrideSource: isEnvOverridden && !base.allowOrgOverride
                         ? 'env' as const
                         : 'registry' as const,
+                    schema,
                 };
             }
             // Runtime-registered type with no registry entry — synthesise a
@@ -642,6 +698,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 loadOrder: 1000,
                 domain: 'system' as const,
                 overrideSource: writableOverrides.has(singular) ? 'env' as const : 'registry' as const,
+                schema,
             };
         }).sort((a, b) => {
             if (a.domain !== b.domain) return a.domain.localeCompare(b.domain);

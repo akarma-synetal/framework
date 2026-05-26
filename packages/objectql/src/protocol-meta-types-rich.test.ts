@@ -30,6 +30,9 @@ describe('ObjectStackProtocolImplementation - getMetaTypes rich response', () =>
         registry.registerItem('object', { name: 'sys_user', label: 'User' }, 'name');
         registry.registerItem('view', { name: 'sys_user.grid', type: 'grid', object: 'sys_user' }, 'name');
         registry.registerItem('app', { name: 'crm', label: 'CRM' }, 'name');
+        // Flow is registry-default `allowOrgOverride: false` — used by the
+        // "honours OBJECTSTACK_METADATA_WRITABLE" test as a control.
+        registry.registerItem('flow', { name: 'crm.onboard', steps: [] }, 'name');
 
         mockEngine = {
             registry,
@@ -81,7 +84,7 @@ describe('ObjectStackProtocolImplementation - getMetaTypes rich response', () =>
     });
 
     it('honours OBJECTSTACK_METADATA_WRITABLE to elevate allowOrgOverride', async () => {
-        process.env.OBJECTSTACK_METADATA_WRITABLE = 'object,permission';
+        process.env.OBJECTSTACK_METADATA_WRITABLE = 'object,field';
         ObjectStackProtocolImplementation.resetEnvWritableCache();
 
         const result: any = await protocol.getMetaTypes();
@@ -89,10 +92,12 @@ describe('ObjectStackProtocolImplementation - getMetaTypes rich response', () =>
         expect(objectEntry.allowOrgOverride).toBe(true);
         expect(objectEntry.overrideSource).toBe('env');
 
-        // Types not listed retain their registry value.
-        const appEntry = result.entries.find((e: any) => e.type === 'app');
-        expect(appEntry.allowOrgOverride).toBe(false);
-        expect(appEntry.overrideSource).toBe('registry');
+        // Types not listed AND not writable in the registry default retain
+        // `allowOrgOverride: false`. `flow` is one such type — it is intentionally
+        // execution-pinned and not org-overridable until ADR-0006 lands.
+        const flowEntry = result.entries.find((e: any) => e.type === 'flow');
+        expect(flowEntry.allowOrgOverride).toBe(false);
+        expect(flowEntry.overrideSource).toBe('registry');
     });
 
     it('saveMetaItem honours the env-elevated allow list', async () => {

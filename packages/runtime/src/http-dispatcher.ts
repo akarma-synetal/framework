@@ -780,23 +780,29 @@ export class HttpDispatcher {
         
         // GET /metadata/types
         if (parts[0] === 'types') {
-            // PRIORITY 1: Try MetadataService directly (includes both typeRegistry with agent/tool AND runtime-registered types)
+            // PRIORITY 1: Try protocol service — it returns BOTH legacy
+            // `types: string[]` AND the richer `entries` array (with
+            // JSON Schemas, allowOrgOverride flags, domain, etc) needed by
+            // the metadata admin UI. It internally also merges
+            // MetadataService runtime types, so this path is strictly richer.
+            const protocol = await this.resolveService('protocol');
+            if (protocol && typeof protocol.getMetaTypes === 'function') {
+                try {
+                    const result = await protocol.getMetaTypes({});
+                    return { handled: true, response: this.success(result) };
+                } catch (e: any) {
+                    console.warn('[HttpDispatcher] protocol.getMetaTypes() failed:', e?.message);
+                }
+            }
+            // PRIORITY 2: MetadataService fallback (types only, no entries)
             const metadataService = await this.resolveService('metadata', _context.environmentId);
-
             if (metadataService && typeof (metadataService as any).getRegisteredTypes === 'function') {
                 try {
                     const types = await (metadataService as any).getRegisteredTypes();
                     return { handled: true, response: this.success({ types }) };
                 } catch (e: any) {
-                    // Log error but continue to fallbacks
                     console.warn('[HttpDispatcher] MetadataService.getRegisteredTypes() failed:', e.message);
                 }
-            }
-            // PRIORITY 2: Try protocol service (returns SchemaRegistry types only - missing agent/tool)
-            const protocol = await this.resolveService('protocol');
-            if (protocol && typeof protocol.getMetaTypes === 'function') {
-                const result = await protocol.getMetaTypes({});
-                return { handled: true, response: this.success(result) };
             }
             // Last resort: hardcoded defaults
             return { handled: true, response: this.success({ types: ['object', 'app', 'plugin'] }) };
@@ -1006,19 +1012,21 @@ export class HttpDispatcher {
 
         // GET /metadata — return available metadata types
         if (parts.length === 0) {
-            // Try MetadataService for registered types
+            // Prefer protocol service for the rich `entries` array (with
+            // JSON Schemas etc); fall back to MetadataService types-only.
+            const protocol = await this.resolveService('protocol');
+            if (protocol && typeof protocol.getMetaTypes === 'function') {
+                try {
+                    const result = await protocol.getMetaTypes({});
+                    return { handled: true, response: this.success(result) };
+                } catch { /* fall through */ }
+            }
             const metadataService = await this.resolveService('metadata', _context.environmentId);
             if (metadataService && typeof (metadataService as any).getRegisteredTypes === 'function') {
                 try {
                     const types = await (metadataService as any).getRegisteredTypes();
                     return { handled: true, response: this.success({ types }) };
                 } catch { /* fall through */ }
-            }
-            // Try protocol service for dynamic types
-            const protocol = await this.resolveService('protocol');
-            if (protocol && typeof protocol.getMetaTypes === 'function') {
-                const result = await protocol.getMetaTypes({});
-                return { handled: true, response: this.success(result) };
             }
             return { handled: true, response: this.success({ types: ['object', 'app', 'plugin'] }) };
         }
