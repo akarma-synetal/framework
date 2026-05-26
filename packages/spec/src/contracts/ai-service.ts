@@ -429,13 +429,6 @@ export interface AIConversation {
     updatedAt: string;
     /** Conversation metadata */
     metadata?: Record<string, unknown>;
-    /**
-     * Opaque cursor pointing to the message immediately before this
-     * page. Present only when `get(id, { limit })` returned a windowed
-     * view AND older history exists. Pass back as `options.cursor` to
-     * fetch the previous page.
-     */
-    nextCursor?: string;
 }
 
 /**
@@ -457,25 +450,15 @@ export interface IAIConversationService {
     }): Promise<AIConversation>;
 
     /**
-     * Get a conversation by ID.
+     * Get a conversation by ID, including its full message history.
      *
-     * When `options.limit` is supplied, only the most recent `limit`
-     * messages are returned (oldest first within the page). Pass
-     * `options.cursor` (the `cursor` from a previous page) to fetch the
-     * preceding window — useful for "load more" / scroll-back UIs.
-     *
-     * The returned `AIConversation` carries an optional `nextCursor`
-     * when more history exists older than the current page; clients
-     * should pass it as `cursor` on the next call.
+     * For paginated or filtered reads of `ai_messages`, use the generic
+     * ObjectQL data endpoint directly — that's the canonical query layer.
      *
      * @param conversationId - Conversation identifier
-     * @param options - Optional message-pagination knobs
      * @returns The conversation, or null if not found
      */
-    get(
-        conversationId: string,
-        options?: { limit?: number; cursor?: string },
-    ): Promise<AIConversation | null>;
+    get(conversationId: string): Promise<AIConversation | null>;
 
     /**
      * List conversations with optional filters
