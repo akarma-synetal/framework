@@ -248,7 +248,9 @@ an `aggregate` measure or chart spec, and a `layout: {x,y,w,h}`.
 
 See the **Production Pattern** section below for the full
 `Dashboard` shape with `refreshInterval`, header actions, date range,
-global filters, and widget options.
+global filters, widget options, and the period-over-period (`compareTo`)
+/ date-bucketing (`categoryGranularity`) modifiers available on every
+data-bound widget.
 
 ---
 
@@ -491,15 +493,80 @@ no second `filter` is required.
 | `{ offset: '7d' }` | Shift by an explicit duration. Units: `d` (days), `w` (weeks), `M` (months), `y` (years). |
 
 * **Metric widgets** — the prior-period value renders as a small caption
-  beneath the headline number, alongside a green/red delta arrow.
-  Authors should *not* hand-author `options.trend` when `compareTo` is
-  set; the renderer wins and overwrites it.
-* **Chart widgets** — the comparison series is appended after the
-  primary series with `variant: 'comparison'` and styled as a muted /
-  dashed overlay. Single-series charts (bar / line / area) get an
-  automatic second series; multi-series pivots are not yet supported.
+  beneath the headline number, alongside a green/red delta arrow and an
+  i18n label (`较上期` / `vs previous period`, `较去年` / `vs last year`,
+  `较前7天` / `vs previous 7d`, etc.). Authors should *not* hand-author
+  `options.trend` when `compareTo` is set; the renderer wins and overwrites
+  it.
+* **Cartesian charts** (`line` / `area` / `bar` / `horizontal-bar` /
+  `scatter`) — the comparison series is appended after the primary series
+  with `variant: 'comparison'` and styled as a muted overlay (`opacity: 0.5`
+  + `strokeDasharray: '4 4'` for line/area/scatter; `opacity: 0.4` for
+  bars). Override per-series with `series.dashArray` / `series.opacity`.
+* **Pie / donut / funnel** — `compareTo` is silently ignored; there is no
+  meaningful "two-period" composition for part-of-whole charts.
 * **Requirements** — `compareTo` is a no-op when the filter contains no
-  resolvable date macros and no global `dateRange` is configured.
+  resolvable date macros and no global `dateRange` is configured. The
+  shifted query reuses the original `filter` shape and replaces only the
+  date-bound clauses.
+
+```typescript
+// Metric — WoW delta
+{ id: 'done_this_week', type: 'metric', object: 'task',
+  filter: { assignee: '{current_user_id}', status: 'done',
+            completed_at: { $gte: '{week_start}' } },
+  aggregate: 'count',
+  compareTo: 'previousPeriod' }
+
+// Bar — YoY overlay on a stable category set
+{ id: 'headcount_by_dept', type: 'bar', object: 'employee',
+  filter: { status: { $ne: 'terminated' } },
+  aggregate: 'count', categoryField: 'department',
+  compareTo: 'previousYear' }
+```
+
+### Server-side date bucketing — `categoryGranularity`
+
+For any chart with `categoryField` pointing at a date/datetime field, set
+`categoryGranularity` to bucket values server-side. Without it every
+distinct timestamp becomes its own category, which collapses a 12-row
+seed dataset into a 12-point flat-line chart.
+
+| Value | Bucket key |
+|:--|:--|
+| `'day'` | Calendar day (`YYYY-MM-DD`) |
+| `'week'` | ISO week (`YYYY-Www`) |
+| `'month'` | Calendar month (`YYYY-MM`) |
+| `'quarter'` | Calendar quarter (`YYYY-Qn`) |
+| `'year'` | Calendar year (`YYYY`) |
+
+* **Engine support** — Postgres `date_trunc`, MySQL `date_format`, SQLite
+  `strftime`, MongoDB `$dateTrunc`, in-memory `bucketDateValue` fallback.
+  All emitted by the analytics service, not the client.
+* **Rule of thumb** — `day` for ≤30d windows, `week` for ~90d, `month`
+  for 6–12 months, `quarter` for multi-year, `year` for retention /
+  compliance scopes.
+* **Combines with `compareTo`** — the comparison query is issued with the
+  same granularity, so the muted overlay aligns bucket-for-bucket.
+* **xAxis format** — pair with a matching `chartConfig.xAxis.format`
+  (`%b %d` for day, `%b %Y` for month, etc.) so the rendered labels
+  match the bucket grain.
+
+```typescript
+// Line chart — monthly trend with YoY overlay
+{ id: 'signed_by_month', type: 'line', object: 'contract',
+  filter: { signed_date: { $gte: '{12_months_ago}' } },
+  aggregate: 'count',
+  categoryField: 'signed_date',
+  categoryGranularity: 'month',
+  compareTo: 'previousYear',
+  chartConfig: {
+    type: 'line',
+    xAxis: { field: 'signed_date', format: '%b %Y' },
+    yAxis: [{ field: 'value', format: '0,0' }],
+  },
+}
+```
 
 ---
 
