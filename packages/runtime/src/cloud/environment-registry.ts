@@ -10,9 +10,9 @@
  *   - a local file artifact (see {@link FileArtifactApiClient} +
  *     {@link ArtifactEnvironmentRegistry})
  *
- * The contract was extracted from `@objectstack/service-cloud` in Phase R
- * so the runtime can express "fetch artifact + boot per-project kernel"
- * without taking a dependency on the cloud control plane.
+ * The contract lives in `@objectstack/runtime` so the runtime can
+ * express "fetch artifact + boot per-project kernel" without taking a
+ * dependency on the cloud control plane.
  */
 
 import type * as Contracts from '@objectstack/spec/contracts';

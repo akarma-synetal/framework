@@ -5,10 +5,9 @@
  *
  * Forwards `GET /api/v1/marketplace/*` from a tenant ObjectOS runtime to
  * the configured ObjectStack Cloud control-plane URL. The cloud endpoint
- * (`packages/service-cloud/src/routes/marketplace.ts`) is unauthenticated
- * and only exposes packages whose owner has opted in to the public catalog
- * (`sys_package.marketplace_listed = true`) — so the proxy passes through
- * without any credentials.
+ * is unauthenticated and only exposes packages whose owner has opted in
+ * to the public catalog (`sys_package.marketplace_listed = true`) — so the
+ * proxy passes through without any credentials.
  *
  * Why proxy instead of direct browser → cloud:
  *   - The Console SPA stays on the tenant origin, so no CORS configuration

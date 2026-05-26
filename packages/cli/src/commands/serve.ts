@@ -179,8 +179,8 @@ export default class Serve extends Command {
    *
    * Opt out: `objectstack serve --preset minimal`.
    *
-   * Mirrored on hosted objectos per-project kernels by
-   * `mountDefaultProjectPlugins()` in `@objectstack/service-cloud`.
+   * Cloud / multi-environment hosts (which live in a separate distribution)
+   * mirror this list on their per-project kernels.
    */
   static readonly ALWAYS_ON_CAPABILITIES: readonly string[] = Object.freeze([
     'queue', 'job', 'cache', 'settings', 'email', 'storage',
@@ -359,9 +359,10 @@ export default class Serve extends Command {
         config = merged;
       }
 
-      // Boot-mode dispatch: standalone goes directly through
-      // `@objectstack/runtime` (no cloud dependencies). runtime/cloud
-      // modes go through `@objectstack/service-cloud`.
+      // Boot-mode dispatch: this open-core CLI only supports `standalone`
+      // (and the artifact-fallback shortcut). Cloud / multi-environment
+      // boot modes live in a separate distribution and are no longer
+      // resolved from this package.
       if (useArtifactFallback || shouldBootWithLibrary(config)) {
         // The boot stack returns only `{plugins, api}` — preserve the
         // original stack metadata (notably `requires`, `analyticsCubes`,
@@ -370,9 +371,6 @@ export default class Serve extends Command {
         const resolvedMode = config.bootMode ?? process.env.OS_MODE ?? 'standalone';
         if (useArtifactFallback) {
           // Artifact-only boot — no objectstack.config.ts authored.
-          // Always use the default-host helper which is standalone-only
-          // and never depends on @objectstack/service-cloud.
-          //
           // When `useEmptyBoot` is set the user asked for a quick-start
           // ("objectstack start" with nothing to load); skip the
           // "missing artifact" error and assemble a bare kernel that
@@ -385,26 +383,12 @@ export default class Serve extends Command {
           const bootResult = await createStandaloneStack(config.standalone);
           config = { ...originalConfig, ...bootResult } as any;
         } else {
-          // Cloud / multi-environment boot modes require @objectstack/service-cloud.
-          // When the package is unavailable (e.g. someone vendored only the
-          // public framework), fail with a clear, actionable error instead of
-          // an opaque module-not-found stack trace.
-          let createBootStack: any;
-          try {
-            ({ createBootStack } = await import('@objectstack/service-cloud'));
-          } catch (err) {
-            throw new Error(
-              `Boot mode '${resolvedMode}' requires @objectstack/service-cloud, which is not installed.\n`
-              + `Either install it (\`pnpm add @objectstack/service-cloud\`) or switch to bootMode='standalone'.\n`
-              + `Underlying error: ${(err as Error)?.message ?? String(err)}`,
-            );
-          }
-          const bootResult = await createBootStack({
-            mode: config.bootMode,
-            runtime: config.runtime ?? config.project,
-            cloud: config.cloud,
-          });
-          config = { ...originalConfig, ...bootResult } as any;
+          throw new Error(
+            `Boot mode '${resolvedMode}' is not available in the open-core CLI.\n`
+            + `Only 'standalone' is supported here. Cloud / multi-environment hosts ship\n`
+            + `from a separate distribution. Either switch to bootMode='standalone' or use\n`
+            + `the cloud-aware CLI.`,
+          );
         }
       }
 
@@ -889,41 +873,15 @@ export default class Serve extends Command {
         }
       }
 
-      // 5. Auto-register Studio single-environment signal in dev mode.
+      // 5. Studio single-environment signal.
       //
-      // `objectstack dev` runs a vanilla user stack (e.g. the HotCRM
-      // reference app at https://github.com/objectstack-ai/hotcrm)
-      // as a single project — there is no apps/cloud control plane and no
-      // org/project picker is meaningful. Without this plugin Studio would
-      // fall back to its multi-environment default and ask the user to "Create
-      // organization" before showing any platform metadata.
-      //
-      // The plugin only registers `GET /api/v1/studio/runtime-config`
-      // (returning `{ singleEnvironment: true, defaultOrgId, defaultProjectId }`)
-      // — no identity seed, since CLI dev mode has no sys_organization /
-      // sys_environment tables to write into. Skipped when the user config
-      // already carries a single-environment / multi-environment plugin.
-      const hasProjectModePlugin = plugins.some((p: any) => {
-        const n = p?.name ?? p?.constructor?.name ?? '';
-        return n === 'com.objectstack.studio.single-environment'
-          || n === 'com.objectstack.multi-environment'
-          || n === 'com.objectstack.studio.runtime-config';
-      });
-      if (isDev && !hasProjectModePlugin) {
-        try {
-          const cloudPkg = '@objectstack/service-cloud';
-          const { createSingleEnvironmentPlugin } = await import(/* webpackIgnore: true */ cloudPkg);
-          await kernel.use(createSingleEnvironmentPlugin({
-            environmentId: process.env.OS_ENVIRONMENT_ID ?? 'proj_local',
-            orgId: process.env.OS_ORG_ID ?? 'org_local',
-            orgName: 'Local',
-          }));
-          trackPlugin('SingleEnvironment');
-        } catch {
-          // @objectstack/service-cloud not installed — Studio falls back
-          // to multi-environment mode (org/project picker visible).
-        }
-      }
+      // The built-in `RuntimeConfigPlugin` (auto-registered below at
+      // step 5b-ii) already responds to `GET /api/v1/studio/runtime-config`
+      // with `{ singleEnvironment, defaultOrgId, defaultEnvironmentId }`,
+      // so no extra plugin is needed here. Cloud / multi-environment
+      // hosts ship their own runtime-config plugin in a separate
+      // distribution; if the user config carries one already we skip
+      // injecting the default one further down.
 
       // 5b. Auto-register MarketplaceProxyPlugin so the runtime console's
       // marketplace browse UI works in `objectstack dev` without manually
@@ -1037,7 +995,7 @@ export default class Serve extends Command {
           if (isHostKernel) {
             console.warn(chalk.yellow(
               '  ⚠ AuthPlugin skipped on host kernel — runtime mode (ObjectOSEnvironmentPlugin detected).\n' +
-              '    Auth is owned per-project by ArtifactKernelFactory (see service-cloud).'
+              '    Auth is owned per-project by ArtifactKernelFactory in the cloud distribution.'
             ));
           } else if (!secret) {
             console.warn(chalk.yellow('  ⚠ AuthPlugin skipped — set AUTH_SECRET to enable authentication in production'));
@@ -1072,8 +1030,8 @@ export default class Serve extends Command {
               if (!trustedOrigins.includes(baseOrigin)) trustedOrigins.push(baseOrigin);
             } catch { /* ignore malformed baseUrl */ }
             // Preview-mode subdomain wildcards (`<commit>--<pid>.<base>`).
-            // Honour `OS_PREVIEW_BASE_DOMAINS` (used by service-cloud's
-            // preview routing) and add `http://*.<base>:*` patterns.
+            // Honour `OS_PREVIEW_BASE_DOMAINS` (used by the cloud preview routing)
+            // and add `http://*.<base>:*` patterns.
             const previewMode = (process.env.OS_PREVIEW_MODE ?? '').trim().toLowerCase();
             const isPreviewMode = previewMode === '1' || previewMode === 'true' || previewMode === 'yes';
             if (isPreviewMode) {

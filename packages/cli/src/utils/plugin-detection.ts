@@ -30,8 +30,8 @@ export function isHostConfig(config: any): boolean {
  *   2. `OS_MODE=off` is explicitly set (escape hatch for the
  *      legacy lightweight assembler).
  *
- * Recognised mode aliases match `resolveMode()` in
- * `@objectstack/service-cloud/boot-env`.
+ * Recognised mode aliases match the cloud distribution's
+ * `resolveMode()` (kept in sync for back-compat).
  */
 const RECOGNISED_MODES = new Set([
   'runtime',

@@ -10,10 +10,9 @@
  * flows and a `requires: [...]` capability list. That should be enough
  * to boot a runtime, with zero hand-written host code.
  *
- * Boot mode: **standalone only**. This module intentionally does NOT
- * depend on `@objectstack/service-cloud`. Cloud / multi-environment hosts
- * still write their own `objectstack.config.ts` (see
- * `apps/objectos/objectstack.config.ts`).
+ * Boot mode: **standalone only**. This module deliberately has zero
+ * dependency on the cloud distribution — cloud / multi-environment hosts
+ * ship their own bootstrap and write their own `objectstack.config.ts`.
  *
  * Resolution order for the artifact path:
  *   1. `options.artifactPath` (explicit caller override)
