@@ -16,6 +16,10 @@ export * from './driver-nosql.zod';
 
 export * from './dataset.zod';
 
+// Form Layouts
+export { ObjectFormLayout } from './object.form';
+export { FieldFormLayout } from './field.form';
+
 // Seed Loader Protocol (Relationship Resolution & Dependency Ordering)
 export * from './seed-loader.zod';
 

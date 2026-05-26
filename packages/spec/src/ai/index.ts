@@ -31,3 +31,8 @@ export * from './usage.zod';
 export * from './mcp.zod';
 export * from './knowledge-source.zod';
 export * from './knowledge-document.zod';
+
+// Form Layouts
+export { AgentFormLayout } from './agent.form';
+export { ToolFormLayout } from './tool.form';
+export { SkillFormLayout } from './skill.form';
