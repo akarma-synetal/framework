@@ -60,16 +60,22 @@ describe('Pipeline dashboard', () => {
     expect(w.filter.close_date.$lte).toBe('{current_year_end}');
   });
 
-  it('uses a sliding `{ offset }` compareTo on the trend chart', () => {
+  it('uses a YoY `previousYear` compareTo on the trend chart', () => {
     const w: any = byId.get('pipeline_trend_90d');
-    expect(w.compareTo).toEqual({ offset: '90d' });
+    expect(w.compareTo).toBe('previousYear');
     expect(w.type).toBe('line');
+    expect(w.categoryGranularity).toBe('month');
   });
 
-  it('omits compareTo on widgets that do not need it (pie, plain bar, total)', () => {
+  it('omits compareTo on widgets that do not need it (pie, total)', () => {
     expect((byId.get('total_pipeline') as any).compareTo).toBeUndefined();
-    expect((byId.get('opportunities_by_stage') as any).compareTo).toBeUndefined();
     expect((byId.get('pipeline_by_industry') as any).compareTo).toBeUndefined();
+  });
+
+  it('uses `compareTo: previousPeriod` on the Opportunities by Stage bar chart', () => {
+    const w: any = byId.get('opportunities_by_stage');
+    expect(w.compareTo).toBe('previousPeriod');
+    expect(w.type).toBe('bar');
   });
 
   it('widgets bind to the opportunity object', () => {

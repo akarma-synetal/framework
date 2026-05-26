@@ -13,12 +13,14 @@ import type { Dashboard } from '@objectstack/spec/ui';
  *   labelled "vs last quarter".
  * - **Avg Deal Size YoY** — metric with `compareTo: 'previousYear'` to
  *   compare against the same window one year prior.
- * - **Pipeline Trend (90d)** — line chart with a sliding
- *   `compareTo: { offset: '90d' }` overlay, rendered as a dashed muted
- *   series on top of the current 90-day trend.
- * - **Opportunities by Stage** / **Pipeline by Industry** — bar / pie
- *   examples without `compareTo` (pie / donut / funnel ignore overlays
- *   even if set).
+ * - **Pipeline Trend (12 months)** — line chart with
+ *   `categoryGranularity: 'month'` bucketing and a `compareTo: 'previousYear'`
+ *   overlay, rendered as a dashed muted series on top of the current
+ *   12-month trend.
+ * - **Opportunities by Stage** — bar chart with
+ *   `compareTo: 'previousPeriod'` to overlay the prior quarter.
+ * - **Pipeline by Industry** — pie chart without `compareTo`
+ *   (pie / donut / funnel ignore overlays even if set).
  */
 export const PipelineDashboard: Dashboard = {
   name: 'pipeline_dashboard',
