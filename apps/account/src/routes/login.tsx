@@ -81,7 +81,9 @@ function LoginPage() {
     organizationsLoading,
     organizationsFetched,
     setActiveOrganization,
+    features,
   } = useSession();
+  const signUpDisabled = features?.signUpDisabled === true;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -256,16 +258,18 @@ function LoginPage() {
                     >
                       {submitting ? t('auth.login.submitting') : t('auth.login.submit')}
                     </Button>
-                    <p className="text-center text-sm text-muted-foreground">
-                      {t('auth.login.noAccount')}{' '}
-                      <Link
-                        to="/register"
-                        search={redirect ? { redirect } : undefined}
-                        className="font-medium text-primary underline-offset-4 hover:underline"
-                      >
-                        {t('auth.login.signUp')}
-                      </Link>
-                    </p>
+                    {signUpDisabled ? null : (
+                      <p className="text-center text-sm text-muted-foreground">
+                        {t('auth.login.noAccount')}{' '}
+                        <Link
+                          to="/register"
+                          search={redirect ? { redirect } : undefined}
+                          className="font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          {t('auth.login.signUp')}
+                        </Link>
+                      </p>
+                    )}
                   </div>
                 </form>
               </CardContent>

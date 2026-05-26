@@ -266,6 +266,7 @@ export class AuthManager {
    */
   private async createAuthInstance(): Promise<Auth<any>> {
     const { betterAuth } = await import('better-auth');
+    const { createAuthMiddleware } = await import('better-auth/api');
     const plugins = await this.buildPluginList();
     const passwordHasher = await this.resolvePasswordHasher();
     const betterAuthConfig: BetterAuthOptions = {
@@ -328,12 +329,22 @@ export class AuthManager {
       // Social / OAuth providers
       ...(this.config.socialProviders ? { socialProviders: this.config.socialProviders as any } : {}),
 
-      // Email and password configuration
-      emailAndPassword: {
+      // Email and password configuration.
+      // `disableSignUp`: the env var `OS_DISABLE_SIGNUP=true` overrides
+      // the config-file value so deployments can flip the toggle without
+      // a code change (`getPublicConfig()` applies the same precedence so
+      // `/auth/config` stays consistent with the server enforcement).
+      emailAndPassword: (() => {
+        const disableSignUpEnv = (globalThis as any)?.process?.env?.OS_DISABLE_SIGNUP;
+        const disableSignUpFromEnv = disableSignUpEnv != null
+          ? String(disableSignUpEnv).toLowerCase() === 'true'
+          : undefined;
+        const effectiveDisableSignUp = disableSignUpFromEnv ?? this.config.emailAndPassword?.disableSignUp;
+        return {
         enabled: this.config.emailAndPassword?.enabled ?? true,
         ...(passwordHasher ? { password: passwordHasher } : {}),
-        ...(this.config.emailAndPassword?.disableSignUp != null
-          ? { disableSignUp: this.config.emailAndPassword.disableSignUp } : {}),
+        ...(effectiveDisableSignUp != null
+          ? { disableSignUp: effectiveDisableSignUp } : {}),
         ...(this.config.emailAndPassword?.requireEmailVerification != null
           ? { requireEmailVerification: this.config.emailAndPassword.requireEmailVerification } : {}),
         ...(this.config.emailAndPassword?.minPasswordLength != null
@@ -374,7 +385,8 @@ export class AuthManager {
             throw err;
           }
         },
-      },
+        };
+      })(),
 
       // Email verification
       ...(this.config.emailVerification || this.config.emailService ? {
@@ -432,6 +444,40 @@ export class AuthManager {
       // for SSO JIT-provisioning too, unlike kernel-level ObjectQL
       // middleware which better-auth's adapter bypasses).
       ...(this.config.databaseHooks ? { databaseHooks: this.config.databaseHooks } : {}),
+
+      // Bootstrap bypass for `disableSignUp`. The first-run owner wizard
+      // (`/_account/setup`) calls `POST /auth/sign-up/email` to create
+      // the very first user — if `OS_DISABLE_SIGNUP=true` is set on a
+      // fresh install we'd lock the operator out of their own instance.
+      // Solution: when the request hits `/sign-up/email` AND no users
+      // exist yet, temporarily flip `disableSignUp` off for *this*
+      // request's context. Once the owner is created the next request
+      // sees `userCount > 0` and the toggle is enforced again.
+      hooks: {
+        before: createAuthMiddleware(async (ctx: any) => {
+          if (ctx?.path !== '/sign-up/email') return;
+          const ep = ctx?.context?.options?.emailAndPassword;
+          if (!ep?.disableSignUp) return;
+          try {
+            const adapter = ctx.context.adapter;
+            const existing = await adapter.findOne({ model: 'user', where: [] });
+            if (!existing) {
+              ctx.context.__osDisableSignUpOrig = ep.disableSignUp;
+              ep.disableSignUp = false;
+            }
+          } catch {
+            // Adapter not ready → keep disableSignUp on.
+          }
+        }),
+        after: createAuthMiddleware(async (ctx: any) => {
+          if (ctx?.path !== '/sign-up/email') return;
+          const ep = ctx?.context?.options?.emailAndPassword;
+          if (ep && ctx.context.__osDisableSignUpOrig !== undefined) {
+            ep.disableSignUp = ctx.context.__osDisableSignUpOrig;
+            delete ctx.context.__osDisableSignUpOrig;
+          }
+        }),
+      },
 
       // Trusted origins for CSRF protection (supports wildcards like "https://*.example.com")
       // Auto-includes origins from CORS_ORIGIN env var so CORS and CSRF stay in sync.
@@ -1152,11 +1198,20 @@ export class AuthManager {
       }
     }
 
-    // Extract email/password config (safe fields only)
+    // Extract email/password config (safe fields only).
+    // `OS_DISABLE_SIGNUP=true` is an env-var override so deployments can
+    // turn off self-service registration without editing the config file
+    // (mirrors the `OS_MULTI_ORG_ENABLED` pattern below). The env var, when
+    // set to a truthy value, wins over the config-file setting; otherwise
+    // we fall back to `emailAndPassword.disableSignUp` (default `false`).
     const emailPasswordConfig: Partial<EmailAndPasswordConfig> = this.config.emailAndPassword ?? {};
+    const disableSignUpEnv = (globalThis as any)?.process?.env?.OS_DISABLE_SIGNUP;
+    const disableSignUpFromEnv = disableSignUpEnv != null
+      ? String(disableSignUpEnv).toLowerCase() === 'true'
+      : undefined;
     const emailPassword = {
       enabled: emailPasswordConfig.enabled !== false, // Default to true
-      disableSignUp: emailPasswordConfig.disableSignUp ?? false,
+      disableSignUp: disableSignUpFromEnv ?? emailPasswordConfig.disableSignUp ?? false,
       requireEmailVerification: emailPasswordConfig.requireEmailVerification ?? false,
     };
 

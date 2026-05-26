@@ -58,6 +58,17 @@ export interface AuthFeatures {
    * invite-accept) still work — only fresh creation is forbidden.
    */
   multiOrgEnabled?: boolean;
+  /**
+   * When `true`, self-service email/password registration is disabled
+   * (controlled by env `OS_DISABLE_SIGNUP=true` or the
+   * `emailAndPassword.disableSignUp` config option). The Account SPA
+   * uses this to hide the "Sign up" link on the login page and bounce
+   * direct hits to `/register` back to `/login`.
+   *
+   * Mirrors `emailPassword.disableSignUp` from `GET /auth/config` so
+   * callers don't have to read two separate slices of the response.
+   */
+  signUpDisabled?: boolean;
   oidcProvider?: boolean;
   deviceAuthorization?: boolean;
 }
@@ -168,7 +179,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       .getConfig()
       .then((res: any) => {
         if (cancelled) return;
-        const f = res?.features ?? res?.data?.features ?? null;
+        const root = res?.data ?? res ?? {};
+        const f: AuthFeatures = { ...(root.features ?? {}) };
+        // Lift `emailPassword.disableSignUp` into the flat features
+        // surface so route components don't have to grab two slices.
+        if (root.emailPassword?.disableSignUp === true) {
+          f.signUpDisabled = true;
+        }
         setFeatures(f);
       })
       .catch(() => {

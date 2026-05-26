@@ -45,7 +45,18 @@ function RegisterPage() {
     organizationsLoading,
     organizationsFetched,
     setActiveOrganization,
+    features,
   } = useSession();
+
+  // Defense-in-depth for the `OS_DISABLE_SIGNUP=true` /
+  // `emailAndPassword.disableSignUp` toggle: bounce direct hits to
+  // /register back to /login the moment we know signup is off. The
+  // server still 403s the submission as the ultimate gate.
+  useEffect(() => {
+    if (features?.signUpDisabled === true) {
+      navigate({ to: '/login', search: redirect ? { redirect } : {}, replace: true });
+    }
+  }, [features?.signUpDisabled, navigate, redirect]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
