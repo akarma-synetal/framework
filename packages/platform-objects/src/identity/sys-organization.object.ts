@@ -35,6 +35,12 @@ export const SysOrganization = ObjectSchema.create({
       target: '/api/v1/auth/organization/create',
       successMessage: 'Organization created',
       refreshAfter: true,
+      // Hidden when the deployment is provisioned in single-org mode
+      // (`OS_MULTI_ORG_ENABLED=false`). `features.multiOrgEnabled` is
+      // populated by the console/account shells from `/auth/config`;
+      // we default to visible when the flag is undefined so we don't
+      // accidentally hide the button while auth config is still loading.
+      visible: 'features.multiOrgEnabled != false',
       params: [
         { field: 'name', required: true },
         { field: 'slug', required: true },
