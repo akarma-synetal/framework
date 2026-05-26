@@ -177,6 +177,14 @@ Window functions compute values across row sets WITHOUT collapsing results.
 
 ### LAG / LEAD (Period-over-Period)
 
+> **For dashboard widgets**, prefer the higher-level `compareTo:
+> 'previousPeriod' | 'previousYear' | { offset }` field on the widget
+> schema (see *objectstack-ui* → *Period-over-period — `compareTo`*).
+> The renderer issues the shifted query for you and aligns the result
+> bucket-for-bucket with `categoryGranularity`. Reach for the raw
+> `lag` / `lead` window functions below when you need the comparison
+> in a custom query result (reports, ad-hoc SQL, cube measures).
+
 ```typescript
 // Month-over-month comparison
 {

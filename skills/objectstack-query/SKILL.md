@@ -528,8 +528,8 @@ Use dashboards/reports metadata as the practical query pattern source:
 
 | Query Need | CRM Reference | Pattern |
 |:--|:--|:--|
-| KPI widgets | `dashboards/sales.dashboard.ts` | Filtered aggregates (`sum`, `count`, `avg`) over `opportunity` |
-| Time-series chart | `dashboards/sales.dashboard.ts` | Date filters + month bucketing for trend analysis |
+| KPI widgets | `dashboards/sales.dashboard.ts` | Filtered aggregates (`sum`, `count`, `avg`) over `opportunity`. Add `compareTo: 'previousPeriod' \| 'previousYear'` on the widget for a one-line period-over-period delta. |
+| Time-series chart | `dashboards/sales.dashboard.ts` | Date filters + `categoryGranularity: 'day' \| 'week' \| 'month' \| 'quarter' \| 'year'` for server-side bucketing — never bucket by hand on the client. Pair with `compareTo` for an aligned YoY overlay. |
 | Matrix report | `reports/opportunity.report.ts` | `groupingsDown` + `groupingsAcross` + `dateGranularity: 'quarter'` |
 | Funnel summary | `reports/opportunity.report.ts` | Multi-level grouping (`owner -> stage`) + aggregated measures |
 | Operational filter | dashboard/report filters | Prefer declarative operators (`$ne`, `$nin`, `$gte`) over hardcoded SQL |

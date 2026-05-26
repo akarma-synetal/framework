@@ -494,10 +494,10 @@ no second `filter` is required.
 
 * **Metric widgets** — the prior-period value renders as a small caption
   beneath the headline number, alongside a green/red delta arrow and an
-  i18n label (`较上期` / `vs previous period`, `较去年` / `vs last year`,
-  `较前7天` / `vs previous 7d`, etc.). Authors should *not* hand-author
-  `options.trend` when `compareTo` is set; the renderer wins and overwrites
-  it.
+  i18n trend label resolved from the comparison kind (e.g. `vs previous
+  period`, `vs previous year`, `vs previous 7d`). Authors should *not*
+  hand-author `options.trend` when `compareTo` is set; the renderer wins
+  and overwrites it.
 * **Cartesian charts** (`line` / `area` / `bar` / `horizontal-bar` /
   `scatter`) — the comparison series is appended after the primary series
   with `variant: 'comparison'` and styled as a muted overlay (`opacity: 0.5`
