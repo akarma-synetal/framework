@@ -51,8 +51,8 @@ export const reportForm = defineForm({
       collapsible: true,
       collapsed: true,
       fields: [
-        { field: 'filter', widget: 'filter-builder' },
-        { field: 'chart', widget: 'chart-config' },
+        { field: 'filter', widget: 'master-detail' },
+        { field: 'chart', widget: 'object-fields' },
       ],
     },
     {
@@ -60,8 +60,8 @@ export const reportForm = defineForm({
       collapsible: true,
       collapsed: true,
       fields: [
-        { field: 'aria', widget: 'json' },
-        { field: 'performance', widget: 'json' },
+        { field: 'aria', widget: 'object-fields' },
+        { field: 'performance', widget: 'object-fields' },
       ],
     },
   ],
