@@ -62,6 +62,87 @@ export const PackagePublisherSchema = lazySchema(() => z
 export type PackagePublisher = z.infer<typeof PackagePublisherSchema>;
 
 // ---------------------------------------------------------------------------
+// Per-locale translations for package listings
+// ---------------------------------------------------------------------------
+
+/**
+ * BCP-47 locale tag — `en`, `zh`, `en-US`, `zh-CN`, …
+ *
+ * Used as the key in {@link PackageTranslationsSchema}. We accept the short
+ * (`zh`) and region-qualified (`zh-CN`) forms; resolvers should fall back
+ * from `zh-CN` → `zh` → fallbackLocale → base field.
+ */
+export const PackageLocaleSchema = lazySchema(() => z
+  .string()
+  .regex(/^[a-z]{2,3}(-[A-Z]{2})?$/, 'must be a BCP-47 locale (e.g. en, zh, zh-CN)')
+  .describe('BCP-47 locale tag'));
+
+export type PackageLocale = z.infer<typeof PackageLocaleSchema>;
+
+/**
+ * Per-locale overrides for a package's display metadata.
+ *
+ * Any field omitted falls back to the base column on {@link PackageSchema}
+ * (or {@link MarketplaceListingSchema}). Publishers are encouraged to ship
+ * at least the `en` base copy in the base columns and add additional
+ * locales here; the resolver always prefers the requested locale before
+ * falling back.
+ *
+ * `screenshotCaptions` is keyed by **screenshot array index as a string**
+ * (`"0"`, `"1"`, …) so it survives JSON round-trips without coupling to a
+ * separate id.
+ */
+export const PackageTranslationSchema = lazySchema(() => z.object({
+  /** Localized display name (overrides {@link PackageSchema}.displayName) */
+  displayName: z.string().min(1).max(128).optional()
+    .describe('Localized display name'),
+
+  /** Localized short description (overrides PackageSchema.description) */
+  description: z.string().max(512).optional()
+    .describe('Localized short description'),
+
+  /** Localized long-form README markdown (overrides PackageSchema.readme) */
+  readme: z.string().optional()
+    .describe('Localized long-form readme (markdown)'),
+
+  /**
+   * Localized tagline. Only meaningful on MarketplaceListing; safe to omit
+   * on raw PackageSchema. Mirrors {@link MarketplaceListingSchema}.tagline.
+   */
+  tagline: z.string().max(120).optional()
+    .describe('Localized short tagline (marketplace listing only)'),
+
+  /**
+   * Localized screenshot captions, keyed by screenshot array index as a
+   * string (e.g. `{ "0": "Dashboard", "1": "Inbox" }`). Captures the same
+   * data as {@link MarketplaceListingSchema}.screenshots[].caption but
+   * keeps it locale-keyed without forcing publishers to duplicate the
+   * full screenshots array per locale.
+   */
+  screenshotCaptions: z.record(z.string(), z.string()).optional()
+    .describe('Per-index screenshot caption overrides'),
+}).describe('Per-locale overrides for a package listing'));
+
+export type PackageTranslation = z.infer<typeof PackageTranslationSchema>;
+
+/**
+ * Locale-keyed translation map.
+ *
+ * `{ "zh": { displayName: "客户管理", ... }, "ja": { ... } }`
+ *
+ * Resolution order for a requested locale `req`:
+ *   1. exact match (e.g. `zh-CN`)
+ *   2. language-only fallback (e.g. `zh`)
+ *   3. caller-supplied `fallbackLocale` (default `en`)
+ *   4. the base column on the parent schema
+ */
+export const PackageTranslationsSchema = lazySchema(() => z
+  .record(PackageLocaleSchema, PackageTranslationSchema)
+  .describe('Locale-keyed overrides; missing keys fall back to base columns'));
+
+export type PackageTranslations = z.infer<typeof PackageTranslationsSchema>;
+
+// ---------------------------------------------------------------------------
 // sys_package — Package identity
 // ---------------------------------------------------------------------------
 
@@ -139,6 +220,14 @@ export const PackageSchema = lazySchema(() => z.object({
     'If true, surfaces in the Create Project blueprint picker as a starter template'
   ),
 
+  /**
+   * Locale-keyed overrides for {@link displayName}, {@link description},
+   * and {@link readme}. Missing locales / fields fall back to the base
+   * columns. See {@link PackageTranslationsSchema}.
+   */
+  translations: PackageTranslationsSchema.optional()
+    .describe('Locale-keyed overrides for display_name / description / readme'),
+
   /** Creation timestamp (ISO-8601). */
   createdAt: z.string().datetime().describe('Creation timestamp (ISO-8601)'),
 
@@ -171,6 +260,7 @@ export const CreatePackageRequestSchema = lazySchema(() => z.object({
   license: z.string().optional(),
   publisher: PackagePublisherSchema.optional(),
   isStarter: z.boolean().optional(),
+  translations: PackageTranslationsSchema.optional(),
   createdBy: z.string().describe('User ID creating the package'),
 }).describe('Register a new package in the Control Plane'));
 
@@ -192,6 +282,7 @@ export const UpdatePackageRequestSchema = lazySchema(() => z.object({
   license: z.string().optional(),
   publisher: PackagePublisherSchema.optional(),
   isStarter: z.boolean().optional(),
+  translations: PackageTranslationsSchema.optional(),
 }).describe('Update mutable package metadata'));
 
 export type UpdatePackageRequest = z.infer<typeof UpdatePackageRequestSchema>;

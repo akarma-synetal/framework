@@ -46,6 +46,7 @@ import { z } from 'zod';
  * Publisher Verification Status
  */
 import { lazySchema } from '../shared/lazy-schema';
+import { PackageTranslationsSchema } from './package.zod';
 export const PublisherVerificationSchema = lazySchema(() => z.enum([
   'unverified',  // Not yet verified
   'pending',     // Verification in progress
@@ -295,6 +296,15 @@ export const MarketplaceListingSchema = lazySchema(() => z.object({
   /** Last updated date */
   updatedAt: z.string().datetime().optional()
     .describe('Last updated timestamp'),
+
+  /**
+   * Locale-keyed overrides for `name`, `tagline`, `description`, and
+   * screenshot captions. See {@link PackageTranslationsSchema}.
+   *
+   * Resolution: requested-locale → language-only → `en` → base column.
+   */
+  translations: PackageTranslationsSchema.optional()
+    .describe('Locale-keyed overrides for name / tagline / description / screenshot captions'),
 }).describe('Public-facing package listing on the marketplace'));
 
 // ==========================================
