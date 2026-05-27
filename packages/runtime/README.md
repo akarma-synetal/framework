@@ -644,4 +644,4 @@ Defaults are noop — zero overhead until you plug an adapter.
 
 ## License
 
-Apache-2.0
+Apache-2.0. See [LICENSING.md](../../LICENSING.md).

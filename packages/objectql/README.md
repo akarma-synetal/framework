@@ -113,4 +113,4 @@ step-by-step instructions.
 
 ## License
 
-Apache-2.0 © ObjectStack
+Apache-2.0. See [LICENSING.md](../../LICENSING.md).

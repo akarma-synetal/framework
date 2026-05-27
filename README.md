@@ -1,7 +1,7 @@
 # ObjectStack
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: Apache 2.0 + BUSL 1.1](https://img.shields.io/badge/License-Apache%202.0%20%2B%20BUSL%201.1-blue.svg)](./LICENSING.md)
 ![Version](https://img.shields.io/badge/version-v4.0.1-green.svg)
 ![Tests](https://img.shields.io/badge/tests-6%2C507%20passing-brightgreen.svg)
 
@@ -318,4 +318,6 @@ Run locally: `pnpm docs:dev`
 
 ## License
 
-Apache 2.0 © ObjectStack
+ObjectStack uses folder-scoped dual licensing: everything is Apache-2.0 by
+default; only `packages/services/*/` and `packages/plugins/*/` are BUSL-1.1
+with a four-year conversion to Apache-2.0. See [LICENSING.md](./LICENSING.md).

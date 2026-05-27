@@ -3,7 +3,7 @@
 > ObjectStack microkernel — dependency injection, plugin lifecycle, event bus, and service registry for metadata-driven runtimes.
 
 [![npm](https://img.shields.io/npm/v/@objectstack/core.svg)](https://www.npmjs.com/package/@objectstack/core)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSING.md)
 
 ## Overview
 
@@ -117,4 +117,4 @@ use()  → init()  → start()  → [running]  → stop()  → unload()
 
 ## License
 
-Apache-2.0 © ObjectStack
+Apache-2.0. See [LICENSING.md](../../LICENSING.md).

@@ -428,4 +428,4 @@ function TaskForm() {
 
 ## License
 
-Apache-2.0
+Apache-2.0. See [LICENSING.md](../../LICENSING.md).

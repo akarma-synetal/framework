@@ -387,4 +387,4 @@ When adding new types to this package:
 
 ## License
 
-MIT
+Apache-2.0. See [LICENSING.md](../../LICENSING.md).

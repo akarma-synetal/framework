@@ -367,8 +367,8 @@ When adding new prompts:
 
 ## 📄 License
 
-These prompts are part of the ObjectStack Protocol specification.  
-License: Apache 2.0 © ObjectStack
+These prompts are part of the ObjectStack Protocol specification.
+License: Apache-2.0. See [LICENSING.md](../../LICENSING.md).
 
 ---
 

@@ -1,20 +1,19 @@
-ObjectStack is dual-licensed.
+ObjectStack uses folder-scoped dual licensing.
 
-Different packages in this monorepo are released under different licenses.
-See LICENSING.md for the per-package license map, and see each package's
-own LICENSE file and its package.json "license" field for the authoritative
-answer.
+Different folders in this monorepo are released under different licenses. See
+LICENSING.md for the folder-level license map. Published package manifests
+mirror these rules through their package.json "license" fields.
 
 Summary
 -------
 
-- Protocols, SDKs, CLI, and framework adapters are licensed under the
-  Apache License, Version 2.0. The full text is in LICENSE.apache.
+- Everything is licensed under the Apache License, Version 2.0 by default. The
+  full text is in LICENSE.apache.
 
-- The runtime, services, and official plugins are licensed under the
-  Business Source License 1.1, with a Change Date four years after each
-  release at which the license converts to Apache License, Version 2.0.
-  The full text is in LICENSE.bsl.
+- Only packages/services/* and packages/plugins/* are licensed under the
+  Business Source License 1.1, with a Change Date four years after each release
+  at which the license converts to Apache License, Version 2.0. The full text is
+  in LICENSE.bsl.
 
 For details, see LICENSING.md in this directory.
 

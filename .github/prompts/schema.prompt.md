@@ -6,18 +6,18 @@
 
 Mission: Build the "Post-SaaS Operating System" — an open-core, local-first ecosystem that virtualizes data (SQL/Redis/Excel) and unifies business logic.
 Project & Responsibilities
- * packages/spec (The Constitution) [Apache 2.0]
+ * packages/spec (The Constitution) [Apache-2.0]
    * CRITICAL: Contains the shared manifest.schema.json, TypeScript interfaces, and plugin lifecycle hooks (onInstall, onEnable).
    * Rule: All other packages depend on this. No circular dependencies.
- * packages/objectql (Data Engine) [Apache 2.0]
+ * packages/objectql (Data Engine) [Apache-2.0]
    * Universal Data Protocol. Compiles GraphQL-like queries into SQL/Redis commands.
-  * packages/platform-objects (Platform Object Catalog) [Apache 2.0]
+  * packages/platform-objects (Platform Object Catalog) [Apache-2.0]
    * Canonical ObjectStack platform objects for identity, security, audit, tenant, and metadata.
  * packages/objectui (Projection Engine) [MIT]
    * React/Shadcn UI components for Server-Driven UI (SDUI).
  * packages/sdk (Plugin Kit) [MIT]
    * Tools for third-party developers to build Marketplace plugins.
- * drivers/* [Apache 2.0]
+ * packages/plugins/* drivers [BUSL-1.1]
    * driver-postgres, driver-redis, driver-excel.
    * Must implement interfaces defined in packages/spec.
 
@@ -176,5 +176,4 @@ When I give you a short command, map it to the following actions:
 3. **定义表单布局时**：
 > "Create Layout Protocol."
 > *（AI 会自动生成 List 和 Form 的布局结构定义。）*
-
 

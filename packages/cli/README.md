@@ -288,4 +288,4 @@ or via the Settings hub (`namespace=storage`).
 
 ## License
 
-Apache-2.0
+Apache-2.0. See [LICENSING.md](../../LICENSING.md).

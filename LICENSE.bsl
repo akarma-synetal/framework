@@ -4,8 +4,9 @@ License text copyright (c) 2020 MariaDB Corporation Ab, All Rights Reserved.
 Parameters
 
 Licensor:             ObjectStack AI LLC
-Licensed Work:        ObjectStack Runtime: the BSL-licensed packages
-                      of the ObjectStack monorepo as listed in LICENSING.md.
+Licensed Work:        ObjectStack official services and plugins: the
+                      BSL-licensed packages of the ObjectStack monorepo as
+                      listed in LICENSING.md.
                       Copyright (c) 2026 ObjectStack AI LLC.
 Additional Use Grant: You may make production use of the Licensed Work, provided
                       Your use does not include offering the Licensed Work to third

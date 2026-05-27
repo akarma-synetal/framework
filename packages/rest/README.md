@@ -3,7 +3,7 @@
 > Auto-generated REST API layer for ObjectStack — turns protocol metadata into CRUD, batch, metadata, and discovery endpoints with zero boilerplate.
 
 [![npm](https://img.shields.io/npm/v/@objectstack/rest.svg)](https://www.npmjs.com/package/@objectstack/rest)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSING.md)
 
 ## Overview
 
@@ -125,4 +125,4 @@ Plus metadata and discovery routes:
 
 ## License
 
-Apache-2.0 © ObjectStack
+Apache-2.0. See [LICENSING.md](../../LICENSING.md).
