@@ -202,7 +202,17 @@
           "index": false,
           "externalId": false
         }
-      }
+      },
+      "actions": [
+        {
+          "name": "crm_convert_lead",
+          "label": "Convert Lead",
+          "objectName": "crm_contact",
+          "type": "flow",
+          "target": "opportunity_won_notification",
+          "refreshAfter": false
+        }
+      ]
     },
     {
       "name": "crm_opportunity",
@@ -511,6 +521,43 @@
       }
     }
   ],
+  "pages": [
+    {
+      "name": "crm_welcome",
+      "label": "CRM Welcome",
+      "type": "home",
+      "template": "header-sidebar-main",
+      "regions": [
+        {
+          "name": "header",
+          "width": "full",
+          "components": [
+            {
+              "type": "page:header",
+              "properties": {
+                "title": "Welcome to the CRM",
+                "subtitle": "Manage your accounts, contacts and opportunities."
+              }
+            }
+          ]
+        },
+        {
+          "name": "main",
+          "width": "large",
+          "components": [
+            {
+              "type": "element:text",
+              "properties": {
+                "content": "This is a sample custom page. Edit it in Studio to add charts, lists, or AI components."
+              }
+            }
+          ]
+        }
+      ],
+      "isDefault": false,
+      "kind": "full"
+    }
+  ],
   "dashboards": [
     {
       "name": "pipeline_dashboard",
@@ -671,6 +718,100 @@
       "columns": 12
     }
   ],
+  "reports": [
+    {
+      "name": "crm_sales_by_stage",
+      "label": "Sales by Stage",
+      "description": "Total opportunity amount grouped by sales stage.",
+      "objectName": "crm_opportunity",
+      "type": "summary",
+      "columns": [
+        {
+          "field": "stage",
+          "label": "Stage"
+        },
+        {
+          "field": "name",
+          "label": "Opportunity"
+        },
+        {
+          "field": "amount",
+          "label": "Amount"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "name": "crm_convert_lead",
+      "label": "Convert Lead",
+      "objectName": "crm_contact",
+      "type": "flow",
+      "target": "opportunity_won_notification",
+      "refreshAfter": false
+    }
+  ],
+  "workflows": [
+    {
+      "name": "crm_high_value_deal_alert",
+      "objectName": "crm_opportunity",
+      "triggerType": "on_create_or_update",
+      "description": "Notify sales managers when a deal larger than $100k is created or updated.",
+      "criteria": {
+        "dialect": "cel",
+        "source": "record.amount > 100000"
+      },
+      "active": true,
+      "executionOrder": 100,
+      "reevaluateOnChange": false
+    }
+  ],
+  "approvals": [
+    {
+      "name": "crm_discount_approval",
+      "label": "Opportunity Discount Approval",
+      "object": "crm_opportunity",
+      "active": true,
+      "description": "Two-step approval for opportunities with significant discounts.",
+      "entryCriteria": {
+        "dialect": "cel",
+        "source": "record.discount_percent > 20"
+      },
+      "lockRecord": true,
+      "steps": [
+        {
+          "name": "manager_review",
+          "label": "Manager Review",
+          "description": "First-line sales manager reviews the discount.",
+          "approvers": [
+            {
+              "type": "role",
+              "value": "sales_manager"
+            }
+          ],
+          "behavior": "first_response",
+          "rejectionBehavior": "reject_process"
+        },
+        {
+          "name": "finance_review",
+          "label": "Finance Review",
+          "description": "Finance signs off if discount exceeds 30%.",
+          "entryCriteria": {
+            "dialect": "cel",
+            "source": "record.discount_percent > 30"
+          },
+          "approvers": [
+            {
+              "type": "role",
+              "value": "finance_approver"
+            }
+          ],
+          "behavior": "unanimous",
+          "rejectionBehavior": "back_to_previous"
+        }
+      ]
+    }
+  ],
   "flows": [
     {
       "name": "opportunity_won_notification",
@@ -728,6 +869,81 @@
       ],
       "active": false,
       "runAs": "user"
+    }
+  ],
+  "roles": [
+    {
+      "name": "sales_rep",
+      "label": "Sales Representative",
+      "description": "Front-line sales representative."
+    },
+    {
+      "name": "sales_manager",
+      "label": "Sales Manager",
+      "description": "Manages a team of sales reps."
+    }
+  ],
+  "permissions": [
+    {
+      "name": "crm_sales_user",
+      "label": "CRM Sales User",
+      "isProfile": false,
+      "objects": {
+        "crm_account": {
+          "allowCreate": false,
+          "allowRead": false,
+          "allowEdit": false,
+          "allowDelete": false,
+          "allowTransfer": false,
+          "allowRestore": false,
+          "allowPurge": false,
+          "viewAllRecords": false,
+          "modifyAllRecords": false
+        },
+        "crm_contact": {
+          "allowCreate": false,
+          "allowRead": false,
+          "allowEdit": false,
+          "allowDelete": false,
+          "allowTransfer": false,
+          "allowRestore": false,
+          "allowPurge": false,
+          "viewAllRecords": false,
+          "modifyAllRecords": false
+        },
+        "crm_opportunity": {
+          "allowCreate": false,
+          "allowRead": false,
+          "allowEdit": false,
+          "allowDelete": false,
+          "allowTransfer": false,
+          "allowRestore": false,
+          "allowPurge": false,
+          "viewAllRecords": false,
+          "modifyAllRecords": false
+        }
+      }
+    }
+  ],
+  "agents": [
+    {
+      "name": "crm_sales_assistant",
+      "label": "Sales Assistant",
+      "role": "You are a helpful sales operations assistant for a CRM system.",
+      "instructions": "Help sales reps find contacts, update opportunities, and summarise their pipeline. Always be concise and ask before making destructive changes.",
+      "active": true,
+      "visibility": "global"
+    }
+  ],
+  "skills": [
+    {
+      "name": "crm_deal_management",
+      "label": "Deal Management",
+      "description": "Tools and prompts for working with sales opportunities.",
+      "tools": [
+        "crm_lookup_contact"
+      ],
+      "active": true
     }
   ],
   "hooks": [

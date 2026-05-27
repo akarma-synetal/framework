@@ -1,0 +1,36 @@
+// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+
+import type { Identity, Security } from '@objectstack/spec';
+
+/**
+ * Example roles — a small sales hierarchy.
+ */
+export const SalesRepRole: Identity.Role = {
+  name: 'sales_rep',
+  label: 'Sales Representative',
+  description: 'Front-line sales representative.',
+};
+
+export const SalesManagerRole: Identity.Role = {
+  name: 'sales_manager',
+  label: 'Sales Manager',
+  description: 'Manages a team of sales reps.',
+  parentRole: 'sales_rep',
+};
+
+/**
+ * Example permission set — base permissions on CRM objects for sales users.
+ *
+ * Note: `objects` is a Record keyed by object name, not an array.
+ */
+export const SalesUserPermissionSet: Security.PermissionSet = {
+  name: 'crm_sales_user',
+  label: 'CRM Sales User',
+  description: 'Standard CRUD on CRM objects for sales team members.',
+  isProfile: false,
+  objects: {
+    crm_account: { read: true, create: true, edit: true, delete: false },
+    crm_contact: { read: true, create: true, edit: true, delete: false },
+    crm_opportunity: { read: true, create: true, edit: true, delete: false },
+  },
+};
