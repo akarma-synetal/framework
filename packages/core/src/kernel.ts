@@ -334,12 +334,26 @@ export class ObjectKernel {
                 
                 if (!result.success) {
                     this.logger.error(`Plugin startup failed: ${plugin.name}`, result.error);
-                    console.error(`[Kernel] Plugin startup failed: ${plugin.name}`, result.error instanceof Error ? result.error.message : result.error, result.error instanceof Error ? result.error.stack : '');
-                    
+                    const origMsg = result.error instanceof Error ? result.error.message : String(result.error);
+                    const origStack = result.error instanceof Error ? result.error.stack : '';
+                    console.error(`[Kernel] Plugin startup failed: ${plugin.name}`, origMsg, origStack);
+
                     if (this.config.rollbackOnFailure) {
                         this.logger.warn('Rolling back started plugins...');
                         await this.rollbackStartedPlugins();
-                        throw new Error(`Plugin ${plugin.name} failed to start - rollback complete`);
+                        // Propagate the original cause through the thrown error
+                        // so callers (e.g. cloud auth-proxy) can surface the
+                        // real failure instead of an opaque "rollback complete"
+                        // string. Without this, every kernel-boot failure looks
+                        // identical from the outside.
+                        const err: any = new Error(
+                            `Plugin ${plugin.name} failed to start - rollback complete: ${origMsg}`,
+                        );
+                        if (result.error instanceof Error) {
+                            err.cause = result.error;
+                            err.originalStack = origStack;
+                        }
+                        throw err;
                     }
                 }
             }
