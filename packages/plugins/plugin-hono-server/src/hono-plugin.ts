@@ -659,6 +659,9 @@ export class HonoServerPlugin implements Plugin {
                 // objects in a single pass.
                 const objects: Record<string, any> = {};
                 const fields: Record<string, { readable: boolean; editable: boolean }> = {};
+                const systemPermissions = new Set<string>();
+                const tabRank: Record<string, number> = { hidden: 0, default_off: 1, default_on: 2, visible: 3 };
+                const tabPermissions: Record<string, 'visible' | 'hidden' | 'default_on' | 'default_off'> = {};
                 for (const ps of resolved) {
                     if (ps?.objects) {
                         for (const [obj, perm] of Object.entries(ps.objects)) {
@@ -679,6 +682,20 @@ export class HonoServerPlugin implements Plugin {
                             fields[key] = acc;
                         }
                     }
+                    if (Array.isArray(ps?.systemPermissions)) {
+                        for (const sp of ps.systemPermissions) {
+                            if (typeof sp === 'string') systemPermissions.add(sp);
+                        }
+                    }
+                    if (ps?.tabPermissions && typeof ps.tabPermissions === 'object') {
+                        for (const [app, val] of Object.entries(ps.tabPermissions as Record<string, unknown>)) {
+                            if (typeof val !== 'string' || !(val in tabRank)) continue;
+                            const cur = tabPermissions[app];
+                            if (!cur || tabRank[val] > tabRank[cur]) {
+                                tabPermissions[app] = val as 'visible' | 'hidden' | 'default_on' | 'default_off';
+                            }
+                        }
+                    }
                 }
                 return c.json({
                     authenticated: true,
@@ -688,10 +705,42 @@ export class HonoServerPlugin implements Plugin {
                     permissionSets: resolved.map((p: any) => p?.name).filter(Boolean),
                     objects,
                     fields,
+                    systemPermissions: Array.from(systemPermissions),
+                    tabPermissions,
                 });
             } catch (err: any) {
                 ctx.logger.warn('[hono] /auth/me/permissions failed', { err: err?.message });
                 return c.json({ authenticated: true, userId: execCtx.userId, objects: {}, fields: {} });
+            }
+        });
+
+        // GET /me/apps — list apps the current user is allowed to enter.
+        // Filters `metadata.list('app')` by:
+        //   1. AppSchema.requiredPermissions ⊆ ctx.systemPermissions
+        //   2. ctx.tabPermissions[app.name] !== 'hidden'
+        // Anonymous users get an empty array. When SecurityPlugin is absent
+        // we fail-open and return every app (matches server behaviour).
+        rawApp.get(`${prefix}/me/apps`, async (c: any) => {
+            const execCtx = await resolveCtx(c);
+            if (!execCtx?.userId) return c.json({ apps: [] });
+            try {
+                const metadata: any = ctx.getService('metadata');
+                if (!metadata?.list) return c.json({ apps: [] });
+                const all: any[] = (await metadata.list('app')) ?? [];
+                const sysPerms = new Set<string>(execCtx.systemPermissions ?? []);
+                const tabs = (execCtx as any).tabPermissions ?? {};
+                const failOpen = !ctx.getService('security.permissions');
+                const apps = all.filter((app: any) => {
+                    if (!app?.name) return false;
+                    if (tabs[app.name] === 'hidden') return false;
+                    if (failOpen) return true;
+                    const req: string[] = Array.isArray(app.requiredPermissions) ? app.requiredPermissions : [];
+                    return req.every((p) => sysPerms.has(p));
+                });
+                return c.json({ apps });
+            } catch (err: any) {
+                ctx.logger.warn('[hono] /me/apps failed', { err: err?.message });
+                return c.json({ apps: [] });
             }
         });
 

@@ -51,6 +51,8 @@ const result = ExecutionContext.parse(data);
 | **tenantId** | `string` | optional |  |
 | **roles** | `string[]` | ✅ |  |
 | **permissions** | `string[]` | ✅ |  |
+| **systemPermissions** | `string[]` | optional |  |
+| **tabPermissions** | `Record<string, Enum<'visible' \| 'hidden' \| 'default_on' \| 'default_off'>>` | optional |  |
 | **org_user_ids** | `string[]` | optional |  |
 | **isSystem** | `boolean` | ✅ |  |
 | **accessToken** | `string` | optional |  |

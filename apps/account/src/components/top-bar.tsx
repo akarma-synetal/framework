@@ -8,7 +8,7 @@
  *   - Right: locale toggle + theme toggle + UserMenu (avatar dropdown w/ sign-out)
  */
 
-import { Link, useLocation, useParams } from '@tanstack/react-router';
+import { useLocation, useParams } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { ChevronRight, UserCircle2 } from 'lucide-react';
 import { useObjectTranslation } from '@object-ui/i18n';
@@ -28,13 +28,13 @@ import { OrganizationSwitcher } from '@/components/organization-switcher';
 
 function AccountBrand({ label }: { label: string }) {
   return (
-    <Link
-      to="/account"
+    <a
+      href="/"
       className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-gradient text-primary-foreground shadow-sm shadow-primary/30 ring-1 ring-white/15 transition-transform hover:scale-105"
       aria-label={label}
     >
       <UserCircle2 className="h-4 w-4" />
-    </Link>
+    </a>
   );
 }
 

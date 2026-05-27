@@ -37,7 +37,7 @@ export const ExecutionContextSchema = lazySchema(() => z.object({
    * entry (`AppSchema.requiredPermissions`) and system-level capabilities
    * like `manage_users`, `studio.access`, `setup.access`.
    */
-  systemPermissions: z.array(z.string()).default([]),
+  systemPermissions: z.array(z.string()).optional(),
 
   /**
    * Aggregated tab/app visibility overrides (merged most-permissive across
