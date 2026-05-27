@@ -685,14 +685,18 @@ export class AuthManager {
         // never seed `sys_environment`) keep working: any lookup error
         // is treated as "no envs to protect".
         organizationHooks: {
-          // Gate fresh organization creation behind `OS_MULTI_ORG_ENABLED`.
+          // Gate fresh organization creation behind the multi-org flag.
           // The plugin itself is always installed (so list/update/invite endpoints
           // keep responding); only the `create` operation is denied when the
-          // deployment is provisioned in single-org mode. Default is enabled
-          // to preserve historical behaviour.
+          // deployment is provisioned in single-org mode. Resolution order:
+          // 1. explicit `OS_MULTI_ORG_ENABLED` (wins for backwards compat),
+          // 2. else `OS_MULTI_TENANT` (multi-tenant deployments are always
+          //    multi-org), default `'false'` → single-org / per-env runtime.
           beforeCreateOrganization: async () => {
+            const env = (globalThis as any)?.process?.env ?? {};
+            const explicit = env.OS_MULTI_ORG_ENABLED;
             const flag = String(
-              (globalThis as any)?.process?.env?.OS_MULTI_ORG_ENABLED ?? 'true',
+              explicit ?? env.OS_MULTI_TENANT ?? 'false',
             ).toLowerCase();
             if (flag === 'false') {
               const { APIError } = await import('better-auth/api');
@@ -1217,8 +1221,13 @@ export class AuthManager {
 
     // Extract enabled features
     const pluginConfig: Partial<AuthPluginConfig> = this.config.plugins ?? {};
+    // Multi-org capability (UI org-switcher, "create org" action, etc.).
+    // Resolution order: explicit `OS_MULTI_ORG_ENABLED` wins, else fall
+    // back to `OS_MULTI_TENANT` (multi-tenant deployments are always
+    // multi-org); default `'false'` → single-org / per-env runtime.
+    const multiOrgEnv = (globalThis as any)?.process?.env ?? {};
     const multiOrgEnabled = String(
-      (globalThis as any)?.process?.env?.OS_MULTI_ORG_ENABLED ?? 'true',
+      multiOrgEnv.OS_MULTI_ORG_ENABLED ?? multiOrgEnv.OS_MULTI_TENANT ?? 'false',
     ).toLowerCase() !== 'false';
 
     // Legal links shown beneath the login / register cards. Defaults to
