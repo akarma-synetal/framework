@@ -44,11 +44,40 @@ export class AppPlugin implements Plugin {
         this.bundle = bundle;
         this.projectContext = projectContext;
         // Support both direct manifest (legacy) and Stack Definition (nested manifest)
-        const sys = bundle.manifest || bundle;
-        const appId = sys.id || sys.name || 'unnamed-app';
+        const sys = bundle?.manifest || bundle;
+        const appId = sys?.id || sys?.name;
+
+        if (!appId) {
+            // Fail fast with the bundle keys so callers can see exactly
+            // which input was malformed. The old silent fallback to
+            // `'unnamed-app'` produced opaque
+            // "Plugin plugin.app.unnamed-app failed to start - rollback complete"
+            // errors at kernel boot whenever the wrong slice of an
+            // artifact envelope was handed to AppPlugin (e.g. passing
+            // `artifact.metadata` without surfacing the sibling
+            // `artifact.manifest`).
+            const bundleKeys = bundle && typeof bundle === 'object'
+                ? Object.keys(bundle).slice(0, 20).join(',')
+                : typeof bundle;
+            const sysKeys = sys && typeof sys === 'object'
+                ? Object.keys(sys).slice(0, 20).join(',')
+                : typeof sys;
+            const ctxHint = projectContext
+                ? ` projectContext=${JSON.stringify({
+                    environmentId: projectContext.environmentId,
+                    packageId: projectContext.packageId,
+                    source: projectContext.source,
+                })}`
+                : '';
+            throw new Error(
+                `[AppPlugin] bundle is missing manifest.id and manifest.name — `
+                + `cannot register as a plugin. bundleKeys=[${bundleKeys}] `
+                + `sysKeys=[${sysKeys}]${ctxHint}`,
+            );
+        }
 
         this.name = `plugin.app.${appId}`;
-        this.version = sys.version;
+        this.version = sys?.version;
     }
 
     init = async (ctx: PluginContext) => {

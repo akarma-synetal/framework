@@ -266,4 +266,33 @@ describe('AppPlugin', () => {
             );
         });
     });
+
+    describe('constructor fail-fast', () => {
+        it('throws with bundle key context when manifest id/name is missing', () => {
+            // Mirrors the regression where the cloud artifact-kernel-factory
+            // handed `artifact.metadata` (category arrays only) without
+            // surfacing the sibling `artifact.manifest`, producing opaque
+            // "Plugin plugin.app.unnamed-app failed to start" errors.
+            const bundle = { objects: [], views: [], apps: [] };
+            expect(() => new AppPlugin(bundle as any, {
+                environmentId: 'env-1',
+                organizationId: 'org-1',
+                packageId: 'pkg.test',
+                source: 'package',
+            } as any)).toThrowError(/missing manifest\.id and manifest\.name/);
+        });
+
+        it('throws when nested manifest has neither id nor name', () => {
+            const bundle = { manifest: { version: '1.0.0' } };
+            expect(() => new AppPlugin(bundle as any)).toThrowError(
+                /missing manifest\.id and manifest\.name/,
+            );
+        });
+
+        it('accepts bundle with only manifest.name', () => {
+            const bundle = { manifest: { name: 'name-only' } };
+            const plugin = new AppPlugin(bundle as any);
+            expect(plugin.name).toBe('plugin.app.name-only');
+        });
+    });
 });

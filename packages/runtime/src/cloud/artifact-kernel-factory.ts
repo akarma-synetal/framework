@@ -289,8 +289,29 @@ export class ArtifactKernelFactory implements EnvironmentKernelFactory {
         }
 
         const projectName = project.hostname ?? environmentId;
-        const bundle = artifact.metadata as any;
-        const sys = bundle?.manifest ?? bundle;
+        // Cloud Artifact API envelope shape (see
+        // `service-cloud/src/routes/cloud.ts`):
+        //   { schemaVersion, environmentId, commitId, checksum,
+        //     metadata: { objects, views, apps, ... },  // category arrays only
+        //     functions, manifest, builtAt, runtime }
+        // `manifest` is a TOP-LEVEL SIBLING of `metadata`, not nested
+        // inside it. AppPlugin reads `bundle.manifest.id` for the plugin
+        // name, so we must surface the sibling manifest onto the bundle
+        // we hand it — otherwise it falls back to `'unnamed-app'` and a
+        // package install (e.g. CRM Starter with declarative hooks)
+        // crashes the env kernel at start, rolling back all plugins and
+        // 500'ing every API.
+        const artifactAny = artifact as any;
+        const topLevelManifest = (artifactAny?.manifest && typeof artifactAny.manifest === 'object')
+            ? artifactAny.manifest
+            : null;
+        const topLevelFunctions = Array.isArray(artifactAny?.functions) ? artifactAny.functions : [];
+        const bundle: any = {
+            ...(artifact.metadata ?? {}),
+            ...(topLevelManifest ? { manifest: topLevelManifest } : {}),
+            functions: topLevelFunctions,
+        };
+        const sys = bundle.manifest ?? bundle;
         const packageId = sys?.packageId ?? sys?.package_id ?? bundle?.packageId;
 
         // Per-project i18n: register I18nServicePlugin BEFORE AppPlugin so
