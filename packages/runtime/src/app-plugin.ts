@@ -489,50 +489,73 @@ export class AppPlugin implements Plugin {
              if (multiTenant) {
                  ctx.logger.info('[Seeder] multi-tenant mode — skipping inline seed; per-org replay will run on sys_organization insert');
              } else {
-             // Use SeedLoaderService for metadata-driven loading with reference resolution
-             try {
-                 const metadata = ctx.getService('metadata') as IMetadataService | undefined;
-                 if (metadata) {
-                     const seedLoader = new SeedLoaderService(ql, metadata, ctx.logger);
-                     const { SeedLoaderRequestSchema } = await import('@objectstack/spec/data');
-                     const request = SeedLoaderRequestSchema.parse({
-                         datasets: normalizedDatasets,
-                         config: { defaultMode: 'upsert', multiPass: true },
-                     });
-                     const result = await seedLoader.load(request);
-                     ctx.logger.info('[Seeder] Seed loading complete', {
-                         inserted: result.summary.totalInserted,
-                         updated: result.summary.totalUpdated,
-                         errors: result.errors.length,
-                     });
-                 } else {
-                     // Fallback: basic insert when metadata service is not available
-                     ctx.logger.debug('[Seeder] No metadata service; using basic insert fallback');
-                     for (const dataset of normalizedDatasets) {
-                         ctx.logger.info(`[Seeder] Seeding ${dataset.records.length} records for ${dataset.object}`);
-                         for (const record of dataset.records) {
-                             try {
-                                 await ql.insert(dataset.object, record, { context: { isSystem: true } } as any);
-                             } catch (err: any) {
-                                 ctx.logger.warn(`[Seeder] Failed to insert ${dataset.object} record:`, { error: err.message });
-                             }
-                         }
-                     }
-                     ctx.logger.info('[Seeder] Data seeding complete.');
-                 }
-             } catch (err: any) {
-                 // If SeedLoaderService fails (e.g., metadata not available), fall back to basic insert
-                 ctx.logger.warn('[Seeder] SeedLoaderService failed, falling back to basic insert', { error: err.message });
-                 for (const dataset of normalizedDatasets) {
-                     for (const record of dataset.records) {
-                         try {
-                             await ql.insert(dataset.object, record, { context: { isSystem: true } } as any);
-                         } catch (insertErr: any) {
-                             ctx.logger.warn(`[Seeder] Failed to insert ${dataset.object} record:`, { error: insertErr.message });
-                         }
-                     }
-                 }
-                 ctx.logger.info('[Seeder] Data seeding complete (fallback).');
+             // Inline seed budget: large bundles (e.g. CRM Starter's 10
+             // datasets) can easily exceed the kernel's plugin-start
+             // timeout. We MUST NOT let seed work tear the kernel down —
+             // a 500 on /auth and /data is far worse than a delayed seed.
+             // Race the actual seed work against a soft budget; if we run
+             // out of time, log loudly and let the kernel proceed.
+             const seedBudgetMs = Number(process.env.OS_INLINE_SEED_BUDGET_MS ?? 8000);
+             const seedPromise = (async () => {
+              try {
+                  const metadata = ctx.getService('metadata') as IMetadataService | undefined;
+                  if (metadata) {
+                      const seedLoader = new SeedLoaderService(ql, metadata, ctx.logger);
+                      const { SeedLoaderRequestSchema } = await import('@objectstack/spec/data');
+                      const request = SeedLoaderRequestSchema.parse({
+                          datasets: normalizedDatasets,
+                          config: { defaultMode: 'upsert', multiPass: true },
+                      });
+                      const result = await seedLoader.load(request);
+                      ctx.logger.info('[Seeder] Seed loading complete', {
+                          inserted: result.summary.totalInserted,
+                          updated: result.summary.totalUpdated,
+                          errors: result.errors.length,
+                      });
+                  } else {
+                      // Fallback: basic insert when metadata service is not available
+                      ctx.logger.debug('[Seeder] No metadata service; using basic insert fallback');
+                      for (const dataset of normalizedDatasets) {
+                          ctx.logger.info(`[Seeder] Seeding ${dataset.records.length} records for ${dataset.object}`);
+                          for (const record of dataset.records) {
+                              try {
+                                  await ql.insert(dataset.object, record, { context: { isSystem: true } } as any);
+                              } catch (err: any) {
+                                  ctx.logger.warn(`[Seeder] Failed to insert ${dataset.object} record:`, { error: err.message });
+                              }
+                          }
+                      }
+                      ctx.logger.info('[Seeder] Data seeding complete.');
+                  }
+              } catch (err: any) {
+                  // If SeedLoaderService fails (e.g., metadata not available), fall back to basic insert
+                  ctx.logger.warn('[Seeder] SeedLoaderService failed, falling back to basic insert', { error: err.message });
+                  for (const dataset of normalizedDatasets) {
+                      for (const record of dataset.records) {
+                          try {
+                              await ql.insert(dataset.object, record, { context: { isSystem: true } } as any);
+                          } catch (insertErr: any) {
+                              ctx.logger.warn(`[Seeder] Failed to insert ${dataset.object} record:`, { error: insertErr.message });
+                          }
+                      }
+                  }
+                  ctx.logger.info('[Seeder] Data seeding complete (fallback).');
+              }
+             })();
+             let timer: ReturnType<typeof setTimeout> | undefined;
+             const budget = new Promise<'budget'>((resolve) => {
+                 timer = setTimeout(() => resolve('budget'), seedBudgetMs);
+             });
+             const winner = await Promise.race([seedPromise.then(() => 'done' as const), budget]);
+             if (timer) clearTimeout(timer);
+             if (winner === 'budget') {
+                 ctx.logger.warn(
+                     `[Seeder] Inline seed exceeded ${seedBudgetMs}ms budget for ${appId}; continuing in background to avoid blocking kernel start.`,
+                 );
+                 // Don't leave the promise unobserved.
+                 seedPromise.catch((err: any) => {
+                     ctx.logger.warn('[Seeder] Background seed failed after budget', { appId, error: err?.message ?? String(err) });
+                 });
              }
              }
         }
