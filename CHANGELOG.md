@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — `@objectstack/objectql` test suite re-aligned with current overlay policy
+
+The CI `Test Core` job had been failing on `@objectstack/objectql#test`
+since the `Test Core` paths filter first re-engaged after the
+`feat: add project mode, metadata forms, and org overlays` series
+(`ba252da0b`, `482eb67cc`) shifted the overlay/persistence contract
+without updating the affected fixtures.
+
+- Updated four test files — `overlay-precedence.test.ts`,
+  `protocol-meta.test.ts`, `protocol-meta-types-rich.test.ts`, and
+  `sys-metadata-repository.test.ts` — to track the current
+  `DEFAULT_METADATA_TYPE_REGISTRY` (object/field/flow/workflow/agent/
+  permission/role/profile/action/approval now opt into per-org
+  overlay; the invariant pin now covers the execution/wiring-layer
+  types — trigger/validation/hook/datasource/router/function/service —
+  that must stay non-overridable).
+- Adjusted persistence assertions for the new `sys_metadata` row
+  shape (`checksum` / `created_at` / `updated_at`, no `scope`) and
+  the dedicated `sys_metadata_history` table, plus optimistic-
+  concurrency (`parentVersion`) usage and the now-unwrapped DB
+  error propagation.
+- No production code changed. `pnpm turbo run test --filter
+  @objectstack/objectql` is green (371/371).
+
 ### Added — Settings → runtime bridge for the embedder
 
 The `embedder_*` settings configured in **Setup → AI & Embedder** now
