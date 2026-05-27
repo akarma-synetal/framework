@@ -155,20 +155,67 @@ export class EmailServicePlugin implements Plugin {
 
           // Register the `mail/test` action handler so saving + sending
           // a test email actually exercises the live transport.
+          //
+          // The handler accepts both the persisted snapshot (`values`)
+          // and the (possibly unsaved) form state posted as
+          // `payload.values`, with overrides winning. When the merged
+          // provider/api_key differ from what the live `svc` is bound
+          // to, a one-shot temporary `EmailService` is built so the
+          // operator can validate edits before hitting "Save".
           if (typeof settings.registerAction === 'function') {
             const svc = this.service;
-            settings.registerAction('mail', 'test', async ({ values, ctx: actionCtx }: any) => {
+            settings.registerAction('mail', 'test', async ({ values, payload, ctx: actionCtx }: any) => {
+              const overrides =
+                payload && typeof payload === 'object' && payload !== null && 'values' in payload
+                  ? (payload as { values?: Record<string, unknown> }).values ?? {}
+                  : {};
+              const merged: Record<string, unknown> = { ...(values ?? {}), ...overrides };
               const to = (actionCtx?.body?.to as string | undefined)
-                ?? (values.from_email as string | undefined);
+                ?? (payload?.to as string | undefined)
+                ?? (merged.from_email as string | undefined);
               if (!to) {
                 return { ok: false, severity: 'error', message: 'Provide a "to" address (or set from_email).' };
               }
+
+              // Build a temporary service from the merged values when
+              // the form differs from the live svc — covers the
+              // "edited but not saved" path.
+              let target: EmailService = svc;
+              let tempDescription = '';
+              const provider = String(merged.provider ?? 'smtp');
+              const apiKey = typeof merged.api_key === 'string' ? merged.api_key : undefined;
+              if (provider !== 'smtp' && provider !== 'log') {
+                if (!apiKey) {
+                  return { ok: false, severity: 'error', message: `${provider}: api_key is required.` };
+                }
+                try {
+                  const transport = makeTransport({
+                    provider: provider as 'resend' | 'postmark',
+                    apiKey,
+                    logger: ctx.logger,
+                  });
+                  target = new EmailService({
+                    transport,
+                    defaultFrom: merged.from_email
+                      ? {
+                          address: String(merged.from_email),
+                          name: merged.from_name ? String(merged.from_name) : undefined,
+                        }
+                      : undefined,
+                    logger: ctx.logger,
+                  });
+                  tempDescription = ` via ${provider}`;
+                } catch (err: any) {
+                  return { ok: false, severity: 'error', message: `Failed to build ${provider} transport: ${err?.message ?? String(err)}` };
+                }
+              }
+
               try {
-                const result = await svc.send({
+                const result = await target.send({
                   to,
-                  from: values.from_email ? {
-                    address: String(values.from_email),
-                    name: values.from_name ? String(values.from_name) : undefined,
+                  from: merged.from_email ? {
+                    address: String(merged.from_email),
+                    name: merged.from_name ? String(merged.from_name) : undefined,
                   } : undefined,
                   subject: 'ObjectStack mail test',
                   text: 'This is a test email from the ObjectStack settings page.',
@@ -179,7 +226,7 @@ export class EmailServicePlugin implements Plugin {
                 return {
                   ok: true,
                   severity: 'info',
-                  message: `Sent test email to ${to} (id=${result.id}).`,
+                  message: `Sent test email to ${to}${tempDescription} (id=${result.id}).`,
                 };
               } catch (err: any) {
                 return { ok: false, severity: 'error', message: err?.message ?? String(err) };

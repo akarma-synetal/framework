@@ -77,15 +77,14 @@ export const SETUP_APP: App = {
       ],
     },
     {
-      // Data Model — typed browse + edit for the schema metadata that
-      // drives every other surface. Phase 3b: the Objects + Fields nav
-      // entries now use the new `component` nav variant to route to
-      // first-party metadata admin pages (`metadata:resource`) instead
-      // of grids over `sys_metadata`. The new pages render the 3-state
-      // overlay (code · overlay · effective), surface References, and
-      // gate destructive saves behind a confirmation dialog. The raw
-      // `sys_metadata` grid remains available under Advanced for
-      // debugging.
+      // Data Model — entry points for the metadata that drives every other
+      // surface. Curated to the items admins routinely maintain (the full
+      // 14-type catalog is one click away under "All Metadata Types").
+      //
+      // Fields are intentionally NOT a top-level entry — they are managed
+      // in-context from the parent Object's edit form (master-detail
+      // fields section). A flat global field list across every object is
+      // rarely useful and adds noise.
       id: 'group_data_model',
       type: 'group',
       label: 'Data Model',
@@ -106,13 +105,76 @@ export const SETUP_APP: App = {
           params: { type: 'object' },
           icon: 'box',
         },
+      ],
+    },
+    {
+      // User Experience — the metadata that shapes what end users see.
+      // These are the most frequently edited UI artefacts; the rest
+      // (reports, actions, pages) are still reachable via the directory.
+      id: 'group_ux',
+      type: 'group',
+      label: 'User Experience',
+      icon: 'layout',
+      children: [
         {
-          id: 'nav_fields',
+          id: 'nav_apps',
           type: 'component',
-          label: 'Fields',
+          label: 'Apps',
           componentRef: 'metadata:resource',
-          params: { type: 'field' },
-          icon: 'columns',
+          params: { type: 'app' },
+          icon: 'app-window',
+        },
+        {
+          id: 'nav_views',
+          type: 'component',
+          label: 'Views',
+          componentRef: 'metadata:resource',
+          params: { type: 'view' },
+          icon: 'table',
+        },
+        {
+          id: 'nav_dashboards',
+          type: 'component',
+          label: 'Dashboards',
+          componentRef: 'metadata:resource',
+          params: { type: 'dashboard' },
+          icon: 'layout-dashboard',
+        },
+      ],
+    },
+    {
+      // Automation — high-touch admin surfaces: flows, workflow rules,
+      // and approval processes. Skills/Tools/Agents (AI metadata) are
+      // grouped together because they are typically configured together
+      // by the same team.
+      id: 'group_automation_ai',
+      type: 'group',
+      label: 'Automation & AI',
+      icon: 'workflow',
+      children: [
+        {
+          id: 'nav_flows',
+          type: 'component',
+          label: 'Flows',
+          componentRef: 'metadata:resource',
+          params: { type: 'flow' },
+          icon: 'git-branch',
+        },
+        {
+          id: 'nav_workflows',
+          type: 'component',
+          label: 'Workflow Rules',
+          componentRef: 'metadata:resource',
+          params: { type: 'workflow' },
+          icon: 'zap',
+        },
+        {
+          id: 'nav_agents',
+          type: 'component',
+          label: 'AI Agents',
+          componentRef: 'metadata:resource',
+          params: { type: 'agent' },
+          icon: 'bot',
         },
       ],
     },

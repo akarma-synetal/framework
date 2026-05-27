@@ -564,6 +564,7 @@ export const FormFieldSchema = lazySchema(() => z.object({
   placeholder: I18nLabelSchema.optional().describe('Placeholder text'),
   helpText: I18nLabelSchema.optional().describe('Help/hint text'),
   readonly: z.boolean().optional().describe('Read-only override'),
+  immutable: z.boolean().optional().describe('Editable on create, locked once the record exists (e.g. machine names).'),
   required: z.boolean().optional().describe('Required override'),
   hidden: z.boolean().optional().describe('Hidden override'),
   colSpan: z.number().int().min(1).max(4).optional().describe('Column span in grid layout (1-4)'),

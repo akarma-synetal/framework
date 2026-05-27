@@ -159,8 +159,19 @@ export class SettingsServicePlugin implements Plugin {
         // instance. We avoid re-registering the service because the
         // kernel disallows `registerService` for an already-registered
         // name.
+        //
+        // SettingsEngine and IDataEngine have *different* update
+        // signatures — SettingsEngine bundles `{ where, data }` into a
+        // single opts object, while IDataEngine takes
+        // `(object, data, options?)` and extracts the row id from
+        // `data.id` or `options.where.id`. A force-cast leaves runtime
+        // calls to `update(object, { where, data })` reaching the real
+        // engine as a malformed payload with no id, which then throws
+        // "Update requires an ID or options.multi=true". The adapter
+        // below performs the translation so SettingsService can keep
+        // its narrow, bundled signature.
         this.service!.bindEngine(
-          engine as unknown as SettingsEngine,
+          wrapEngineAsSettingsEngine(engine),
           this.buildAuditSink(ctx, engine),
           {
             secretStore: this.buildSecretStore(engine),
@@ -242,11 +253,16 @@ export class SettingsServicePlugin implements Plugin {
         return row ?? null;
       },
       async update(id, patch) {
-        await eng.update('sys_secret', {
-          where: { id },
-          data: patch,
-          bypassTenantAudit: true,
-        });
+        // IDataEngine.update signature is `(object, data, options?)`
+        // and extracts the record id from `data.id` (or
+        // `options.where.id`). Passing `{ where, data, ... }` as the
+        // data argument left id=undefined and tripped
+        // "Update requires an ID or options.multi=true".
+        await eng.update(
+          'sys_secret',
+          { id, ...patch },
+          { bypassTenantAudit: true },
+        );
       },
     };
   }
@@ -281,4 +297,49 @@ export class SettingsServicePlugin implements Plugin {
       },
     };
   }
+}
+
+/**
+ * Translate an `IDataEngine` instance into the narrower `SettingsEngine`
+ * surface used inside `SettingsService`. The two interfaces diverge on
+ * `update`:
+ *
+ *   - SettingsEngine: `update(object, { where, data, bypassTenantAudit })`
+ *   - IDataEngine:    `update(object, data, options?)` — id comes from
+ *     `data.id` or `options.where.id`; otherwise the engine throws
+ *     "Update requires an ID or options.multi=true".
+ *
+ * The adapter resolves the row id from `where.id` when present and
+ * forwards everything in IDataEngine's positional form. When the caller
+ * supplies a non-id where clause (composite-key tables), we fall back
+ * to `multi: true` so the engine routes through `driver.updateMany`
+ * instead of throwing.
+ */
+function wrapEngineAsSettingsEngine(engine: IDataEngine): SettingsEngine {
+  const eng: any = engine;
+  return {
+    async find(objectName, opts) {
+      return eng.find(objectName, opts);
+    },
+    async insert(objectName, data, opts) {
+      return eng.insert(objectName, data, opts);
+    },
+    async update(objectName, opts) {
+      const { where, data, bypassTenantAudit } = opts as {
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+        bypassTenantAudit?: boolean;
+      };
+      const driverOpts = bypassTenantAudit ? { bypassTenantAudit: true } : undefined;
+      const id = (where as any)?.id;
+      if (id !== undefined && id !== null) {
+        return eng.update(objectName, { id, ...data }, driverOpts);
+      }
+      return eng.update(objectName, data, {
+        where,
+        multi: true,
+        ...(driverOpts ?? {}),
+      });
+    },
+  };
 }

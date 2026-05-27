@@ -14,7 +14,7 @@ export const objectForm = defineForm({
       description: 'Identity, labels, and taxonomy.',
       columns: 2,
       fields: [
-        { field: 'name', type: 'text', required: true, colSpan: 1, helpText: 'snake_case unique identifier (immutable)' },
+        { field: 'name', type: 'text', required: true, immutable: true, colSpan: 1, helpText: 'snake_case unique identifier (immutable after creation)' },
         { field: 'label', type: 'text', colSpan: 1, helpText: 'Singular display name (e.g. "Account")' },
         { field: 'pluralLabel', type: 'text', colSpan: 1, helpText: 'Plural display name (e.g. "Accounts")' },
         { field: 'icon', type: 'text', colSpan: 1, helpText: 'Lucide icon name (e.g. "building", "users")' },

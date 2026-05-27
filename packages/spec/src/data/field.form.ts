@@ -16,7 +16,7 @@ export const fieldForm = defineForm({
       description: 'Core field identity and constraints.',
       columns: 2,
       fields: [
-        { field: 'name', required: true, colSpan: 1, helpText: 'Unique identifier (snake_case)' },
+        { field: 'name', required: true, immutable: true, colSpan: 1, helpText: 'Unique identifier (snake_case, immutable after creation)' },
         { field: 'label', required: true, colSpan: 1, helpText: 'Display name for users' },
         { field: 'type', required: true, colSpan: 1, helpText: 'Data type of this field' },
         { field: 'group', colSpan: 1, helpText: 'Group name for form layout' },

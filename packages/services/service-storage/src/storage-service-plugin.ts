@@ -253,17 +253,26 @@ export class StorageServicePlugin implements Plugin {
         // Register the live `storage/test` probe handler.
         if (typeof settings.registerAction === 'function' && this.storage) {
           const proxy = this.storage;
-          settings.registerAction('storage', 'test', async ({ values }: any) => {
+          settings.registerAction('storage', 'test', async ({ values, payload }: any) => {
+            // Merge the (possibly unsaved) form state posted as
+            // `payload.values` over the persisted snapshot so an operator
+            // can validate edits before hitting "Save". Matches the
+            // pattern used by ai/test and mail/test.
+            const overrides =
+              payload && typeof payload === 'object' && payload !== null && 'values' in payload
+                ? (payload as { values?: Record<string, unknown> }).values ?? {}
+                : {};
+            const merged: Record<string, unknown> = { ...(values ?? {}), ...overrides };
             const probeKey = `__objectstack_probe__/${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
             const probeBytes = Buffer.from(`probe@${new Date().toISOString()}`, 'utf-8');
             try {
-              // If values differ from current adapter, build a temporary
-              // adapter so we can validate user-typed credentials without
+              // If merged values are present, build a temporary adapter
+              // so we can validate user-typed credentials without
               // committing them.
               let target: IStorageService = proxy;
-              if (values && Object.keys(values).length > 0) {
+              if (merged && Object.keys(merged).length > 0) {
                 try {
-                  target = await this.buildAdapterFromValues(values);
+                  target = await this.buildAdapterFromValues(merged);
                 } catch (err: any) {
                   return { ok: false, severity: 'error', message: err?.message ?? String(err) };
                 }
@@ -274,7 +283,7 @@ export class StorageServicePlugin implements Plugin {
                 return { ok: false, severity: 'error', message: 'Probe download did not match upload.' };
               }
               await target.delete(probeKey);
-              const adapter = String(values?.adapter ?? this.options.adapter ?? 'local');
+              const adapter = String(merged.adapter ?? this.options.adapter ?? 'local');
               return {
                 ok: true,
                 severity: 'info',

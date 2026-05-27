@@ -1020,12 +1020,11 @@ export class AIServicePlugin implements Plugin {
         // what the running service actually uses — env-only configuration
         // is a fully supported deployment mode.
         if (provider === 'memory') {
-          const liveAdapter = this.service?.['config']?.adapter as LLMAdapter | undefined;
-          const liveName = liveAdapter?.name ?? '';
-          if (liveAdapter && liveName && liveName !== 'memory') {
+          const liveName = this.service?.adapterName ?? '';
+          if (this.service && liveName && liveName !== 'memory') {
             const started = Date.now();
             try {
-              const result = await liveAdapter.chat(
+              const result = await this.service.chat(
                 [{ role: 'user', content: 'ping' }],
                 { maxTokens: 8 },
               );
