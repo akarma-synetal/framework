@@ -298,4 +298,5 @@ Tests run against in-memory SQLite (`:memory:`) — no external services require
 
 ## License
 
-Apache-2.0 — Copyright (c) 2025 ObjectStack
+BUSL-1.1 with a four-year conversion to Apache-2.0. See
+[LICENSING.md](../../../LICENSING.md).

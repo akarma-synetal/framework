@@ -60,3 +60,8 @@ the following built-in manifests are pre-registered out of the box:
 | `storage`      | `StorageServicePlugin`      | Local FS / S3 + encrypted secret + `storage/test` |
 | `branding`     | (built-in fallback)         | Workspace name, logo, accent colour         |
 | `feature_flags`| (built-in fallback)         | Opt-in experimental features                |
+
+## License
+
+BUSL-1.1 with a four-year conversion to Apache-2.0. See
+[LICENSING.md](../../../LICENSING.md).

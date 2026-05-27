@@ -126,3 +126,7 @@ kernel.use(new HonoServerPlugin({
 
 This plugin wraps `@objectstack/hono` to provide a turnkey HTTP server solution for the Runtime. It binds the standard `HttpDispatcher` to a Hono application and starts listening on the configured port.
 
+## License
+
+BUSL-1.1 with a four-year conversion to Apache-2.0. See
+[LICENSING.md](../../../LICENSING.md).

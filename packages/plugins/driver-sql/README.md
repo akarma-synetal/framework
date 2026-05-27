@@ -522,7 +522,8 @@ const stack = defineStack({
 
 ## License
 
-Apache-2.0
+BUSL-1.1 with a four-year conversion to Apache-2.0. See
+[LICENSING.md](../../../LICENSING.md).
 
 ## See Also
 

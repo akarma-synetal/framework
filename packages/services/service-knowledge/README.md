@@ -6,3 +6,8 @@ Orchestrator implementing `IKnowledgeService` over pluggable
 `knowledge-ragflow`, …).
 
 See [`content/docs/protocol/knowledge.mdx`](../../../content/docs/protocol/knowledge.mdx).
+
+## License
+
+BUSL-1.1 with a four-year conversion to Apache-2.0. See
+[LICENSING.md](../../../LICENSING.md).

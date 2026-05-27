@@ -48,3 +48,8 @@ Each `KnowledgeSource` must include `options.datasetId` pointing to a pre-create
 | `healthCheck()` | `GET /api/v1/datasets` (auth probe) |
 
 Permission filtering happens in `KnowledgeService` after `search()` returns — it re-checks each hit's `sourceRecordId` via ObjectQL.
+
+## License
+
+BUSL-1.1 with a four-year conversion to Apache-2.0. See
+[LICENSING.md](../../../LICENSING.md).
