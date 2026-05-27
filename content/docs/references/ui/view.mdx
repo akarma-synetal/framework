@@ -359,6 +359,18 @@ This schema accepts one of the following structures:
 
 ---
 
+#### Option 4
+
+### Properties
+
+| Property | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| **provider** | `string` | ✅ |  |
+| **schemaId** | `string` | ✅ | Schema identifier — typically the metadata type name |
+| **schema** | `Record<string, any>` | optional | Inline JSON Schema (Draft 2020-12). Optional when schemaId is resolvable. |
+
+---
+
 
 ---
 
