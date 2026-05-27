@@ -54,6 +54,18 @@ export const StandaloneStackConfigSchema = z.object({
     databaseDriver: z.enum(['sqlite', 'sqlite-wasm', 'turso', 'memory', 'postgres', 'mongodb']).optional(),
     environmentId: z.string().optional(),
     artifactPath: z.string().optional(),
+    /**
+     * Project root directory. When set (typically by the CLI after locating
+     * `objectstack.config.ts`), the default sqlite database is placed under
+     * `<projectRoot>/.objectstack/data/standalone.db` instead of the global
+     * `~/.objectstack/data/standalone.db`. This keeps per-project data
+     * scoped to the project folder so different examples / apps don't
+     * share a single database by accident.
+     *
+     * Explicit `databaseUrl` / `OS_DATABASE_URL` / `OS_HOME` still take
+     * precedence over this default.
+     */
+    projectRoot: z.string().optional(),
 });
 
 export type StandaloneStackConfig = z.input<typeof StandaloneStackConfigSchema>;
@@ -114,7 +126,11 @@ export async function createStandaloneStack(config?: StandaloneStackConfig): Pro
     const dbUrl = cfg.databaseUrl
         ?? process.env.OS_DATABASE_URL?.trim()
         ?? process.env.TURSO_DATABASE_URL?.trim()
-        ?? `file:${resolvePath(resolveObjectStackHome(), 'data/standalone.db')}`;
+        ?? (process.env.OS_HOME?.trim()
+            ? `file:${resolvePath(resolveObjectStackHome(), 'data/standalone.db')}`
+            : (cfg.projectRoot
+                ? `file:${resolvePath(cfg.projectRoot, '.objectstack/data/standalone.db')}`
+                : `file:${resolvePath(resolveObjectStackHome(), 'data/standalone.db')}`));
     const dbAuthToken = cfg.databaseAuthToken
         ?? process.env.OS_DATABASE_AUTH_TOKEN?.trim()
         ?? process.env.TURSO_AUTH_TOKEN?.trim();

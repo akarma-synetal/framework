@@ -380,7 +380,14 @@ export default class Serve extends Command {
           config = { ...originalConfig, ...bootResult } as any;
         } else if (resolvedMode === 'standalone') {
           const { createStandaloneStack } = await import('@objectstack/runtime');
-          const bootResult = await createStandaloneStack(config.standalone);
+          // Anchor the default sqlite database under the project folder
+          // (next to objectstack.config.ts) instead of the global
+          // ~/.objectstack home, so per-project data stays per-project.
+          const standaloneInput = {
+            ...(config.standalone ?? {}),
+            projectRoot: (config.standalone?.projectRoot ?? path.dirname(absolutePath)),
+          };
+          const bootResult = await createStandaloneStack(standaloneInput);
           config = { ...originalConfig, ...bootResult } as any;
         } else {
           throw new Error(
