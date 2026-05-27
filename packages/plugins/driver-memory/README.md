@@ -3,7 +3,7 @@
 > In-memory ObjectQL driver for ObjectStack — zero-config storage for development, unit tests, Storybook, and browser MSW mocks.
 
 [![npm](https://img.shields.io/npm/v/@objectstack/driver-memory.svg)](https://www.npmjs.com/package/@objectstack/driver-memory)
-[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](../../../LICENSING.md)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../../LICENSING.md)
 
 ## Overview
 
@@ -99,5 +99,4 @@ const driver = new InMemoryDriver({
 
 ## License
 
-BUSL-1.1 with a four-year conversion to Apache-2.0. See
-[LICENSING.md](../../../LICENSING.md).
+Apache-2.0. See [LICENSING.md](../../../LICENSING.md).

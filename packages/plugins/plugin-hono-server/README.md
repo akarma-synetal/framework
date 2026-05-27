@@ -128,5 +128,4 @@ This plugin wraps `@objectstack/hono` to provide a turnkey HTTP server solution 
 
 ## License
 
-BUSL-1.1 with a four-year conversion to Apache-2.0. See
-[LICENSING.md](../../../LICENSING.md).
+Apache-2.0. See [LICENSING.md](../../../LICENSING.md).

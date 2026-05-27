@@ -1,7 +1,7 @@
 {
   "name": "@objectstack/plugin-security",
   "version": "6.8.0",
-  "license": "BUSL-1.1",
+  "license": "Apache-2.0",
   "description": "Security Plugin for ObjectStack — RBAC, RLS, and Field-Level Security Runtime",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
