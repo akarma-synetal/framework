@@ -6,18 +6,18 @@ Mission: Build the "Post-SaaS Operating System" — an open-core, local-first ec
 1. The "Galaxy" Architecture (Monorepo Structure)
 We use a Monorepo (pnpm + Turborepo) to manage the ecosystem, but components are designed to be published independently.
 Directory Structure & Responsibilities
- * packages/spec (The Constitution) [Apache 2.0]
+ * packages/spec (The Constitution) [Apache-2.0]
    * CRITICAL: Contains the shared manifest.schema.json, TypeScript interfaces, and plugin lifecycle hooks (onInstall, onEnable).
    * Rule: All other packages depend on this. No circular dependencies.
- * packages/objectql (Data Engine) [Apache 2.0]
+ * packages/objectql (Data Engine) [Apache-2.0]
    * Universal Data Protocol. Compiles GraphQL-like queries into SQL/Redis commands.
-  * packages/platform-objects (Platform Object Catalog) [Apache 2.0]
+  * packages/platform-objects (Platform Object Catalog) [Apache-2.0]
    * Canonical ObjectStack platform objects for identity, security, audit, tenant, and metadata.
- * packages/objectui (Projection Engine) [MIT]
+ * packages/objectui (Projection Engine, separate repository)
    * React/Shadcn UI components for Server-Driven UI (SDUI).
- * packages/sdk (Plugin Kit) [MIT]
+ * packages/sdk (Plugin Kit, historical package name)
    * Tools for third-party developers to build Marketplace plugins.
- * drivers/* [Apache 2.0]
+ * packages/plugins/* drivers [Apache-2.0]
    * driver-postgres, driver-redis, driver-excel.
    * Must implement interfaces defined in packages/spec.
 Commercial & Apps
