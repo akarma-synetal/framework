@@ -75,6 +75,10 @@ function toHeaders(input: any): any {
   return h;
 }
 
+function safeJsonParse<T>(s: string, fallback: T): T {
+  try { return JSON.parse(s) as T; } catch { return fallback; }
+}
+
 async function tryFind(ql: any, object: string, where: any, limit = 100): Promise<any[]> {
   if (!ql || typeof ql.find !== 'function') return [];
   try {
@@ -97,6 +101,7 @@ export async function resolveExecutionContext(opts: ResolveOptions): Promise<Exe
   const ctx: ExecutionContext = {
     roles: [],
     permissions: [],
+    systemPermissions: [],
     isSystem: false,
   };
 
@@ -253,10 +258,43 @@ export async function resolveExecutionContext(opts: ResolveOptions): Promise<Exe
       { id: { $in: Array.from(psIds) } },
       500,
     );
+    const tabRank: Record<string, number> = {
+      hidden: 0,
+      default_off: 1,
+      default_on: 2,
+      visible: 3,
+    };
+    const mergedTabs: Record<string, 'visible' | 'hidden' | 'default_on' | 'default_off'> = {};
     for (const ps of psRows) {
       if (ps.name && !ctx.permissions!.includes(ps.name)) {
         ctx.permissions!.push(ps.name);
       }
+      // System permissions may be stored as JSON string in DB rows.
+      const sysPerms = typeof ps.system_permissions === 'string'
+        ? safeJsonParse(ps.system_permissions, [])
+        : (ps.system_permissions ?? ps.systemPermissions);
+      if (Array.isArray(sysPerms)) {
+        for (const p of sysPerms) {
+          if (typeof p === 'string' && !ctx.systemPermissions!.includes(p)) {
+            ctx.systemPermissions!.push(p);
+          }
+        }
+      }
+      const tabs = typeof ps.tab_permissions === 'string'
+        ? safeJsonParse(ps.tab_permissions, {})
+        : (ps.tab_permissions ?? ps.tabPermissions);
+      if (tabs && typeof tabs === 'object') {
+        for (const [app, val] of Object.entries(tabs as Record<string, unknown>)) {
+          if (typeof val !== 'string' || !(val in tabRank)) continue;
+          const cur = mergedTabs[app];
+          if (!cur || tabRank[val] > tabRank[cur]) {
+            mergedTabs[app] = val as 'visible' | 'hidden' | 'default_on' | 'default_off';
+          }
+        }
+      }
+    }
+    if (Object.keys(mergedTabs).length > 0) {
+      ctx.tabPermissions = mergedTabs;
     }
   }
 

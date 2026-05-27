@@ -25,7 +25,7 @@ function ForgotPasswordPage() {
     setSubmitting(true);
     try {
       const redirectTo = window.location.origin + import.meta.env.BASE_URL.replace(/\/$/, '') + '/reset-password';
-      const res = await fetch('/api/v1/auth/request-password-reset', {
+      const res = await fetch('/api/v1/auth/forget-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

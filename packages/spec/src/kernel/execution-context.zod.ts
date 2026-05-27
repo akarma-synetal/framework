@@ -32,6 +32,22 @@ export const ExecutionContextSchema = lazySchema(() => z.object({
   permissions: z.array(z.string()).default([]),
 
   /**
+   * Aggregated system permissions (union of `PermissionSet.systemPermissions`
+   * across the user's resolved permission sets). Used to gate app
+   * entry (`AppSchema.requiredPermissions`) and system-level capabilities
+   * like `manage_users`, `studio.access`, `setup.access`.
+   */
+  systemPermissions: z.array(z.string()).default([]),
+
+  /**
+   * Aggregated tab/app visibility overrides (merged most-permissive across
+   * the user's resolved permission sets: visible > default_on > default_off > hidden).
+   * Keyed by app name. A `hidden` value forces an app off the user's
+   * authorized list even if `requiredPermissions` would otherwise pass.
+   */
+  tabPermissions: z.record(z.string(), z.enum(['visible', 'hidden', 'default_on', 'default_off'])).optional(),
+
+  /**
    * IDs of all users in the active organization. Pre-resolved so RLS
    * expressions can scope visibility of identity tables (`sys_user`)
    * via `IN (current_user.org_user_ids)` without needing subquery
