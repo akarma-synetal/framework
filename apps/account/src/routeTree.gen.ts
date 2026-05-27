@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerifyEmailPromptRouteImport } from './routes/verify-email-prompt'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -38,6 +39,11 @@ import { Route as OrganizationsOrgIdGeneralRouteImport } from './routes/organiza
 import { Route as AccountOauthApplicationsNewRouteImport } from './routes/account.oauth-applications.new'
 import { Route as AccountOauthApplicationsClientIdRouteImport } from './routes/account.oauth-applications.$clientId'
 
+const VerifyEmailPromptRoute = VerifyEmailPromptRouteImport.update({
+  id: '/verify-email-prompt',
+  path: '/verify-email-prompt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
   id: '/verify-email',
   path: '/verify-email',
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/verify-email-prompt': typeof VerifyEmailPromptRoute
   '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
   '/account/invitations': typeof AccountInvitationsRoute
   '/account/linked-accounts': typeof AccountLinkedAccountsRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/verify-email-prompt': typeof VerifyEmailPromptRoute
   '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
   '/account/invitations': typeof AccountInvitationsRoute
   '/account/linked-accounts': typeof AccountLinkedAccountsRoute
@@ -253,6 +261,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/verify-email-prompt': typeof VerifyEmailPromptRoute
   '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
   '/account/invitations': typeof AccountInvitationsRoute
   '/account/linked-accounts': typeof AccountLinkedAccountsRoute
@@ -285,6 +294,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/setup'
     | '/verify-email'
+    | '/verify-email-prompt'
     | '/accept-invitation/$invitationId'
     | '/account/invitations'
     | '/account/linked-accounts'
@@ -314,6 +324,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/setup'
     | '/verify-email'
+    | '/verify-email-prompt'
     | '/accept-invitation/$invitationId'
     | '/account/invitations'
     | '/account/linked-accounts'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/setup'
     | '/verify-email'
+    | '/verify-email-prompt'
     | '/accept-invitation/$invitationId'
     | '/account/invitations'
     | '/account/linked-accounts'
@@ -374,6 +386,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SetupRoute: typeof SetupRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  VerifyEmailPromptRoute: typeof VerifyEmailPromptRoute
   AcceptInvitationInvitationIdRoute: typeof AcceptInvitationInvitationIdRoute
   AuthDeviceRoute: typeof AuthDeviceRoute
   OauthConsentRoute: typeof OauthConsentRoute
@@ -384,6 +397,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verify-email-prompt': {
+      id: '/verify-email-prompt'
+      path: '/verify-email-prompt'
+      fullPath: '/verify-email-prompt'
+      preLoaderRoute: typeof VerifyEmailPromptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/verify-email': {
       id: '/verify-email'
       path: '/verify-email'
@@ -638,6 +658,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SetupRoute: SetupRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  VerifyEmailPromptRoute: VerifyEmailPromptRoute,
   AcceptInvitationInvitationIdRoute: AcceptInvitationInvitationIdRoute,
   AuthDeviceRoute: AuthDeviceRoute,
   OauthConsentRoute: OauthConsentRoute,
