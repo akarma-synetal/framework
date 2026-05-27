@@ -37,7 +37,7 @@ export const skillForm = defineForm({
       collapsed: true,
       fields: [
         { field: 'triggerPhrases', widget: 'string-tags', helpText: 'Natural language phrases that activate this skill' },
-        { field: 'triggerConditions', widget: 'master-detail', helpText: 'Programmatic conditions (e.g., objectName == "case")' },
+        { field: 'triggerConditions', type: 'repeater', helpText: 'Programmatic conditions (e.g., objectName == "case")' },
       ],
     },
     {

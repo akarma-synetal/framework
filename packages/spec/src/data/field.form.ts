@@ -40,7 +40,7 @@ export const fieldForm = defineForm({
         { field: 'precision', visibleOn: "data.type == 'currency' || data.type == 'number'", helpText: 'Decimal places (e.g., 2 for $10.50)' },
         { field: 'scale', visibleOn: "data.type == 'number'", helpText: 'Number of decimal digits' },
         // Select field options
-        { field: 'options', widget: 'master-detail', visibleOn: "data.type == 'select' || data.type == 'multiselect'", helpText: 'Available options (label/value pairs)' },
+        { field: 'options', type: 'repeater', visibleOn: "data.type == 'select' || data.type == 'multiselect'", helpText: 'Available options (label/value pairs)' },
         // Reference field options
         { field: 'reference', widget: 'ref:object', visibleOn: "data.type == 'lookup' || data.type == 'master_detail'", helpText: 'Referenced object name' },
         { field: 'referenceFilters', widget: 'string-tags', visibleOn: "data.type == 'lookup' || data.type == 'master_detail'", helpText: 'Filter expressions (e.g., "active = true")' },

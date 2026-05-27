@@ -34,9 +34,9 @@ export const viewForm = defineForm({
       label: 'Columns & filters',
       description: 'What rows show and how users filter them.',
       fields: [
-        { field: 'columns', widget: 'master-detail', required: true, helpText: 'Columns to display (field names from selected object)' },
-        { field: 'filter', widget: 'master-detail', helpText: 'Filter conditions' },
-        { field: 'sort', widget: 'master-detail', helpText: 'Default sort order' },
+        { field: 'columns', type: 'repeater', required: true, helpText: 'Columns to display (field names from selected object)' },
+        { field: 'filter', type: 'repeater', helpText: 'Filter conditions' },
+        { field: 'sort', type: 'repeater', helpText: 'Default sort order' },
         { field: 'searchableFields', widget: 'string-tags', helpText: 'Field names available for quick search' },
         { field: 'filterableFields', widget: 'string-tags', helpText: 'Field names available for filtering' },
       ],

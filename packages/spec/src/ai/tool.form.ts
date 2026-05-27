@@ -29,8 +29,8 @@ export const toolForm = defineForm({
       label: 'Schemas',
       description: 'Inputs the tool accepts and the shape of its output.',
       fields: [
-        { field: 'parameters', widget: 'master-detail', required: true, helpText: 'Input parameters — define properties like: {name: {type: "string", description: "..."}}' },
-        { field: 'outputSchema', widget: 'master-detail', helpText: 'Output schema for validation (optional)' },
+        { field: 'parameters', type: 'composite', required: true, helpText: 'Input parameters — define properties like: {name: {type: "string", description: "..."}}' },
+        { field: 'outputSchema', type: 'composite', helpText: 'Output schema for validation (optional)' },
       ],
     },
     {

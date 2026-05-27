@@ -40,7 +40,7 @@ export const approvalForm = defineForm({
       fields: [
         {
           field: 'steps',
-          widget: 'master-detail',
+          type: 'repeater',
           required: true,
           helpText: 'Approval steps in order — each step defines who approves and what happens',
         },
@@ -52,9 +52,9 @@ export const approvalForm = defineForm({
       collapsible: true,
       collapsed: true,
       fields: [
-        { field: 'escalation', widget: 'master-detail', helpText: 'Auto-escalate or auto-approve after timeout' },
-        { field: 'onFinalApprove', widget: 'master-detail', helpText: 'Actions when all steps approved (e.g., update status)' },
-        { field: 'onFinalReject', widget: 'master-detail', helpText: 'Actions when rejected (e.g., notify submitter)' },
+        { field: 'escalation', type: 'composite', helpText: 'Auto-escalate or auto-approve after timeout' },
+        { field: 'onFinalApprove', type: 'repeater', helpText: 'Actions when all steps approved (e.g., update status)' },
+        { field: 'onFinalReject', type: 'repeater', helpText: 'Actions when rejected (e.g., notify submitter)' },
       ],
     },
   ],

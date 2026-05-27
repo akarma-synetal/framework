@@ -29,14 +29,14 @@ export const pageForm = defineForm({
       description: 'Record binding and page-local state.',
       fields: [
         { field: 'object', widget: 'ref:object', helpText: 'Bound object (for Record pages)' },
-        { field: 'variables', widget: 'master-detail', helpText: 'Local page state variables' },
+        { field: 'variables', type: 'repeater', helpText: 'Local page state variables' },
       ],
     },
     {
       label: 'Layout',
       description: 'Page regions and components placed within them.',
       fields: [
-        { field: 'regions', widget: 'master-detail', required: true, helpText: 'Layout regions (header, main, sidebar, footer) with components' },
+        { field: 'regions', type: 'repeater', required: true, helpText: 'Layout regions (header, main, sidebar, footer) with components' },
       ],
     },
     {
@@ -48,7 +48,7 @@ export const pageForm = defineForm({
         { field: 'isDefault', helpText: 'Set as default page for this page type' },
         { field: 'kind', helpText: 'Page override mode: full or slotted (for record pages)' },
         { field: 'assignedProfiles', widget: 'string-tags', helpText: 'Profiles that can access this page' },
-        { field: 'aria', widget: 'master-detail', helpText: 'Accessibility attributes (ARIA labels, roles)' },
+        { field: 'aria', type: 'composite', helpText: 'Accessibility attributes (ARIA labels, roles)' },
       ],
     },
   ],

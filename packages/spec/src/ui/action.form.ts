@@ -30,8 +30,8 @@ export const actionForm = defineForm({
       fields: [
         { field: 'target', visibleOn: "data.type != 'script'", helpText: 'URL, flow name, or API endpoint to call' },
         { field: 'method', visibleOn: "data.type == 'api'", helpText: 'HTTP method (GET, POST, PUT, DELETE)' },
-        { field: 'body', widget: 'master-detail', visibleOn: "data.type == 'script'", helpText: 'JavaScript code to execute' },
-        { field: 'params', widget: 'master-detail', helpText: 'User input parameters (show form before executing)' },
+        { field: 'body', widget: 'code', visibleOn: "data.type == 'script'", helpText: 'JavaScript code to execute' },
+        { field: 'params', type: 'repeater', helpText: 'User input parameters (show form before executing)' },
         { field: 'confirmText', helpText: 'Confirmation message (e.g., "Are you sure?")' },
         { field: 'successMessage', helpText: 'Success message after completion' },
         { field: 'refreshAfter', helpText: 'Refresh the list/page after action completes' },
@@ -43,7 +43,7 @@ export const actionForm = defineForm({
       collapsible: true,
       collapsed: true,
       fields: [
-        { field: 'locations', widget: 'master-detail', helpText: 'Where to show this action (toolbar, row menu, etc.)' },
+        { field: 'locations', type: 'repeater', helpText: 'Where to show this action (toolbar, row menu, etc.)' },
         { field: 'component', helpText: 'How to render (button, icon, menu item)' },
         { field: 'visible', widget: 'textarea', helpText: 'CEL expression: show only when condition is true' },
         { field: 'disabled', widget: 'textarea', helpText: 'CEL expression: disable when condition is true' },

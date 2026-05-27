@@ -29,17 +29,17 @@ export const flowForm = defineForm({
       fields: [
         {
           field: 'nodes',
-          widget: 'master-detail',
+          type: 'repeater',
           required: true,
           helpText: '⚠️ Consider using Flow Designer visual editor instead of JSON',
         },
         {
           field: 'edges',
-          widget: 'master-detail',
+          type: 'repeater',
           required: true,
           helpText: 'Connections between nodes — use Flow Designer for easier editing',
         },
-        { field: 'variables', widget: 'master-detail', helpText: 'Flow variables (inputs/outputs)' },
+        { field: 'variables', type: 'repeater', helpText: 'Flow variables (inputs/outputs)' },
       ],
     },
     {
@@ -52,7 +52,7 @@ export const flowForm = defineForm({
         { field: 'status', required: true, colSpan: 1, helpText: 'Deployment status: draft → active → obsolete' },
         { field: 'version', colSpan: 1, helpText: 'Version number (auto-incremented)' },
         { field: 'runAs', colSpan: 1, helpText: 'Execute as system (admin) or user (current user permissions)' },
-        { field: 'errorHandling', widget: 'master-detail', colSpan: 2, helpText: 'What to do when a node fails (fail, retry, continue)' },
+        { field: 'errorHandling', type: 'composite', colSpan: 2, helpText: 'What to do when a node fails (fail, retry, continue)' },
       ],
     },
   ],

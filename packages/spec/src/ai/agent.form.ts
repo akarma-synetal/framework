@@ -39,7 +39,7 @@ export const agentForm = defineForm({
       description: 'Skills, tools, and knowledge sources the agent can use.',
       fields: [
         { field: 'skills', widget: 'string-tags', helpText: 'Skill names (Agent→Skill→Tool architecture)' },
-        { field: 'tools', widget: 'master-detail', helpText: 'Direct tool references (legacy mode)' },
+        { field: 'tools', type: 'repeater', helpText: 'Direct tool references (legacy mode)' },
         { field: 'knowledge', type: 'composite', helpText: 'RAG knowledge access configuration' },
       ],
     },

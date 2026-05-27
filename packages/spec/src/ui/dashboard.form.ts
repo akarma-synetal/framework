@@ -31,7 +31,7 @@ export const dashboardForm = defineForm({
       label: 'Widgets',
       description: 'Cards and charts placed on the grid.',
       fields: [
-        { field: 'widgets', widget: 'master-detail', required: true, helpText: 'Dashboard widgets with position and sizing' },
+        { field: 'widgets', type: 'repeater', required: true, helpText: 'Dashboard widgets with position and sizing' },
       ],
     },
     {
@@ -41,7 +41,7 @@ export const dashboardForm = defineForm({
       collapsed: true,
       fields: [
         { field: 'dateRange', type: 'composite', helpText: 'Default date range selector' },
-        { field: 'globalFilters', widget: 'master-detail', helpText: 'Filters applied to all widgets' },
+        { field: 'globalFilters', type: 'repeater', helpText: 'Filters applied to all widgets' },
       ],
     },
     {

@@ -25,7 +25,7 @@ export const appForm = defineForm({
       description: 'Sidebar items and area grouping.',
       fields: [
         { field: 'navigation', type: 'composite', helpText: 'Nav tree — recursive structure' },
-        { field: 'areas', widget: 'master-detail', helpText: 'Group items into collapsible areas' },
+        { field: 'areas', type: 'repeater', helpText: 'Group items into collapsible areas' },
         { field: 'homePageId', type: 'text', helpText: 'Landing page when app opens' },
         { field: 'mobileNavigation', type: 'composite', helpText: 'Bottom tab bar config for mobile' },
       ],

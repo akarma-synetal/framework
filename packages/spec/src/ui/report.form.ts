@@ -29,16 +29,16 @@ export const reportForm = defineForm({
       label: 'Columns',
       description: 'Columns shown in the report output.',
       fields: [
-        { field: 'columns', widget: 'master-detail', helpText: 'Columns to display in the report' },
+        { field: 'columns', type: 'repeater', helpText: 'Columns to display in the report' },
       ],
     },
     {
       label: 'Groupings',
       description: 'How rows (and columns, for matrix reports) are grouped.',
       fields: [
-        { field: 'groupingsDown', widget: 'master-detail', helpText: 'Row grouping levels' },
+        { field: 'groupingsDown', type: 'repeater', helpText: 'Row grouping levels' },
         // CEL visibility — only Matrix reports use column groupings.
-        { field: 'groupingsAcross', widget: 'master-detail', visibleOn: "data.type == 'matrix'", helpText: 'Column grouping levels (matrix only)' },
+        { field: 'groupingsAcross', type: 'repeater', visibleOn: "data.type == 'matrix'", helpText: 'Column grouping levels (matrix only)' },
       ],
     },
     {
@@ -46,7 +46,7 @@ export const reportForm = defineForm({
       description: 'Additional blocks joined into a single report (joined reports only).',
       visibleOn: "data.type == 'joined'",
       fields: [
-        { field: 'blocks', widget: 'master-detail', helpText: 'Join multiple objects (joined report only)' },
+        { field: 'blocks', type: 'repeater', helpText: 'Join multiple objects (joined report only)' },
       ],
     },
     {
@@ -55,7 +55,7 @@ export const reportForm = defineForm({
       collapsible: true,
       collapsed: true,
       fields: [
-        { field: 'filter', widget: 'master-detail', helpText: 'Report-level filters' },
+        { field: 'filter', type: 'repeater', helpText: 'Report-level filters' },
         { field: 'chart', type: 'composite', helpText: 'Chart config (type, legend, colors)' },
       ],
     },
