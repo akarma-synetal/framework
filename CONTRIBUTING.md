@@ -434,8 +434,7 @@ Contributors will be:
 ## License
 
 By contributing, you agree that your contributions will be licensed under the
-license of the folder being modified. See [LICENSING.md](./LICENSING.md) for
-the folder-scoped license map.
+Apache License, Version 2.0.
 
 ---
 

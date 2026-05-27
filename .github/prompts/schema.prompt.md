@@ -17,7 +17,7 @@ Project & Responsibilities
    * React/Shadcn UI components for Server-Driven UI (SDUI).
  * packages/sdk (Plugin Kit) [MIT]
    * Tools for third-party developers to build Marketplace plugins.
- * packages/plugins/* drivers [BUSL-1.1]
+ * packages/plugins/* drivers [Apache-2.0]
    * driver-postgres, driver-redis, driver-excel.
    * Must implement interfaces defined in packages/spec.
 
@@ -176,4 +176,3 @@ When I give you a short command, map it to the following actions:
 3. **定义表单布局时**：
 > "Create Layout Protocol."
 > *（AI 会自动生成 List 和 Form 的布局结构定义。）*
-
