@@ -3,6 +3,7 @@
 import { Args, Command, Flags } from '@oclif/core';
 import chalk from 'chalk';
 import { spawnSync, spawn } from 'child_process';
+import dotenvFlow from 'dotenv-flow';
 import fs from 'fs';
 import path from 'path';
 import { printHeader, printKV, printStep, printError } from '../utils/format.js';
@@ -59,6 +60,11 @@ export default class Dev extends Command {
   async run(): Promise<void> {
     const { args, flags } = await this.parse(Dev);
     const packageName = args.package;
+
+    // Load .env files following Vite/Next.js convention (mirrors `serve`).
+    // `dev` is always development mode, so prefer `.env.development*` over
+    // `.env.production*`. Loaded BEFORE any env lookups.
+    dotenvFlow.config({ node_env: 'development', silent: true });
 
     printHeader('Development Mode');
 

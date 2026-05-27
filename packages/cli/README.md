@@ -106,6 +106,29 @@ export default defineStack({
 });
 ```
 
+### Environment files (`.env`)
+
+`dev`, `start`, and `serve` all load `.env` files following the
+Vite / Next.js convention, in this order (later files override earlier):
+
+1. `.env`
+2. `.env.${NODE_ENV}` — `development` for `os dev`, `production` for `os start` (override with `NODE_ENV=...`)
+3. `.env.local`
+4. `.env.${NODE_ENV}.local`
+
+Any variable already in the process environment wins. Typical project
+layout:
+
+```
+.env                     # checked in — safe defaults
+.env.development         # checked in — dev URLs, demo creds
+.env.production          # checked in — production URLs
+.env.local               # gitignored — secrets, personal overrides
+```
+
+Common variables: `OS_DATABASE_URL`, `OS_DATABASE_DRIVER`,
+`OS_HOME`, `AUTH_SECRET`, `PORT`.
+
 ## CLI Options
 
 ### Global

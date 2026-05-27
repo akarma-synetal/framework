@@ -4,6 +4,7 @@ import { Command, Flags } from '@oclif/core';
 import chalk from 'chalk';
 import { spawn, spawnSync } from 'child_process';
 import crypto from 'crypto';
+import dotenvFlow from 'dotenv-flow';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -105,6 +106,13 @@ export default class Start extends Command {
 
   async run(): Promise<void> {
     const { flags } = await this.parse(Start);
+
+    // Load .env files following Vite/Next.js convention (mirrors `serve`).
+    // Loaded BEFORE any env lookups so OS_DATABASE_URL/OS_HOME/AUTH_SECRET
+    // from `.env`, `.env.production`, `.env.local`, etc. are picked up.
+    const mode = process.env.NODE_ENV === 'test' ? 'test'
+      : (process.env.NODE_ENV || 'production');
+    dotenvFlow.config({ node_env: mode, silent: true });
 
     printHeader('ObjectStack');
 
