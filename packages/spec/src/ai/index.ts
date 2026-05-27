@@ -22,8 +22,11 @@
  */
 
 export * from './agent.zod';
+export { agentForm } from './agent.form';
 export * from './tool.zod';
+export { toolForm } from './tool.form';
 export * from './skill.zod';
+export { skillForm } from './skill.form';
 export * from './conversation.zod';
 export * from './model-registry.zod';
 export * from './embedding.zod';

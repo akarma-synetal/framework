@@ -11,10 +11,11 @@ import { defineForm } from './view.zod';
 
 export const reportForm = defineForm({
   schemaId: 'report',
-  type: 'tabbed',
+  type: 'simple',
   sections: [
     {
       label: 'Basics',
+      description: 'Identity and data source.',
       columns: 2,
       fields: [
         { field: 'name', type: 'text', colSpan: 1, required: true, helpText: 'snake_case unique identifier' },
@@ -26,12 +27,14 @@ export const reportForm = defineForm({
     },
     {
       label: 'Columns',
+      description: 'Columns shown in the report output.',
       fields: [
         { field: 'columns', widget: 'master-detail', helpText: 'Columns to display in the report' },
       ],
     },
     {
       label: 'Groupings',
+      description: 'How rows (and columns, for matrix reports) are grouped.',
       fields: [
         { field: 'groupingsDown', widget: 'master-detail', helpText: 'Row grouping levels' },
         // CEL visibility — only Matrix reports use column groupings.
@@ -40,14 +43,15 @@ export const reportForm = defineForm({
     },
     {
       label: 'Joined blocks',
-      // Show only when this is a joined report. Section-level visibility is
-      // not yet first-class so we mirror it on every field for now.
+      description: 'Additional blocks joined into a single report (joined reports only).',
+      visibleOn: "data.type == 'joined'",
       fields: [
-        { field: 'blocks', widget: 'master-detail', visibleOn: "data.type == 'joined'", helpText: 'Join multiple objects (joined report only)' },
+        { field: 'blocks', widget: 'master-detail', helpText: 'Join multiple objects (joined report only)' },
       ],
     },
     {
       label: 'Filter & chart',
+      description: 'Report-level filters and chart presentation.',
       collapsible: true,
       collapsed: true,
       fields: [
@@ -57,6 +61,7 @@ export const reportForm = defineForm({
     },
     {
       label: 'Advanced',
+      description: 'Accessibility and performance tuning.',
       collapsible: true,
       collapsed: true,
       fields: [

@@ -147,7 +147,12 @@ export class AIServicePlugin implements Plugin {
     }
 
     if (provider === 'gateway') {
-      const gatewayModel = String(values.gateway_model ?? '').trim();
+      // Fall back to AI_GATEWAY_MODEL env var when the form has no model —
+      // mirrors detectAdapter() so operators who only configured env vars
+      // can still validate the connection from the UI.
+      const gatewayModel =
+        String(values.gateway_model ?? '').trim() ||
+        String(process.env.AI_GATEWAY_MODEL ?? '').trim();
       if (!gatewayModel) return null;
       try {
         const gatewayPkg = '@ai-sdk/gateway';
@@ -173,7 +178,18 @@ export class AIServicePlugin implements Plugin {
     const spec = providerSpecs[provider];
     if (!spec) return null;
 
-    const apiKey = String(values[`${provider}_api_key`] ?? '').trim();
+    const apiKey =
+      String(values[`${provider}_api_key`] ?? '').trim() ||
+      // Fall back to the corresponding env var so operators who only
+      // configured env credentials (and didn't paste the key into the
+      // settings form) can still validate the connection.
+      String(
+        process.env[
+          provider === 'openai' ? 'OPENAI_API_KEY'
+          : provider === 'anthropic' ? 'ANTHROPIC_API_KEY'
+          : 'GOOGLE_GENERATIVE_AI_API_KEY'
+        ] ?? '',
+      ).trim();
     if (!apiKey) return null;
 
     // The Vercel-style provider SDKs read credentials from environment
@@ -997,7 +1013,37 @@ export class AIServicePlugin implements Plugin {
             : {};
         const merged: Record<string, unknown> = { ...(values ?? {}), ...overrides };
         const provider = String(merged.provider ?? 'memory');
+
+        // When the form provider is the default `memory` (i.e. operator
+        // hasn't saved AI settings yet) but env vars detected a real
+        // adapter at boot, exercise that live adapter so the test reflects
+        // what the running service actually uses — env-only configuration
+        // is a fully supported deployment mode.
         if (provider === 'memory') {
+          const liveAdapter = this.service?.['config']?.adapter as LLMAdapter | undefined;
+          const liveName = liveAdapter?.name ?? '';
+          if (liveAdapter && liveName && liveName !== 'memory') {
+            const started = Date.now();
+            try {
+              const result = await liveAdapter.chat(
+                [{ role: 'user', content: 'ping' }],
+                { maxTokens: 8 },
+              );
+              const latency = Date.now() - started;
+              const preview = String((result as any)?.text ?? '').slice(0, 60);
+              return {
+                ok: true,
+                severity: 'info',
+                message: `Env-configured adapter "${liveName}" responded in ${latency}ms${preview ? ` — "${preview}"` : ''}.`,
+              };
+            } catch (err: any) {
+              return {
+                ok: false,
+                severity: 'error',
+                message: `Env-configured adapter "${liveName}" request failed: ${err?.message ?? String(err)}`,
+              };
+            }
+          }
           return {
             ok: true,
             severity: 'warning',
@@ -1014,7 +1060,7 @@ export class AIServicePlugin implements Plugin {
           return {
             ok: false,
             severity: 'error',
-            message: `Could not build adapter for provider=${provider}. Check API key and that the provider SDK package is installed.`,
+            message: `Could not build adapter for provider=${provider}. Check API key (or the corresponding env var) and that the provider SDK package is installed.`,
           };
         }
         const started = Date.now();

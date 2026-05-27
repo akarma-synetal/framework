@@ -13,13 +13,14 @@ import type {
 } from '@objectstack/spec/api';
 import type { MetadataCacheRequest, MetadataCacheResponse, ServiceInfo, ApiRoutes, WellKnownCapabilities } from '@objectstack/spec/api';
 import type { IFeedService } from '@objectstack/spec/contracts';
-import { parseFilterAST, isFilterAST, objectForm } from '@objectstack/spec/data';
+import { parseFilterAST, isFilterAST, objectForm, fieldForm, ObjectSchema, FieldSchema } from '@objectstack/spec/data';
 import { PLURAL_TO_SINGULAR, SINGULAR_TO_PLURAL } from '@objectstack/spec/shared';
-import { ListViewSchema, FormViewSchema, DashboardSchema, AppSchema, PageSchema, ReportSchema, reportForm, viewForm, appForm, dashboardForm, type FormView } from '@objectstack/spec/ui';
+import { ListViewSchema, FormViewSchema, DashboardSchema, AppSchema, PageSchema, ReportSchema, ActionSchema, reportForm, viewForm, appForm, dashboardForm, actionForm, pageForm, type FormView } from '@objectstack/spec/ui';
 import { RoleSchema, roleForm } from '@objectstack/spec/identity';
 import { PermissionSetSchema } from '@objectstack/spec/security';
 import { EmailTemplateSchema } from '@objectstack/spec/system';
-import { ToolSchema, SkillSchema, AgentSchema } from '@objectstack/spec/ai';
+import { ToolSchema, SkillSchema, AgentSchema, agentForm, toolForm, skillForm } from '@objectstack/spec/ai';
+import { FlowSchema, WorkflowRuleSchema, ApprovalProcessSchema, flowForm, workflowForm, approvalForm } from '@objectstack/spec/automation';
 import { DEFAULT_METADATA_TYPE_REGISTRY } from '@objectstack/spec/kernel';
 import { z } from 'zod';
 
@@ -32,10 +33,13 @@ import { z } from 'zod';
  * property between {@link ListViewSchema} and {@link FormViewSchema}.
  */
 const TYPE_TO_SCHEMA: Record<string, z.ZodTypeAny> = {
+    object: ObjectSchema,
+    field: FieldSchema,
     dashboard: DashboardSchema,
     app: AppSchema,
     page: PageSchema,
     report: ReportSchema,
+    action: ActionSchema,
     role: RoleSchema,
     permission: PermissionSetSchema,
     profile: PermissionSetSchema,
@@ -43,6 +47,9 @@ const TYPE_TO_SCHEMA: Record<string, z.ZodTypeAny> = {
     tool: ToolSchema,
     skill: SkillSchema,
     agent: AgentSchema,
+    flow: FlowSchema,
+    workflow: WorkflowRuleSchema,
+    approval: ApprovalProcessSchema,
 };
 
 /**
@@ -58,11 +65,20 @@ const TYPE_TO_SCHEMA: Record<string, z.ZodTypeAny> = {
  */
 const TYPE_TO_FORM: Record<string, FormView> = {
     object: objectForm,
+    field: fieldForm,
     report: reportForm,
     view: viewForm,
     app: appForm,
     dashboard: dashboardForm,
     role: roleForm,
+    action: actionForm,
+    page: pageForm,
+    agent: agentForm,
+    tool: toolForm,
+    skill: skillForm,
+    flow: flowForm,
+    workflow: workflowForm,
+    approval: approvalForm,
 };
 
 /**
@@ -82,6 +98,117 @@ function toJsonSchemaSafe(schema: z.ZodTypeAny): Record<string, unknown> | undef
         return undefined;
     }
 }
+
+/**
+ * Hand-crafted fallback JSON Schemas for metadata types whose Zod schema
+ * cannot be safely converted via `z.toJSONSchema()` (e.g. due to recursive
+ * references or non-representable constructs like `z.lazy()` chains).
+ *
+ * These mirror the shape consumed by the corresponding `*.form.ts` layouts,
+ * so the SchemaForm renderer can still produce a real form (instead of
+ * falling back to the raw JSON editor). All fields use lenient types
+ * (`string | object | array`) because the widget hint in the form layout
+ * is what actually drives the UI control selection — the JSON Schema is
+ * only used to (a) seed defaults and (b) report which property names exist.
+ */
+const HAND_CRAFTED_SCHEMAS: Record<string, Record<string, unknown>> = {
+    object: {
+        type: 'object',
+        properties: {
+            name: { type: 'string' },
+            label: { type: 'string' },
+            pluralLabel: { type: 'string' },
+            icon: { type: 'string' },
+            description: { type: 'string' },
+            tags: { type: 'array', items: { type: 'string' } },
+            active: { type: 'boolean', default: true },
+            isSystem: { type: 'boolean', default: false },
+            abstract: { type: 'boolean', default: false },
+            datasource: { type: 'string' },
+            fields: {
+                type: 'array',
+                default: [],
+                items: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string' },
+                        label: { type: 'string' },
+                        type: { type: 'string' },
+                        required: { type: 'boolean', default: false },
+                        unique: { type: 'boolean', default: false },
+                        defaultValue: {},
+                        description: { type: 'string' },
+                    },
+                    required: ['name', 'type'],
+                },
+            },
+            capabilities: { type: 'object', additionalProperties: true },
+        },
+        required: ['name'],
+        additionalProperties: true,
+    },
+    action: {
+        type: 'object',
+        properties: {
+            name: { type: 'string' },
+            label: { type: 'string' },
+            objectName: { type: 'string' },
+            icon: { type: 'string' },
+            type: { type: 'string', enum: ['url', 'flow', 'api', 'script'] },
+            variant: { type: 'string', enum: ['primary', 'secondary', 'danger', 'ghost', 'outline'] },
+            target: { type: 'string' },
+            method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
+            body: {
+                type: 'array',
+                default: [],
+                items: {
+                    type: 'object',
+                    properties: {
+                        line: { type: 'string' },
+                    },
+                },
+            },
+            params: {
+                type: 'array',
+                default: [],
+                items: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string' },
+                        label: { type: 'string' },
+                        type: { type: 'string' },
+                        required: { type: 'boolean', default: false },
+                    },
+                    required: ['name'],
+                },
+            },
+            confirmText: { type: 'string' },
+            successMessage: { type: 'string' },
+            refreshAfter: { type: 'boolean', default: true },
+            locations: {
+                type: 'array',
+                default: [],
+                items: {
+                    type: 'object',
+                    properties: {
+                        location: { type: 'string' },
+                    },
+                },
+            },
+            component: { type: 'string' },
+            visible: { type: 'string' },
+            disabled: { type: 'string' },
+            shortcut: { type: 'string' },
+            bulkEnabled: { type: 'boolean', default: false },
+            aiExposed: { type: 'boolean', default: false },
+            recordIdParam: { type: 'string' },
+            recordIdField: { type: 'string' },
+            bodyShape: { type: 'string', enum: ['flat', 'nested'] },
+        },
+        required: ['name', 'label', 'type'],
+        additionalProperties: true,
+    },
+};
 
 /**
  * Zod schemas used to validate overlay items before they are persisted into
@@ -688,7 +815,8 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             const zodSchema = singular === 'view'
                 ? ListViewSchema
                 : TYPE_TO_SCHEMA[singular];
-            const schema = zodSchema ? toJsonSchemaSafe(zodSchema) : undefined;
+            const schema = (zodSchema ? toJsonSchemaSafe(zodSchema) : undefined)
+                ?? HAND_CRAFTED_SCHEMAS[singular];
             const form = TYPE_TO_FORM[singular];
 
             const base = registryByType.get(singular as any);

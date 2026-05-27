@@ -7,38 +7,41 @@ import { defineForm } from '../ui/view.zod';
  */
 export const objectForm = defineForm({
   schemaId: 'object',
-  type: 'tabbed',
+  type: 'simple',
   sections: [
     {
       label: 'Basics',
       description: 'Identity, labels, and taxonomy.',
+      columns: 2,
       fields: [
-        { field: 'name', type: 'text', required: true, helpText: 'snake_case unique identifier (immutable)' },
-        { field: 'label', type: 'text', helpText: 'Singular display name (e.g. "Account")' },
-        { field: 'pluralLabel', type: 'text', helpText: 'Plural display name (e.g. "Accounts")' },
-        { field: 'icon', type: 'text', helpText: 'Lucide icon name (e.g. "building", "users")' },
-        { field: 'description', type: 'textarea', helpText: 'Developer documentation' },
-        { field: 'tags', widget: 'string-tags', helpText: 'Categorization tags (e.g. "sales", "system")' },
-        { field: 'active', type: 'boolean', helpText: 'Is the object active and usable' },
-        { field: 'isSystem', type: 'boolean', helpText: 'System object (protected from deletion)' },
-        { field: 'abstract', type: 'boolean', helpText: 'Abstract base (cannot be instantiated)' },
+        { field: 'name', type: 'text', required: true, colSpan: 1, helpText: 'snake_case unique identifier (immutable)' },
+        { field: 'label', type: 'text', colSpan: 1, helpText: 'Singular display name (e.g. "Account")' },
+        { field: 'pluralLabel', type: 'text', colSpan: 1, helpText: 'Plural display name (e.g. "Accounts")' },
+        { field: 'icon', type: 'text', colSpan: 1, helpText: 'Lucide icon name (e.g. "building", "users")' },
+        { field: 'description', type: 'textarea', colSpan: 2, helpText: 'Developer documentation' },
+        { field: 'tags', widget: 'string-tags', colSpan: 2, helpText: 'Categorization tags (e.g. "sales", "system")' },
+        { field: 'active', type: 'boolean', colSpan: 1, helpText: 'Is the object active and usable' },
+        { field: 'isSystem', type: 'boolean', colSpan: 1, helpText: 'System object (protected from deletion)' },
+        { field: 'abstract', type: 'boolean', colSpan: 1, helpText: 'Abstract base (cannot be instantiated)' },
       ],
     },
     {
       label: 'Fields',
-      description: 'Define the data model.',
+      description: 'Define the data model — each row becomes a column in the database table.',
       fields: [
-        { 
-          field: 'fields', 
-          widget: 'master-detail', 
+        {
+          field: 'fields',
+          widget: 'master-detail',
           required: true,
-          helpText: 'Field definitions — each row is a column in the database table',
+          helpText: 'Add the columns this object will store',
         },
       ],
     },
     {
       label: 'Capabilities',
       description: 'System features and API exposure.',
+      collapsible: true,
+      collapsed: true,
       fields: [
         { field: 'capabilities', widget: 'object-fields', helpText: 'Enable/disable system features' },
       ],

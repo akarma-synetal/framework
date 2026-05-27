@@ -4,18 +4,20 @@ import { defineForm } from './view.zod';
 
 export const appForm = defineForm({
   schemaId: 'app',
-  type: 'tabbed',
+  type: 'simple',
   sections: [
     {
       label: 'Basics',
+      description: 'App identity and activation.',
+      columns: 2,
       fields: [
-        { field: 'name', type: 'text', required: true, helpText: 'snake_case, unique' },
-        { field: 'label', type: 'text', required: true },
-        { field: 'description', type: 'textarea' },
-        { field: 'version', type: 'text' },
-        { field: 'icon', type: 'text', helpText: 'Lucide icon name (e.g. "users", "briefcase")' },
-        { field: 'active', type: 'boolean' },
-        { field: 'isDefault', type: 'boolean', helpText: 'Make this the default app for new users' },
+        { field: 'name', type: 'text', required: true, colSpan: 1, helpText: 'snake_case, unique' },
+        { field: 'label', type: 'text', required: true, colSpan: 1 },
+        { field: 'description', type: 'textarea', colSpan: 2 },
+        { field: 'version', type: 'text', colSpan: 1 },
+        { field: 'icon', type: 'text', colSpan: 1, helpText: 'Lucide icon name (e.g. "users", "briefcase")' },
+        { field: 'active', type: 'boolean', colSpan: 1 },
+        { field: 'isDefault', type: 'boolean', colSpan: 1, helpText: 'Make this the default app for new users' },
       ],
     },
     {
@@ -39,10 +41,16 @@ export const appForm = defineForm({
     },
     {
       label: 'Branding',
+      description: 'Theme colors and logo.',
+      collapsible: true,
+      collapsed: true,
       fields: [{ field: 'branding', widget: 'object-fields', helpText: 'Primary/secondary colors, logo, theme' }],
     },
     {
       label: 'Access & sharing',
+      description: 'Who can access this app and how it can be embedded.',
+      collapsible: true,
+      collapsed: true,
       fields: [
         { field: 'requiredPermissions', widget: 'string-tags', helpText: 'Permissions needed to access this app' },
         { field: 'sharing', widget: 'object-fields', helpText: 'Public/internal/restricted access control' },

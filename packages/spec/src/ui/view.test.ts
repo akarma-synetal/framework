@@ -411,7 +411,7 @@ describe('FormSectionSchema', () => {
     const result = FormSectionSchema.parse(section);
     expect(result.collapsible).toBe(false);
     expect(result.collapsed).toBe(false);
-    expect(result.columns).toBe(2);
+    expect(result.columns).toBe(1);
   });
 
   it('should accept form section with all properties', () => {

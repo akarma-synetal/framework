@@ -4,24 +4,27 @@ import { defineForm } from './view.zod';
 
 export const dashboardForm = defineForm({
   schemaId: 'dashboard',
-  type: 'tabbed',
+  type: 'simple',
   sections: [
     {
       label: 'Basics',
+      description: 'Dashboard identity and description.',
+      columns: 2,
       fields: [
-        { field: 'name', type: 'text', required: true, helpText: 'snake_case unique identifier' },
-        { field: 'label', type: 'text', required: true, helpText: 'Display name' },
-        { field: 'description', type: 'textarea' },
+        { field: 'name', type: 'text', required: true, colSpan: 1, helpText: 'snake_case unique identifier' },
+        { field: 'label', type: 'text', required: true, colSpan: 1, helpText: 'Display name' },
+        { field: 'description', type: 'textarea', colSpan: 2 },
       ],
     },
     {
       label: 'Layout',
       description: 'Grid sizing and refresh cadence.',
+      columns: 3,
       fields: [
-        { field: 'columns', type: 'number', helpText: 'Number of grid columns (default 12)' },
-        { field: 'gap', type: 'number', helpText: 'Grid gap in Tailwind spacing units' },
-        { field: 'refreshInterval', type: 'number', helpText: 'Auto-refresh interval (seconds)' },
-        { field: 'header', widget: 'object-fields', helpText: 'Dashboard header config (title, subtitle, actions)' },
+        { field: 'columns', type: 'number', colSpan: 1, helpText: 'Grid columns (default 12)' },
+        { field: 'gap', type: 'number', colSpan: 1, helpText: 'Grid gap (Tailwind units)' },
+        { field: 'refreshInterval', type: 'number', colSpan: 1, helpText: 'Auto-refresh (seconds)' },
+        { field: 'header', widget: 'object-fields', colSpan: 3, helpText: 'Dashboard header config (title, subtitle, actions)' },
       ],
     },
     {
@@ -33,6 +36,9 @@ export const dashboardForm = defineForm({
     },
     {
       label: 'Filters',
+      description: 'Default and global filters applied across widgets.',
+      collapsible: true,
+      collapsed: true,
       fields: [
         { field: 'dateRange', widget: 'object-fields', helpText: 'Default date range selector' },
         { field: 'globalFilters', widget: 'master-detail', helpText: 'Filters applied to all widgets' },
@@ -40,6 +46,9 @@ export const dashboardForm = defineForm({
     },
     {
       label: 'Advanced',
+      description: 'Accessibility and performance tuning.',
+      collapsible: true,
+      collapsed: true,
       fields: [
         { field: 'aria', widget: 'object-fields', helpText: 'Accessibility labels' },
         { field: 'performance', widget: 'object-fields', helpText: 'Caching and optimization config' },

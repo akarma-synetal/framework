@@ -590,7 +590,7 @@ export const FormSectionSchema = lazySchema(() => z.object({
     z.literal(2),
     z.literal(3),
     z.literal(4),
-  ]).default(2).transform(val => (typeof val === 'string' ? parseInt(val) : val) as 1 | 2 | 3 | 4),
+  ]).default(1).transform(val => (typeof val === 'string' ? parseInt(val) : val) as 1 | 2 | 3 | 4),
   fields: z.array(z.union([
     z.string(), // Legacy: simple field name
     FormFieldSchema, // Enhanced: detailed field config

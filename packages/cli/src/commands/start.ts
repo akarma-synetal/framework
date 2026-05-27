@@ -1,7 +1,8 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { Command, Flags } from '@oclif/core';
-import { spawn } from 'child_process';
+import chalk from 'chalk';
+import { spawn, spawnSync } from 'child_process';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -11,23 +12,31 @@ import { printHeader, printKV, printStep, printError } from '../utils/format.js'
 /**
  * `objectstack start` — zero-config quick boot.
  *
- * Three escalating modes, picked automatically:
+ * Four escalating modes, picked automatically:
  *
  *   1. **Empty boot** (no artifact, no config in cwd)
  *      Boots a bare kernel with Studio mounted at `/_studio/`. The user
  *      can then browse the marketplace and install apps into the home
  *      directory at runtime. Perfect for "I just want to try it".
  *
- *   2. **Artifact boot** (an `objectstack.json` is reachable)
+ *   2. **Project boot** (`objectstack.config.ts` in cwd)
+ *      Auto-compiles the project config to `./dist/objectstack.json`
+ *      (if no fresher artifact exists) and boots from it. The home
+ *      directory defaults to **`<cwd>/.objectstack`** so the project's
+ *      sqlite database, uploads and runtime cache stay alongside the
+ *      project source rather than in `~/.objectstack`.
+ *
+ *   3. **Artifact boot** (an `objectstack.json` is reachable)
  *      Boots from the compiled artifact, same as today.
  *
- *   3. **Explicit overrides** (`--artifact`, `--database`, ...)
+ *   4. **Explicit overrides** (`--artifact`, `--database`, ...)
  *      Highest precedence — the user is in control.
  *
- * The HOME directory (default `~/.objectstack`) is where the default
- * sqlite database, downloaded marketplace apps and plugin cache all live
- * — independent of the current working directory, so the same `os start`
- * gives you the same instance no matter where you run it.
+ * The HOME directory layout:
+ *   - With a project config in cwd → `<cwd>/.objectstack` (project-local).
+ *   - Without a project config     → `~/.objectstack` (global, shared
+ *     across `os start` invocations from any directory).
+ *   - Always overridable with `--home` or `$OS_HOME`.
  */
 export default class Start extends Command {
   static override description = 'Quick-start an ObjectStack server (auto-falls back to an empty kernel with Studio + marketplace when no artifact is present)';
@@ -55,13 +64,19 @@ export default class Start extends Command {
 
     // Home directory — where persistent runtime state lives.
     home: Flags.string({
-      description: 'Home directory for persistent state (default ~/.objectstack; overrides $OS_HOME)',
+      description: 'Home directory for persistent state (default <cwd>/.objectstack when an objectstack.config.ts is present, otherwise ~/.objectstack; overrides $OS_HOME)',
     }),
 
     // Artifact source
     artifact: Flags.string({
       char: 'a',
-      description: 'Path or http(s):// URL to the compiled objectstack.json (overrides $OS_ARTIFACT_PATH; auto-detected from ./dist/objectstack.json or <home>/dist/objectstack.json)',
+      description: 'Path or http(s):// URL to the compiled objectstack.json (overrides $OS_ARTIFACT_PATH; auto-detected from ./dist/objectstack.json or <home>/dist/objectstack.json; when an objectstack.config.ts is present and no artifact exists, it is compiled automatically)',
+    }),
+
+    compile: Flags.boolean({
+      description: 'Force-compile objectstack.config.ts → dist/objectstack.json before booting (auto when artifact is missing). Ignored when --artifact is set.',
+      default: false,
+      allowNo: true,
     }),
 
     // Project identity
@@ -93,9 +108,19 @@ export default class Start extends Command {
 
     printHeader('ObjectStack');
 
+    // ── Project mode detection ─────────────────────────────────────
+    // If the cwd contains an `objectstack.config.ts`, treat the cwd as
+    // the project root: the home directory defaults to project-local
+    // (./.objectstack) and the config is compiled to ./dist/objectstack.json
+    // automatically when no artifact is available.
+    const cwd = process.cwd();
+    const projectConfigPath = path.resolve(cwd, 'objectstack.config.ts');
+    const hasProjectConfig = fs.existsSync(projectConfigPath);
+
     // ── Home directory ──────────────────────────────────────────────
-    // Priority: --home > $OS_HOME > ~/.objectstack
-    const homeDir = resolveHome(flags.home);
+    // Priority: --home > $OS_HOME > <cwd>/.objectstack (project mode)
+    //         > ~/.objectstack (global mode)
+    const homeDir = resolveHome(flags.home, { hasProjectConfig, cwd });
     try {
       fs.mkdirSync(path.join(homeDir, 'data'), { recursive: true });
     } catch (err: any) {
@@ -105,8 +130,38 @@ export default class Start extends Command {
 
     // ── Artifact resolution ────────────────────────────────────────
     // Priority: --artifact > $OS_ARTIFACT_PATH > ./dist/objectstack.json
-    //         > <home>/dist/objectstack.json > none (empty boot)
-    const artifactSource = resolveArtifactSource(flags.artifact, homeDir);
+    //         > <home>/dist/objectstack.json > none
+    //
+    // In project mode (objectstack.config.ts present) we additionally
+    // auto-compile the config to ./dist/objectstack.json when no
+    // artifact has been built yet, so `os start` works on a fresh
+    // clone without needing a separate `os build`.
+    let artifactSource = resolveArtifactSource(flags.artifact, homeDir);
+
+    const shouldAutoCompile = hasProjectConfig
+      && !flags.artifact
+      && !process.env.OS_ARTIFACT_PATH
+      && (flags.compile || !artifactSource);
+
+    if (shouldAutoCompile) {
+      const outputPath = path.resolve(cwd, 'dist/objectstack.json');
+      printStep('Compiling objectstack.config.ts → dist/objectstack.json...');
+      const binPath = process.argv[1];
+      const compileResult = spawnSync(
+        process.execPath,
+        [binPath, 'compile', '--output', outputPath],
+        { stdio: 'inherit', env: process.env },
+      );
+      if (compileResult.status !== 0) {
+        printError('Compile failed — fix errors above before starting the server');
+        console.error(chalk.yellow('  Hint: run `objectstack start --artifact <path>` to skip the compile step.'));
+        process.exit(1);
+      }
+      artifactSource = {
+        path: outputPath,
+        display: path.relative(cwd, outputPath),
+      };
+    }
 
     // ── Database resolution ─────────────────────────────────────────
     // Priority: --database > $OS_DATABASE_URL > file:<home>/data/objectstack.db
@@ -132,6 +187,9 @@ export default class Start extends Command {
       ?? readOrCreateAuthSecret(homeDir);
 
     // ── Banner ──────────────────────────────────────────────────────
+    if (hasProjectConfig) {
+      printKV('Config', path.relative(cwd, projectConfigPath) || 'objectstack.config.ts', '📂');
+    }
     printKV('Home', homeDir, '🏠');
     if (artifactSource) {
       printKV('Artifact', artifactSource.display, '📦');
@@ -177,12 +235,20 @@ export default class Start extends Command {
   }
 }
 
-function resolveHome(flagValue?: string): string {
+function resolveHome(
+  flagValue: string | undefined,
+  opts: { hasProjectConfig: boolean; cwd: string },
+): string {
   const raw = flagValue ?? process.env.OS_HOME;
   if (raw && raw.trim().length > 0) {
     const v = raw.trim();
     if (v.startsWith('~')) return path.resolve(os.homedir(), v.slice(1).replace(/^[/\\]/, ''));
     return path.resolve(v);
+  }
+  // Project mode: keep state next to the source so each project is
+  // self-contained and `os start` from another cwd doesn't reuse it.
+  if (opts.hasProjectConfig) {
+    return path.resolve(opts.cwd, '.objectstack');
   }
   return path.resolve(os.homedir(), '.objectstack');
 }

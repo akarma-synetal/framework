@@ -1,0 +1,60 @@
+// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+
+import { defineForm } from '../ui/view.zod';
+
+/**
+ * Agent Metadata Form
+ * 
+ * Form layout for creating/editing AI agent metadata definitions.
+ */
+export const agentForm = defineForm({
+  schemaId: 'agent',
+  type: 'simple',
+  sections: [
+    {
+      label: 'Identity',
+      description: 'How users see and reference this agent.',
+      columns: 2,
+      fields: [
+        { field: 'name', required: true, colSpan: 1, helpText: 'Unique identifier (snake_case)' },
+        { field: 'label', required: true, colSpan: 1, helpText: 'Display name (e.g., "Sales Assistant")' },
+        { field: 'role', required: true, colSpan: 2, helpText: 'Agent persona (e.g., "Customer Support Specialist")' },
+        { field: 'avatar', colSpan: 1, helpText: 'Avatar image URL' },
+        { field: 'active', colSpan: 1, helpText: 'Enable/disable this agent' },
+      ],
+    },
+    {
+      label: 'AI Configuration',
+      description: 'Model selection, instructions, planning, and memory.',
+      fields: [
+        { field: 'instructions', required: true, widget: 'textarea', helpText: 'System prompt — tell the agent how to behave and what it can do' },
+        { field: 'model', widget: 'object-fields', helpText: 'AI model configuration (provider, model name, temperature, etc.)' },
+        { field: 'planning', widget: 'object-fields', helpText: 'Autonomous reasoning configuration (strategy, max iterations, replan)' },
+        { field: 'memory', widget: 'object-fields', helpText: 'Memory management (short-term, long-term, reflection)' },
+        { field: 'lifecycle', widget: 'object-fields', helpText: 'State machine defining conversation flow' },
+      ],
+    },
+    {
+      label: 'Capabilities',
+      description: 'Skills, tools, and knowledge sources the agent can use.',
+      fields: [
+        { field: 'skills', widget: 'string-tags', helpText: 'Skill names (Agent→Skill→Tool architecture)' },
+        { field: 'tools', widget: 'master-detail', helpText: 'Direct tool references (legacy mode)' },
+        { field: 'knowledge', widget: 'object-fields', helpText: 'RAG knowledge access configuration' },
+      ],
+    },
+    {
+      label: 'Access & Security',
+      description: 'Who can use this agent and what safeguards apply.',
+      collapsible: true,
+      collapsed: true,
+      fields: [
+        { field: 'visibility', helpText: 'Scope: global, organization, or private' },
+        { field: 'access', widget: 'string-tags', helpText: 'User IDs or role names who can chat with this agent' },
+        { field: 'permissions', widget: 'string-tags', helpText: 'Required permissions to use this agent' },
+        { field: 'tenantId', helpText: 'Restrict to specific organization ID' },
+        { field: 'guardrails', widget: 'object-fields', helpText: 'Safety rules and content policies' },
+      ],
+    },
+  ],
+});
