@@ -167,9 +167,25 @@ function LoginPage() {
       await refresh();
       toast({ title: t('auth.login.welcomeToast') });
     } catch (err) {
+      const errorMessage = (err as Error).message;
+      
+      // Check if the error is due to unverified email
+      if (
+        errorMessage.includes('email') &&
+        (errorMessage.toLowerCase().includes('verif') ||
+         errorMessage.toLowerCase().includes('not verified'))
+      ) {
+        // Redirect to verification prompt page
+        navigate({
+          to: '/verify-email-prompt',
+          search: { email, redirect },
+        });
+        return;
+      }
+      
       toast({
         title: t('auth.login.failed'),
-        description: (err as Error).message,
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

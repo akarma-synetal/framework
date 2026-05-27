@@ -129,15 +129,53 @@ function RegisterPage() {
     setSubmitting(true);
     try {
       await client.auth.register({ name, email, password });
-      await refresh();
+      
+      // If email verification is enabled, registration succeeds but the user
+      // can't sign in until they verify. Check if we got a "needs verification"
+      // signal and redirect to the verification prompt page.
+      try {
+        await refresh();
+      } catch (refreshErr) {
+        const errorMessage = (refreshErr as Error).message;
+        if (
+          errorMessage.includes('email') &&
+          (errorMessage.toLowerCase().includes('verif') ||
+           errorMessage.toLowerCase().includes('not verified'))
+        ) {
+          // Redirect to verification prompt page
+          navigate({
+            to: '/verify-email-prompt',
+            search: { email, redirect },
+          });
+          return;
+        }
+        throw refreshErr;
+      }
+      
       toast({ title: t('auth.register.successToast') });
       // Navigation is handled by the auth-redirect effect above once the
       // session updates: it sends users with an active org to the platform
       // home, otherwise to /organizations/new.
     } catch (err) {
+      const errorMessage = (err as Error).message;
+      
+      // Also check if registration itself returned a verification requirement
+      if (
+        errorMessage.includes('email') &&
+        (errorMessage.toLowerCase().includes('verif') ||
+         errorMessage.toLowerCase().includes('sent'))
+      ) {
+        // Registration succeeded, verification email sent
+        navigate({
+          to: '/verify-email-prompt',
+          search: { email, redirect },
+        });
+        return;
+      }
+      
       toast({
         title: t('auth.register.failed'),
-        description: (err as Error).message,
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
