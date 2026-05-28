@@ -10,890 +10,890 @@ import type { TranslationData } from '@objectstack/spec/system';
 
 export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = {
   object: {
-    label: "Object",
+    label: "Objeto",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Identity, labels, and taxonomy."
+        label: "Aspectos básicos",
+        description: "Identidad, etiquetas y taxonomía."
       },
       fields: {
-        label: "Fields",
-        description: "Define the data model — each row becomes a column in the database table."
+        label: "Campos",
+        description: "Define el modelo de datos — cada fila se convierte en una columna de la tabla de base de datos."
       },
       capabilities: {
-        label: "Capabilities",
-        description: "System features and API exposure."
+        label: "Capacidades",
+        description: "Funciones del sistema y exposición de API."
       },
       advanced: {
-        label: "Advanced",
-        description: "State machines, actions, and storage."
+        label: "Avanzado",
+        description: "Máquinas de estado, acciones y almacenamiento."
       }
     },
     fields: {
       name: {
-        helpText: "snake_case unique identifier (immutable after creation)"
+        helpText: "Identificador único snake_case (inmutable tras la creación)"
       },
       label: {
-        helpText: "Singular display name (e.g. \"Account\")"
+        helpText: "Nombre mostrado en singular (p. ej. \"Account\")"
       },
       pluralLabel: {
-        helpText: "Plural display name (e.g. \"Accounts\")"
+        helpText: "Nombre mostrado en plural (p. ej. \"Accounts\")"
       },
       icon: {
-        helpText: "Lucide icon name (e.g. \"building\", \"users\")"
+        helpText: "Nombre de icono Lucide (p. ej. \"building\", \"users\")"
       },
       description: {
-        helpText: "Developer documentation"
+        helpText: "Documentación para desarrolladores"
       },
       tags: {
-        helpText: "Categorization tags (e.g. \"sales\", \"system\")"
+        helpText: "Etiquetas de categorización (p. ej. \"sales\", \"system\")"
       },
       active: {
-        helpText: "Is the object active and usable"
+        helpText: "Indica si el objeto está activo y usable"
       },
       isSystem: {
-        helpText: "System object (protected from deletion)"
+        helpText: "Objeto de sistema (protegido contra eliminación)"
       },
       abstract: {
-        helpText: "Abstract base (cannot be instantiated)"
+        helpText: "Base abstracta (no se puede instanciar)"
       },
       fields: {
-        helpText: "Add the columns this object will store"
+        helpText: "Añade las columnas que almacenará este objeto"
       },
       "fields.name": {
-        helpText: "snake_case identifier"
+        helpText: "Identificador snake_case"
       },
       "fields.label": {
-        helpText: "Display label"
+        helpText: "Etiqueta mostrada"
       },
       "fields.type": {
-        helpText: "Field type"
+        helpText: "Tipo de campo"
       },
       "fields.reference": {
-        helpText: "Target object (for lookup/master_detail)"
+        helpText: "Objeto de destino (para lookup/master_detail)"
       },
       capabilities: {
-        helpText: "Enable/disable system features"
+        helpText: "Activa/desactiva funciones del sistema"
       },
       datasource: {
-        helpText: "Target datasource ID (default: \"default\")"
+        helpText: "ID de fuente de datos de destino (valor predeterminado: \"default\")"
       }
     }
   },
   field: {
-    label: "Field",
+    label: "Campo",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Core field identity and constraints."
+        label: "Aspectos básicos",
+        description: "Identidad y restricciones básicas del campo."
       },
       configuration: {
-        label: "Configuration",
-        description: "Field-type specific settings (visible blocks depend on the chosen type)."
+        label: "Configuración",
+        description: "Ajustes específicos del tipo de campo (los bloques visibles dependen del tipo elegido)."
       },
       formula: {
-        label: "Formula & Computed",
-        description: "Calculated values and roll-up summaries."
+        label: "Fórmula y calculado",
+        description: "Valores calculados y resúmenes roll-up."
       },
       advanced: {
-        label: "Advanced",
-        description: "Database, UI, audit, and security settings."
+        label: "Avanzado",
+        description: "Ajustes de base de datos, UI, auditoría y seguridad."
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case, immutable after creation)"
+        helpText: "Identificador único (snake_case, inmutable tras la creación)"
       },
       label: {
-        helpText: "Display name for users"
+        helpText: "Nombre mostrado a los usuarios"
       },
       type: {
-        helpText: "Data type of this field"
+        helpText: "Tipo de datos de este campo"
       },
       group: {
-        helpText: "Group name for form layout"
+        helpText: "Nombre de grupo para el diseño del formulario"
       },
       description: {
-        helpText: "Help text shown to users"
+        helpText: "Texto de ayuda mostrado a los usuarios"
       },
       required: {
-        helpText: "User must provide a value"
+        helpText: "El usuario debe proporcionar un valor"
       },
       unique: {
-        helpText: "No two records can have the same value"
+        helpText: "No puede haber dos registros con el mismo valor"
       },
       multiple: {
-        helpText: "Allow multiple values (for select/lookup)"
+        helpText: "Permite varios valores (para select/lookup)"
       },
       defaultValue: {
-        helpText: "Default value for new records"
+        helpText: "Valor predeterminado para registros nuevos"
       },
       minLength: {
-        helpText: "Minimum character length"
+        helpText: "Longitud mínima de caracteres"
       },
       maxLength: {
-        helpText: "Maximum character length"
+        helpText: "Longitud máxima de caracteres"
       },
       min: {
-        helpText: "Minimum value"
+        helpText: "Valor mínimo"
       },
       max: {
-        helpText: "Maximum value"
+        helpText: "Valor máximo"
       },
       precision: {
-        helpText: "Decimal places (e.g., 2 for $10.50)"
+        helpText: "Decimales (p. ej., 2 para $10.50)"
       },
       scale: {
-        helpText: "Number of decimal digits"
+        helpText: "Número de dígitos decimales"
       },
       options: {
-        helpText: "Available options (label/value pairs)"
+        helpText: "Opciones disponibles (pares label/value)"
       },
       reference: {
-        helpText: "Referenced object name"
+        helpText: "Nombre del objeto referenciado"
       },
       referenceFilters: {
-        helpText: "Filter expressions (e.g., \"active = true\")"
+        helpText: "Expresiones de filtro (p. ej., \"active = true\")"
       },
       deleteBehavior: {
-        helpText: "What happens when referenced record is deleted"
+        helpText: "Qué ocurre cuando se elimina el registro referenciado"
       },
       expression: {
-        helpText: "CEL expression to calculate this field (makes it read-only)"
+        helpText: "Expresión CEL para calcular este campo (lo hace de solo lectura)"
       },
       summaryOperations: {
-        helpText: "Roll-up summary configuration (for parent-child relationships)"
+        helpText: "Configuración de resumen roll-up (para relaciones padre-hijo)"
       },
       cached: {
-        helpText: "Caching configuration for computed fields"
+        helpText: "Configuración de caché para campos calculados"
       },
       columnName: {
-        helpText: "Physical column name in database (defaults to field name)"
+        helpText: "Nombre de columna física en la base de datos (por defecto, el nombre del campo)"
       },
       index: {
-        helpText: "Create database index for faster queries"
+        helpText: "Crea un índice de base de datos para consultas más rápidas"
       },
       externalId: {
-        helpText: "Mark as external ID for upsert operations"
+        helpText: "Marca como ID externo para operaciones upsert"
       },
       readonly: {
-        helpText: "Field is read-only in forms"
+        helpText: "El campo es de solo lectura en formularios"
       },
       hidden: {
-        helpText: "Hide field from default UI views"
+        helpText: "Oculta el campo en las vistas UI predeterminadas"
       },
       searchable: {
-        helpText: "Include in global search results"
+        helpText: "Incluye en los resultados de búsqueda global"
       },
       sortable: {
-        helpText: "Allow sorting lists by this field"
+        helpText: "Permite ordenar listas por este campo"
       },
       auditTrail: {
-        helpText: "Track detailed changes with user and timestamp"
+        helpText: "Registra cambios detallados con usuario y marca temporal"
       },
       trackFeedHistory: {
-        helpText: "Show changes in activity feed"
+        helpText: "Muestra cambios en el feed de actividad"
       },
       encryptionConfig: {
-        helpText: "Field-level encryption (GDPR/HIPAA/PCI-DSS)"
+        helpText: "Cifrado a nivel de campo (GDPR/HIPAA/PCI-DSS)"
       },
       maskingRule: {
-        helpText: "Data masking rules for PII protection"
+        helpText: "Reglas de enmascaramiento de datos para protección de PII"
       }
     }
   },
   trigger: {
-    label: "Trigger"
+    label: "Disparador"
   },
   validation: {
-    label: "Validation Rule"
+    label: "Regla de validación"
   },
   hook: {
     label: "Hook",
     sections: {
       identity: {
-        label: "Identity",
-        description: "What this hook is and when it fires."
+        label: "Identidad",
+        description: "Qué es este hook y cuándo se dispara."
       },
       body: {
-        label: "Body",
-        description: "Inline expression or sandboxed JavaScript executed when the hook fires."
+        label: "Cuerpo",
+        description: "Expresión en línea o JavaScript en sandbox ejecutado cuando se dispara el hook."
       },
       legacy_handler: {
-        label: "Legacy handler",
-        description: "Function name reference — deprecated in favour of body."
+        label: "Manejador heredado",
+        description: "Referencia de nombre de función — obsoleta en favor de body."
       },
       execution: {
-        label: "Execution"
+        label: "Ejecución"
       }
     },
     fields: {
       name: {
-        helpText: "snake_case identifier (immutable after creation)"
+        helpText: "Identificador snake_case (inmutable tras la creación)"
       },
       object: {
-        helpText: "Target object name (or \"*\" for global)"
+        helpText: "Nombre del objeto de destino (o \"*\" para global)"
       },
       events: {
-        helpText: "Lifecycle events (e.g. beforeInsert, afterUpdate)"
+        helpText: "Eventos de ciclo de vida (p. ej. beforeInsert, afterUpdate)"
       },
       priority: {
-        helpText: "Lower numbers run first"
+        helpText: "Los números menores se ejecutan primero"
       },
       body: {
-        helpText: "Either an L1 expression or an L2 sandboxed JS body"
+        helpText: "Una expresión L1 o un body JS L2 en sandbox"
       },
       "body.language": {
-        helpText: "expression = pure formula; js = sandboxed JavaScript"
+        helpText: "expression = fórmula pura; js = JavaScript en sandbox"
       },
       "body.source": {
-        helpText: "Function body source — no top-level imports"
+        helpText: "Código fuente del body de la función — sin imports de nivel superior"
       },
       "body.capabilities": {
-        helpText: "Allowed ctx APIs (api.read, api.write, crypto.uuid, log, …)"
+        helpText: "API ctx permitidas (api.read, api.write, crypto.uuid, log, …)"
       },
       "body.timeoutMs": {
-        helpText: "Per-invocation timeout (ms)"
+        helpText: "Tiempo de espera por invocación (ms)"
       },
       handler: {
-        helpText: "Handler function name (deprecated — prefer `body`)"
+        helpText: "Nombre de función manejadora (obsoleto — preferir `body`)"
       },
       async: {
-        helpText: "Run in background, do not block the transaction"
+        helpText: "Ejecutar en segundo plano, sin bloquear la transacción"
       },
       condition: {
-        helpText: "Optional formula — skip the hook when this evaluates to false"
+        helpText: "Fórmula opcional — omite el hook cuando evalúa a false"
       }
     }
   },
   view: {
-    label: "View",
+    label: "Vista",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Identity and primary surface."
+        label: "Aspectos básicos",
+        description: "Identidad y superficie principal."
       },
       columns_filters: {
-        label: "Columns & filters",
-        description: "What rows show and how users filter them."
+        label: "Columnas y filtros",
+        description: "Qué filas se muestran y cómo las filtran los usuarios."
       },
       table_options: {
-        label: "Table options",
-        description: "Grid-only display options."
+        label: "Opciones de tabla",
+        description: "Opciones de visualización solo de cuadrícula."
       },
       kanban: {
         label: "Kanban",
-        description: "Kanban-specific board configuration."
+        description: "Configuración de tablero específica de Kanban."
       },
       calendar: {
-        label: "Calendar",
-        description: "Calendar-specific configuration."
+        label: "Calendario",
+        description: "Configuración específica de calendario."
       },
       gantt: {
         label: "Gantt",
-        description: "Gantt-specific configuration."
+        description: "Configuración específica de Gantt."
       },
       gallery: {
-        label: "Gallery",
-        description: "Gallery-specific configuration."
+        label: "Galería",
+        description: "Configuración específica de galería."
       },
       timeline: {
-        label: "Timeline",
-        description: "Timeline-specific configuration."
+        label: "Cronología",
+        description: "Configuración específica de cronología."
       },
       chart: {
-        label: "Chart",
-        description: "Chart-specific configuration."
+        label: "Gráfico",
+        description: "Configuración específica de gráfico."
       },
       navigation_sharing: {
-        label: "Navigation & sharing",
-        description: "Where this view appears and who can see it."
+        label: "Navegación y uso compartido",
+        description: "Dónde aparece esta vista y quién puede verla."
       }
     },
     fields: {
       name: {
-        helpText: "snake_case, unique per environment"
+        helpText: "snake_case, único por environment"
       },
       type: {
-        helpText: "Primary view surface"
+        helpText: "Superficie principal de la vista"
       },
       data: {
-        helpText: "Data source — e.g. {\"provider\":\"object\",\"object\":\"task\"}"
+        helpText: "Fuente de datos — p. ej. {\"provider\":\"object\",\"object\":\"task\"}"
       },
       columns: {
-        helpText: "Columns to display (field names from selected object)"
+        helpText: "Columnas que mostrar (nombres de campo del objeto seleccionado)"
       },
       filter: {
-        helpText: "Filter conditions"
+        helpText: "Condiciones de filtro"
       },
       sort: {
-        helpText: "Default sort order"
+        helpText: "Orden predeterminado"
       },
       searchableFields: {
-        helpText: "Field names available for quick search"
+        helpText: "Nombres de campo disponibles para búsqueda rápida"
       },
       filterableFields: {
-        helpText: "Field names available for filtering"
+        helpText: "Nombres de campo disponibles para filtrado"
       }
     }
   },
   page: {
-    label: "Page",
+    label: "Página",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Page identity and template."
+        label: "Aspectos básicos",
+        description: "Identidad y plantilla de página."
       },
       data_context: {
-        label: "Data Context",
-        description: "Record binding and page-local state."
+        label: "Contexto de datos",
+        description: "Vinculación de registros y estado local de página."
       },
       layout: {
-        label: "Layout",
-        description: "Page regions and components placed within them."
+        label: "Diseño",
+        description: "Regiones de página y componentes colocados en ellas."
       },
       advanced: {
-        label: "Advanced",
-        description: "Activation, audience, and accessibility."
+        label: "Avanzado",
+        description: "Activación, audiencia y accesibilidad."
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "Identificador único (snake_case)"
       },
       label: {
-        helpText: "Page title shown to users"
+        helpText: "Título de página mostrado a los usuarios"
       },
       icon: {
-        helpText: "Icon for navigation menu"
+        helpText: "Icono para el menú de navegación"
       },
       type: {
-        helpText: "Page type (record, home, app, dashboard, etc.)"
+        helpText: "Tipo de página (record, home, app, dashboard, etc.)"
       },
       template: {
-        helpText: "Layout template (e.g., \"header-sidebar-main\")"
+        helpText: "Plantilla de diseño (p. ej., \"header-sidebar-main\")"
       },
       description: {
-        helpText: "Page description for navigation"
+        helpText: "Descripción de página para navegación"
       },
       object: {
-        helpText: "Bound object (for Record pages)"
+        helpText: "Objeto vinculado (para páginas Record)"
       },
       variables: {
-        helpText: "Local page state variables"
+        helpText: "Variables de estado local de página"
       },
       regions: {
-        helpText: "Layout regions (header, main, sidebar, footer) with components"
+        helpText: "Regiones de diseño (header, main, sidebar, footer) con componentes"
       },
       isDefault: {
-        helpText: "Set as default page for this page type"
+        helpText: "Establece como página predeterminada para este tipo de página"
       },
       kind: {
-        helpText: "Page override mode: full or slotted (for record pages)"
+        helpText: "Modo de anulación de página: full o slotted (para páginas record)"
       },
       assignedProfiles: {
-        helpText: "Profiles that can access this page"
+        helpText: "Perfiles que pueden acceder a esta página"
       },
       aria: {
-        helpText: "Accessibility attributes (ARIA labels, roles)"
+        helpText: "Atributos de accesibilidad (etiquetas ARIA, roles)"
       }
     }
   },
   dashboard: {
-    label: "Dashboard",
+    label: "Panel",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Dashboard identity and description."
+        label: "Aspectos básicos",
+        description: "Identidad y descripción del panel."
       },
       layout: {
-        label: "Layout",
-        description: "Grid sizing and refresh cadence."
+        label: "Diseño",
+        description: "Tamaño de cuadrícula y cadencia de actualización."
       },
       widgets: {
         label: "Widgets",
-        description: "Cards and charts placed on the grid."
+        description: "Tarjetas y gráficos colocados en la cuadrícula."
       },
       filters: {
-        label: "Filters",
-        description: "Default and global filters applied across widgets."
+        label: "Filtros",
+        description: "Filtros predeterminados y globales aplicados a todos los widgets."
       },
       advanced: {
-        label: "Advanced",
-        description: "Accessibility and performance tuning."
+        label: "Avanzado",
+        description: "Ajustes de accesibilidad y rendimiento."
       }
     },
     fields: {
       name: {
-        helpText: "snake_case unique identifier"
+        helpText: "Identificador único snake_case"
       },
       label: {
-        helpText: "Display name"
+        helpText: "Nombre mostrado"
       },
       columns: {
-        helpText: "Grid columns (default 12)"
+        helpText: "Columnas de cuadrícula (predeterminado 12)"
       },
       gap: {
-        helpText: "Grid gap (Tailwind units)"
+        helpText: "Separación de cuadrícula (unidades Tailwind)"
       },
       refreshInterval: {
-        helpText: "Auto-refresh (seconds)"
+        helpText: "Actualización automática (segundos)"
       },
       header: {
-        helpText: "Dashboard header config (title, subtitle, actions)"
+        helpText: "Configuración de cabecera del panel (title, subtitle, actions)"
       },
       widgets: {
-        helpText: "Dashboard widgets with position and sizing"
+        helpText: "Widgets del panel con posición y tamaño"
       },
       dateRange: {
-        helpText: "Default date range selector"
+        helpText: "Selector predeterminado de intervalo de fechas"
       },
       globalFilters: {
-        helpText: "Filters applied to all widgets"
+        helpText: "Filtros aplicados a todos los widgets"
       },
       aria: {
-        helpText: "Accessibility labels"
+        helpText: "Etiquetas de accesibilidad"
       },
       performance: {
-        helpText: "Caching and optimization config"
+        helpText: "Configuración de caché y optimización"
       }
     }
   },
   app: {
-    label: "Application",
+    label: "Aplicación",
     sections: {
       basics: {
-        label: "Basics",
-        description: "App identity and activation."
+        label: "Aspectos básicos",
+        description: "Identidad y activación de la app."
       },
       navigation: {
-        label: "Navigation",
-        description: "Sidebar items and area grouping."
+        label: "Navegación",
+        description: "Elementos de barra lateral y agrupación de áreas."
       },
       content: {
-        label: "Content",
-        description: "Objects and APIs this app uses."
+        label: "Contenido",
+        description: "Objetos y API que usa esta app."
       },
       branding: {
-        label: "Branding",
-        description: "Theme colors and logo."
+        label: "Marca",
+        description: "Colores de tema y logotipo."
       },
       access_and_sharing: {
-        label: "Access & sharing",
-        description: "Who can access this app and how it can be embedded."
+        label: "Acceso y uso compartido",
+        description: "Quién puede acceder a esta app y cómo puede incrustarse."
       }
     },
     fields: {
       name: {
-        helpText: "snake_case, unique"
+        helpText: "snake_case, único"
       },
       icon: {
-        helpText: "Lucide icon name (e.g. \"users\", \"briefcase\")"
+        helpText: "Nombre de icono Lucide (p. ej. \"users\", \"briefcase\")"
       },
       isDefault: {
-        helpText: "Make this the default app for new users"
+        helpText: "Convierte esta app en la predeterminada para usuarios nuevos"
       },
       navigation: {
-        helpText: "Nav tree — recursive structure"
+        helpText: "Árbol de navegación — estructura recursiva"
       },
       areas: {
-        helpText: "Group items into collapsible areas"
+        helpText: "Agrupa elementos en áreas plegables"
       },
       homePageId: {
-        helpText: "Landing page when app opens"
+        helpText: "Página de inicio al abrir la app"
       },
       mobileNavigation: {
-        helpText: "Bottom tab bar config for mobile"
+        helpText: "Configuración de barra de pestañas inferior para móvil"
       },
       objects: {
-        helpText: "Object names this app exposes"
+        helpText: "Nombres de objeto que expone esta app"
       },
       apis: {
-        helpText: "API endpoint definitions"
+        helpText: "Definiciones de endpoints API"
       },
       defaultAgent: {
-        helpText: "AI agent for the ambient assistant button"
+        helpText: "Agente de IA para el botón de asistente ambiental"
       },
       branding: {
-        helpText: "Primary/secondary colors, logo, theme"
+        helpText: "Colores primario/secundario, logotipo, tema"
       },
       requiredPermissions: {
-        helpText: "Permissions needed to access this app"
+        helpText: "Permisos necesarios para acceder a esta app"
       },
       sharing: {
-        helpText: "Public/internal/restricted access control"
+        helpText: "Control de acceso público/interno/restringido"
       },
       embed: {
-        helpText: "iFrame embed configuration"
+        helpText: "Configuración de incrustación iFrame"
       },
       aria: {
-        helpText: "Accessibility labels"
+        helpText: "Etiquetas de accesibilidad"
       }
     }
   },
   action: {
-    label: "Action",
+    label: "Acción",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Action identity and presentation."
+        label: "Aspectos básicos",
+        description: "Identidad y presentación de la acción."
       },
       behavior: {
-        label: "Behavior",
-        description: "Configure what happens when the action is triggered."
+        label: "Comportamiento",
+        description: "Configura qué ocurre cuando se dispara la acción."
       },
       placement: {
-        label: "Placement",
-        description: "Where and when the action button appears."
+        label: "Ubicación",
+        description: "Dónde y cuándo aparece el botón de acción."
       },
       advanced: {
-        label: "Advanced",
-        description: "Bulk operations, AI exposure, and API request shape."
+        label: "Avanzado",
+        description: "Operaciones masivas, exposición a IA y forma de solicitud API."
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "Identificador único (snake_case)"
       },
       label: {
-        helpText: "Button text shown to users"
+        helpText: "Texto de botón mostrado a los usuarios"
       },
       objectName: {
-        helpText: "Object this action belongs to (optional)"
+        helpText: "Objeto al que pertenece esta acción (opcional)"
       },
       icon: {
-        helpText: "Lucide icon name (e.g., \"check\", \"x-circle\")"
+        helpText: "Nombre de icono Lucide (p. ej., \"check\", \"x-circle\")"
       },
       type: {
-        helpText: "What happens when clicked"
+        helpText: "Qué ocurre al hacer clic"
       },
       variant: {
-        helpText: "Button style (primary=blue, danger=red, ghost=transparent)"
+        helpText: "Estilo de botón (primary=blue, danger=red, ghost=transparent)"
       },
       target: {
-        helpText: "URL, flow name, or API endpoint to call"
+        helpText: "URL, nombre de flujo o endpoint API que llamar"
       },
       method: {
-        helpText: "HTTP method (GET, POST, PUT, DELETE)"
+        helpText: "Método HTTP (GET, POST, PUT, DELETE)"
       },
       body: {
-        helpText: "JavaScript code to execute"
+        helpText: "Código JavaScript que ejecutar"
       },
       params: {
-        helpText: "User input parameters (show form before executing)"
+        helpText: "Parámetros de entrada de usuario (muestra el formulario antes de ejecutar)"
       },
       confirmText: {
-        helpText: "Confirmation message (e.g., \"Are you sure?\")"
+        helpText: "Mensaje de confirmación (p. ej., \"Are you sure?\")"
       },
       successMessage: {
-        helpText: "Success message after completion"
+        helpText: "Mensaje de éxito tras completar"
       },
       refreshAfter: {
-        helpText: "Refresh the list/page after action completes"
+        helpText: "Actualiza la lista/página tras completar la acción"
       },
       locations: {
-        helpText: "Where to show this action (toolbar, row menu, etc.)"
+        helpText: "Dónde mostrar esta acción (toolbar, row menu, etc.)"
       },
       component: {
-        helpText: "How to render (button, icon, menu item)"
+        helpText: "Cómo renderizar (button, icon, menu item)"
       },
       visible: {
-        helpText: "CEL expression: show only when condition is true"
+        helpText: "Expresión CEL: mostrar solo cuando la condición sea true"
       },
       disabled: {
-        helpText: "CEL expression: disable when condition is true"
+        helpText: "Expresión CEL: desactivar cuando la condición sea true"
       },
       shortcut: {
-        helpText: "Keyboard shortcut (e.g., \"Ctrl+S\", \"Cmd+Enter\")"
+        helpText: "Atajo de teclado (p. ej., \"Ctrl+S\", \"Cmd+Enter\")"
       },
       bulkEnabled: {
-        helpText: "Allow applying to multiple selected records"
+        helpText: "Permite aplicar a varios registros seleccionados"
       },
       aiExposed: {
-        helpText: "Allow AI agents to call this action"
+        helpText: "Permite que agentes de IA llamen a esta acción"
       },
       recordIdParam: {
-        helpText: "Body parameter name for record ID"
+        helpText: "Nombre del parámetro body para ID de registro"
       },
       recordIdField: {
-        helpText: "Field to use as record ID (default: \"id\")"
+        helpText: "Campo que usar como ID de registro (valor predeterminado: \"id\")"
       },
       bodyShape: {
-        helpText: "Request body structure (flat or nested)"
+        helpText: "Estructura del cuerpo de solicitud (flat o nested)"
       }
     }
   },
   report: {
-    label: "Report",
+    label: "Informe",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Identity and data source."
+        label: "Aspectos básicos",
+        description: "Identidad y fuente de datos."
       },
       columns: {
-        label: "Columns",
-        description: "Columns shown in the report output."
+        label: "Columnas",
+        description: "Columnas mostradas en la salida del informe."
       },
       groupings: {
-        label: "Groupings",
-        description: "How rows (and columns, for matrix reports) are grouped."
+        label: "Agrupaciones",
+        description: "Cómo se agrupan las filas (y columnas, para informes matrix)."
       },
       joined_blocks: {
-        label: "Joined blocks",
-        description: "Additional blocks joined into a single report (joined reports only)."
+        label: "Bloques unidos",
+        description: "Bloques adicionales unidos en un solo informe (solo informes joined)."
       },
       filter_and_chart: {
-        label: "Filter & chart",
-        description: "Report-level filters and chart presentation."
+        label: "Filtro y gráfico",
+        description: "Filtros a nivel de informe y presentación del gráfico."
       },
       advanced: {
-        label: "Advanced",
-        description: "Accessibility and performance tuning."
+        label: "Avanzado",
+        description: "Ajustes de accesibilidad y rendimiento."
       }
     },
     fields: {
       name: {
-        helpText: "snake_case unique identifier"
+        helpText: "Identificador único snake_case"
       },
       objectName: {
-        helpText: "Data source object"
+        helpText: "Objeto de fuente de datos"
       },
       type: {
-        helpText: "Report type: tabular/summary/matrix/joined"
+        helpText: "Tipo de informe: tabular/summary/matrix/joined"
       },
       columns: {
-        helpText: "Columns to display in the report"
+        helpText: "Columnas que mostrar en el informe"
       },
       groupingsDown: {
-        helpText: "Row grouping levels"
+        helpText: "Niveles de agrupación de filas"
       },
       groupingsAcross: {
-        helpText: "Column grouping levels (matrix only)"
+        helpText: "Niveles de agrupación de columnas (solo matrix)"
       },
       blocks: {
-        helpText: "Join multiple objects (joined report only)"
+        helpText: "Une varios objetos (solo informe joined)"
       },
       filter: {
-        helpText: "Report-level filters"
+        helpText: "Filtros a nivel de informe"
       },
       chart: {
-        helpText: "Chart config (type, legend, colors)"
+        helpText: "Configuración de gráfico (type, legend, colors)"
       },
       aria: {
-        helpText: "Accessibility labels"
+        helpText: "Etiquetas de accesibilidad"
       },
       performance: {
-        helpText: "Caching and optimization"
+        helpText: "Caché y optimización"
       }
     }
   },
   flow: {
-    label: "Flow",
+    label: "Flujo",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Flow identity and how it starts."
+        label: "Aspectos básicos",
+        description: "Identidad del flujo y cómo se inicia."
       },
       canvas: {
-        label: "Canvas",
-        description: "Nodes, edges, and flow variables — consider the visual designer for complex flows."
+        label: "Lienzo",
+        description: "Nodos, aristas y variables de flujo — considera el diseñador visual para flujos complejos."
       },
       execution: {
-        label: "Execution",
-        description: "Deployment status, identity, and error handling."
+        label: "Ejecución",
+        description: "Estado de despliegue, identidad y gestión de errores."
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "Identificador único (snake_case)"
       },
       label: {
-        helpText: "Display name for users"
+        helpText: "Nombre mostrado a los usuarios"
       },
       type: {
-        helpText: "How the flow starts (autolaunched, record_change, schedule, screen, api)"
+        helpText: "Cómo se inicia el flujo (autolaunched, record_change, schedule, screen, api)"
       },
       template: {
-        helpText: "Is this a reusable subflow (can be called from other flows)"
+        helpText: "Indica si es un subflujo reutilizable (puede llamarse desde otros flujos)"
       },
       description: {
-        helpText: "What this flow does"
+        helpText: "Qué hace este flujo"
       },
       nodes: {
-        helpText: "⚠️ Consider using Flow Designer visual editor instead of JSON"
+        helpText: "⚠️ Considera usar el editor visual Flow Designer en lugar de JSON"
       },
       edges: {
-        helpText: "Connections between nodes — use Flow Designer for easier editing"
+        helpText: "Conexiones entre nodos — usa Flow Designer para editar más fácilmente"
       },
       variables: {
-        helpText: "Flow variables (inputs/outputs)"
+        helpText: "Variables de flujo (inputs/outputs)"
       },
       status: {
-        helpText: "Deployment status: draft → active → obsolete"
+        helpText: "Estado de despliegue: draft → active → obsolete"
       },
       version: {
-        helpText: "Version number (auto-incremented)"
+        helpText: "Número de versión (autoincrementado)"
       },
       runAs: {
-        helpText: "Execute as system (admin) or user (current user permissions)"
+        helpText: "Ejecutar como system (admin) o user (permisos del usuario actual)"
       },
       errorHandling: {
-        helpText: "What to do when a node fails (fail, retry, continue)"
+        helpText: "Qué hacer cuando falla un nodo (fail, retry, continue)"
       }
     }
   },
   workflow: {
-    label: "Workflow",
+    label: "Flujo de trabajo",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Identity and the object/event that triggers it."
+        label: "Aspectos básicos",
+        description: "Identidad y objeto/evento que lo dispara."
       },
       actions: {
-        label: "Actions",
-        description: "What this workflow does when fired."
+        label: "Acciones",
+        description: "Qué hace este flujo de trabajo cuando se dispara."
       },
       advanced: {
-        label: "Advanced",
-        description: "Ordering and execution behaviour."
+        label: "Avanzado",
+        description: "Orden y comportamiento de ejecución."
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "Identificador único (snake_case)"
       },
       objectName: {
-        helpText: "Which object triggers this workflow"
+        helpText: "Qué objeto dispara este flujo de trabajo"
       },
       triggerType: {
-        helpText: "When to run: on_create, on_update, on_delete, schedule"
+        helpText: "Cuándo ejecutar: on_create, on_update, on_delete, schedule"
       },
       active: {
-        helpText: "Enable/disable this workflow"
+        helpText: "Activa/desactiva este flujo de trabajo"
       },
       description: {
-        helpText: "What this workflow does"
+        helpText: "Qué hace este flujo de trabajo"
       },
       criteria: {
-        helpText: "CEL expression: only run when this condition is true"
+        helpText: "Expresión CEL: ejecutar solo cuando esta condición sea true"
       },
       actions: {
-        helpText: "Actions to execute immediately (field update, email, API call, etc.)"
+        helpText: "Acciones que ejecutar inmediatamente (field update, email, API call, etc.)"
       },
       timeTriggers: {
-        helpText: "Scheduled actions (e.g., send reminder 1 day before deadline)"
+        helpText: "Acciones programadas (p. ej., enviar recordatorio 1 día antes del plazo)"
       },
       executionOrder: {
-        helpText: "Run order when multiple workflows match (lower = earlier)"
+        helpText: "Orden de ejecución cuando coinciden varios flujos de trabajo (menor = antes)"
       }
     }
   },
   approval: {
-    label: "Approval Process",
+    label: "Proceso de aprobación",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Approval process identity and the object it gates."
+        label: "Aspectos básicos",
+        description: "Identidad del proceso de aprobación y el objeto que controla."
       },
       entry_rules: {
-        label: "Entry rules",
-        description: "Who can submit, and what happens to the record while pending."
+        label: "Reglas de entrada",
+        description: "Quién puede enviar y qué ocurre con el registro mientras está pendiente."
       },
       steps: {
-        label: "Steps",
-        description: "Ordered approval chain — each step picks the approver and decides routing."
+        label: "Pasos",
+        description: "Cadena de aprobación ordenada — cada paso elige aprobador y decide el enrutado."
       },
       escalation_and_outcomes: {
-        label: "Escalation & outcomes",
-        description: "SLA, escalation, and post-decision actions."
+        label: "Escalado y resultados",
+        description: "SLA, escalado y acciones posteriores a la decisión."
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "Identificador único (snake_case)"
       },
       label: {
-        helpText: "Display name (e.g., \"Contract Approval\")"
+        helpText: "Nombre mostrado (p. ej., \"Contract Approval\")"
       },
       object: {
-        helpText: "Which object needs approval"
+        helpText: "Qué objeto necesita aprobación"
       },
       active: {
-        helpText: "Enable/disable this approval process"
+        helpText: "Activa/desactiva este proceso de aprobación"
       },
       description: {
-        helpText: "What gets approved and why"
+        helpText: "Qué se aprueba y por qué"
       },
       entryCriteria: {
-        helpText: "CEL expression: users can submit only when this is true"
+        helpText: "Expresión CEL: los usuarios solo pueden enviar cuando esto sea true"
       },
       lockRecord: {
-        helpText: "Lock record from editing while approval is pending"
+        helpText: "Bloquea la edición del registro mientras la aprobación está pendiente"
       },
       approvalStatusField: {
-        helpText: "Field name to mirror approval status (e.g., \"approval_status\")"
+        helpText: "Nombre de campo para reflejar el estado de aprobación (p. ej., \"approval_status\")"
       },
       steps: {
-        helpText: "Approval steps in order — each step defines who approves and what happens"
+        helpText: "Pasos de aprobación en orden — cada paso define quién aprueba y qué ocurre"
       },
       escalation: {
-        helpText: "Auto-escalate or auto-approve after timeout"
+        helpText: "Escala o aprueba automáticamente tras el tiempo de espera"
       },
       onFinalApprove: {
-        helpText: "Actions when all steps approved (e.g., update status)"
+        helpText: "Acciones cuando todos los pasos se aprueban (p. ej., actualizar estado)"
       },
       onFinalReject: {
-        helpText: "Actions when rejected (e.g., notify submitter)"
+        helpText: "Acciones al rechazar (p. ej., notificar al remitente)"
       }
     }
   },
   job: {
-    label: "Background Job"
+    label: "Trabajo en segundo plano"
   },
   datasource: {
-    label: "Datasource"
+    label: "Fuente de datos"
   },
   translation: {
-    label: "Translation"
+    label: "Traducción"
   },
   router: {
     label: "Router"
   },
   function: {
-    label: "Function"
+    label: "Función"
   },
   service: {
-    label: "Service"
+    label: "Servicio"
   },
   email_template: {
-    label: "Email Template",
+    label: "Plantilla de email",
     sections: {
       identity: {
-        label: "Identity",
-        description: "Identifier and content type. The id is referenced by sendTemplate({ template: id, ... })."
+        label: "Identidad",
+        description: "Identificador y tipo de contenido. El id se referencia con sendTemplate({ template: id, ... })."
       },
       subject: {
-        label: "Subject",
-        description: "Subject line. Supports {{var.path}} interpolation."
+        label: "Asunto",
+        description: "Línea de asunto. Admite interpolación {{var.path}}."
       },
       body: {
-        label: "Body",
-        description: "Email body. Use {{var}} for variables. Editor highlights based on body type."
+        label: "Cuerpo",
+        description: "Cuerpo del email. Usa {{var}} para variables. El editor resalta según el tipo de body."
       },
       variables_and_attachments: {
-        label: "Variables & Attachments",
-        description: "Declared template variables and optional file attachments."
+        label: "Variables y adjuntos",
+        description: "Variables de plantilla declaradas y adjuntos de archivo opcionales."
       }
     },
     fields: {
       id: {
-        helpText: "Template id (e.g. auth.password_reset)"
+        helpText: "id de plantilla (p. ej. auth.password_reset)"
       },
       body: {
-        helpText: "Body content. Will be rendered as HTML, plain text, or Markdown based on Body Type."
+        helpText: "Contenido del body. Se renderizará como HTML, texto plano o Markdown según Body Type."
       },
       variables: {
-        helpText: "List of variable names referenced in subject/body"
+        helpText: "Lista de nombres de variable referenciados en subject/body"
       },
       attachments: {
         helpText: "[{ \"name\": \"...\", \"url\": \"...\" }]"
@@ -901,37 +901,37 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     }
   },
   permission: {
-    label: "Permission Set",
+    label: "Conjunto de permisos",
     sections: {
       identity: {
-        label: "Identity",
-        description: "Permission Sets stack on top of a Profile to grant additional access. Profiles are the base set assigned 1:1 to each user."
+        label: "Identidad",
+        description: "Los conjuntos de permisos se apilan sobre un perfil para conceder acceso adicional. Los perfiles son el conjunto base asignado 1:1 a cada usuario."
       },
       system_permissions: {
-        label: "System Permissions",
-        description: "High-level capabilities not tied to a specific object — e.g. manage_users, view_audit_logs."
+        label: "Permisos del sistema",
+        description: "Capacidades de alto nivel no vinculadas a un objeto específico — p. ej. manage_users, view_audit_logs."
       },
       object_and_field_permissions: {
-        label: "Object & Field Permissions",
-        description: "Per-object CRUD + per-field FLS. Edit via the matrix editor or paste JSON here."
+        label: "Permisos de objeto y campo",
+        description: "CRUD por objeto + FLS por campo. Edita mediante el editor matricial o pega JSON aquí."
       },
       tab_and_row_level_security: {
-        label: "Tab & Row-Level Security",
-        description: "Tab visibility, RLS policies, and custom context variables for predicate evaluation."
+        label: "Pestaña y seguridad a nivel de fila",
+        description: "Visibilidad de pestañas, políticas RLS y variables de contexto personalizadas para evaluar predicados."
       }
     },
     fields: {
       name: {
-        helpText: "Machine name (snake_case)"
+        helpText: "Nombre de máquina (snake_case)"
       },
       label: {
-        helpText: "Display label for admins"
+        helpText: "Etiqueta mostrada para administradores"
       },
       isProfile: {
-        helpText: "Profile = base set assigned to users. Permission Set = additive grant."
+        helpText: "Profile = conjunto base asignado a usuarios. Permission Set = concesión adicional."
       },
       systemPermissions: {
-        helpText: "List of system capability keys"
+        helpText: "Lista de claves de capacidades del sistema"
       },
       objects: {
         helpText: "{ \"account\": { allowRead: true, allowEdit: true, ... } }"
@@ -943,45 +943,45 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
         helpText: "{ \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
       },
       rowLevelSecurity: {
-        helpText: "Array of RLS policies (see rls.zod.ts)"
+        helpText: "Array de políticas RLS (ver rls.zod.ts)"
       },
       contextVariables: {
-        helpText: "Custom variables referenced in RLS predicates"
+        helpText: "Variables personalizadas referenciadas en predicados RLS"
       }
     }
   },
   profile: {
-    label: "Profile",
+    label: "Perfil",
     sections: {
       identity: {
-        label: "Identity",
-        description: "Permission Sets stack on top of a Profile to grant additional access. Profiles are the base set assigned 1:1 to each user."
+        label: "Identidad",
+        description: "Los conjuntos de permisos se apilan sobre un perfil para conceder acceso adicional. Los perfiles son el conjunto base asignado 1:1 a cada usuario."
       },
       system_permissions: {
-        label: "System Permissions",
-        description: "High-level capabilities not tied to a specific object — e.g. manage_users, view_audit_logs."
+        label: "Permisos del sistema",
+        description: "Capacidades de alto nivel no vinculadas a un objeto específico — p. ej. manage_users, view_audit_logs."
       },
       object_and_field_permissions: {
-        label: "Object & Field Permissions",
-        description: "Per-object CRUD + per-field FLS. Edit via the matrix editor or paste JSON here."
+        label: "Permisos de objeto y campo",
+        description: "CRUD por objeto + FLS por campo. Edita mediante el editor matricial o pega JSON aquí."
       },
       tab_and_row_level_security: {
-        label: "Tab & Row-Level Security",
-        description: "Tab visibility, RLS policies, and custom context variables for predicate evaluation."
+        label: "Pestaña y seguridad a nivel de fila",
+        description: "Visibilidad de pestañas, políticas RLS y variables de contexto personalizadas para evaluar predicados."
       }
     },
     fields: {
       name: {
-        helpText: "Machine name (snake_case)"
+        helpText: "Nombre de máquina (snake_case)"
       },
       label: {
-        helpText: "Display label for admins"
+        helpText: "Etiqueta mostrada para administradores"
       },
       isProfile: {
-        helpText: "Profile = base set assigned to users. Permission Set = additive grant."
+        helpText: "Profile = conjunto base asignado a usuarios. Permission Set = concesión adicional."
       },
       systemPermissions: {
-        helpText: "List of system capability keys"
+        helpText: "Lista de claves de capacidades del sistema"
       },
       objects: {
         helpText: "{ \"account\": { allowRead: true, allowEdit: true, ... } }"
@@ -993,19 +993,19 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
         helpText: "{ \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
       },
       rowLevelSecurity: {
-        helpText: "Array of RLS policies (see rls.zod.ts)"
+        helpText: "Array de políticas RLS (ver rls.zod.ts)"
       },
       contextVariables: {
-        helpText: "Custom variables referenced in RLS predicates"
+        helpText: "Variables personalizadas referenciadas en predicados RLS"
       }
     }
   },
   role: {
-    label: "Role",
+    label: "Rol",
     sections: {
       role: {
-        label: "Role",
-        description: "Roles compose a hierarchy used for record sharing (sales VP → sales mgr → sales rep). Permissions themselves live on Permission Sets and Profiles."
+        label: "Rol",
+        description: "Los roles componen una jerarquía usada para compartir registros (sales VP → sales mgr → sales rep). Los permisos en sí residen en Permission Sets y Profiles."
       }
     },
     fields: {
@@ -1013,186 +1013,186 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
         helpText: "snake_case"
       },
       parent: {
-        helpText: "Parent role machine name (Reports To)"
+        helpText: "Nombre de máquina del rol padre (Reports To)"
       }
     }
   },
   agent: {
-    label: "AI Agent",
+    label: "Agente de IA",
     sections: {
       identity: {
-        label: "Identity",
-        description: "How users see and reference this agent."
+        label: "Identidad",
+        description: "Cómo ven y referencian este agente los usuarios."
       },
       ai_configuration: {
-        label: "AI Configuration",
-        description: "Model selection, instructions, planning, and memory."
+        label: "Configuración de IA",
+        description: "Selección de modelo, instrucciones, planificación y memoria."
       },
       capabilities: {
-        label: "Capabilities",
-        description: "Skills, tools, and knowledge sources the agent can use."
+        label: "Capacidades",
+        description: "Skills, herramientas y fuentes de conocimiento que puede usar el agente."
       },
       access: {
-        label: "Access & Security",
-        description: "Who can use this agent and what safeguards apply."
+        label: "Acceso y seguridad",
+        description: "Quién puede usar este agente y qué salvaguardas se aplican."
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "Identificador único (snake_case)"
       },
       label: {
-        helpText: "Display name (e.g., \"Sales Assistant\")"
+        helpText: "Nombre mostrado (p. ej., \"Sales Assistant\")"
       },
       role: {
-        helpText: "Agent persona (e.g., \"Customer Support Specialist\")"
+        helpText: "Persona del agente (p. ej., \"Customer Support Specialist\")"
       },
       avatar: {
-        helpText: "Avatar image URL"
+        helpText: "URL de imagen de avatar"
       },
       active: {
-        helpText: "Enable/disable this agent"
+        helpText: "Activa/desactiva este agente"
       },
       instructions: {
-        helpText: "System prompt — tell the agent how to behave and what it can do"
+        helpText: "Prompt del sistema — indica al agente cómo comportarse y qué puede hacer"
       },
       model: {
-        helpText: "AI model configuration (provider, model name, temperature, etc.)"
+        helpText: "Configuración del modelo de IA (provider, model name, temperature, etc.)"
       },
       planning: {
-        helpText: "Autonomous reasoning configuration (strategy, max iterations, replan)"
+        helpText: "Configuración de razonamiento autónomo (strategy, max iterations, replan)"
       },
       memory: {
-        helpText: "Memory management (short-term, long-term, reflection)"
+        helpText: "Gestión de memoria (short-term, long-term, reflection)"
       },
       lifecycle: {
-        helpText: "State machine defining conversation flow"
+        helpText: "Máquina de estado que define el flujo de conversación"
       },
       skills: {
-        helpText: "Skill names (Agent→Skill→Tool architecture)"
+        helpText: "Nombres de skill (arquitectura Agent→Skill→Tool)"
       },
       tools: {
-        helpText: "Direct tool references (legacy mode)"
+        helpText: "Referencias directas a herramientas (modo heredado)"
       },
       knowledge: {
-        helpText: "RAG knowledge access configuration"
+        helpText: "Configuración de acceso a conocimiento RAG"
       },
       visibility: {
-        helpText: "Scope: global, organization, or private"
+        helpText: "Ámbito: global, organization o private"
       },
       access: {
-        helpText: "User IDs or role names who can chat with this agent"
+        helpText: "IDs de usuario o nombres de rol que pueden chatear con este agente"
       },
       permissions: {
-        helpText: "Required permissions to use this agent"
+        helpText: "Permisos necesarios para usar este agente"
       },
       tenantId: {
-        helpText: "Restrict to specific organization ID"
+        helpText: "Restringe a un ID de organization específico"
       },
       guardrails: {
-        helpText: "Safety rules and content policies"
+        helpText: "Reglas de seguridad y políticas de contenido"
       }
     }
   },
   tool: {
-    label: "AI Tool",
+    label: "Herramienta de IA",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Tool identity and AI-facing description."
+        label: "Aspectos básicos",
+        description: "Identidad de herramienta y descripción para IA."
       },
       schemas: {
-        label: "Schemas",
-        description: "Inputs the tool accepts and the shape of its output."
+        label: "Esquemas",
+        description: "Entradas que acepta la herramienta y forma de su salida."
       },
       access_and_safety: {
-        label: "Access & safety",
-        description: "Permissions and confirmation requirements."
+        label: "Acceso y seguridad",
+        description: "Permisos y requisitos de confirmación."
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "Identificador único (snake_case)"
       },
       label: {
-        helpText: "Display name for Studio UI"
+        helpText: "Nombre mostrado para Studio UI"
       },
       description: {
-        helpText: "Tell AI when to use this tool — be specific!"
+        helpText: "Indica a IA cuándo usar esta herramienta — sé específico."
       },
       category: {
-        helpText: "Tool category (data, action, flow, integration, etc.)"
+        helpText: "Categoría de herramienta (data, action, flow, integration, etc.)"
       },
       objectName: {
-        helpText: "Related object (if this tool operates on a specific object)"
+        helpText: "Objeto relacionado (si esta herramienta opera sobre un objeto específico)"
       },
       active: {
-        helpText: "Enable/disable this tool"
+        helpText: "Activa/desactiva esta herramienta"
       },
       builtIn: {
-        helpText: "Platform built-in tool (vs user-defined)"
+        helpText: "Herramienta integrada de la plataforma (frente a definida por usuario)"
       },
       parameters: {
-        helpText: "Input parameters — define properties like: {name: {type: \"string\", description: \"...\"}}"
+        helpText: "Parámetros de entrada — define propiedades como: {name: {type: \"string\", description: \"...\"}}"
       },
       outputSchema: {
-        helpText: "Output schema for validation (optional)"
+        helpText: "Esquema de salida para validación (opcional)"
       },
       requiresConfirmation: {
-        helpText: "Ask user to approve before executing (for destructive actions)"
+        helpText: "Pide aprobación al usuario antes de ejecutar (para acciones destructivas)"
       },
       permissions: {
-        helpText: "Required permissions to use this tool"
+        helpText: "Permisos necesarios para usar esta herramienta"
       }
     }
   },
   skill: {
-    label: "AI Skill",
+    label: "Habilidad de IA",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Skill identity and human-readable description."
+        label: "Aspectos básicos",
+        description: "Identidad de skill y descripción legible."
       },
       ai_instructions: {
-        label: "AI Instructions",
-        description: "How the agent should reason with this skill."
+        label: "Instrucciones de IA",
+        description: "Cómo debe razonar el agente con esta skill."
       },
       triggers: {
-        label: "Triggers",
-        description: "When this skill should activate."
+        label: "Disparadores",
+        description: "Cuándo debe activarse esta skill."
       },
       access: {
-        label: "Access",
-        description: "Required permissions to use this skill."
+        label: "Acceso",
+        description: "Permisos necesarios para usar esta skill."
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "Identificador único (snake_case)"
       },
       label: {
-        helpText: "Display name (e.g., \"Case Management\")"
+        helpText: "Nombre mostrado (p. ej., \"Case Management\")"
       },
       description: {
-        helpText: "What this skill does"
+        helpText: "Qué hace esta skill"
       },
       active: {
-        helpText: "Enable/disable this skill"
+        helpText: "Activa/desactiva esta skill"
       },
       instructions: {
-        helpText: "Instructions for AI — tell it how to use these tools together"
+        helpText: "Instrucciones para IA — indica cómo usar estas herramientas juntas"
       },
       tools: {
-        helpText: "Tool names (supports wildcard: action_*)"
+        helpText: "Nombres de herramienta (admite comodín: action_*)"
       },
       triggerPhrases: {
-        helpText: "Natural language phrases that activate this skill"
+        helpText: "Frases de lenguaje natural que activan esta skill"
       },
       triggerConditions: {
-        helpText: "Programmatic conditions (e.g., objectName == \"case\")"
+        helpText: "Condiciones programáticas (p. ej., objectName == \"case\")"
       },
       permissions: {
-        helpText: "Required permissions to use this skill"
+        helpText: "Permisos necesarios para usar esta skill"
       }
     }
   }

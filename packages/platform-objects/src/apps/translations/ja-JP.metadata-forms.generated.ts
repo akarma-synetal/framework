@@ -10,890 +10,890 @@ import type { TranslationData } from '@objectstack/spec/system';
 
 export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = {
   object: {
-    label: "Object",
+    label: "オブジェクト",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Identity, labels, and taxonomy."
+        label: "基本",
+        description: "ID、ラベル、分類。"
       },
       fields: {
-        label: "Fields",
-        description: "Define the data model — each row becomes a column in the database table."
+        label: "フィールド",
+        description: "データモデルを定義 — 各行がデータベーステーブルの列になる。"
       },
       capabilities: {
-        label: "Capabilities",
-        description: "System features and API exposure."
+        label: "機能",
+        description: "システム機能と API 公開。"
       },
       advanced: {
-        label: "Advanced",
-        description: "State machines, actions, and storage."
+        label: "詳細",
+        description: "ステートマシン、アクション、ストレージ。"
       }
     },
     fields: {
       name: {
-        helpText: "snake_case unique identifier (immutable after creation)"
+        helpText: "snake_case の一意識別子（作成後は変更不可）"
       },
       label: {
-        helpText: "Singular display name (e.g. \"Account\")"
+        helpText: "単数表示名（例: \"Account\"）"
       },
       pluralLabel: {
-        helpText: "Plural display name (e.g. \"Accounts\")"
+        helpText: "複数表示名（例: \"Accounts\"）"
       },
       icon: {
-        helpText: "Lucide icon name (e.g. \"building\", \"users\")"
+        helpText: "Lucide アイコン名（例: \"building\", \"users\"）"
       },
       description: {
-        helpText: "Developer documentation"
+        helpText: "開発者向けドキュメント"
       },
       tags: {
-        helpText: "Categorization tags (e.g. \"sales\", \"system\")"
+        helpText: "分類タグ（例: \"sales\", \"system\"）"
       },
       active: {
-        helpText: "Is the object active and usable"
+        helpText: "オブジェクトが有効で使用可能か"
       },
       isSystem: {
-        helpText: "System object (protected from deletion)"
+        helpText: "システムオブジェクト（削除から保護）"
       },
       abstract: {
-        helpText: "Abstract base (cannot be instantiated)"
+        helpText: "抽象ベース（インスタンス化不可）"
       },
       fields: {
-        helpText: "Add the columns this object will store"
+        helpText: "このオブジェクトが保存する列を追加"
       },
       "fields.name": {
-        helpText: "snake_case identifier"
+        helpText: "snake_case 識別子"
       },
       "fields.label": {
-        helpText: "Display label"
+        helpText: "表示ラベル"
       },
       "fields.type": {
-        helpText: "Field type"
+        helpText: "フィールド型"
       },
       "fields.reference": {
-        helpText: "Target object (for lookup/master_detail)"
+        helpText: "対象オブジェクト（lookup/master_detail 用）"
       },
       capabilities: {
-        helpText: "Enable/disable system features"
+        helpText: "システム機能の有効/無効"
       },
       datasource: {
-        helpText: "Target datasource ID (default: \"default\")"
+        helpText: "対象データソース ID（既定: \"default\"）"
       }
     }
   },
   field: {
-    label: "Field",
+    label: "フィールド",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Core field identity and constraints."
+        label: "基本",
+        description: "フィールドの基本 ID と制約。"
       },
       configuration: {
-        label: "Configuration",
-        description: "Field-type specific settings (visible blocks depend on the chosen type)."
+        label: "設定",
+        description: "フィールド型別の設定（表示ブロックは選択した型による）。"
       },
       formula: {
-        label: "Formula & Computed",
-        description: "Calculated values and roll-up summaries."
+        label: "数式と計算",
+        description: "計算値とロールアップ集計。"
       },
       advanced: {
-        label: "Advanced",
-        description: "Database, UI, audit, and security settings."
+        label: "詳細",
+        description: "データベース、UI、監査、セキュリティ設定。"
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case, immutable after creation)"
+        helpText: "一意識別子（snake_case、作成後は変更不可）"
       },
       label: {
-        helpText: "Display name for users"
+        helpText: "ユーザー向け表示名"
       },
       type: {
-        helpText: "Data type of this field"
+        helpText: "このフィールドのデータ型"
       },
       group: {
-        helpText: "Group name for form layout"
+        helpText: "フォームレイアウトのグループ名"
       },
       description: {
-        helpText: "Help text shown to users"
+        helpText: "ユーザーに表示するヘルプテキスト"
       },
       required: {
-        helpText: "User must provide a value"
+        helpText: "ユーザーによる値入力が必須"
       },
       unique: {
-        helpText: "No two records can have the same value"
+        helpText: "複数レコードで同じ値を不可"
       },
       multiple: {
-        helpText: "Allow multiple values (for select/lookup)"
+        helpText: "複数値を許可（select/lookup 用）"
       },
       defaultValue: {
-        helpText: "Default value for new records"
+        helpText: "新規レコードの既定値"
       },
       minLength: {
-        helpText: "Minimum character length"
+        helpText: "最小文字数"
       },
       maxLength: {
-        helpText: "Maximum character length"
+        helpText: "最大文字数"
       },
       min: {
-        helpText: "Minimum value"
+        helpText: "最小値"
       },
       max: {
-        helpText: "Maximum value"
+        helpText: "最大値"
       },
       precision: {
-        helpText: "Decimal places (e.g., 2 for $10.50)"
+        helpText: "小数桁数（例: $10.50 なら 2）"
       },
       scale: {
-        helpText: "Number of decimal digits"
+        helpText: "小数部の桁数"
       },
       options: {
-        helpText: "Available options (label/value pairs)"
+        helpText: "使用可能な選択肢（label/value ペア）"
       },
       reference: {
-        helpText: "Referenced object name"
+        helpText: "参照先オブジェクト名"
       },
       referenceFilters: {
-        helpText: "Filter expressions (e.g., \"active = true\")"
+        helpText: "フィルター式（例: \"active = true\"）"
       },
       deleteBehavior: {
-        helpText: "What happens when referenced record is deleted"
+        helpText: "参照先レコード削除時の動作"
       },
       expression: {
-        helpText: "CEL expression to calculate this field (makes it read-only)"
+        helpText: "このフィールドを計算する CEL 式（読み取り専用化）"
       },
       summaryOperations: {
-        helpText: "Roll-up summary configuration (for parent-child relationships)"
+        helpText: "ロールアップ集計設定（親子関係用）"
       },
       cached: {
-        helpText: "Caching configuration for computed fields"
+        helpText: "計算フィールドのキャッシュ設定"
       },
       columnName: {
-        helpText: "Physical column name in database (defaults to field name)"
+        helpText: "データベース上の物理列名（既定はフィールド名）"
       },
       index: {
-        helpText: "Create database index for faster queries"
+        helpText: "高速クエリ用のデータベースインデックスを作成"
       },
       externalId: {
-        helpText: "Mark as external ID for upsert operations"
+        helpText: "upsert 操作用の外部 ID としてマーク"
       },
       readonly: {
-        helpText: "Field is read-only in forms"
+        helpText: "フォームでフィールドを読み取り専用にする"
       },
       hidden: {
-        helpText: "Hide field from default UI views"
+        helpText: "既定 UI ビューからフィールドを非表示"
       },
       searchable: {
-        helpText: "Include in global search results"
+        helpText: "グローバル検索結果に含める"
       },
       sortable: {
-        helpText: "Allow sorting lists by this field"
+        helpText: "このフィールドでリストの並べ替えを許可"
       },
       auditTrail: {
-        helpText: "Track detailed changes with user and timestamp"
+        helpText: "ユーザーとタイムスタンプ付きで詳細変更を追跡"
       },
       trackFeedHistory: {
-        helpText: "Show changes in activity feed"
+        helpText: "アクティビティフィードに変更を表示"
       },
       encryptionConfig: {
-        helpText: "Field-level encryption (GDPR/HIPAA/PCI-DSS)"
+        helpText: "フィールドレベル暗号化（GDPR/HIPAA/PCI-DSS）"
       },
       maskingRule: {
-        helpText: "Data masking rules for PII protection"
+        helpText: "PII 保護用データマスキングルール"
       }
     }
   },
   trigger: {
-    label: "Trigger"
+    label: "トリガー"
   },
   validation: {
-    label: "Validation Rule"
+    label: "検証ルール"
   },
   hook: {
-    label: "Hook",
+    label: "フック",
     sections: {
       identity: {
-        label: "Identity",
-        description: "What this hook is and when it fires."
+        label: "ID",
+        description: "このフックの内容と発火タイミング。"
       },
       body: {
-        label: "Body",
-        description: "Inline expression or sandboxed JavaScript executed when the hook fires."
+        label: "本文",
+        description: "フック発火時に実行されるインライン式またはサンドボックス化 JavaScript。"
       },
       legacy_handler: {
-        label: "Legacy handler",
-        description: "Function name reference — deprecated in favour of body."
+        label: "レガシーハンドラー",
+        description: "関数名参照 — body を推奨、非推奨。"
       },
       execution: {
-        label: "Execution"
+        label: "実行"
       }
     },
     fields: {
       name: {
-        helpText: "snake_case identifier (immutable after creation)"
+        helpText: "snake_case 識別子（作成後は変更不可）"
       },
       object: {
-        helpText: "Target object name (or \"*\" for global)"
+        helpText: "対象オブジェクト名（グローバルは \"*\"）"
       },
       events: {
-        helpText: "Lifecycle events (e.g. beforeInsert, afterUpdate)"
+        helpText: "ライフサイクルイベント（例: beforeInsert, afterUpdate）"
       },
       priority: {
-        helpText: "Lower numbers run first"
+        helpText: "小さい数値ほど先に実行"
       },
       body: {
-        helpText: "Either an L1 expression or an L2 sandboxed JS body"
+        helpText: "L1 式または L2 サンドボックス JS body"
       },
       "body.language": {
-        helpText: "expression = pure formula; js = sandboxed JavaScript"
+        helpText: "expression = 純粋な数式; js = サンドボックス化 JavaScript"
       },
       "body.source": {
-        helpText: "Function body source — no top-level imports"
+        helpText: "関数 body ソース — トップレベル import 不可"
       },
       "body.capabilities": {
-        helpText: "Allowed ctx APIs (api.read, api.write, crypto.uuid, log, …)"
+        helpText: "許可する ctx API（api.read, api.write, crypto.uuid, log, …）"
       },
       "body.timeoutMs": {
-        helpText: "Per-invocation timeout (ms)"
+        helpText: "呼び出しごとのタイムアウト（ms）"
       },
       handler: {
-        helpText: "Handler function name (deprecated — prefer `body`)"
+        helpText: "ハンドラー関数名（非推奨 — `body` を推奨）"
       },
       async: {
-        helpText: "Run in background, do not block the transaction"
+        helpText: "バックグラウンドで実行し、トランザクションをブロックしない"
       },
       condition: {
-        helpText: "Optional formula — skip the hook when this evaluates to false"
+        helpText: "任意の数式 — false 評価時はフックをスキップ"
       }
     }
   },
   view: {
-    label: "View",
+    label: "ビュー",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Identity and primary surface."
+        label: "基本",
+        description: "ID と主要サーフェス。"
       },
       columns_filters: {
-        label: "Columns & filters",
-        description: "What rows show and how users filter them."
+        label: "列とフィルター",
+        description: "表示する行とユーザーのフィルター方法。"
       },
       table_options: {
-        label: "Table options",
-        description: "Grid-only display options."
+        label: "テーブルオプション",
+        description: "グリッド専用の表示オプション。"
       },
       kanban: {
-        label: "Kanban",
-        description: "Kanban-specific board configuration."
+        label: "カンバン",
+        description: "カンバン専用のボード設定。"
       },
       calendar: {
-        label: "Calendar",
-        description: "Calendar-specific configuration."
+        label: "カレンダー",
+        description: "カレンダー専用設定。"
       },
       gantt: {
-        label: "Gantt",
-        description: "Gantt-specific configuration."
+        label: "ガント",
+        description: "ガント専用設定。"
       },
       gallery: {
-        label: "Gallery",
-        description: "Gallery-specific configuration."
+        label: "ギャラリー",
+        description: "ギャラリー専用設定。"
       },
       timeline: {
-        label: "Timeline",
-        description: "Timeline-specific configuration."
+        label: "タイムライン",
+        description: "タイムライン専用設定。"
       },
       chart: {
-        label: "Chart",
-        description: "Chart-specific configuration."
+        label: "チャート",
+        description: "チャート専用設定。"
       },
       navigation_sharing: {
-        label: "Navigation & sharing",
-        description: "Where this view appears and who can see it."
+        label: "ナビゲーションと共有",
+        description: "このビューの表示場所と閲覧可能者。"
       }
     },
     fields: {
       name: {
-        helpText: "snake_case, unique per environment"
+        helpText: "snake_case、environment ごとに一意"
       },
       type: {
-        helpText: "Primary view surface"
+        helpText: "主要ビューサーフェス"
       },
       data: {
-        helpText: "Data source — e.g. {\"provider\":\"object\",\"object\":\"task\"}"
+        helpText: "データソース — 例: {\"provider\":\"object\",\"object\":\"task\"}"
       },
       columns: {
-        helpText: "Columns to display (field names from selected object)"
+        helpText: "表示する列（選択オブジェクトのフィールド名）"
       },
       filter: {
-        helpText: "Filter conditions"
+        helpText: "フィルター条件"
       },
       sort: {
-        helpText: "Default sort order"
+        helpText: "既定の並び順"
       },
       searchableFields: {
-        helpText: "Field names available for quick search"
+        helpText: "クイック検索で使用可能なフィールド名"
       },
       filterableFields: {
-        helpText: "Field names available for filtering"
+        helpText: "フィルターで使用可能なフィールド名"
       }
     }
   },
   page: {
-    label: "Page",
+    label: "ページ",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Page identity and template."
+        label: "基本",
+        description: "ページ ID とテンプレート。"
       },
       data_context: {
-        label: "Data Context",
-        description: "Record binding and page-local state."
+        label: "データコンテキスト",
+        description: "レコードバインドとページローカル状態。"
       },
       layout: {
-        label: "Layout",
-        description: "Page regions and components placed within them."
+        label: "レイアウト",
+        description: "ページ領域とそこに配置するコンポーネント。"
       },
       advanced: {
-        label: "Advanced",
-        description: "Activation, audience, and accessibility."
+        label: "詳細",
+        description: "有効化、対象ユーザー、アクセシビリティ。"
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "一意識別子（snake_case）"
       },
       label: {
-        helpText: "Page title shown to users"
+        helpText: "ユーザーに表示するページタイトル"
       },
       icon: {
-        helpText: "Icon for navigation menu"
+        helpText: "ナビゲーションメニューのアイコン"
       },
       type: {
-        helpText: "Page type (record, home, app, dashboard, etc.)"
+        helpText: "ページ種別（record, home, app, dashboard など）"
       },
       template: {
-        helpText: "Layout template (e.g., \"header-sidebar-main\")"
+        helpText: "レイアウトテンプレート（例: \"header-sidebar-main\"）"
       },
       description: {
-        helpText: "Page description for navigation"
+        helpText: "ナビゲーション用ページ説明"
       },
       object: {
-        helpText: "Bound object (for Record pages)"
+        helpText: "バインド先オブジェクト（Record ページ用）"
       },
       variables: {
-        helpText: "Local page state variables"
+        helpText: "ページローカル状態変数"
       },
       regions: {
-        helpText: "Layout regions (header, main, sidebar, footer) with components"
+        helpText: "コンポーネントを含むレイアウト領域（header, main, sidebar, footer）"
       },
       isDefault: {
-        helpText: "Set as default page for this page type"
+        helpText: "このページ種別の既定ページに設定"
       },
       kind: {
-        helpText: "Page override mode: full or slotted (for record pages)"
+        helpText: "ページ上書きモード: full または slotted（record ページ用）"
       },
       assignedProfiles: {
-        helpText: "Profiles that can access this page"
+        helpText: "このページにアクセス可能なプロファイル"
       },
       aria: {
-        helpText: "Accessibility attributes (ARIA labels, roles)"
+        helpText: "アクセシビリティ属性（ARIA ラベル、ロール）"
       }
     }
   },
   dashboard: {
-    label: "Dashboard",
+    label: "ダッシュボード",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Dashboard identity and description."
+        label: "基本",
+        description: "ダッシュボード ID と説明。"
       },
       layout: {
-        label: "Layout",
-        description: "Grid sizing and refresh cadence."
+        label: "レイアウト",
+        description: "グリッドサイズと更新間隔。"
       },
       widgets: {
-        label: "Widgets",
-        description: "Cards and charts placed on the grid."
+        label: "ウィジェット",
+        description: "グリッドに配置するカードとチャート。"
       },
       filters: {
-        label: "Filters",
-        description: "Default and global filters applied across widgets."
+        label: "フィルター",
+        description: "ウィジェット全体に適用する既定およびグローバルフィルター。"
       },
       advanced: {
-        label: "Advanced",
-        description: "Accessibility and performance tuning."
+        label: "詳細",
+        description: "アクセシビリティとパフォーマンス調整。"
       }
     },
     fields: {
       name: {
-        helpText: "snake_case unique identifier"
+        helpText: "snake_case の一意識別子"
       },
       label: {
-        helpText: "Display name"
+        helpText: "表示名"
       },
       columns: {
-        helpText: "Grid columns (default 12)"
+        helpText: "グリッド列（既定 12）"
       },
       gap: {
-        helpText: "Grid gap (Tailwind units)"
+        helpText: "グリッド間隔（Tailwind 単位）"
       },
       refreshInterval: {
-        helpText: "Auto-refresh (seconds)"
+        helpText: "自動更新（秒）"
       },
       header: {
-        helpText: "Dashboard header config (title, subtitle, actions)"
+        helpText: "ダッシュボードヘッダー設定（title, subtitle, actions）"
       },
       widgets: {
-        helpText: "Dashboard widgets with position and sizing"
+        helpText: "位置とサイズを持つダッシュボードウィジェット"
       },
       dateRange: {
-        helpText: "Default date range selector"
+        helpText: "既定の日付範囲セレクター"
       },
       globalFilters: {
-        helpText: "Filters applied to all widgets"
+        helpText: "全ウィジェットに適用するフィルター"
       },
       aria: {
-        helpText: "Accessibility labels"
+        helpText: "アクセシビリティラベル"
       },
       performance: {
-        helpText: "Caching and optimization config"
+        helpText: "キャッシュと最適化設定"
       }
     }
   },
   app: {
-    label: "Application",
+    label: "アプリケーション",
     sections: {
       basics: {
-        label: "Basics",
-        description: "App identity and activation."
+        label: "基本",
+        description: "アプリ ID と有効化。"
       },
       navigation: {
-        label: "Navigation",
-        description: "Sidebar items and area grouping."
+        label: "ナビゲーション",
+        description: "サイドバー項目とエリアグループ化。"
       },
       content: {
-        label: "Content",
-        description: "Objects and APIs this app uses."
+        label: "コンテンツ",
+        description: "このアプリが使用するオブジェクトと API。"
       },
       branding: {
-        label: "Branding",
-        description: "Theme colors and logo."
+        label: "ブランディング",
+        description: "テーマカラーとロゴ。"
       },
       access_and_sharing: {
-        label: "Access & sharing",
-        description: "Who can access this app and how it can be embedded."
+        label: "アクセスと共有",
+        description: "このアプリにアクセス可能なユーザーと埋め込み方法。"
       }
     },
     fields: {
       name: {
-        helpText: "snake_case, unique"
+        helpText: "snake_case、一意"
       },
       icon: {
-        helpText: "Lucide icon name (e.g. \"users\", \"briefcase\")"
+        helpText: "Lucide アイコン名（例: \"users\", \"briefcase\"）"
       },
       isDefault: {
-        helpText: "Make this the default app for new users"
+        helpText: "新規ユーザーの既定アプリにする"
       },
       navigation: {
-        helpText: "Nav tree — recursive structure"
+        helpText: "ナビツリー — 再帰構造"
       },
       areas: {
-        helpText: "Group items into collapsible areas"
+        helpText: "項目を折りたたみ可能なエリアにグループ化"
       },
       homePageId: {
-        helpText: "Landing page when app opens"
+        helpText: "アプリ起動時のランディングページ"
       },
       mobileNavigation: {
-        helpText: "Bottom tab bar config for mobile"
+        helpText: "モバイル用ボトムタブバー設定"
       },
       objects: {
-        helpText: "Object names this app exposes"
+        helpText: "このアプリが公開するオブジェクト名"
       },
       apis: {
-        helpText: "API endpoint definitions"
+        helpText: "API エンドポイント定義"
       },
       defaultAgent: {
-        helpText: "AI agent for the ambient assistant button"
+        helpText: "常駐アシスタントボタン用 AI エージェント"
       },
       branding: {
-        helpText: "Primary/secondary colors, logo, theme"
+        helpText: "プライマリ/セカンダリカラー、ロゴ、テーマ"
       },
       requiredPermissions: {
-        helpText: "Permissions needed to access this app"
+        helpText: "このアプリへのアクセスに必要な権限"
       },
       sharing: {
-        helpText: "Public/internal/restricted access control"
+        helpText: "公開/内部/制限付きアクセス制御"
       },
       embed: {
-        helpText: "iFrame embed configuration"
+        helpText: "iFrame 埋め込み設定"
       },
       aria: {
-        helpText: "Accessibility labels"
+        helpText: "アクセシビリティラベル"
       }
     }
   },
   action: {
-    label: "Action",
+    label: "アクション",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Action identity and presentation."
+        label: "基本",
+        description: "アクション ID と表示。"
       },
       behavior: {
-        label: "Behavior",
-        description: "Configure what happens when the action is triggered."
+        label: "動作",
+        description: "アクション発火時の動作を設定。"
       },
       placement: {
-        label: "Placement",
-        description: "Where and when the action button appears."
+        label: "配置",
+        description: "アクションボタンの表示場所とタイミング。"
       },
       advanced: {
-        label: "Advanced",
-        description: "Bulk operations, AI exposure, and API request shape."
+        label: "詳細",
+        description: "一括操作、AI 公開、API リクエスト形状。"
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "一意識別子（snake_case）"
       },
       label: {
-        helpText: "Button text shown to users"
+        helpText: "ユーザーに表示するボタンテキスト"
       },
       objectName: {
-        helpText: "Object this action belongs to (optional)"
+        helpText: "このアクションが属するオブジェクト（任意）"
       },
       icon: {
-        helpText: "Lucide icon name (e.g., \"check\", \"x-circle\")"
+        helpText: "Lucide アイコン名（例: \"check\", \"x-circle\"）"
       },
       type: {
-        helpText: "What happens when clicked"
+        helpText: "クリック時の動作"
       },
       variant: {
-        helpText: "Button style (primary=blue, danger=red, ghost=transparent)"
+        helpText: "ボタンスタイル（primary=blue, danger=red, ghost=transparent）"
       },
       target: {
-        helpText: "URL, flow name, or API endpoint to call"
+        helpText: "呼び出す URL、フロー名、または API エンドポイント"
       },
       method: {
-        helpText: "HTTP method (GET, POST, PUT, DELETE)"
+        helpText: "HTTP メソッド（GET, POST, PUT, DELETE）"
       },
       body: {
-        helpText: "JavaScript code to execute"
+        helpText: "実行する JavaScript コード"
       },
       params: {
-        helpText: "User input parameters (show form before executing)"
+        helpText: "ユーザー入力パラメーター（実行前にフォームを表示）"
       },
       confirmText: {
-        helpText: "Confirmation message (e.g., \"Are you sure?\")"
+        helpText: "確認メッセージ（例: \"Are you sure?\"）"
       },
       successMessage: {
-        helpText: "Success message after completion"
+        helpText: "完了後の成功メッセージ"
       },
       refreshAfter: {
-        helpText: "Refresh the list/page after action completes"
+        helpText: "アクション完了後にリスト/ページを更新"
       },
       locations: {
-        helpText: "Where to show this action (toolbar, row menu, etc.)"
+        helpText: "このアクションの表示場所（toolbar, row menu など）"
       },
       component: {
-        helpText: "How to render (button, icon, menu item)"
+        helpText: "レンダリング方法（button, icon, menu item）"
       },
       visible: {
-        helpText: "CEL expression: show only when condition is true"
+        helpText: "CEL 式: 条件が true の場合のみ表示"
       },
       disabled: {
-        helpText: "CEL expression: disable when condition is true"
+        helpText: "CEL 式: 条件が true の場合に無効化"
       },
       shortcut: {
-        helpText: "Keyboard shortcut (e.g., \"Ctrl+S\", \"Cmd+Enter\")"
+        helpText: "キーボードショートカット（例: \"Ctrl+S\", \"Cmd+Enter\"）"
       },
       bulkEnabled: {
-        helpText: "Allow applying to multiple selected records"
+        helpText: "選択した複数レコードへの適用を許可"
       },
       aiExposed: {
-        helpText: "Allow AI agents to call this action"
+        helpText: "AI エージェントによるこのアクションの呼び出しを許可"
       },
       recordIdParam: {
-        helpText: "Body parameter name for record ID"
+        helpText: "レコード ID 用 body パラメーター名"
       },
       recordIdField: {
-        helpText: "Field to use as record ID (default: \"id\")"
+        helpText: "レコード ID として使用するフィールド（既定: \"id\"）"
       },
       bodyShape: {
-        helpText: "Request body structure (flat or nested)"
+        helpText: "リクエスト body 構造（flat または nested）"
       }
     }
   },
   report: {
-    label: "Report",
+    label: "レポート",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Identity and data source."
+        label: "基本",
+        description: "ID とデータソース。"
       },
       columns: {
-        label: "Columns",
-        description: "Columns shown in the report output."
+        label: "列",
+        description: "レポート出力に表示する列。"
       },
       groupings: {
-        label: "Groupings",
-        description: "How rows (and columns, for matrix reports) are grouped."
+        label: "グループ化",
+        description: "行（matrix レポートでは列も）のグループ化方法。"
       },
       joined_blocks: {
-        label: "Joined blocks",
-        description: "Additional blocks joined into a single report (joined reports only)."
+        label: "結合ブロック",
+        description: "1 つのレポートに結合する追加ブロック（joined レポートのみ）。"
       },
       filter_and_chart: {
-        label: "Filter & chart",
-        description: "Report-level filters and chart presentation."
+        label: "フィルターとチャート",
+        description: "レポートレベルのフィルターとチャート表示。"
       },
       advanced: {
-        label: "Advanced",
-        description: "Accessibility and performance tuning."
+        label: "詳細",
+        description: "アクセシビリティとパフォーマンス調整。"
       }
     },
     fields: {
       name: {
-        helpText: "snake_case unique identifier"
+        helpText: "snake_case の一意識別子"
       },
       objectName: {
-        helpText: "Data source object"
+        helpText: "データソースオブジェクト"
       },
       type: {
-        helpText: "Report type: tabular/summary/matrix/joined"
+        helpText: "レポート種別: tabular/summary/matrix/joined"
       },
       columns: {
-        helpText: "Columns to display in the report"
+        helpText: "レポートに表示する列"
       },
       groupingsDown: {
-        helpText: "Row grouping levels"
+        helpText: "行グループ化レベル"
       },
       groupingsAcross: {
-        helpText: "Column grouping levels (matrix only)"
+        helpText: "列グループ化レベル（matrix のみ）"
       },
       blocks: {
-        helpText: "Join multiple objects (joined report only)"
+        helpText: "複数オブジェクトを結合（joined レポートのみ）"
       },
       filter: {
-        helpText: "Report-level filters"
+        helpText: "レポートレベルのフィルター"
       },
       chart: {
-        helpText: "Chart config (type, legend, colors)"
+        helpText: "チャート設定（type, legend, colors）"
       },
       aria: {
-        helpText: "Accessibility labels"
+        helpText: "アクセシビリティラベル"
       },
       performance: {
-        helpText: "Caching and optimization"
+        helpText: "キャッシュと最適化"
       }
     }
   },
   flow: {
-    label: "Flow",
+    label: "フロー",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Flow identity and how it starts."
+        label: "基本",
+        description: "フロー ID と開始方法。"
       },
       canvas: {
-        label: "Canvas",
-        description: "Nodes, edges, and flow variables — consider the visual designer for complex flows."
+        label: "キャンバス",
+        description: "ノード、エッジ、フロー変数 — 複雑なフローはビジュアルデザイナーを検討。"
       },
       execution: {
-        label: "Execution",
-        description: "Deployment status, identity, and error handling."
+        label: "実行",
+        description: "デプロイ状態、ID、エラー処理。"
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "一意識別子（snake_case）"
       },
       label: {
-        helpText: "Display name for users"
+        helpText: "ユーザー向け表示名"
       },
       type: {
-        helpText: "How the flow starts (autolaunched, record_change, schedule, screen, api)"
+        helpText: "フローの開始方法（autolaunched, record_change, schedule, screen, api）"
       },
       template: {
-        helpText: "Is this a reusable subflow (can be called from other flows)"
+        helpText: "再利用可能なサブフローか（他のフローから呼び出し可）"
       },
       description: {
-        helpText: "What this flow does"
+        helpText: "このフローの処理内容"
       },
       nodes: {
-        helpText: "⚠️ Consider using Flow Designer visual editor instead of JSON"
+        helpText: "⚠️ JSON ではなく Flow Designer ビジュアルエディターの利用を検討"
       },
       edges: {
-        helpText: "Connections between nodes — use Flow Designer for easier editing"
+        helpText: "ノード間の接続 — 編集しやすい Flow Designer を使用"
       },
       variables: {
-        helpText: "Flow variables (inputs/outputs)"
+        helpText: "フロー変数（inputs/outputs）"
       },
       status: {
-        helpText: "Deployment status: draft → active → obsolete"
+        helpText: "デプロイ状態: draft → active → obsolete"
       },
       version: {
-        helpText: "Version number (auto-incremented)"
+        helpText: "バージョン番号（自動インクリメント）"
       },
       runAs: {
-        helpText: "Execute as system (admin) or user (current user permissions)"
+        helpText: "system（admin）または user（現在のユーザー権限）として実行"
       },
       errorHandling: {
-        helpText: "What to do when a node fails (fail, retry, continue)"
+        helpText: "ノード失敗時の処理（fail, retry, continue）"
       }
     }
   },
   workflow: {
-    label: "Workflow",
+    label: "ワークフロー",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Identity and the object/event that triggers it."
+        label: "基本",
+        description: "ID と発火元のオブジェクト/イベント。"
       },
       actions: {
-        label: "Actions",
-        description: "What this workflow does when fired."
+        label: "アクション",
+        description: "発火時にこのワークフローが行う処理。"
       },
       advanced: {
-        label: "Advanced",
-        description: "Ordering and execution behaviour."
+        label: "詳細",
+        description: "順序と実行動作。"
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "一意識別子（snake_case）"
       },
       objectName: {
-        helpText: "Which object triggers this workflow"
+        helpText: "このワークフローを発火するオブジェクト"
       },
       triggerType: {
-        helpText: "When to run: on_create, on_update, on_delete, schedule"
+        helpText: "実行タイミング: on_create, on_update, on_delete, schedule"
       },
       active: {
-        helpText: "Enable/disable this workflow"
+        helpText: "このワークフローの有効/無効"
       },
       description: {
-        helpText: "What this workflow does"
+        helpText: "このワークフローの処理内容"
       },
       criteria: {
-        helpText: "CEL expression: only run when this condition is true"
+        helpText: "CEL 式: この条件が true の場合のみ実行"
       },
       actions: {
-        helpText: "Actions to execute immediately (field update, email, API call, etc.)"
+        helpText: "即時実行するアクション（field update, email, API call など）"
       },
       timeTriggers: {
-        helpText: "Scheduled actions (e.g., send reminder 1 day before deadline)"
+        helpText: "スケジュールアクション（例: 期限 1 日前にリマインダー送信）"
       },
       executionOrder: {
-        helpText: "Run order when multiple workflows match (lower = earlier)"
+        helpText: "複数ワークフロー一致時の実行順（小さいほど早い）"
       }
     }
   },
   approval: {
-    label: "Approval Process",
+    label: "承認プロセス",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Approval process identity and the object it gates."
+        label: "基本",
+        description: "承認プロセス ID と対象オブジェクト。"
       },
       entry_rules: {
-        label: "Entry rules",
-        description: "Who can submit, and what happens to the record while pending."
+        label: "エントリールール",
+        description: "送信可能者と保留中レコードの動作。"
       },
       steps: {
-        label: "Steps",
-        description: "Ordered approval chain — each step picks the approver and decides routing."
+        label: "ステップ",
+        description: "順序付き承認チェーン — 各ステップで承認者とルーティングを決定。"
       },
       escalation_and_outcomes: {
-        label: "Escalation & outcomes",
-        description: "SLA, escalation, and post-decision actions."
+        label: "エスカレーションと結果",
+        description: "SLA、エスカレーション、決定後アクション。"
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "一意識別子（snake_case）"
       },
       label: {
-        helpText: "Display name (e.g., \"Contract Approval\")"
+        helpText: "表示名（例: \"Contract Approval\"）"
       },
       object: {
-        helpText: "Which object needs approval"
+        helpText: "承認が必要なオブジェクト"
       },
       active: {
-        helpText: "Enable/disable this approval process"
+        helpText: "この承認プロセスの有効/無効"
       },
       description: {
-        helpText: "What gets approved and why"
+        helpText: "承認対象と理由"
       },
       entryCriteria: {
-        helpText: "CEL expression: users can submit only when this is true"
+        helpText: "CEL 式: これが true の場合のみユーザーが送信可能"
       },
       lockRecord: {
-        helpText: "Lock record from editing while approval is pending"
+        helpText: "承認保留中はレコード編集をロック"
       },
       approvalStatusField: {
-        helpText: "Field name to mirror approval status (e.g., \"approval_status\")"
+        helpText: "承認状態を反映するフィールド名（例: \"approval_status\"）"
       },
       steps: {
-        helpText: "Approval steps in order — each step defines who approves and what happens"
+        helpText: "順序付き承認ステップ — 各ステップで承認者と処理を定義"
       },
       escalation: {
-        helpText: "Auto-escalate or auto-approve after timeout"
+        helpText: "タイムアウト後に自動エスカレーションまたは自動承認"
       },
       onFinalApprove: {
-        helpText: "Actions when all steps approved (e.g., update status)"
+        helpText: "全ステップ承認時のアクション（例: ステータス更新）"
       },
       onFinalReject: {
-        helpText: "Actions when rejected (e.g., notify submitter)"
+        helpText: "却下時のアクション（例: 申請者へ通知）"
       }
     }
   },
   job: {
-    label: "Background Job"
+    label: "バックグラウンドジョブ"
   },
   datasource: {
-    label: "Datasource"
+    label: "データソース"
   },
   translation: {
-    label: "Translation"
+    label: "翻訳"
   },
   router: {
-    label: "Router"
+    label: "ルーター"
   },
   function: {
-    label: "Function"
+    label: "関数"
   },
   service: {
-    label: "Service"
+    label: "サービス"
   },
   email_template: {
-    label: "Email Template",
+    label: "メールテンプレート",
     sections: {
       identity: {
-        label: "Identity",
-        description: "Identifier and content type. The id is referenced by sendTemplate({ template: id, ... })."
+        label: "ID",
+        description: "識別子とコンテンツ型。id は sendTemplate({ template: id, ... }) で参照される。"
       },
       subject: {
-        label: "Subject",
-        description: "Subject line. Supports {{var.path}} interpolation."
+        label: "件名",
+        description: "件名行。{{var.path}} 補間をサポート。"
       },
       body: {
-        label: "Body",
-        description: "Email body. Use {{var}} for variables. Editor highlights based on body type."
+        label: "本文",
+        description: "メール本文。変数には {{var}} を使用。エディターは body 型に基づきハイライト。"
       },
       variables_and_attachments: {
-        label: "Variables & Attachments",
-        description: "Declared template variables and optional file attachments."
+        label: "変数と添付ファイル",
+        description: "宣言済みテンプレート変数と任意の添付ファイル。"
       }
     },
     fields: {
       id: {
-        helpText: "Template id (e.g. auth.password_reset)"
+        helpText: "テンプレート id（例: auth.password_reset）"
       },
       body: {
-        helpText: "Body content. Will be rendered as HTML, plain text, or Markdown based on Body Type."
+        helpText: "本文コンテンツ。Body Type に基づき HTML、プレーンテキスト、Markdown としてレンダリング。"
       },
       variables: {
-        helpText: "List of variable names referenced in subject/body"
+        helpText: "subject/body で参照する変数名リスト"
       },
       attachments: {
         helpText: "[{ \"name\": \"...\", \"url\": \"...\" }]"
@@ -901,37 +901,37 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     }
   },
   permission: {
-    label: "Permission Set",
+    label: "権限セット",
     sections: {
       identity: {
-        label: "Identity",
-        description: "Permission Sets stack on top of a Profile to grant additional access. Profiles are the base set assigned 1:1 to each user."
+        label: "ID",
+        description: "権限セットはプロファイルに追加アクセス権を重ねる。プロファイルは各ユーザーに 1:1 で割り当てる基本セット。"
       },
       system_permissions: {
-        label: "System Permissions",
-        description: "High-level capabilities not tied to a specific object — e.g. manage_users, view_audit_logs."
+        label: "システム権限",
+        description: "特定オブジェクトに紐づかない高レベル機能 — 例: manage_users, view_audit_logs。"
       },
       object_and_field_permissions: {
-        label: "Object & Field Permissions",
-        description: "Per-object CRUD + per-field FLS. Edit via the matrix editor or paste JSON here."
+        label: "オブジェクトとフィールド権限",
+        description: "オブジェクト単位の CRUD + フィールド単位の FLS。マトリックスエディターで編集、またはここに JSON を貼り付け。"
       },
       tab_and_row_level_security: {
-        label: "Tab & Row-Level Security",
-        description: "Tab visibility, RLS policies, and custom context variables for predicate evaluation."
+        label: "タブと行レベルセキュリティ",
+        description: "タブ表示、RLS ポリシー、述語評価用カスタムコンテキスト変数。"
       }
     },
     fields: {
       name: {
-        helpText: "Machine name (snake_case)"
+        helpText: "マシン名（snake_case）"
       },
       label: {
-        helpText: "Display label for admins"
+        helpText: "管理者向け表示ラベル"
       },
       isProfile: {
-        helpText: "Profile = base set assigned to users. Permission Set = additive grant."
+        helpText: "Profile = ユーザーに割り当てる基本セット。Permission Set = 追加権限。"
       },
       systemPermissions: {
-        helpText: "List of system capability keys"
+        helpText: "システム機能キーのリスト"
       },
       objects: {
         helpText: "{ \"account\": { allowRead: true, allowEdit: true, ... } }"
@@ -943,45 +943,45 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
         helpText: "{ \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
       },
       rowLevelSecurity: {
-        helpText: "Array of RLS policies (see rls.zod.ts)"
+        helpText: "RLS ポリシーの配列（rls.zod.ts 参照）"
       },
       contextVariables: {
-        helpText: "Custom variables referenced in RLS predicates"
+        helpText: "RLS 述語で参照するカスタム変数"
       }
     }
   },
   profile: {
-    label: "Profile",
+    label: "プロファイル",
     sections: {
       identity: {
-        label: "Identity",
-        description: "Permission Sets stack on top of a Profile to grant additional access. Profiles are the base set assigned 1:1 to each user."
+        label: "ID",
+        description: "権限セットはプロファイルに追加アクセス権を重ねる。プロファイルは各ユーザーに 1:1 で割り当てる基本セット。"
       },
       system_permissions: {
-        label: "System Permissions",
-        description: "High-level capabilities not tied to a specific object — e.g. manage_users, view_audit_logs."
+        label: "システム権限",
+        description: "特定オブジェクトに紐づかない高レベル機能 — 例: manage_users, view_audit_logs。"
       },
       object_and_field_permissions: {
-        label: "Object & Field Permissions",
-        description: "Per-object CRUD + per-field FLS. Edit via the matrix editor or paste JSON here."
+        label: "オブジェクトとフィールド権限",
+        description: "オブジェクト単位の CRUD + フィールド単位の FLS。マトリックスエディターで編集、またはここに JSON を貼り付け。"
       },
       tab_and_row_level_security: {
-        label: "Tab & Row-Level Security",
-        description: "Tab visibility, RLS policies, and custom context variables for predicate evaluation."
+        label: "タブと行レベルセキュリティ",
+        description: "タブ表示、RLS ポリシー、述語評価用カスタムコンテキスト変数。"
       }
     },
     fields: {
       name: {
-        helpText: "Machine name (snake_case)"
+        helpText: "マシン名（snake_case）"
       },
       label: {
-        helpText: "Display label for admins"
+        helpText: "管理者向け表示ラベル"
       },
       isProfile: {
-        helpText: "Profile = base set assigned to users. Permission Set = additive grant."
+        helpText: "Profile = ユーザーに割り当てる基本セット。Permission Set = 追加権限。"
       },
       systemPermissions: {
-        helpText: "List of system capability keys"
+        helpText: "システム機能キーのリスト"
       },
       objects: {
         helpText: "{ \"account\": { allowRead: true, allowEdit: true, ... } }"
@@ -993,19 +993,19 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
         helpText: "{ \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
       },
       rowLevelSecurity: {
-        helpText: "Array of RLS policies (see rls.zod.ts)"
+        helpText: "RLS ポリシーの配列（rls.zod.ts 参照）"
       },
       contextVariables: {
-        helpText: "Custom variables referenced in RLS predicates"
+        helpText: "RLS 述語で参照するカスタム変数"
       }
     }
   },
   role: {
-    label: "Role",
+    label: "ロール",
     sections: {
       role: {
-        label: "Role",
-        description: "Roles compose a hierarchy used for record sharing (sales VP → sales mgr → sales rep). Permissions themselves live on Permission Sets and Profiles."
+        label: "ロール",
+        description: "ロールはレコード共有に使う階層を構成（sales VP → sales mgr → sales rep）。権限自体は Permission Sets と Profiles に存在。"
       }
     },
     fields: {
@@ -1013,186 +1013,186 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
         helpText: "snake_case"
       },
       parent: {
-        helpText: "Parent role machine name (Reports To)"
+        helpText: "親ロールのマシン名（Reports To）"
       }
     }
   },
   agent: {
-    label: "AI Agent",
+    label: "AI エージェント",
     sections: {
       identity: {
-        label: "Identity",
-        description: "How users see and reference this agent."
+        label: "ID",
+        description: "ユーザーから見たこのエージェントの表示と参照。"
       },
       ai_configuration: {
-        label: "AI Configuration",
-        description: "Model selection, instructions, planning, and memory."
+        label: "AI 設定",
+        description: "モデル選択、指示、計画、メモリ。"
       },
       capabilities: {
-        label: "Capabilities",
-        description: "Skills, tools, and knowledge sources the agent can use."
+        label: "機能",
+        description: "エージェントが使用できるスキル、ツール、ナレッジソース。"
       },
       access: {
-        label: "Access & Security",
-        description: "Who can use this agent and what safeguards apply."
+        label: "アクセスとセキュリティ",
+        description: "このエージェントを使用できるユーザーと適用する安全対策。"
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "一意識別子（snake_case）"
       },
       label: {
-        helpText: "Display name (e.g., \"Sales Assistant\")"
+        helpText: "表示名（例: \"Sales Assistant\"）"
       },
       role: {
-        helpText: "Agent persona (e.g., \"Customer Support Specialist\")"
+        helpText: "エージェントペルソナ（例: \"Customer Support Specialist\"）"
       },
       avatar: {
-        helpText: "Avatar image URL"
+        helpText: "アバター画像 URL"
       },
       active: {
-        helpText: "Enable/disable this agent"
+        helpText: "このエージェントの有効/無効"
       },
       instructions: {
-        helpText: "System prompt — tell the agent how to behave and what it can do"
+        helpText: "システムプロンプト — エージェントの振る舞いと可能な操作を指定"
       },
       model: {
-        helpText: "AI model configuration (provider, model name, temperature, etc.)"
+        helpText: "AI モデル設定（provider, model name, temperature など）"
       },
       planning: {
-        helpText: "Autonomous reasoning configuration (strategy, max iterations, replan)"
+        helpText: "自律推論設定（strategy, max iterations, replan）"
       },
       memory: {
-        helpText: "Memory management (short-term, long-term, reflection)"
+        helpText: "メモリ管理（short-term, long-term, reflection）"
       },
       lifecycle: {
-        helpText: "State machine defining conversation flow"
+        helpText: "会話フローを定義するステートマシン"
       },
       skills: {
-        helpText: "Skill names (Agent→Skill→Tool architecture)"
+        helpText: "スキル名（Agent→Skill→Tool アーキテクチャ）"
       },
       tools: {
-        helpText: "Direct tool references (legacy mode)"
+        helpText: "直接ツール参照（レガシーモード）"
       },
       knowledge: {
-        helpText: "RAG knowledge access configuration"
+        helpText: "RAG ナレッジアクセス設定"
       },
       visibility: {
-        helpText: "Scope: global, organization, or private"
+        helpText: "スコープ: global, organization, または private"
       },
       access: {
-        helpText: "User IDs or role names who can chat with this agent"
+        helpText: "このエージェントとチャット可能なユーザー ID またはロール名"
       },
       permissions: {
-        helpText: "Required permissions to use this agent"
+        helpText: "このエージェントの使用に必要な権限"
       },
       tenantId: {
-        helpText: "Restrict to specific organization ID"
+        helpText: "特定 organization ID に制限"
       },
       guardrails: {
-        helpText: "Safety rules and content policies"
+        helpText: "安全ルールとコンテンツポリシー"
       }
     }
   },
   tool: {
-    label: "AI Tool",
+    label: "AI ツール",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Tool identity and AI-facing description."
+        label: "基本",
+        description: "ツール ID と AI 向け説明。"
       },
       schemas: {
-        label: "Schemas",
-        description: "Inputs the tool accepts and the shape of its output."
+        label: "スキーマ",
+        description: "ツールが受け取る入力と出力の形状。"
       },
       access_and_safety: {
-        label: "Access & safety",
-        description: "Permissions and confirmation requirements."
+        label: "アクセスと安全性",
+        description: "権限と確認要件。"
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "一意識別子（snake_case）"
       },
       label: {
-        helpText: "Display name for Studio UI"
+        helpText: "Studio UI 向け表示名"
       },
       description: {
-        helpText: "Tell AI when to use this tool — be specific!"
+        helpText: "AI にこのツールの使用タイミングを指示 — 具体的に！"
       },
       category: {
-        helpText: "Tool category (data, action, flow, integration, etc.)"
+        helpText: "ツールカテゴリ（data, action, flow, integration など）"
       },
       objectName: {
-        helpText: "Related object (if this tool operates on a specific object)"
+        helpText: "関連オブジェクト（このツールが特定オブジェクトを扱う場合）"
       },
       active: {
-        helpText: "Enable/disable this tool"
+        helpText: "このツールの有効/無効"
       },
       builtIn: {
-        helpText: "Platform built-in tool (vs user-defined)"
+        helpText: "プラットフォーム組み込みツール（ユーザー定義との対比）"
       },
       parameters: {
-        helpText: "Input parameters — define properties like: {name: {type: \"string\", description: \"...\"}}"
+        helpText: "入力パラメーター — 次のようなプロパティを定義: {name: {type: \"string\", description: \"...\"}}"
       },
       outputSchema: {
-        helpText: "Output schema for validation (optional)"
+        helpText: "検証用出力スキーマ（任意）"
       },
       requiresConfirmation: {
-        helpText: "Ask user to approve before executing (for destructive actions)"
+        helpText: "実行前にユーザー承認を求める（破壊的アクション用）"
       },
       permissions: {
-        helpText: "Required permissions to use this tool"
+        helpText: "このツールの使用に必要な権限"
       }
     }
   },
   skill: {
-    label: "AI Skill",
+    label: "AI スキル",
     sections: {
       basics: {
-        label: "Basics",
-        description: "Skill identity and human-readable description."
+        label: "基本",
+        description: "スキル ID と人間向け説明。"
       },
       ai_instructions: {
-        label: "AI Instructions",
-        description: "How the agent should reason with this skill."
+        label: "AI 指示",
+        description: "エージェントがこのスキルで推論する方法。"
       },
       triggers: {
-        label: "Triggers",
-        description: "When this skill should activate."
+        label: "トリガー",
+        description: "このスキルの起動タイミング。"
       },
       access: {
-        label: "Access",
-        description: "Required permissions to use this skill."
+        label: "アクセス",
+        description: "このスキルの使用に必要な権限。"
       }
     },
     fields: {
       name: {
-        helpText: "Unique identifier (snake_case)"
+        helpText: "一意識別子（snake_case）"
       },
       label: {
-        helpText: "Display name (e.g., \"Case Management\")"
+        helpText: "表示名（例: \"Case Management\"）"
       },
       description: {
-        helpText: "What this skill does"
+        helpText: "このスキルの処理内容"
       },
       active: {
-        helpText: "Enable/disable this skill"
+        helpText: "このスキルの有効/無効"
       },
       instructions: {
-        helpText: "Instructions for AI — tell it how to use these tools together"
+        helpText: "AI への指示 — これらのツールを併用する方法を指定"
       },
       tools: {
-        helpText: "Tool names (supports wildcard: action_*)"
+        helpText: "ツール名（ワイルドカード対応: action_*）"
       },
       triggerPhrases: {
-        helpText: "Natural language phrases that activate this skill"
+        helpText: "このスキルを起動する自然言語フレーズ"
       },
       triggerConditions: {
-        helpText: "Programmatic conditions (e.g., objectName == \"case\")"
+        helpText: "プログラム条件（例: objectName == \"case\"）"
       },
       permissions: {
-        helpText: "Required permissions to use this skill"
+        helpText: "このスキルの使用に必要な権限"
       }
     }
   }
