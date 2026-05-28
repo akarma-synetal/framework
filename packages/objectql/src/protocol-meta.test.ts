@@ -826,4 +826,148 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
             expect(discovery.services.metadata.message).toBeUndefined();
         });
     });
+
+    // ═══════════════════════════════════════════════════════════════
+    // ADR-0005 PR-10d.7 — two-tier metadata authorization model.
+    //
+    // For types declaring `allowOrgOverride:false, allowRuntimeCreate:true`
+    // (hook, trigger, validation), the per-item provenance decides:
+    //
+    //  • Item exists in the SchemaRegistry tagged with `_packageId`
+    //    (i.e. shipped from a code package)   →   write rejected with 403
+    //                                              not_overridable.
+    //  • Item does NOT exist as a packaged artifact (registry miss OR
+    //    registry hit with no `_packageId`)   →   write accepted; persists
+    //                                              to sys_metadata as a
+    //                                              user-created DB item.
+    //
+    // Verifies the security boundary (artifact-shipped code is never
+    // mutable at runtime) while restoring the "I can author my own hooks"
+    // capability the spec always intended.
+    // ═══════════════════════════════════════════════════════════════
+
+    describe('two-tier authorization (PR-10d.7)', () => {
+        let scoped: ObjectStackProtocolImplementation;
+
+        beforeEach(() => {
+            // Project-kernel mode (environmentId set) so the gate engages.
+            scoped = new ObjectStackProtocolImplementation(
+                mockEngine,
+                undefined,
+                undefined,
+                'env_alpha',
+            );
+        });
+
+        it('rejects modifying an artifact-backed hook with not_overridable', async () => {
+            // Simulate the artifact loader having registered a code-shipped
+            // hook. The `_packageId` tag is the trusted artifact-origin
+            // marker (set by registerItem when called with a packageId).
+            registry.registerItem(
+                'hook',
+                { name: 'shipped_hook', object: 'case', events: ['beforeUpdate'] },
+                'name' as any,
+                'crm-plugin',
+            );
+
+            await expect(
+                scoped.saveMetaItem({
+                    type: 'hook',
+                    name: 'shipped_hook',
+                    item: { name: 'shipped_hook', object: 'case', events: ['beforeInsert'] },
+                    organizationId: 'org_alpha',
+                }),
+            ).rejects.toMatchObject({
+                code: 'not_overridable',
+                status: 403,
+            });
+        });
+
+        it('accepts brand-new hook (no artifact at this name)', async () => {
+            mockEngine.findOne.mockResolvedValue(null);
+
+            const result = await scoped.saveMetaItem({
+                type: 'hook',
+                name: 'my_user_hook',
+                item: { name: 'my_user_hook', object: 'case', events: ['beforeUpdate'] },
+                organizationId: 'org_alpha',
+            });
+
+            expect(result.success).toBe(true);
+            expect(mockEngine.insert).toHaveBeenCalled();
+        });
+
+        it('accepts editing an existing DB-only hook (no artifact)', async () => {
+            // DB-only items: the seeder / prior saveMetaItem may rehydrate
+            // them into the registry without a packageId. Such items must
+            // still be editable.
+            registry.registerItem(
+                'hook',
+                { name: 'my_user_hook', object: 'case', events: ['beforeUpdate'] },
+                'name' as any,
+            ); // no packageId arg — DB-rehydration parity
+
+            mockEngine.findOne.mockResolvedValue(null);
+
+            const result = await scoped.saveMetaItem({
+                type: 'hook',
+                name: 'my_user_hook',
+                item: { name: 'my_user_hook', object: 'case', events: ['beforeInsert', 'beforeUpdate'] },
+                organizationId: 'org_alpha',
+            });
+
+            expect(result.success).toBe(true);
+        });
+
+        it('accepts brand-new trigger and validation (allowRuntimeCreate:true)', async () => {
+            mockEngine.findOne.mockResolvedValue(null);
+
+            const triggerResult = await scoped.saveMetaItem({
+                type: 'trigger',
+                name: 'my_trigger',
+                item: { name: 'my_trigger', object: 'case', event: 'beforeInsert' },
+                organizationId: 'org_alpha',
+            });
+            const validationResult = await scoped.saveMetaItem({
+                type: 'validation',
+                name: 'my_validation',
+                item: { name: 'my_validation', object: 'case' },
+                organizationId: 'org_alpha',
+            });
+
+            expect(triggerResult.success).toBe(true);
+            expect(validationResult.success).toBe(true);
+        });
+
+        it('rejects brand-new function with not_creatable (allowRuntimeCreate:false)', async () => {
+            // `function` has BOTH flags false → no runtime authoring allowed.
+            await expect(
+                scoped.saveMetaItem({
+                    type: 'function',
+                    name: 'my_fn',
+                    item: { name: 'my_fn', handler: 'index.ts' },
+                    organizationId: 'org_alpha',
+                }),
+            ).rejects.toMatchObject({
+                code: 'not_creatable',
+                status: 403,
+            });
+        });
+
+        it('artifact-backed view (allowOrgOverride:true) still overlays cleanly', async () => {
+            // Regression: types that DO allow overlays must keep working
+            // even when the item is artifact-backed.
+            const viewBase = { name: 'case_grid', type: 'grid' as const, object: 'case', columns: [{ field: 'name' }] };
+            registry.registerItem('view', viewBase, 'name' as any, 'crm-plugin');
+            mockEngine.findOne.mockResolvedValue(null);
+
+            const result = await scoped.saveMetaItem({
+                type: 'view',
+                name: 'case_grid',
+                item: { ...viewBase, columns: [{ field: 'name' }, { field: 'status' }] },
+                organizationId: 'org_alpha',
+            });
+            expect(result.success).toBe(true);
+        });
+    });
 });

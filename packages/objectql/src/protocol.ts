@@ -2455,6 +2455,26 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         this._envWritableTypes = null;
     }
 
+    /**
+     * Types that opt into runtime creation of brand-new items (ADR-0005
+     * extension — two-tier model). A type may have
+     * `allowOrgOverride: false` (cannot overlay artifact-shipped items)
+     * yet still set `allowRuntimeCreate: true` (users can author new
+     * items in `sys_metadata`). The two flags are orthogonal; see
+     * {@link isArtifactBacked} for how the protocol decides which gate
+     * applies to a given save/delete.
+     */
+    private static readonly RUNTIME_CREATE_ALLOWED_TYPES: ReadonlySet<string> = (() => {
+        const out = new Set<string>();
+        for (const entry of DEFAULT_METADATA_TYPE_REGISTRY) {
+            if (!entry.allowRuntimeCreate) continue;
+            out.add(entry.type);
+            const plural = SINGULAR_TO_PLURAL[entry.type];
+            if (plural) out.add(plural);
+        }
+        return out;
+    })();
+
     /** Normalize plural→singular before consulting the allow-list. */
     private static isOverlayAllowed(type: string): boolean {
         const singular = PLURAL_TO_SINGULAR[type] ?? type;
@@ -2464,6 +2484,41 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         }
         const env = this.envWritableTypes();
         return env.has(singular) || env.has(type);
+    }
+
+    /** Does this type permit creating brand-new (artifact-free) items? */
+    private static isRuntimeCreateAllowed(type: string): boolean {
+        const singular = PLURAL_TO_SINGULAR[type] ?? type;
+        return this.RUNTIME_CREATE_ALLOWED_TYPES.has(singular)
+            || this.RUNTIME_CREATE_ALLOWED_TYPES.has(type);
+    }
+
+    /**
+     * Does an artifact (npm-package-loaded) item exist at `(type, name)`?
+     *
+     * The schema registry's `_packageId` tag is set only when
+     * `registerItem(..., packageId)` is called with a truthy packageId
+     * — and only artifact loaders do that. DB-rehydrated items
+     * (sys_metadata rows registered back into the registry by
+     * `getMetaItems` / `loadMetaFromDb`) call `registerItem` without a
+     * packageId, so they carry no `_packageId` and are correctly
+     * excluded here.
+     *
+     * Used by the two-tier authorization model to distinguish
+     * "overlaying a packaged item" (requires `allowOrgOverride`) from
+     * "authoring a DB-only item" (requires only `allowRuntimeCreate`).
+     */
+    private isArtifactBacked(type: string, name: string): boolean {
+        const registry = (this.engine as any)?.registry;
+        if (!registry || typeof registry.getItem !== 'function') {
+            // No registry available (test fixtures with partial engine
+            // mocks). Treat as no artifact backing — safer for create paths
+            // and the type-level gates still apply.
+            return false;
+        }
+        const singular = PLURAL_TO_SINGULAR[type] ?? type;
+        const item = registry.getItem(singular, name) ?? registry.getItem(type, name);
+        return Boolean(item && item._packageId);
     }
 
     /**
@@ -2493,22 +2548,41 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             throw new Error('Item data is required');
         }
 
-        // ADR-0005 opt-in gate: project-kernel customization is only allowed
-        // for types whose registry entry sets `allowOrgOverride: true`.
-        // Returns 403 `not_overridable` so the caller can distinguish from a
-        // generic 400 (validation) or 422 (spec mismatch).
-        if (this.environmentId !== undefined
-            && !ObjectStackProtocolImplementation.isOverlayAllowed(request.type)) {
-            const allowed = Array.from(ObjectStackProtocolImplementation.OVERLAY_ALLOWED_TYPES).join(', ');
-            const err = new Error(
-                `[not_overridable] Metadata type '${request.type}' has not opted into per-org overlay writes. `
-                + `Set allowOrgOverride: true on its DEFAULT_METADATA_TYPE_REGISTRY entry to enable, `
-                + `or set the OBJECTSTACK_METADATA_WRITABLE env var (comma-separated singular type names) to opt in at runtime. `
-                + `Currently allowed: ${allowed}. See docs/adr/0005-metadata-customization-overlay.md.`
-            );
-            (err as any).code = 'not_overridable';
-            (err as any).status = 403;
-            throw err;
+        // ADR-0005 (extended — two-tier model): project-kernel customization is
+        // gated by per-item provenance, not just the type-level flag.
+        //
+        //  • Item exists as a packaged artifact → require `allowOrgOverride`
+        //    (writing here would overlay code-shipped behaviour; gated for
+        //    security on executable types like hook/trigger/validation).
+        //  • Item does NOT exist as an artifact → require `allowRuntimeCreate`
+        //    OR `allowOrgOverride`. This lets users author brand-new hooks /
+        //    validations / triggers without unlocking the artifact-shadowing
+        //    capability. Returns `not_creatable` (vs `not_overridable`) so
+        //    the UI can present a tailored message.
+        if (this.environmentId !== undefined) {
+            const overlayAllowed = ObjectStackProtocolImplementation.isOverlayAllowed(request.type);
+            const runtimeCreateAllowed = ObjectStackProtocolImplementation.isRuntimeCreateAllowed(request.type);
+            const artifactBacked = this.isArtifactBacked(request.type, request.name);
+            if (artifactBacked && !overlayAllowed) {
+                const err = new Error(
+                    `[not_overridable] Metadata item '${request.type}/${request.name}' is provided by a code package `
+                    + `and the type has not opted into per-org overlay writes (allowOrgOverride=false). `
+                    + `Edit the source artifact and redeploy, or set OBJECTSTACK_METADATA_WRITABLE to grant a runtime escape hatch. `
+                    + `See docs/adr/0005-metadata-customization-overlay.md.`
+                );
+                (err as any).code = 'not_overridable';
+                (err as any).status = 403;
+                throw err;
+            }
+            if (!artifactBacked && !overlayAllowed && !runtimeCreateAllowed) {
+                const err = new Error(
+                    `[not_creatable] Metadata type '${request.type}' does not allow runtime creation `
+                    + `(allowRuntimeCreate=false, allowOrgOverride=false). New items of this type must be defined in source code.`
+                );
+                (err as any).code = 'not_creatable';
+                (err as any).status = 403;
+                throw err;
+            }
         }
 
         // Phase 3a-destructive: for object/field writes, diff against the
@@ -2623,7 +2697,14 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         // reading an item) get true optimistic-lock conflict detection
         // surfaced as a 409.
         const singularTypeForRepo = PLURAL_TO_SINGULAR[request.type] ?? request.type;
-        if (ObjectStackProtocolImplementation.isOverlayAllowed(singularTypeForRepo)) {
+        const overlayAllowedForRepo = ObjectStackProtocolImplementation.isOverlayAllowed(singularTypeForRepo);
+        const runtimeCreateAllowedForRepo = ObjectStackProtocolImplementation.isRuntimeCreateAllowed(singularTypeForRepo);
+        const useRepoPath = overlayAllowedForRepo || runtimeCreateAllowedForRepo;
+        if (useRepoPath) {
+            const artifactBacked = this.isArtifactBacked(singularTypeForRepo, request.name);
+            const intent: 'override-artifact' | 'runtime-only' = artifactBacked
+                ? 'override-artifact'
+                : 'runtime-only';
             const orgId = request.organizationId ?? null;
             const repo = this.getOverlayRepo(orgId);
             const ref = {
@@ -2643,6 +2724,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     parentVersion,
                     actor: request.actor ?? 'system',
                     source: 'protocol.saveMetaItem',
+                    intent,
                 });
                 // Persistence succeeded — NOW it's safe to mutate the
                 // in-memory object registry. If put() had thrown, the
@@ -2771,7 +2853,8 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         limit?: number;
     }): Promise<{ events: import('@objectstack/metadata-core').MetadataEvent[] }> {
         const singularType = PLURAL_TO_SINGULAR[request.type] ?? request.type;
-        if (!ObjectStackProtocolImplementation.isOverlayAllowed(singularType)) {
+        if (!ObjectStackProtocolImplementation.isOverlayAllowed(singularType)
+            && !ObjectStackProtocolImplementation.isRuntimeCreateAllowed(singularType)) {
             return { events: [] };
         }
         const orgId = request.organizationId ?? null;
@@ -2808,19 +2891,39 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         reset?: boolean;
         seq?: number;
     }> {
-        if (this.environmentId !== undefined
-            && !ObjectStackProtocolImplementation.isOverlayAllowed(request.type)) {
-            const err = new Error(
-                `[not_overridable] Metadata type '${request.type}' has not opted into per-org overlay writes. `
-                + `See docs/adr/0005-metadata-customization-overlay.md.`
-            );
-            (err as any).code = 'not_overridable';
-            (err as any).status = 403;
-            throw err;
+        // Two-tier authorization for delete (mirrors saveMetaItem).
+        //  • Artifact-backed item → delete becomes a tombstone overlay,
+        //    requires `allowOrgOverride`.
+        //  • DB-only item → hard delete of a user-created row,
+        //    requires `allowRuntimeCreate` (or `allowOrgOverride`).
+        if (this.environmentId !== undefined) {
+            const overlayAllowed = ObjectStackProtocolImplementation.isOverlayAllowed(request.type);
+            const runtimeCreateAllowed = ObjectStackProtocolImplementation.isRuntimeCreateAllowed(request.type);
+            const artifactBacked = this.isArtifactBacked(request.type, request.name);
+            if (artifactBacked && !overlayAllowed) {
+                const err = new Error(
+                    `[not_overridable] Metadata item '${request.type}/${request.name}' is provided by a code package `
+                    + `and the type has not opted into per-org overlay writes. `
+                    + `See docs/adr/0005-metadata-customization-overlay.md.`
+                );
+                (err as any).code = 'not_overridable';
+                (err as any).status = 403;
+                throw err;
+            }
+            if (!artifactBacked && !overlayAllowed && !runtimeCreateAllowed) {
+                const err = new Error(
+                    `[not_creatable] Metadata type '${request.type}' does not allow runtime creation or deletion.`
+                );
+                (err as any).code = 'not_creatable';
+                (err as any).status = 403;
+                throw err;
+            }
         }
 
         const singularTypeForRepo = PLURAL_TO_SINGULAR[request.type] ?? request.type;
-        const useRepoPath = ObjectStackProtocolImplementation.isOverlayAllowed(singularTypeForRepo);
+        const overlayAllowedForRepoDel = ObjectStackProtocolImplementation.isOverlayAllowed(singularTypeForRepo);
+        const runtimeCreateAllowedForRepoDel = ObjectStackProtocolImplementation.isRuntimeCreateAllowed(singularTypeForRepo);
+        const useRepoPath = overlayAllowedForRepoDel || runtimeCreateAllowedForRepoDel;
 
         // ADR-0008 — overlay-allowed types route through SysMetadataRepository
         // so the delete (a) is wrapped in engine.transaction(), (b) appends a
@@ -2861,6 +2964,9 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     parentVersion,
                     actor: request.actor ?? 'system',
                     source: 'protocol.deleteMetaItem',
+                    intent: this.isArtifactBacked(singularTypeForRepo, request.name)
+                        ? 'override-artifact'
+                        : 'runtime-only',
                 });
 
                 // Refresh the in-memory artifact-side state on control-plane

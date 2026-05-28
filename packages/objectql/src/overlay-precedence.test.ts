@@ -154,27 +154,23 @@ describe('overlay whitelist enforcement (shared-DB invariant)', () => {
         });
     });
 
-    // ── denied types: execution/wiring-layer; must stay code-only ──
-    describe('denied (allowOrgOverride: false) — must throw 403 not_overridable', () => {
-        // These types remain `allowOrgOverride: false` after ba252da0b.
-        // Accepting them as per-org overlays would corrupt runtime
-        // execution semantics (event hooks, data-wiring, API routing).
-        const denied: Array<{ type: string; reason: string; item: any }> = [
-            {
-                type: 'trigger',
-                reason: 'system-level event hook; per-org overlay would enable silent schema bypasses',
-                item: { name: 'on_insert', object: 'case', event: 'beforeInsert' },
-            },
-            {
-                type: 'validation',
-                reason: 'per-org validation rules could silently disable required-field checks',
-                item: { name: 'require_name', object: 'case' },
-            },
-            {
-                type: 'hook',
-                reason: 'same category as trigger — execution-layer, not render-layer',
-                item: { name: 'before_save', object: 'case' },
-            },
+    // ── denied types (two-tier model, ADR-0005 extension) ──
+    //
+    // After PR-10d.7 introduced `allowRuntimeCreate`, "denied" now splits
+    // into two cohorts:
+    //
+    //  1. Types with `allowRuntimeCreate: true` (hook/trigger/validation) —
+    //     blocked only when overlaying an artifact-backed item. Brand-new
+    //     (artifact-free) names succeed. Tested separately below.
+    //
+    //  2. Types with `allowRuntimeCreate: false` (datasource/router/
+    //     function/service) — blocked for ANY write in project-kernel mode.
+    //     The error code surfaces as `not_creatable` when the item has no
+    //     artifact (which the empty test-mock registry guarantees) and
+    //     `not_overridable` when an artifact exists. Both carry status 403
+    //     and the same underlying security guarantee.
+    describe('denied — must throw 403 (not_overridable or not_creatable)', () => {
+        const deniedTypeWide: Array<{ type: string; reason: string; item: any }> = [
             {
                 type: 'datasource',
                 reason: 'wiring level; must be code, not per-org metadata',
@@ -196,18 +192,13 @@ describe('overlay whitelist enforcement (shared-DB invariant)', () => {
                 item: { name: 'notification_service' },
             },
             {
-                type: 'hooks', // plural — `hooks` maps to `hook` in PLURAL_TO_SINGULAR
-                reason: 'plural form of denied type must also be denied',
-                item: { name: 'before_save', object: 'case' },
-            },
-            {
                 type: 'datasources', // plural — `datasources` maps to `datasource` in PLURAL_TO_SINGULAR
                 reason: 'plural form of denied type must also be denied',
                 item: { name: 'analytics' },
             },
         ];
 
-        for (const { type, reason, item } of denied) {
+        for (const { type, reason, item } of deniedTypeWide) {
             it(`rejects ${type} — ${reason}`, async () => {
                 await expect(
                     protocol.saveMetaItem({
@@ -217,9 +208,34 @@ describe('overlay whitelist enforcement (shared-DB invariant)', () => {
                         organizationId: 'org_alpha',
                     }),
                 ).rejects.toMatchObject({
-                    code: 'not_overridable',
+                    code: expect.stringMatching(/^(not_overridable|not_creatable)$/),
                     status: 403,
                 });
+            });
+        }
+    });
+
+    // ── runtime-creatable types: brand-new items succeed; overriding an
+    //    artifact-backed item still requires allowOrgOverride. The test
+    //    registry has no artifacts, so saves all succeed here; provenance-
+    //    aware rejection is exercised in `protocol-meta.test.ts`.
+    describe('runtime-creatable (allowOrgOverride:false, allowRuntimeCreate:true) — brand-new items succeed', () => {
+        const runtimeCreatable: Array<{ type: string; item: any }> = [
+            { type: 'trigger', item: { name: 'on_insert', object: 'case', event: 'beforeInsert' } },
+            { type: 'validation', item: { name: 'require_name', object: 'case' } },
+            { type: 'hook', item: { name: 'before_save', object: 'case' } },
+            { type: 'hooks', item: { name: 'before_save', object: 'case' } }, // plural
+        ];
+
+        for (const { type, item } of runtimeCreatable) {
+            it(`accepts brand-new ${type}`, async () => {
+                const result = await protocol.saveMetaItem({
+                    type,
+                    name: item.name,
+                    item,
+                    organizationId: 'org_alpha',
+                });
+                expect(result.success).toBe(true);
             });
         }
     });

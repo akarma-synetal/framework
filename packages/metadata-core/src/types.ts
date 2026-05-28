@@ -141,6 +141,24 @@ export type MetadataEvent = z.infer<typeof MetadataEventSchema>;
 
 // ─── Operation options ────────────────────────────────────────────────
 
+/**
+ * Two-tier metadata authorization intent (ADR-0005 extension).
+ *
+ * - `override-artifact`: the write targets an item that ships from a code
+ *   package (an artifact). Only permitted when the type opts into
+ *   per-org overlay writes via `allowOrgOverride: true`.
+ * - `runtime-only`: the write targets a brand-new item OR an item that
+ *   exists only in `sys_metadata` (no artifact backing). Permitted for
+ *   types that opt into runtime creation via `allowRuntimeCreate: true`,
+ *   even when they explicitly forbid artifact overrides.
+ *
+ * The protocol layer determines the intent by consulting the schema
+ * registry; the repository's `assertAllowed()` enforces it as
+ * defense-in-depth. Defaults to `override-artifact` for backward
+ * compatibility with callers that predate the two-tier model.
+ */
+export type MetadataWriteIntent = 'override-artifact' | 'runtime-only';
+
 export interface PutOptions {
   /**
    * Hash this writer believed was at HEAD. `null` means "creating, expect
@@ -153,6 +171,8 @@ export interface PutOptions {
   message?: string;
   /** Optional label for the change log "source" column. */
   source?: string;
+  /** Two-tier authorization intent; defaults to `override-artifact`. */
+  intent?: MetadataWriteIntent;
 }
 
 export interface PutResult {
@@ -169,6 +189,8 @@ export interface DeleteOptions {
   actor: string;
   message?: string;
   source?: string;
+  /** Two-tier authorization intent; defaults to `override-artifact`. */
+  intent?: MetadataWriteIntent;
 }
 
 export interface DeleteResult {

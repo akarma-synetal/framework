@@ -112,24 +112,30 @@ describe('ObjectStackProtocolImplementation - getMetaTypes rich response', () =>
         const scoped = new ObjectStackProtocolImplementation(mockEngine, undefined, undefined, 'env_alpha');
         mockEngine.findOne.mockResolvedValue(null);
 
-        // Without env var: `function` writes blocked (wiring-layer, always false in registry).
+        // Without env var: `function` writes blocked. Since the test
+        // registry has no artifact at this name and `function` has
+        // `allowRuntimeCreate: false`, the protocol returns
+        // `not_creatable` (the precise reason); for artifact-backed names
+        // the code would be `not_overridable`. Both indicate the gate
+        // fired with the same 403 status.
         delete process.env.OBJECTSTACK_METADATA_WRITABLE;
         ObjectStackProtocolImplementation.resetEnvWritableCache();
         resetEnvWritableMetadataTypes();
         await expect(
             scoped.saveMetaItem({ type: 'function', name: 'my_fn', item: { name: 'my_fn' } })
-        ).rejects.toThrow(/not_overridable/);
+        ).rejects.toThrow(/not_(overridable|creatable)/);
 
         // With env var: `function` writes allowed.
         process.env.OBJECTSTACK_METADATA_WRITABLE = 'function';
         ObjectStackProtocolImplementation.resetEnvWritableCache();
         resetEnvWritableMetadataTypes();
-        // Should no longer throw "not_overridable". (May still hit unrelated
-        // persistence errors from the mock engine — we only assert the gate.)
+        // Should no longer throw "not_overridable" / "not_creatable". (May still hit
+        // unrelated persistence errors from the mock engine — we only assert the gate.)
         try {
             await scoped.saveMetaItem({ type: 'function', name: 'my_fn', item: { name: 'my_fn' } });
         } catch (err: any) {
             expect(err.code).not.toBe('not_overridable');
+            expect(err.code).not.toBe('not_creatable');
         }
     });
 

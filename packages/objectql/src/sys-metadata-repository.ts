@@ -56,6 +56,7 @@ import type {
   MetadataItem,
   MetadataItemHeader,
   MetadataEvent,
+  MetadataWriteIntent,
   PutOptions,
   PutResult,
   DeleteOptions,
@@ -120,6 +121,20 @@ export interface SysMetadataRepositoryOptions {
 const OVERLAY_ALLOWED_TYPES: ReadonlySet<string> = new Set(
   DEFAULT_METADATA_TYPE_REGISTRY
     .filter((e) => e.allowOrgOverride)
+    .map((e) => e.type),
+);
+
+/**
+ * Types that opt into runtime creation of brand-new items (two-tier
+ * model — ADR-0005 extension). These items live only in `sys_metadata`;
+ * there is no artifact backing them and `allowOrgOverride` need not be
+ * granted on the type. Used by `assertAllowed()` when called with
+ * `intent: 'runtime-only'` — a signal from the protocol layer that it
+ * has already verified the absence of an artifact-shadowing collision.
+ */
+const RUNTIME_CREATE_ALLOWED_TYPES: ReadonlySet<string> = new Set(
+  DEFAULT_METADATA_TYPE_REGISTRY
+    .filter((e) => e.allowRuntimeCreate)
     .map((e) => e.type),
 );
 
@@ -245,7 +260,7 @@ export class SysMetadataRepository implements MetadataRepository {
 
   async put(ref: MetaRef, spec: unknown, opts: PutOptions): Promise<PutResult> {
     this.assertOpen();
-    this.assertAllowed(ref.type);
+    this.assertAllowed(ref.type, opts.intent);
 
     const body = (spec ?? {}) as Record<string, unknown>;
     const hash = hashSpec(body);
@@ -378,7 +393,7 @@ export class SysMetadataRepository implements MetadataRepository {
 
   async delete(ref: MetaRef, opts: DeleteOptions): Promise<DeleteResult> {
     this.assertOpen();
-    this.assertAllowed(ref.type);
+    this.assertAllowed(ref.type, opts.intent);
 
     const result = await this.withTxn(async (ctx) => {
       const existing = await this.engine.findOne('sys_metadata', {
@@ -604,10 +619,30 @@ export class SysMetadataRepository implements MetadataRepository {
     if (this.closed) throw new Error('SysMetadataRepository is closed');
   }
 
-  private assertAllowed(type: string): void {
+  /**
+   * Defense-in-depth authorization gate.
+   *
+   * `intent` defaults to `'override-artifact'` (the historical strict
+   * behavior). The protocol layer passes `'runtime-only'` after it has
+   * verified — via the schema registry — that no artifact item exists
+   * at `(type, name)`. In that case we accept types with
+   * `allowRuntimeCreate: true`, even when `allowOrgOverride` is false.
+   *
+   * The env-var escape hatch (`OBJECTSTACK_METADATA_WRITABLE`) still
+   * applies to BOTH intents, so operators can opt into artifact
+   * overrides at runtime for emergency fixes.
+   */
+  private assertAllowed(type: string, intent: MetadataWriteIntent = 'override-artifact'): void {
     const singular = PLURAL_TO_SINGULAR[type] ?? type;
     const allowedByRegistry = OVERLAY_ALLOWED_TYPES.has(singular) || OVERLAY_ALLOWED_TYPES.has(type);
     if (allowedByRegistry) return;
+
+    // Two-tier extension: runtime-only writes target a brand-new
+    // (artifact-free) item, so they only need `allowRuntimeCreate`.
+    if (intent === 'runtime-only'
+        && (RUNTIME_CREATE_ALLOWED_TYPES.has(singular) || RUNTIME_CREATE_ALLOWED_TYPES.has(type))) {
+      return;
+    }
 
     // Phase 3a-env-writable: env-var escape hatch.
     const env = envWritableMetadataTypes();
@@ -617,12 +652,16 @@ export class SysMetadataRepository implements MetadataRepository {
       ...OVERLAY_ALLOWED_TYPES,
       ...envWritableMetadataTypes(),
     ];
+    const code = intent === 'runtime-only' ? 'not_creatable' : 'not_overridable';
+    const detail = intent === 'runtime-only'
+      ? `'${type}' has neither allowOrgOverride nor allowRuntimeCreate in the registry. `
+      : `'${type}' is not allowOrgOverride in the registry. `;
     const err: any = new Error(
-      `[not_overridable] '${type}' is not allowOrgOverride in the registry. ` +
-      `Allowed: ${Array.from(new Set(allowed)).join(', ') || '(none)'}. ` +
+      `[${code}] ${detail}` +
+      `Overlay-allowed: ${Array.from(new Set(allowed)).join(', ') || '(none)'}. ` +
       `Set OBJECTSTACK_METADATA_WRITABLE to enable additional types at runtime.`,
     );
-    err.code = 'not_overridable';
+    err.code = code;
     err.status = 403;
     throw err;
   }
