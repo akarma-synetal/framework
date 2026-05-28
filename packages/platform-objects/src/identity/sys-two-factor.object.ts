@@ -147,6 +147,12 @@ export const SysTwoFactor = ObjectSchema.create({
       required: false,
       description: 'JSON-serialized backup recovery codes',
     }),
+
+    verified: Field.boolean({
+      label: 'Verified',
+      defaultValue: true,
+      description: 'Whether the enrollment was confirmed with a valid TOTP code (managed by better-auth)',
+    }),
   },
   
   indexes: [

@@ -31,12 +31,10 @@ test-results/
 
 # Ephemeral screenshots from local browser-verification runs.
 # Long-lived screenshots belong in docs/screenshots/.
-/crm-*.png
-/crm-*.jpeg
-/m10-*.png
-/studio-*.png
-/page-*.png
-/tmp-*.png
+/*.png
+/*.jpeg
+/*.jpg
+/*.webp
 playwright-report/
 
 # Temporary files
