@@ -271,16 +271,27 @@ export class ArtifactKernelFactory implements EnvironmentKernelFactory {
         }
 
         // Per-project SecurityPlugin — provides RBAC + tenant_isolation RLS.
-        // Note: this kernel does NOT auto-create personal organizations for
-        // self-service signups. Project owners are bound to the mirrored
-        // cloud-team org via `seedProjectOrganization` + `seedProjectMember`
-        // below; SSO-JIT-provisioned members get attached to the same team
-        // via the SSO callback path. The CLI's `objectstack serve` mirrors
-        // this behaviour for `pnpm dev`.
+        // Multi-tenant deployments additionally register OrgScopingPlugin,
+        // which provides organization_id auto-stamping, per-org seed
+        // replay, and default-org bootstrap. SecurityPlugin probes the
+        // `org-scoping` service at start time and strips the wildcard
+        // `tenant_isolation` RLS when the scoping plugin is absent —
+        // so OrgScopingPlugin MUST be registered before SecurityPlugin.
         try {
-            const { SecurityPlugin } = await import('@objectstack/plugin-security');
             const multiTenant = String(process.env.OS_MULTI_TENANT ?? 'false').toLowerCase() !== 'false';
-            await kernel.use(new SecurityPlugin({ multiTenant }) as any);
+            if (multiTenant) {
+                try {
+                    const { OrgScopingPlugin } = await import('@objectstack/plugin-org-scoping');
+                    await kernel.use(new OrgScopingPlugin() as any);
+                } catch (err: any) {
+                    this.logger.warn?.('[ArtifactKernelFactory] OrgScopingPlugin not registered (multi-tenant disabled)', {
+                        environmentId,
+                        error: err?.message,
+                    });
+                }
+            }
+            const { SecurityPlugin } = await import('@objectstack/plugin-security');
+            await kernel.use(new SecurityPlugin() as any);
         } catch (err: any) {
             this.logger.warn?.('[ArtifactKernelFactory] SecurityPlugin not registered', {
                 environmentId,

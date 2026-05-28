@@ -1,7 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 /**
- * claimOrphanTenantRows — assign seed-loaded records to the first organization.
+ * claimOrphanOrgRows — assign seed-loaded records to the first organization.
  *
  * Seeds (`defineDataset`) are inserted by `SeedLoaderService` using
  * `{ context: { isSystem: true } }`, which intentionally bypasses
@@ -57,7 +57,7 @@ function hasOrganizationField(schema: ServiceObject): boolean {
  *
  * Returns a per-object summary `{ object, count }[]`.
  */
-export async function claimOrphanTenantRows(
+export async function claimOrphanOrgRows(
   ql: any,
   organizationId: string,
   options: ClaimOptions = {},
@@ -68,7 +68,7 @@ export async function claimOrphanTenantRows(
   }
   const registry = (ql as any).registry;
   if (!registry || typeof registry.getAllObjects !== 'function') {
-    logger?.warn?.('[security] claimOrphanTenantRows: registry unavailable');
+    logger?.warn?.('[org-scoping] claimOrphanOrgRows: registry unavailable');
     return [];
   }
 
@@ -110,7 +110,7 @@ export async function claimOrphanTenantRows(
           );
           updated += 1;
         } catch (e) {
-          logger?.warn?.(`[security] claim failed for ${schema.name}:${row.id}`, {
+          logger?.warn?.(`[org-scoping] claim failed for ${schema.name}:${row.id}`, {
             error: (e as Error).message,
           });
         }
@@ -119,7 +119,7 @@ export async function claimOrphanTenantRows(
         results.push({ object: schema.name, count: updated });
       }
     } catch (e) {
-      logger?.warn?.(`[security] claim scan failed for ${schema.name}`, {
+      logger?.warn?.(`[org-scoping] claim scan failed for ${schema.name}`, {
         error: (e as Error).message,
       });
     }
@@ -127,7 +127,7 @@ export async function claimOrphanTenantRows(
 
   if (results.length > 0) {
     const total = results.reduce((s, r) => s + r.count, 0);
-    logger?.info?.(`[security] claimed ${total} orphan seed row(s) for organization ${organizationId}`, {
+    logger?.info?.(`[org-scoping] claimed ${total} orphan seed row(s) for organization ${organizationId}`, {
       breakdown: results,
     });
   }

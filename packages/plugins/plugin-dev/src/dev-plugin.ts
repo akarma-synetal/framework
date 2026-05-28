@@ -551,12 +551,23 @@ export class DevPlugin implements Plugin {
     }
 
     // 5. Security Plugin (RBAC, RLS, field-level masking)
+    // OrgScopingPlugin (when multi-tenant) MUST register BEFORE SecurityPlugin
+    // because SecurityPlugin.start() probes the `org-scoping` service and
+    // caches the result for the lifetime of the plugin.
     if (enabled('security')) {
+      const multiTenant = String(process.env.OS_MULTI_TENANT ?? 'false').toLowerCase() !== 'false';
+      if (multiTenant) {
+        try {
+          const { OrgScopingPlugin } = await import('@objectstack/plugin-org-scoping') as any;
+          this.childPlugins.push(new OrgScopingPlugin());
+          ctx.logger.info('  ✔ Org-scoping plugin enabled (multi-tenant: organization_id auto-stamp, per-org seed)');
+        } catch {
+          ctx.logger.warn('  ✘ OS_MULTI_TENANT=true but @objectstack/plugin-org-scoping not installed');
+        }
+      }
       try {
         const { SecurityPlugin } = await import('@objectstack/plugin-security') as any;
-        const multiTenant = String(process.env.OS_MULTI_TENANT ?? 'false').toLowerCase() !== 'false';
-        const securityPlugin = new SecurityPlugin({ multiTenant });
-        this.childPlugins.push(securityPlugin);
+        this.childPlugins.push(new SecurityPlugin());
         ctx.logger.info(`  ✔ Security plugin enabled (RBAC, RLS, field masking; multiTenant=${multiTenant})`);
       } catch {
         ctx.logger.debug('  ℹ @objectstack/plugin-security not installed — skipping security');

@@ -35,29 +35,25 @@ await kernel.bootstrap();
 
 ### Multi-tenant vs single-tenant
 
-`SecurityPlugin` defaults to **multi-tenant** mode. In this mode it:
+`SecurityPlugin` is single-tenant by default. It enforces RBAC, owner-based RLS, and Field-Level Security regardless of mode.
 
-- Auto-injects `organization_id = ctx.tenantId` on insert when the target object declares an `organization_id` field.
-- Honours the wildcard `tenant_isolation` RLS policy
-  (`organization_id = current_user.organization_id`) shipped with the
-  default `member_default` / `viewer_readonly` permission sets.
-
-For single-tenant deployments, switch it off:
+For **multi-tenant** (logical row-level Organization scoping) install [`@objectstack/plugin-org-scoping`](../plugin-org-scoping/README.md) *before* SecurityPlugin:
 
 ```typescript
-kernel.use(new SecurityPlugin({ multiTenant: false }));
+import { OrgScopingPlugin } from '@objectstack/plugin-org-scoping';
+
+await kernel.use(new OrgScopingPlugin());  // MUST be BEFORE SecurityPlugin
+await kernel.use(new SecurityPlugin());
 ```
 
-This skips the per-insert metadata lookup that drives `organization_id`
-auto-injection (the `owner_id` injection still runs) and strips wildcard
-`current_user.organization_id` policies from the per-request policy
-set so the field-existence safety net never has to drop them
-individually. Field-Level Security, owner-based RLS, and per-object
-CRUD checks operate identically regardless of this flag.
+SecurityPlugin probes `getService('org-scoping')` at start time:
 
-In CLI / dev-server mode the same switch is exposed via the
-`OS_MULTI_TENANT` environment variable (default `true`); set
-`OS_MULTI_TENANT=false` before `objectstack serve` / `pnpm dev` to disable.
+- **Service present** → keeps the wildcard `tenant_isolation` RLS policy (`organization_id = current_user.organization_id`) shipped with the default `member_default` / `viewer_readonly` permission sets.
+- **Service absent** → strips those wildcard policies so single-tenant deployments aren't filtered to zero rows.
+
+`organization_id` auto-injection on insert is provided by OrgScopingPlugin; `owner_id` auto-injection always runs in SecurityPlugin regardless.
+
+In CLI / dev-server mode the `OS_MULTI_TENANT` environment variable (default `false`) toggles whether the runtime registers `OrgScopingPlugin` alongside `SecurityPlugin`. Set `OS_MULTI_TENANT=true` before `objectstack serve` / `pnpm dev` to enable.
 
 ## Key Exports
 

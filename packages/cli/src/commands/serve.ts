@@ -1138,17 +1138,29 @@ export default class Serve extends Command {
             }));
             trackPlugin('Auth');
 
+            // Pair: OrgScopingPlugin (multi-tenant) — optional, must register BEFORE SecurityPlugin
+            // OrgScopingPlugin provides `organization_id` auto-stamp, per-org
+            // seed-replay, and default-org bootstrap. SecurityPlugin probes
+            // the `org-scoping` service at start() time and conditionally
+            // strips the wildcard `tenant_isolation` RLS when this plugin
+            // is absent — so registration order matters.
+            const multiTenant = String(process.env.OS_MULTI_TENANT ?? 'false').toLowerCase() !== 'false';
+            if (multiTenant) {
+              try {
+                const orgScopingPkg = '@objectstack/plugin-org-scoping';
+                const { OrgScopingPlugin } = await import(/* webpackIgnore: true */ orgScopingPkg);
+                await kernel.use(new OrgScopingPlugin());
+                trackPlugin('OrgScoping');
+              } catch {
+                // optional — multi-tenant mode requested but plugin not installed
+              }
+            }
+
             // Pair: SecurityPlugin (RBAC) — optional
             try {
               const securityPkg = '@objectstack/plugin-security';
               const { SecurityPlugin } = await import(/* webpackIgnore: true */ securityPkg);
-              // `OS_MULTI_TENANT=true` enables wildcard tenant_isolation
-              // RLS policies and the `organization_id` auto-injection on
-              // insert. Default is off so local `dev`/`start` runs seed
-              // demo data inline at boot without requiring an org —
-              // enable explicitly for cloud / multi-org deployments.
-              const multiTenant = String(process.env.OS_MULTI_TENANT ?? 'false').toLowerCase() !== 'false';
-              await kernel.use(new SecurityPlugin({ multiTenant }));
+              await kernel.use(new SecurityPlugin());
               trackPlugin('Security');
             } catch {
               // optional

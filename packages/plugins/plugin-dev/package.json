@@ -25,6 +25,7 @@
     "@objectstack/objectql": "workspace:^",
     "@objectstack/plugin-auth": "workspace:^",
     "@objectstack/plugin-hono-server": "workspace:^",
+    "@objectstack/plugin-org-scoping": "workspace:^",
     "@objectstack/plugin-security": "workspace:^",
     "@objectstack/rest": "workspace:^",
     "@objectstack/runtime": "workspace:^",
@@ -46,6 +47,9 @@
     "@objectstack/plugin-hono-server": {
       "optional": true
     },
+    "@objectstack/plugin-org-scoping": {
+      "optional": true
+    },
     "@objectstack/plugin-security": {
       "optional": true
     },
@@ -61,6 +65,7 @@
     "@objectstack/objectql": "workspace:*",
     "@objectstack/plugin-auth": "workspace:*",
     "@objectstack/plugin-hono-server": "workspace:*",
+    "@objectstack/plugin-org-scoping": "workspace:*",
     "@objectstack/plugin-security": "workspace:*",
     "@objectstack/rest": "workspace:*",
     "@objectstack/runtime": "workspace:*",

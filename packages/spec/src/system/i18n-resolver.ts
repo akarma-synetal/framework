@@ -805,7 +805,15 @@ export function resolveMetadataFormLabels<T extends Record<string, any>>(
     if (!section || typeof section !== 'object') return section;
     const next: any = { ...section };
     const sectionName: string | undefined =
-      typeof section.name === 'string' ? section.name : undefined;
+      typeof section.name === 'string'
+        ? section.name
+        : typeof section.label === 'string'
+        ? section.label
+            .toLowerCase()
+            .replace(/&/g, 'and')
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+        : undefined;
     if (sectionName) {
       const tLabel = lookupMetadataFormSection(bundle, type, sectionName, 'label', opts);
       if (tLabel) next.label = tLabel;

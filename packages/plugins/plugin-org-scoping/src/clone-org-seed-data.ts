@@ -1,11 +1,11 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 /**
- * cloneTenantSeedData — give every newly-registered org its own copy of
+ * cloneOrgSeedData — give every newly-registered org its own copy of
  * the demo seed data.
  *
  * Multi-tenant deployments treat each `sys_organization` as a hard
- * isolation boundary. The platform-wide `claimOrphanTenantRows` hook
+ * isolation boundary. The platform-wide `claimOrphanOrgRows` hook
  * (see `claim-orphan-tenant-rows.ts`) only fires for the very first
  * org — every subsequent org (created explicitly by a user via
  * `createOrganization`, or by an admin from the console) starts
@@ -134,7 +134,7 @@ async function findDonorOrgId(ql: any): Promise<string | null> {
   }
 }
 
-export async function cloneTenantSeedData(
+export async function cloneOrgSeedData(
   ql: any,
   targetOrgId: string,
   options: CloneOptions = {},
@@ -145,7 +145,7 @@ export async function cloneTenantSeedData(
   }
   const registry = (ql as any).registry;
   if (!registry || typeof registry.getAllObjects !== 'function') {
-    logger?.warn?.('[security] cloneTenantSeedData: registry unavailable');
+    logger?.warn?.('[org-scoping] cloneOrgSeedData: registry unavailable');
     return [];
   }
 
@@ -232,7 +232,7 @@ export async function cloneTenantSeedData(
           inserted.push({ object: objectName, newId, record: data, lookups });
           cloned++;
         } catch (e) {
-          logger?.warn?.('[security] cloneTenantSeedData: insert failed', {
+          logger?.warn?.('[org-scoping] cloneOrgSeedData: insert failed', {
             object: objectName,
             error: (e as Error).message,
           });
@@ -240,7 +240,7 @@ export async function cloneTenantSeedData(
       }
       if (cloned > 0) summary.push({ object: objectName, count: cloned });
     } catch (e) {
-      logger?.warn?.('[security] cloneTenantSeedData: object failed', {
+      logger?.warn?.('[org-scoping] cloneOrgSeedData: object failed', {
         object: objectName,
         error: (e as Error).message,
       });
@@ -292,7 +292,7 @@ export async function cloneTenantSeedData(
     try {
       await ql.update(item.object, { id: item.newId, ...patch }, { context: SYSTEM_CTX });
     } catch (e) {
-      logger?.warn?.('[security] cloneTenantSeedData: lookup remap failed', {
+      logger?.warn?.('[org-scoping] cloneOrgSeedData: lookup remap failed', {
         object: item.object,
         id: item.newId,
         error: (e as Error).message,

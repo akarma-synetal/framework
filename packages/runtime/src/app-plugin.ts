@@ -520,7 +520,7 @@ export class AppPlugin implements Plugin {
 
              // Decide whether to also run the seed inline at AppPlugin
              // start. In multi-tenant mode, the per-org replay (driven
-             // by SecurityPlugin's sys_organization middleware) is the
+             // by OrgScopingPlugin's sys_organization middleware) is the
              // source of truth — running it here too would create NULL-
              // org rows that pollute reads and need a separate claim
              // step. So we skip it. Single-tenant deployments keep the

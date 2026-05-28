@@ -235,15 +235,24 @@ export const BulkDataPermissionSet: PermissionSet = {
 The framework ships four canonical permission sets that are auto-seeded on
 boot by `plugin-security` (see
 `packages/platform-objects/src/security/default-permission-sets.ts`). Use
-these as the baseline for any new tenant — tier custom sets on top rather
+these as the baseline for any new org — tier custom sets on top rather
 than redefining the basics.
 
 | Name | Scope | What it unlocks | Notes |
 |:--|:--|:--|:--|
-| `admin_full_access` | Platform (no RLS) | All objects, all system permissions, Studio + Setup, cross-tenant reads | Reserved for platform operators. Auto-granted to the bootstrap admin (`bootstrapPlatformAdmin`). |
-| `organization_admin` | Per-org (tenant_isolation RLS) | Wildcard CRUD inside the org, `manage_org_users`, Setup app shell (only org-scoped entries visible), invite members, manage roles assignment | **Read-only** on `sys_role`, `sys_permission_set`, `sys_role_permission_set`, `sys_user_permission_set`, `sys_user_role` to prevent self-elevation. Does **not** see Studio. |
+| `admin_full_access` | Platform (no RLS) | All objects, all system permissions, Studio + Setup, cross-org reads | Reserved for platform operators. Auto-granted to the bootstrap admin (`bootstrapPlatformAdmin`). |
+| `organization_admin` | Per-org (`tenant_isolation` RLS, only active when [`plugin-org-scoping`](#objectstackplugin-org-scoping) is loaded) | Wildcard CRUD inside the org, `manage_org_users`, Setup app shell (only org-scoped entries visible), invite members, manage roles assignment | **Read-only** on `sys_role`, `sys_permission_set`, `sys_role_permission_set`, `sys_user_permission_set`, `sys_user_role` to prevent self-elevation. Does **not** see Studio. |
 | `member_default` | Per-org | Standard end-user CRUD on org records | Default profile for invited members. |
 | `viewer_readonly` | Per-org | Read access only | For auditors / read-only stakeholders. |
+
+> **Single-org vs. multi-org runtimes.** The wildcard `tenant_isolation`
+> RLS row above only takes effect when `@objectstack/plugin-org-scoping`
+> is registered (typically via `OS_MULTI_TENANT=true`). In single-org
+> mode `plugin-security` detects the missing `org-scoping` service and
+> strips the wildcard policy so reads / writes aren't accidentally
+> filtered by an unset `current_user.organization_id`. See the
+> [Org-Scoping Plugin README](/packages/plugins/plugin-org-scoping/README.md)
+> for boot order and per-org seed-replay details.
 
 #### Auto-grant for organization admins
 

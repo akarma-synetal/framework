@@ -92,10 +92,12 @@ describe('SecurityPlugin', () => {
   });
 
   // -------------------------------------------------------------------------
-  // multiTenant switch — single-tenant mode strips tenant policies and skips
-  // organization_id auto-injection.
+  // org-scoping probe — when @objectstack/plugin-org-scoping is installed
+  // (i.e. the `org-scoping` service is registered), SecurityPlugin keeps
+  // wildcard `current_user.organization_id` RLS policies. Otherwise it
+  // strips them so single-tenant deployments aren't filtered to nothing.
   // -------------------------------------------------------------------------
-  const makeMiddlewareCtx = (overrides: { permissionSets: PermissionSet[]; objectFields?: string[]; schemaExtra?: Record<string, any> }) => {
+  const makeMiddlewareCtx = (overrides: { permissionSets: PermissionSet[]; objectFields?: string[]; schemaExtra?: Record<string, any>; orgScoping?: boolean }) => {
     const fields: Record<string, any> = {};
     for (const f of overrides.objectFields ?? ['id', 'organization_id', 'owner_id', 'name']) {
       fields[f] = { name: f };
@@ -120,10 +122,17 @@ describe('SecurityPlugin', () => {
       objectql: ql,
       metadata,
     };
+    if (overrides.orgScoping) {
+      // Sentinel object — SecurityPlugin only checks truthiness.
+      services['org-scoping'] = { name: 'com.objectstack.org-scoping' };
+    }
     const ctx: any = {
       logger: { info: vi.fn(), warn: vi.fn() },
       registerService: vi.fn(),
-      getService: (name: string) => services[name],
+      getService: (name: string) => {
+        if (!(name in services)) throw new Error(`service not registered: ${name}`);
+        return services[name];
+      },
     };
     return {
       ctx,
@@ -144,8 +153,11 @@ describe('SecurityPlugin', () => {
     ],
   } as any;
 
-  it('multiTenant: true — auto-injects organization_id on insert', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: true, fallbackPermissionSet: 'member_default' });
+  // Note: `organization_id` auto-injection lives in `@objectstack/plugin-org-scoping`
+  // and is covered by that package's tests. SecurityPlugin only owns
+  // `owner_id` auto-stamping.
+  it('owner_id is always auto-injected on insert (regardless of org-scoping)', async () => {
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({ permissionSets: [tenantPolicySet] });
     await plugin.init(harness.ctx);
     await plugin.start(harness.ctx);
@@ -154,26 +166,13 @@ describe('SecurityPlugin', () => {
       context: { userId: 'u1', tenantId: 'org-1', roles: [], permissions: [] },
     };
     await harness.run(opCtx);
-    expect(opCtx.data.organization_id).toBe('org-1');
-    expect(opCtx.data.owner_id).toBe('u1');
-  });
-
-  it('multiTenant: false — does NOT auto-inject organization_id, still injects owner_id', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
-    const harness = makeMiddlewareCtx({ permissionSets: [tenantPolicySet] });
-    await plugin.init(harness.ctx);
-    await plugin.start(harness.ctx);
-    const opCtx: any = {
-      object: 'task', operation: 'insert', data: { name: 'A' },
-      context: { userId: 'u1', tenantId: 'org-1', roles: [], permissions: [] },
-    };
-    await harness.run(opCtx);
+    // SecurityPlugin no longer touches organization_id — that's plugin-org-scoping's job.
     expect(opCtx.data.organization_id).toBeUndefined();
     expect(opCtx.data.owner_id).toBe('u1');
   });
 
-  it('multiTenant: false — strips tenant_isolation RLS so find applies no tenant where', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+  it('without org-scoping plugin — strips tenant_isolation RLS so find applies no tenant where', async () => {
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({ permissionSets: [tenantPolicySet] });
     await plugin.init(harness.ctx);
     await plugin.start(harness.ctx);
@@ -185,9 +184,9 @@ describe('SecurityPlugin', () => {
     expect(opCtx.ast.where).toBeUndefined();
   });
 
-  it('multiTenant: true — applies tenant_isolation RLS to find', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: true, fallbackPermissionSet: 'member_default' });
-    const harness = makeMiddlewareCtx({ permissionSets: [tenantPolicySet] });
+  it('with org-scoping plugin — applies tenant_isolation RLS to find', async () => {
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
+    const harness = makeMiddlewareCtx({ permissionSets: [tenantPolicySet], orgScoping: true });
     await plugin.init(harness.ctx);
     await plugin.start(harness.ctx);
     const opCtx: any = {
@@ -207,12 +206,13 @@ describe('SecurityPlugin', () => {
   // rows on every read (wrong) — which silently broke the cloud
   // Marketplace UI.
   it('tenancy.enabled=false — wildcard organization_id RLS is skipped, not denied', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: true, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({
       permissionSets: [tenantPolicySet],
       // Catalog table without organization_id; opts out of tenancy.
       objectFields: ['id', 'manifest_id', 'visibility', 'owner_org_id'],
       schemaExtra: { tenancy: { enabled: false, strategy: 'shared' } },
+      orgScoping: true,
     });
     await plugin.init(harness.ctx);
     await plugin.start(harness.ctx);
@@ -227,11 +227,12 @@ describe('SecurityPlugin', () => {
   });
 
   it('tenancy.enabled=false via systemFields.tenant=false — also skipped', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: true, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({
       permissionSets: [tenantPolicySet],
       objectFields: ['id', 'name'],
       schemaExtra: { systemFields: { tenant: false } },
+      orgScoping: true,
     });
     await plugin.init(harness.ctx);
     await plugin.start(harness.ctx);
@@ -247,10 +248,11 @@ describe('SecurityPlugin', () => {
     // Sanity check: dropping the deny sentinel must remain in effect
     // for objects that did NOT opt out — otherwise a wildcard policy
     // applied to a half-migrated table would silently expose every row.
-    const plugin = new SecurityPlugin({ multiTenant: true, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({
       permissionSets: [tenantPolicySet],
       objectFields: ['id', 'name'], // no organization_id, no opt-out
+      orgScoping: true,
     });
     await plugin.init(harness.ctx);
     await plugin.start(harness.ctx);
@@ -270,11 +272,11 @@ describe('SecurityPlugin', () => {
   // tenant's data. The fallback re-resolves with `member_default` so
   // tenant_isolation still applies.
   it('post-resolution fallback — non-empty roles resolving to no permission sets still get tenant_isolation RLS', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: true, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     // The metadata only carries `member_default` (loaded via
     // `permissionSets: [tenantPolicySet]`). The role name 'owner' is
     // not bound anywhere, so `resolvePermissionSets(['owner'])` → [].
-    const harness = makeMiddlewareCtx({ permissionSets: [tenantPolicySet] });
+    const harness = makeMiddlewareCtx({ permissionSets: [tenantPolicySet], orgScoping: true });
     await plugin.init(harness.ctx);
     await plugin.start(harness.ctx);
     const opCtx: any = {
@@ -304,7 +306,7 @@ describe('SecurityPlugin', () => {
   } as any;
 
   it('FLS write — insert with a forbidden field throws PermissionDeniedError', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({
       permissionSets: [flsPolicySet],
       objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
@@ -324,7 +326,7 @@ describe('SecurityPlugin', () => {
   });
 
   it('FLS write — update with a forbidden field throws PermissionDeniedError', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({
       permissionSets: [flsPolicySet],
       objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
@@ -343,7 +345,7 @@ describe('SecurityPlugin', () => {
   });
 
   it('FLS write — multiple forbidden fields are all listed in the error', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({
       permissionSets: [flsPolicySet],
       objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
@@ -362,7 +364,7 @@ describe('SecurityPlugin', () => {
   });
 
   it('FLS write — insert that touches only editable fields passes', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({
       permissionSets: [flsPolicySet],
       objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
@@ -381,7 +383,7 @@ describe('SecurityPlugin', () => {
   });
 
   it('FLS write — bulk insert array catches forbidden field on any row', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({
       permissionSets: [flsPolicySet],
       objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
@@ -403,7 +405,7 @@ describe('SecurityPlugin', () => {
   });
 
   it('FLS write — system context (isSystem) bypasses the check entirely', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({
       permissionSets: [flsPolicySet],
       objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],
@@ -420,7 +422,7 @@ describe('SecurityPlugin', () => {
   });
 
   it('FLS write — fields without any rule pass through (allow-list semantics)', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({
       permissionSets: [flsPolicySet],
       objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn', 'description'],
@@ -438,7 +440,7 @@ describe('SecurityPlugin', () => {
   });
 
   it('FLS write — does not interfere with read (find) — masker still strips read', async () => {
-    const plugin = new SecurityPlugin({ multiTenant: false, fallbackPermissionSet: 'member_default' });
+    const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
     const harness = makeMiddlewareCtx({
       permissionSets: [flsPolicySet],
       objectFields: ['id', 'owner_id', 'name', 'salary', 'ssn'],

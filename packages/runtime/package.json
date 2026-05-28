@@ -28,6 +28,7 @@
     "@objectstack/objectql": "workspace:*",
     "@objectstack/observability": "workspace:*",
     "@objectstack/plugin-auth": "workspace:*",
+    "@objectstack/plugin-org-scoping": "workspace:*",
     "@objectstack/plugin-security": "workspace:*",
     "@objectstack/rest": "workspace:*",
     "@objectstack/service-cluster": "workspace:*",

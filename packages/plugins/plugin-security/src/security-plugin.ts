@@ -12,8 +12,6 @@ import {
   extractMemberPairs,
   reconcileOrgAdminGrant,
 } from './auto-org-admin-grant.js';
-import { claimOrphanTenantRows } from './claim-orphan-tenant-rows.js';
-import { cloneTenantSeedData } from './clone-tenant-seed-data.js';
 import {
   securityObjects,
   securityDefaultPermissionSets,
@@ -37,34 +35,6 @@ export interface SecurityPluginOptions {
    * @default 'member_default'
    */
   fallbackPermissionSet?: string | null;
-  /**
-   * Whether this deployment is multi-tenant.
-   *
-   * When `true` (default), SecurityPlugin:
-   *   - Auto-injects `organization_id = ctx.tenantId` on insert when
-   *     the target object declares an `organization_id` field.
-   *   - Honours the wildcard `tenant_isolation` RLS policy
-   *     (`organization_id = current_user.organization_id`) shipped with
-   *     the default `member_default` / `viewer_readonly` permission
-   *     sets.
-   *
-   * When `false`, SecurityPlugin:
-   *   - Skips the `organization_id` auto-injection block (saves a
-   *     metadata lookup per insert; `owner_id` injection still runs).
-   *   - Strips any RLS policy whose USING expression references
-   *     `current_user.organization_id` from the per-request policy
-   *     set, so single-tenant deployments don't pay the
-   *     field-existence safety-net cost on every find.
-   *
-   * Field-Level Security, owner-based RLS, and per-object permission
-   * checks (allowRead/allowCreate/…) all operate identically regardless
-   * of this flag. Set this to `false` for single-tenant or
-   * single-organization deployments where `organization_id` carries no
-   * meaning.
-   *
-   * @default true
-   */
-  multiTenant?: boolean;
 }
 
 /**
@@ -75,6 +45,16 @@ export interface SecurityPluginOptions {
  *
  * This plugin is fully optional — without it, the system operates
  * without permission checks (same as current behavior).
+ *
+ * **Multi-tenant Organization scoping is provided by the separate
+ * `@objectstack/plugin-org-scoping` package** (auto-stamps
+ * `organization_id` on insert, per-org seed replay, default-org
+ * bootstrap). When that plugin is installed, SecurityPlugin detects
+ * it via `getService('org-scoping')` and keeps the wildcard
+ * `current_user.organization_id` RLS policies that ship with the
+ * default permission sets. Without it, those policies are stripped so
+ * single-tenant deployments don't pay the field-existence safety-net
+ * cost on every find.
  *
  * Dependencies:
  * - objectql service (ObjectQL engine with middleware support)
@@ -91,7 +71,15 @@ export class SecurityPlugin implements Plugin {
   private fieldMasker = new FieldMasker();
   private readonly bootstrapPermissionSets: PermissionSet[];
   private readonly fallbackPermissionSet: string | null;
-  private readonly multiTenant: boolean;
+  /**
+   * Runtime probe — set in `start()` from
+   * `ctx.getService('org-scoping')`. When `false`, wildcard RLS
+   * policies that reference `current_user.organization_id` are
+   * stripped from the per-request policy set (saves the
+   * field-existence safety net cost on every find in single-tenant
+   * deployments). When `true`, the policies apply normally.
+   */
+  private orgScopingEnabled = false;
   /**
    * Per-object field-name cache. Populated lazily from the metadata
    * service / ObjectQL registry on first access per object. Schemas are
@@ -119,7 +107,6 @@ export class SecurityPlugin implements Plugin {
       options.fallbackPermissionSet === undefined
         ? 'member_default'
         : options.fallbackPermissionSet;
-    this.multiTenant = options.multiTenant !== false;
   }
 
   async init(ctx: PluginContext): Promise<void> {
@@ -170,6 +157,26 @@ export class SecurityPlugin implements Plugin {
     if (!ql || typeof ql.registerMiddleware !== 'function') {
       ctx.logger.warn('ObjectQL engine does not support middleware, security middleware not registered');
       return;
+    }
+
+    // Probe for OrgScopingPlugin presence. When registered, its
+    // `init()` exposes itself as the `org-scoping` service. We capture
+    // the boolean once at start time (plugin DI graph is static after
+    // start) and let `collectRLSPolicies` consult it on every request.
+    try {
+      const orgScoping = ctx.getService('org-scoping');
+      this.orgScopingEnabled = !!orgScoping;
+    } catch {
+      this.orgScopingEnabled = false;
+    }
+    if (this.orgScopingEnabled) {
+      ctx.logger.info(
+        '[security] org-scoping plugin detected — wildcard `organization_id` RLS policies will apply',
+      );
+    } else {
+      ctx.logger.info(
+        '[security] org-scoping plugin not present — wildcard `organization_id` RLS policies will be stripped (single-tenant mode)',
+      );
     }
 
     // Construct a dbLoader once that lets resolvePermissionSets
@@ -340,52 +347,29 @@ export class SecurityPlugin implements Plugin {
         }
       }
 
-      // 3.5. Auto-inject tenancy/ownership fields on insert.
+      // 3.5. Auto-inject `owner_id` on insert from the
+      // ExecutionContext. Without this, the row has `owner_id = NULL`
+      // and the default `owner_only_writes` RLS policy hides it from
+      // the very user who just created it.
       //
-      // When an authenticated user inserts a record, the canonical
-      // tenant column (`organization_id`) and ownership column
-      // (`owner_id`) should be auto-populated from
-      // `ExecutionContext.tenantId` / `userId` so the row is visible
-      // to the same RLS policies that gate reads. Without this, the
-      // user creates a row that has `organization_id = NULL`, which
-      // the very next `find` will filter out as a wrong-tenant row —
-      // a confusing "I just created it but I can't see it" footgun.
-      //
-      // Only fills fields that:
-      //   - the object actually declares (so unrelated tables are
-      //     untouched)
-      //   - aren't already set in the payload (caller wins)
-      //   - have a corresponding value on the execution context.
-      //
-      // The `organization_id` half is gated on `multiTenant`; in
-      // single-tenant deployments it's pure overhead.
+      // `organization_id` auto-injection has moved to
+      // `@objectstack/plugin-org-scoping`. Install that plugin for
+      // multi-tenant deployments.
       if (
         opCtx.operation === 'insert' &&
         opCtx.data &&
         typeof opCtx.data === 'object' &&
-        !Array.isArray(opCtx.data)
+        !Array.isArray(opCtx.data) &&
+        !!opCtx.context?.userId
       ) {
-        const needsTenant =
-          this.multiTenant && !!opCtx.context?.tenantId;
-        const needsOwner = !!opCtx.context?.userId;
-        if (needsTenant || needsOwner) {
-          const fields = await this.getObjectFieldNames(metadata, opCtx.object, ql);
-          if (fields) {
-            const data = opCtx.data as Record<string, unknown>;
-            if (
-              needsTenant &&
-              fields.has('organization_id') &&
-              (data.organization_id == null || data.organization_id === '')
-            ) {
-              data.organization_id = opCtx.context!.tenantId;
-            }
-            if (
-              needsOwner &&
-              fields.has('owner_id') &&
-              (data.owner_id == null || data.owner_id === '')
-            ) {
-              data.owner_id = opCtx.context!.userId;
-            }
+        const fields = await this.getObjectFieldNames(metadata, opCtx.object, ql);
+        if (fields) {
+          const data = opCtx.data as Record<string, unknown>;
+          if (
+            fields.has('owner_id') &&
+            (data.owner_id == null || data.owner_id === '')
+          ) {
+            data.owner_id = opCtx.context!.userId;
           }
         }
       }
@@ -464,7 +448,6 @@ export class SecurityPlugin implements Plugin {
       try {
         const report = await bootstrapPlatformAdmin(ql, this.bootstrapPermissionSets, {
           logger: ctx.logger,
-          multiTenant: this.multiTenant,
         });
         bootstrapRanOnce = true;
         ctx.logger.info('[security] platform bootstrap complete', report);
@@ -564,144 +547,10 @@ export class SecurityPlugin implements Plugin {
       void runOrgAdminBackfill();
     }
 
-    // After a sys_organization insert, give the new org its own private
-    // copy of the artifact's demo data (Salesforce-sandbox style):
-    //
-    //   1. PRIMARY PATH — replay the seed datasets registered on the
-    //      kernel's `seed-datasets` service (populated by AppPlugin at
-    //      start) with `organizationId: <newOrgId>`. SeedLoader scopes
-    //      both existing-record lookups and reference resolution to
-    //      that org, so upsert mode produces an independent copy per
-    //      tenant. This works for the FIRST org and EVERY subsequent
-    //      org created explicitly via the better-auth
-    //      `createOrganization` API, the bootstrap default-org seed,
-    //      or the cloud-team mirror.
-    //
-    //   2. FALLBACK A — when no `seed-datasets` service is registered
-    //      (e.g. a plugin-shaped deployment with no AppPlugin), and
-    //      this is the FIRST org, fall back to the legacy
-    //      `claimOrphanTenantRows` path that adopts any NULL-org rows
-    //      a previous AppPlugin inline-seed may have inserted.
-    //
-    //   3. FALLBACK B — when no `seed-datasets` service is registered
-    //      and this is NOT the first org, fall back to
-    //      `cloneTenantSeedData` (donor-based row copy from the very
-    //      first org). Useful for upgrade paths where the new
-    //      service-based flow hasn't been wired yet.
-    if (this.multiTenant) {
-      ql.registerMiddleware(async (opCtx: any, next: () => Promise<void>) => {
-        await next();
-        if (
-          opCtx?.object !== 'sys_organization' ||
-          (opCtx?.operation !== 'create' && opCtx?.operation !== 'insert')
-        ) {
-          return;
-        }
-        const newOrgId = opCtx?.result?.id ?? opCtx?.data?.id;
-        if (!newOrgId) return;
-
-        // Locate the kernel via ctx — most kernel impls expose either
-        // `getService` on PluginContext directly or attach the kernel
-        // ref. Anything we can't resolve becomes `undefined` and we
-        // gracefully fall back.
-        const kernel: any = (ctx as any).kernel ?? ctx;
-        let datasets: any[] | undefined;
-        try {
-          const raw = kernel?.getService?.('seed-datasets');
-          if (Array.isArray(raw) && raw.length > 0) datasets = raw;
-        } catch { /* service not registered */ }
-
-        // Count existing orgs to pick the right fallback path.
-        let orgCount = 0;
-        try {
-          const allOrgs = await ql.find(
-            'sys_organization',
-            { limit: 2, fields: ['id'] },
-            { context: { isSystem: true } },
-          );
-          const list: any[] = Array.isArray(allOrgs)
-            ? allOrgs
-            : Array.isArray(allOrgs?.records)
-              ? allOrgs.records
-              : [];
-          orgCount = list.length;
-        } catch (e) {
-          ctx.logger.warn('[security] failed to count organizations', {
-            error: (e as Error).message,
-          });
-        }
-
-        // ── Primary path: SeedLoader replay scoped to newOrgId ─────
-        // Uses the `seed-replayer` callable that AppPlugin registers
-        // on the kernel (keeps plugin-security free of @objectstack/runtime
-        // import — runtime already depends on us, so the reverse would
-        // be circular).
-        let replayed = false;
-        try {
-          const replayer: any = kernel?.getService?.('seed-replayer');
-          if (typeof replayer === 'function') {
-            const summary = await replayer(newOrgId);
-            const total = (summary?.inserted ?? 0) + (summary?.updated ?? 0);
-            ctx.logger.info(
-              `[security] per-org seed replay for ${newOrgId}: +${summary?.inserted ?? 0} inserted, ${summary?.updated ?? 0} updated, ${summary?.errors?.length ?? 0} error(s)`,
-              {
-                organizationId: newOrgId,
-                errors: summary?.errors?.slice?.(0, 5),
-              },
-            );
-            if (total > 0) replayed = true;
-          } else if (datasets) {
-            ctx.logger.warn('[security] per-org seed: datasets present but no replayer registered', {
-              organizationId: newOrgId,
-            });
-          }
-        } catch (e) {
-          ctx.logger.warn('[security] per-org seed replay failed, falling back', {
-            organizationId: newOrgId,
-            error: (e as Error).message,
-          });
-        }
-        if (replayed) return;
-
-        // ── Fallback A: legacy claim for first org ─────────────────
-        if (orgCount === 1) {
-          try {
-            const claims = await claimOrphanTenantRows(ql, newOrgId, { logger: ctx.logger });
-            if (claims.length > 0) {
-              const total = claims.reduce((s, c) => s + c.count, 0);
-              ctx.logger.info(
-                `[security] claimed ${total} orphan seed row(s) for first organization ${newOrgId}`,
-                { breakdown: claims },
-              );
-              return;
-            }
-          } catch (e) {
-            ctx.logger.warn('[security] claim-orphan-tenant-rows failed', {
-              error: (e as Error).message,
-            });
-          }
-        }
-
-        // ── Fallback B: clone from donor org for subsequent orgs ───
-        if (orgCount > 1) {
-          try {
-            const summary = await cloneTenantSeedData(ql, newOrgId, { logger: ctx.logger });
-            if (summary.length > 0) {
-              const total = summary.reduce((s, c) => s + c.count, 0);
-              ctx.logger.info(
-                `[security] cloned ${total} seed row(s) for new organization ${newOrgId}`,
-                { breakdown: summary },
-              );
-            }
-          } catch (e) {
-            ctx.logger.warn('[security] clone-tenant-seed-data failed', {
-              organizationId: newOrgId,
-              error: (e as Error).message,
-            });
-          }
-        }
-      });
-    }
+    // Per-organization seed data replay on `sys_organization` insert
+    // moved to `@objectstack/plugin-org-scoping` (along with
+    // `claimOrphanOrgRows` / `cloneOrgSeedData`). Install that
+    // plugin for multi-tenant deployments.
   }
 
   async destroy(): Promise<void> {
@@ -721,17 +570,18 @@ export class SecurityPlugin implements Plugin {
     for (const ps of permissionSets) {
       if (ps.rowLevelSecurity) {
         for (const policy of ps.rowLevelSecurity) {
-          // In single-tenant mode, strip any policy that filters on
-          // `current_user.organization_id` — there is no meaningful
-          // tenant to compare against, so the policy would either drop
-          // every row (when the field exists on the object) or be
-          // dropped by the field-existence safety net. Either way it's
-          // pure overhead. Substring match is sufficient: every
-          // wildcard tenant policy in the default permission sets uses
-          // exactly this token, and authors who want a different
-          // multi-tenant story should turn `multiTenant: false` off.
+          // When the org-scoping plugin is NOT installed, strip any
+          // policy that filters on `current_user.organization_id` —
+          // there is no meaningful tenant to compare against, so the
+          // policy would either drop every row (when the field exists
+          // on the object) or be dropped by the field-existence safety
+          // net. Either way it's pure overhead. Substring match is
+          // sufficient: every wildcard tenant policy in the default
+          // permission sets uses exactly this token. Install
+          // `@objectstack/plugin-org-scoping` to enable the
+          // multi-tenant behavior.
           if (
-            !this.multiTenant &&
+            !this.orgScopingEnabled &&
             policy.using &&
             policy.using.includes('current_user.organization_id')
           ) {

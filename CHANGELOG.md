@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking — `@objectstack/plugin-security` org-scoping split into `@objectstack/plugin-org-scoping`
+
+**Removed from `plugin-security`**: the `multiTenant` constructor option,
+the `organization_id` auto-stamp middleware, the `sys_organization`
+post-create seed-replay pipeline, the default-organization bootstrap,
+and the `cloneTenantSeedData` export.
+
+**New package**: [`@objectstack/plugin-org-scoping`](packages/plugins/plugin-org-scoping/README.md)
+ships the row-level Organization scoping primitives — `organization_id`
+auto-stamp, per-org seed replay, default-org bootstrap, orphan-row
+claim, and a new `org-scoping` service that `plugin-security` probes at
+start time to decide whether to keep wildcard `tenant_isolation` RLS
+policies.
+
+**Why**: per ADR-0002, "tenant" in ObjectStack means *physical*
+isolation (one Environment = one database). The row-level
+`organization_id` scoping is a different concept — *logical* scoping
+inside a single DB — so it belongs in its own opt-in plugin. Splitting
+it leaves single-org deployments leaner (no wildcard RLS to strip on
+every query) and gives multi-org deployments a clearer extension point.
+
+**Migration**: single-org deployments need no changes. For multi-org
+(formerly `new SecurityPlugin({ multiTenant: true })`):
+
+```diff
++ import { OrgScopingPlugin } from '@objectstack/plugin-org-scoping';
+  import { SecurityPlugin } from '@objectstack/plugin-security';
+
++ await kernel.use(new OrgScopingPlugin());   // MUST register BEFORE SecurityPlugin
+- await kernel.use(new SecurityPlugin({ multiTenant: true }));
++ await kernel.use(new SecurityPlugin());
+```
+
+The `OS_MULTI_TENANT=true` env switch — read by
+`@objectstack/runtime/cloud/ArtifactKernelFactory`,
+`@objectstack/plugin-dev`, and the `objectstack` CLI's
+`serve` / `dev` / `start` commands — automatically registers
+`OrgScopingPlugin` ahead of `SecurityPlugin`, so projects driven by the
+CLI need no code changes.
+
+See `.changeset/plugin-org-scoping-split.md` for the full breaking-change
+list and ADR-0002 for the rationale on physical-vs-logical tenancy.
+
 ### Breaking — `@objectstack/plugin-security` no longer auto-creates personal workspaces
 
 **Removed**: the `sys_user` post-insert middleware that auto-created a

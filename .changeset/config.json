@@ -32,6 +32,7 @@
       "@objectstack/plugin-hono-server",
       "@objectstack/plugin-mcp-server",
       "@objectstack/plugin-msw",
+      "@objectstack/plugin-org-scoping",
       "@objectstack/plugin-reports",
       "@objectstack/plugin-security",
       "@objectstack/plugin-sharing",

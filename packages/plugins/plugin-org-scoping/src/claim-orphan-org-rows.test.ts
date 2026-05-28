@@ -1,7 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { describe, it, expect, vi } from 'vitest';
-import { claimOrphanTenantRows } from './claim-orphan-tenant-rows.js';
+import { claimOrphanOrgRows } from './claim-orphan-org-rows.js';
 
 function makeQL(schemas: any[], rowsByObject: Record<string, any[]>) {
   const updates: { object: string; data: any; options: any }[] = [];
@@ -25,10 +25,10 @@ function makeQL(schemas: any[], rowsByObject: Record<string, any[]>) {
   return { ql, updates };
 }
 
-describe('claimOrphanTenantRows', () => {
+describe('claimOrphanOrgRows', () => {
   it('returns [] when registry is unavailable', async () => {
     const ql: any = { find: vi.fn(), update: vi.fn() };
-    const result = await claimOrphanTenantRows(ql, 'org_1');
+    const result = await claimOrphanOrgRows(ql, 'org_1');
     expect(result).toEqual([]);
   });
 
@@ -39,7 +39,7 @@ describe('claimOrphanTenantRows', () => {
     const { ql, updates } = makeQL(schemas, {
       better_auth_user: [{ id: 'u1', organization_id: null }],
     });
-    const result = await claimOrphanTenantRows(ql, 'org_1');
+    const result = await claimOrphanOrgRows(ql, 'org_1');
     expect(updates).toHaveLength(0);
     expect(result).toEqual([]);
   });
@@ -51,7 +51,7 @@ describe('claimOrphanTenantRows', () => {
     const { ql, updates } = makeQL(schemas, {
       sys_permission_set: [{ id: 'ps1', organization_id: null }],
     });
-    await claimOrphanTenantRows(ql, 'org_1');
+    await claimOrphanOrgRows(ql, 'org_1');
     expect(updates).toHaveLength(0);
   });
 
@@ -60,7 +60,7 @@ describe('claimOrphanTenantRows', () => {
     const { ql, updates } = makeQL(schemas, {
       global_setting: [{ id: 's1' }],
     });
-    await claimOrphanTenantRows(ql, 'org_1');
+    await claimOrphanOrgRows(ql, 'org_1');
     expect(updates).toHaveLength(0);
   });
 
@@ -77,7 +77,7 @@ describe('claimOrphanTenantRows', () => {
       ],
       account: [{ id: 'a1', organization_id: null }],
     });
-    const result = await claimOrphanTenantRows(ql, 'org_1');
+    const result = await claimOrphanOrgRows(ql, 'org_1');
     expect(updates).toHaveLength(3);
     expect(updates.every((u) => u.options.context?.isSystem === true)).toBe(true);
     expect(updates.every((u) => u.data.organization_id === 'org_1')).toBe(true);
@@ -101,7 +101,7 @@ describe('claimOrphanTenantRows', () => {
       }),
     };
     const logger = { info: vi.fn(), warn: vi.fn() };
-    const result = await claimOrphanTenantRows(ql, 'org_1', { logger });
+    const result = await claimOrphanOrgRows(ql, 'org_1', { logger });
     expect(result).toEqual([{ object: 'quote', count: 1 }]);
     expect(logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('claim failed for quote:q1'),
@@ -114,13 +114,13 @@ describe('claimOrphanTenantRows', () => {
     const { ql, updates } = makeQL(schemas, {
       lead: [{ id: 'l1', organization_id: 'org_other' }],
     });
-    const result = await claimOrphanTenantRows(ql, 'org_1');
+    const result = await claimOrphanOrgRows(ql, 'org_1');
     expect(updates).toHaveLength(0);
     expect(result).toEqual([]);
   });
 
   it('returns [] when ql lacks find/update', async () => {
-    const result = await claimOrphanTenantRows({} as any, 'org_1');
+    const result = await claimOrphanOrgRows({} as any, 'org_1');
     expect(result).toEqual([]);
   });
 });

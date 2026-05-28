@@ -15,7 +15,7 @@ ObjectStack is organized into **51 publishable packages** across multiple catego
 | **Client / DX** | 5 | `client`, `client-react`, `cli`, `create-objectstack`, `vscode-objectstack` |
 | **Framework adapters** | 7 | `express`, `fastify`, `hono`, `nestjs`, `nextjs`, `nuxt`, `sveltekit` |
 | **Drivers** | 4 | `driver-memory`, `driver-sql`, `driver-turso`, `driver-mongodb` |
-| **Plugins** | 12 | `plugin-auth`, `plugin-security`, `plugin-audit`, `plugin-approvals`, `plugin-sharing`, `plugin-email`, `plugin-webhooks`, `plugin-reports`, `plugin-hono-server`, `plugin-mcp-server`, `plugin-msw`, `plugin-dev` |
+| **Plugins** | 13 | `plugin-auth`, `plugin-security`, `plugin-org-scoping`, `plugin-audit`, `plugin-approvals`, `plugin-sharing`, `plugin-email`, `plugin-webhooks`, `plugin-reports`, `plugin-hono-server`, `plugin-mcp-server`, `plugin-msw`, `plugin-dev` |
 | **Platform services** | 14 | `service-ai`, `service-analytics`, `service-automation`, `service-cache`, `service-cloud`, `service-feed`, `service-i18n`, `service-job`, `service-package`, `service-queue`, `service-realtime`, `service-settings`, `service-storage`, `service-tenant` |
 
 
@@ -326,9 +326,17 @@ All services implement contracts from `@objectstack/spec/contracts` and are kern
 
 **Security Plugin** — RBAC, permissions, field-level security.
 
-- **Features**: Role-based access control, object/field permissions, row-level security
+- **Features**: Role-based access control, object/field permissions, row-level security, `owner_id` auto-stamp
 - **When to use**: Multi-user applications with access control requirements
 - **README**: [View README](/packages/plugins/plugin-security/README.md)
+
+### @objectstack/plugin-org-scoping
+
+**Organization Scoping Plugin** — Multi-org (a.k.a. "soft" multi-tenant) row-level scoping built on top of `plugin-security`.
+
+- **Features**: `organization_id` auto-stamp on insert, per-org seed-data replay, default-org bootstrap, orphan-row claim hook
+- **When to use**: Multi-organization SaaS where every row is scoped to an `sys_organization`. Enable by setting `OS_MULTI_TENANT=true` (registered automatically before `plugin-security`)
+- **README**: [View README](/packages/plugins/plugin-org-scoping/README.md)
 
 ### @objectstack/plugin-audit
 
