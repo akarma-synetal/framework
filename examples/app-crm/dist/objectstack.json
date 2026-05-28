@@ -9,6 +9,383 @@
     "name": "CRM (minimal example)",
     "description": "Minimal CRM workspace used by the framework to validate the metadata loading pipeline end-to-end."
   },
+  "datasources": [
+    {
+      "name": "crm_primary",
+      "label": "CRM Primary Database",
+      "driver": "sqlite",
+      "config": {
+        "filename": ":memory:"
+      },
+      "pool": {
+        "min": 1,
+        "max": 5,
+        "idleTimeoutMillis": 30000,
+        "connectionTimeoutMillis": 3000
+      },
+      "active": true
+    },
+    {
+      "name": "crm_analytics",
+      "label": "CRM Analytics Read Replica",
+      "driver": "sqlite",
+      "config": {
+        "filename": ":memory:",
+        "readOnly": true
+      },
+      "active": true
+    }
+  ],
+  "datasourceMapping": [
+    {
+      "namespace": "crm",
+      "datasource": "crm_primary"
+    },
+    {
+      "default": true,
+      "datasource": "crm_primary"
+    }
+  ],
+  "translations": [
+    {
+      "en": {
+        "objects": {
+          "crm_account": {
+            "label": "Account",
+            "pluralLabel": "Accounts",
+            "fields": {
+              "name": {
+                "label": "Account Name"
+              },
+              "industry": {
+                "label": "Industry"
+              },
+              "annual_revenue": {
+                "label": "Annual Revenue"
+              },
+              "website": {
+                "label": "Website"
+              },
+              "phone": {
+                "label": "Phone"
+              },
+              "billing_address": {
+                "label": "Billing Address"
+              },
+              "owner_id": {
+                "label": "Account Owner"
+              }
+            }
+          },
+          "crm_contact": {
+            "label": "Contact",
+            "pluralLabel": "Contacts",
+            "fields": {
+              "first_name": {
+                "label": "First Name"
+              },
+              "last_name": {
+                "label": "Last Name"
+              },
+              "email": {
+                "label": "Email"
+              },
+              "phone": {
+                "label": "Phone"
+              },
+              "title": {
+                "label": "Job Title"
+              },
+              "account_id": {
+                "label": "Account"
+              }
+            }
+          },
+          "crm_opportunity": {
+            "label": "Opportunity",
+            "pluralLabel": "Opportunities",
+            "fields": {
+              "name": {
+                "label": "Opportunity Name"
+              },
+              "stage": {
+                "label": "Stage"
+              },
+              "amount": {
+                "label": "Deal Value"
+              },
+              "close_date": {
+                "label": "Expected Close"
+              },
+              "probability": {
+                "label": "Win Probability (%)"
+              },
+              "discount_percent": {
+                "label": "Discount (%)"
+              },
+              "owner_id": {
+                "label": "Owner"
+              }
+            },
+            "_sections": {
+              "deal_info": {
+                "label": "Deal Information"
+              },
+              "finance": {
+                "label": "Financial Details"
+              }
+            }
+          },
+          "crm_lead": {
+            "label": "Lead",
+            "pluralLabel": "Leads",
+            "fields": {
+              "first_name": {
+                "label": "First Name"
+              },
+              "last_name": {
+                "label": "Last Name"
+              },
+              "email": {
+                "label": "Email"
+              },
+              "company": {
+                "label": "Company"
+              },
+              "status": {
+                "label": "Status"
+              },
+              "lead_score": {
+                "label": "Lead Score"
+              },
+              "source": {
+                "label": "Lead Source"
+              }
+            }
+          },
+          "crm_activity": {
+            "label": "Activity",
+            "pluralLabel": "Activities",
+            "fields": {
+              "subject": {
+                "label": "Subject"
+              },
+              "type": {
+                "label": "Activity Type"
+              },
+              "status": {
+                "label": "Status"
+              },
+              "due_date": {
+                "label": "Due Date"
+              },
+              "contact_id": {
+                "label": "Contact"
+              },
+              "opportunity_id": {
+                "label": "Opportunity"
+              }
+            }
+          }
+        },
+        "apps": {
+          "crm": {
+            "label": "CRM",
+            "description": "Customer Relationship Management",
+            "navigation": {
+              "sales": {
+                "label": "Sales"
+              },
+              "admin": {
+                "label": "Administration"
+              }
+            }
+          }
+        },
+        "messages": {
+          "crm.lead.convert.success": "Lead converted to opportunity successfully.",
+          "crm.lead.convert.error": "Failed to convert lead. Please try again.",
+          "crm.opportunity.won": "Congratulations! Deal marked as won.",
+          "crm.discount.pending_approval": "Discount requires manager approval.",
+          "crm.activity.due_today": "You have {count} activities due today."
+        }
+      },
+      "zh-CN": {
+        "objects": {
+          "crm_account": {
+            "label": "客户",
+            "pluralLabel": "客户列表",
+            "fields": {
+              "name": {
+                "label": "客户名称"
+              },
+              "industry": {
+                "label": "行业"
+              },
+              "annual_revenue": {
+                "label": "年营收"
+              },
+              "website": {
+                "label": "官网"
+              },
+              "phone": {
+                "label": "电话"
+              },
+              "billing_address": {
+                "label": "账单地址"
+              },
+              "owner_id": {
+                "label": "负责人"
+              }
+            }
+          },
+          "crm_contact": {
+            "label": "联系人",
+            "pluralLabel": "联系人列表",
+            "fields": {
+              "first_name": {
+                "label": "名"
+              },
+              "last_name": {
+                "label": "姓"
+              },
+              "email": {
+                "label": "邮箱"
+              },
+              "phone": {
+                "label": "电话"
+              },
+              "title": {
+                "label": "职位"
+              },
+              "account_id": {
+                "label": "所属客户"
+              }
+            }
+          },
+          "crm_opportunity": {
+            "label": "商机",
+            "pluralLabel": "商机列表",
+            "fields": {
+              "name": {
+                "label": "商机名称"
+              },
+              "stage": {
+                "label": "阶段"
+              },
+              "amount": {
+                "label": "金额"
+              },
+              "close_date": {
+                "label": "预计成交日期"
+              },
+              "probability": {
+                "label": "赢单概率 (%)"
+              },
+              "discount_percent": {
+                "label": "折扣 (%)"
+              },
+              "owner_id": {
+                "label": "负责人"
+              }
+            },
+            "_sections": {
+              "deal_info": {
+                "label": "商机信息"
+              },
+              "finance": {
+                "label": "财务明细"
+              }
+            }
+          },
+          "crm_lead": {
+            "label": "线索",
+            "pluralLabel": "线索列表",
+            "fields": {
+              "first_name": {
+                "label": "名"
+              },
+              "last_name": {
+                "label": "姓"
+              },
+              "email": {
+                "label": "邮箱"
+              },
+              "company": {
+                "label": "公司"
+              },
+              "status": {
+                "label": "状态"
+              },
+              "lead_score": {
+                "label": "线索评分"
+              },
+              "source": {
+                "label": "来源"
+              }
+            }
+          },
+          "crm_activity": {
+            "label": "活动",
+            "pluralLabel": "活动列表",
+            "fields": {
+              "subject": {
+                "label": "主题"
+              },
+              "type": {
+                "label": "活动类型"
+              },
+              "status": {
+                "label": "状态"
+              },
+              "due_date": {
+                "label": "截止日期"
+              },
+              "contact_id": {
+                "label": "联系人"
+              },
+              "opportunity_id": {
+                "label": "商机"
+              }
+            }
+          }
+        },
+        "apps": {
+          "crm": {
+            "label": "客户管理",
+            "description": "客户关系管理系统",
+            "navigation": {
+              "sales": {
+                "label": "销售管理"
+              },
+              "admin": {
+                "label": "系统管理"
+              }
+            }
+          }
+        },
+        "messages": {
+          "crm.lead.convert.success": "线索已成功转化为商机。",
+          "crm.lead.convert.error": "线索转化失败，请重试。",
+          "crm.opportunity.won": "恭喜！商机已标记为赢单。",
+          "crm.discount.pending_approval": "折扣需要经理审批。",
+          "crm.activity.due_today": "您今天有 {count} 个活动待处理。"
+        }
+      }
+    }
+  ],
+  "i18n": {
+    "defaultLocale": "en",
+    "supportedLocales": [
+      "en",
+      "zh-CN"
+    ],
+    "fallbackLocale": "en",
+    "fileOrganization": "per_locale",
+    "messageFormat": "simple",
+    "lazyLoad": false,
+    "cache": true
+  },
   "objects": [
     {
       "name": "crm_account",
@@ -901,6 +1278,82 @@
       }
     }
   ],
+  "objectExtensions": [
+    {
+      "extend": "crm_contact",
+      "fields": {
+        "linkedin_url": {
+          "name": "linkedin_url",
+          "label": "LinkedIn URL",
+          "type": "url",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "twitter_handle": {
+          "name": "twitter_handle",
+          "label": "Twitter / X Handle",
+          "type": "text",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "maxLength": 64,
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        },
+        "preferred_channel": {
+          "name": "preferred_channel",
+          "label": "Preferred Contact Channel",
+          "type": "select",
+          "required": false,
+          "searchable": false,
+          "multiple": false,
+          "unique": false,
+          "options": [
+            {
+              "label": "Email",
+              "value": "email"
+            },
+            {
+              "label": "Phone",
+              "value": "phone"
+            },
+            {
+              "label": "LinkedIn",
+              "value": "linkedin"
+            },
+            {
+              "label": "WhatsApp",
+              "value": "whatsapp"
+            }
+          ],
+          "deleteBehavior": "set_null",
+          "auditTrail": false,
+          "hidden": false,
+          "readonly": false,
+          "sortable": true,
+          "index": false,
+          "externalId": false
+        }
+      },
+      "label": "Contact (CRM Extended)",
+      "priority": 210
+    }
+  ],
   "apps": [
     {
       "name": "crm_app",
@@ -975,12 +1428,117 @@
       ]
     }
   ],
+  "portals": [
+    {
+      "kind": "portal",
+      "id": "customer_self_service",
+      "label": "Customer Self-Service Portal",
+      "description": "External portal for customers to track their account and support activities.",
+      "routePrefix": "/portal/customer",
+      "layout": "minimal",
+      "locale": "auto",
+      "seo": {
+        "title": "Customer Portal — CRM Example",
+        "description": "Track your account, opportunities, and support activities.",
+        "robots": "noindex"
+      },
+      "authMode": "magic-link",
+      "profiles": [
+        "customer_portal_user"
+      ],
+      "anonymousEntry": {
+        "routes": [
+          {
+            "path": "/contact",
+            "actionRef": "crm_lead.create",
+            "rateLimit": {
+              "rule": "5/hour/ip",
+              "scope": "ip"
+            },
+            "captcha": true,
+            "bindIdentityFromField": "email"
+          }
+        ],
+        "defaultRateLimit": {
+          "rule": "100/day/ip",
+          "scope": "ip"
+        }
+      },
+      "navigation": [
+        {
+          "id": "my_activities",
+          "label": "My Activities",
+          "icon": "calendar",
+          "order": 1,
+          "type": "view",
+          "viewRef": "crm_activity.activity_grid"
+        },
+        {
+          "id": "my_account",
+          "label": "My Account",
+          "icon": "building",
+          "order": 2,
+          "type": "view",
+          "viewRef": "crm_account.account_list"
+        },
+        {
+          "id": "knowledge_base",
+          "label": "Knowledge Base",
+          "icon": "book-open",
+          "order": 3,
+          "type": "url",
+          "url": "https://docs.example.com",
+          "target": "_blank"
+        }
+      ],
+      "defaultRoute": {
+        "viewRef": "crm_activity.activity_grid"
+      },
+      "embeddable": false,
+      "active": true
+    }
+  ],
   "views": [
     {
+      "list": {
+        "label": "All Activities",
+        "type": "grid",
+        "data": {
+          "provider": "object",
+          "object": "crm_activity"
+        },
+        "columns": [
+          {
+            "field": "subject"
+          },
+          {
+            "field": "type"
+          },
+          {
+            "field": "status"
+          },
+          {
+            "field": "due_date"
+          },
+          {
+            "field": "contact"
+          },
+          {
+            "field": "account"
+          },
+          {
+            "field": "opportunity"
+          }
+        ]
+      },
       "listViews": {
         "all": {
           "label": "All Activities",
           "type": "grid",
+          "data": {
+            "provider": "object",
+            "object": "crm_activity"
+          },
           "columns": [
             {
               "field": "subject"
@@ -1008,6 +1566,10 @@
         "calendar": {
           "label": "Activity Calendar",
           "type": "calendar",
+          "data": {
+            "provider": "object",
+            "object": "crm_activity"
+          },
           "columns": [
             "subject",
             "type",
@@ -1087,10 +1649,45 @@
       }
     },
     {
+      "list": {
+        "label": "All Leads",
+        "type": "grid",
+        "data": {
+          "provider": "object",
+          "object": "crm_lead"
+        },
+        "columns": [
+          {
+            "field": "name"
+          },
+          {
+            "field": "company"
+          },
+          {
+            "field": "status"
+          },
+          {
+            "field": "source"
+          },
+          {
+            "field": "lead_score"
+          },
+          {
+            "field": "assigned_to"
+          },
+          {
+            "field": "email"
+          }
+        ]
+      },
       "listViews": {
         "all": {
           "label": "All Leads",
           "type": "grid",
+          "data": {
+            "provider": "object",
+            "object": "crm_lead"
+          },
           "columns": [
             {
               "field": "name"
@@ -1118,6 +1715,10 @@
         "pipeline": {
           "label": "Lead Pipeline (Kanban)",
           "type": "kanban",
+          "data": {
+            "provider": "object",
+            "object": "crm_lead"
+          },
           "columns": [
             "name",
             "company",
@@ -1218,10 +1819,45 @@
       }
     },
     {
+      "list": {
+        "label": "All Opportunities",
+        "type": "grid",
+        "data": {
+          "provider": "object",
+          "object": "crm_opportunity"
+        },
+        "columns": [
+          {
+            "field": "name"
+          },
+          {
+            "field": "account"
+          },
+          {
+            "field": "stage"
+          },
+          {
+            "field": "amount"
+          },
+          {
+            "field": "probability"
+          },
+          {
+            "field": "expected_revenue"
+          },
+          {
+            "field": "close_date"
+          }
+        ]
+      },
       "listViews": {
         "all": {
           "label": "All Opportunities",
           "type": "grid",
+          "data": {
+            "provider": "object",
+            "object": "crm_opportunity"
+          },
           "columns": [
             {
               "field": "name"
@@ -1249,6 +1885,10 @@
         "pipeline": {
           "label": "Pipeline (Kanban)",
           "type": "kanban",
+          "data": {
+            "provider": "object",
+            "object": "crm_opportunity"
+          },
           "columns": [
             "name",
             "account",
@@ -1270,6 +1910,10 @@
       "formViews": {
         "default": {
           "type": "simple",
+          "data": {
+            "provider": "object",
+            "object": "crm_opportunity"
+          },
           "sections": [
             {
               "label": "Opportunity",
@@ -1533,6 +2177,82 @@
       "type": "flow",
       "target": "opportunity_won_notification",
       "refreshAfter": false
+    }
+  ],
+  "themes": [
+    {
+      "name": "crm_light",
+      "label": "CRM Light",
+      "description": "Default CRM theme — professional blue, light mode.",
+      "mode": "light",
+      "colors": {
+        "primary": "#1E6FD9",
+        "secondary": "#6C757D",
+        "accent": "#17A2B8",
+        "success": "#28A745",
+        "warning": "#FFC107",
+        "error": "#DC3545",
+        "info": "#17A2B8",
+        "background": "#FFFFFF",
+        "surface": "#F8F9FA",
+        "text": "#212529",
+        "textSecondary": "#6C757D",
+        "border": "#DEE2E6"
+      },
+      "typography": {
+        "fontFamily": {
+          "base": "'Inter', 'Segoe UI', system-ui, sans-serif"
+        },
+        "fontSize": {
+          "xs": "0.75rem",
+          "sm": "0.875rem",
+          "base": "1rem",
+          "lg": "1.125rem",
+          "xl": "1.25rem"
+        },
+        "fontWeight": {
+          "normal": 400,
+          "medium": 500,
+          "semibold": 600,
+          "bold": 700
+        },
+        "lineHeight": {
+          "tight": "1.25",
+          "normal": "1.5",
+          "relaxed": "1.75"
+        }
+      },
+      "borderRadius": {
+        "sm": "4px",
+        "md": "6px",
+        "lg": "8px",
+        "xl": "12px",
+        "full": "9999px"
+      },
+      "density": "regular",
+      "wcagContrast": "AA"
+    },
+    {
+      "name": "crm_dark",
+      "label": "CRM Dark",
+      "description": "CRM dark mode theme.",
+      "mode": "dark",
+      "colors": {
+        "primary": "#4D9EF5",
+        "secondary": "#ADB5BD",
+        "accent": "#3DD5F3",
+        "success": "#40C057",
+        "warning": "#FFD43B",
+        "error": "#FA5252",
+        "info": "#3DD5F3",
+        "background": "#121212",
+        "surface": "#1E1E2E",
+        "text": "#E9ECEF",
+        "textSecondary": "#ADB5BD",
+        "border": "#343A40"
+      },
+      "extends": "crm_light",
+      "density": "regular"
     }
   ],
   "workflows": [
@@ -2497,6 +3217,66 @@
       }
     }
   ],
+  "jobs": [
+    {
+      "name": "crm_lead_scoring",
+      "label": "Nightly Lead Score Refresh",
+      "description": "Recalculates lead_score for all open leads using engagement signals.",
+      "schedule": {
+        "type": "cron",
+        "expression": {
+          "dialect": "cron",
+          "source": "0 2 * * *"
+        },
+        "timezone": "UTC"
+      },
+      "handler": "scoreLeads",
+      "retryPolicy": {
+        "maxRetries": 2,
+        "backoffMs": 5000,
+        "backoffMultiplier": 2
+      },
+      "timeout": 300000,
+      "enabled": true
+    },
+    {
+      "name": "crm_pipeline_report",
+      "label": "Weekly Pipeline Report",
+      "description": "Generates and emails weekly pipeline summary to sales managers.",
+      "schedule": {
+        "type": "cron",
+        "expression": {
+          "dialect": "cron",
+          "source": "0 8 * * 1"
+        },
+        "timezone": "UTC"
+      },
+      "handler": "generatePipelineReport",
+      "retryPolicy": {
+        "maxRetries": 1,
+        "backoffMs": 10000,
+        "backoffMultiplier": 1
+      },
+      "timeout": 120000,
+      "enabled": true
+    },
+    {
+      "name": "crm_renewal_sweep",
+      "label": "Daily Renewal Reminder Sweep",
+      "description": "Scans contracts expiring within 30 days and enqueues reminder flows.",
+      "schedule": {
+        "type": "cron",
+        "expression": {
+          "dialect": "cron",
+          "source": "0 9 * * *"
+        },
+        "timezone": "UTC"
+      },
+      "handler": "sweepRenewals",
+      "timeout": 60000,
+      "enabled": true
+    }
+  ],
   "roles": [
     {
       "name": "sales_rep",
@@ -2578,6 +3358,236 @@
       }
     }
   ],
+  "sharingRules": [
+    {
+      "name": "share_high_value_opps_with_managers",
+      "label": "High-Value Deals → Sales Managers",
+      "description": "Automatically share opportunities over $100,000 with all Sales Managers.",
+      "object": "crm_opportunity",
+      "active": true,
+      "accessLevel": "edit",
+      "sharedWith": {
+        "type": "role",
+        "value": "sales_manager"
+      },
+      "type": "criteria",
+      "condition": {
+        "dialect": "cel",
+        "source": "record.amount > 100000"
+      }
+    },
+    {
+      "name": "share_rep_leads_with_manager",
+      "label": "Rep's Leads → Manager (read-only)",
+      "description": "Share each rep's leads with the Sales Manager role for coaching visibility.",
+      "object": "crm_lead",
+      "active": true,
+      "accessLevel": "read",
+      "sharedWith": {
+        "type": "role",
+        "value": "sales_manager"
+      },
+      "type": "owner",
+      "ownedBy": {
+        "type": "role",
+        "value": "sales_rep"
+      }
+    },
+    {
+      "name": "share_won_deal_activities",
+      "label": "Won-Deal Activities → All Sales",
+      "description": "Share activities attached to closed-won opportunities across the sales team.",
+      "object": "crm_activity",
+      "active": true,
+      "accessLevel": "read",
+      "sharedWith": {
+        "type": "role",
+        "value": "sales_rep"
+      },
+      "type": "criteria",
+      "condition": {
+        "dialect": "cel",
+        "source": "record.status == 'completed'"
+      }
+    }
+  ],
+  "policies": [
+    {
+      "name": "crm_default_policy",
+      "password": {
+        "minLength": 12,
+        "requireUppercase": true,
+        "requireLowercase": true,
+        "requireNumbers": true,
+        "requireSymbols": true,
+        "expirationDays": 90,
+        "historyCount": 5
+      },
+      "session": {
+        "idleTimeout": 30,
+        "absoluteTimeout": 480,
+        "forceMfa": false
+      },
+      "audit": {
+        "logRetentionDays": 365,
+        "sensitiveFields": [
+          "annual_revenue",
+          "discount_percent"
+        ],
+        "captureRead": false
+      },
+      "isDefault": true
+    },
+    {
+      "name": "crm_finance_policy",
+      "password": {
+        "minLength": 16,
+        "requireUppercase": true,
+        "requireLowercase": true,
+        "requireNumbers": true,
+        "requireSymbols": true,
+        "expirationDays": 60,
+        "historyCount": 10
+      },
+      "session": {
+        "idleTimeout": 15,
+        "absoluteTimeout": 240,
+        "forceMfa": true
+      },
+      "audit": {
+        "logRetentionDays": 730,
+        "sensitiveFields": [
+          "amount",
+          "discount_percent",
+          "annual_revenue"
+        ],
+        "captureRead": true
+      },
+      "isDefault": false,
+      "assignedProfiles": [
+        "finance_approver"
+      ]
+    }
+  ],
+  "apis": [
+    {
+      "name": "crm_pipeline_summary",
+      "path": "/api/v1/crm/pipeline-summary",
+      "method": "GET",
+      "summary": "Pipeline summary by stage",
+      "description": "Returns opportunity count and total value grouped by stage.",
+      "type": "object_operation",
+      "target": "crm_opportunity",
+      "objectParams": {
+        "object": "crm_opportunity",
+        "operation": "find"
+      },
+      "authRequired": true,
+      "cacheTtl": 60
+    },
+    {
+      "name": "crm_lead_convert",
+      "path": "/api/v1/crm/leads/:id/convert",
+      "method": "POST",
+      "summary": "Convert a lead to an opportunity",
+      "type": "flow",
+      "target": "lead_qualification_conversion",
+      "inputMapping": [
+        {
+          "source": "params.id",
+          "target": "leadId"
+        },
+        {
+          "source": "body.ownerId",
+          "target": "ownerId"
+        }
+      ],
+      "authRequired": true
+    },
+    {
+      "name": "crm_marketing_webhook",
+      "path": "/api/v1/crm/marketing/events",
+      "method": "POST",
+      "summary": "Receive marketing automation events",
+      "type": "flow",
+      "target": "lead_qualification_conversion",
+      "authRequired": false
+    }
+  ],
+  "webhooks": [
+    {
+      "name": "crm_opportunity_changed",
+      "label": "Opportunity Created / Updated",
+      "object": "crm_opportunity",
+      "triggers": [
+        "create",
+        "update"
+      ],
+      "url": "https://hooks.example.com/crm/opportunity",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Source": "objectstack-crm"
+      },
+      "payloadFields": [
+        "id",
+        "name",
+        "stage",
+        "amount",
+        "owner_id",
+        "updated_at"
+      ],
+      "includeSession": false,
+      "authentication": {
+        "type": "bearer",
+        "credentials": {
+          "token": "env:CRM_WEBHOOK_TOKEN"
+        }
+      },
+      "retryPolicy": {
+        "maxRetries": 3,
+        "backoffStrategy": "exponential",
+        "initialDelayMs": 1000,
+        "maxDelayMs": 30000
+      },
+      "timeoutMs": 10000,
+      "secret": "env:CRM_WEBHOOK_SECRET",
+      "isActive": true,
+      "description": "Fires on every opportunity create/update for downstream sync.",
+      "tags": [
+        "crm",
+        "sync"
+      ]
+    },
+    {
+      "name": "crm_deal_won_slack",
+      "label": "Deal Won → Slack",
+      "object": "crm_opportunity",
+      "triggers": [
+        "update"
+      ],
+      "url": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXX",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "payloadFields": [
+        "id",
+        "name",
+        "amount",
+        "owner_id",
+        "close_date"
+      ],
+      "includeSession": false,
+      "timeoutMs": 30000,
+      "isActive": true,
+      "description": "Posts to #wins Slack channel when stage=closed_won.",
+      "tags": [
+        "slack",
+        "notifications"
+      ]
+    }
+  ],
   "agents": [
     {
       "name": "crm_sales_assistant",
@@ -2616,6 +3626,395 @@
       "priority": 100,
       "async": false,
       "onError": "abort"
+    }
+  ],
+  "mappings": [
+    {
+      "name": "csv_import_leads",
+      "label": "CSV Import: Leads",
+      "sourceFormat": "csv",
+      "targetObject": "crm_lead",
+      "fieldMapping": [
+        {
+          "source": "First Name",
+          "target": "first_name",
+          "transform": "none"
+        },
+        {
+          "source": "Last Name",
+          "target": "last_name",
+          "transform": "none"
+        },
+        {
+          "source": "Email",
+          "target": "email",
+          "transform": "none"
+        },
+        {
+          "source": "Phone",
+          "target": "phone",
+          "transform": "none"
+        },
+        {
+          "source": "Company",
+          "target": "company",
+          "transform": "none"
+        },
+        {
+          "source": "Lead Status",
+          "target": "status",
+          "transform": "map",
+          "params": {
+            "valueMap": {
+              "New": "new",
+              "Working": "contacted",
+              "Qualified": "qualified",
+              "Unqualified": "disqualified",
+              "Converted": "converted"
+            }
+          }
+        },
+        {
+          "source": "Lead Source",
+          "target": "source",
+          "transform": "map",
+          "params": {
+            "valueMap": {
+              "Web": "web",
+              "Email Campaign": "email_campaign",
+              "Cold Call": "cold_call",
+              "Referral": "referral",
+              "Trade Show": "trade_show"
+            }
+          }
+        },
+        {
+          "source": "Lead Score",
+          "target": "lead_score",
+          "transform": "none"
+        }
+      ],
+      "mode": "upsert",
+      "upsertKey": [
+        "email"
+      ],
+      "errorPolicy": "skip",
+      "batchSize": 500
+    },
+    {
+      "name": "json_sync_contacts",
+      "label": "JSON Sync: Contacts from HubSpot",
+      "sourceFormat": "json",
+      "targetObject": "crm_contact",
+      "fieldMapping": [
+        {
+          "source": "properties.firstname",
+          "target": "first_name",
+          "transform": "none"
+        },
+        {
+          "source": "properties.lastname",
+          "target": "last_name",
+          "transform": "none"
+        },
+        {
+          "source": "properties.email",
+          "target": "email",
+          "transform": "none"
+        },
+        {
+          "source": "properties.phone",
+          "target": "phone",
+          "transform": "none"
+        },
+        {
+          "source": "properties.jobtitle",
+          "target": "title",
+          "transform": "none"
+        }
+      ],
+      "mode": "upsert",
+      "upsertKey": [
+        "email"
+      ],
+      "errorPolicy": "skip",
+      "batchSize": 250
+    }
+  ],
+  "analyticsCubes": [
+    {
+      "name": "crm_pipeline",
+      "title": "CRM Pipeline",
+      "description": "Revenue and deal-count analytics across the sales pipeline.",
+      "sql": "crm_opportunity",
+      "measures": {
+        "count": {
+          "name": "count",
+          "label": "Deal Count",
+          "type": "count",
+          "sql": "*"
+        },
+        "total_amount": {
+          "name": "total_amount",
+          "label": "Total Pipeline Value",
+          "type": "sum",
+          "sql": "amount",
+          "format": "currency"
+        },
+        "avg_amount": {
+          "name": "avg_amount",
+          "label": "Average Deal Size",
+          "type": "avg",
+          "sql": "amount",
+          "format": "currency"
+        },
+        "win_rate": {
+          "name": "win_rate",
+          "label": "Win Rate (%)",
+          "type": "number",
+          "sql": "SUM(CASE WHEN stage = 'closed_won' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)",
+          "format": "percent"
+        }
+      },
+      "dimensions": {
+        "stage": {
+          "name": "stage",
+          "label": "Pipeline Stage",
+          "type": "string",
+          "sql": "stage"
+        },
+        "close_date": {
+          "name": "close_date",
+          "label": "Close Date",
+          "type": "time",
+          "sql": "close_date"
+        },
+        "owner": {
+          "name": "owner",
+          "label": "Owner",
+          "type": "string",
+          "sql": "owner_id"
+        }
+      },
+      "joins": {
+        "crm_account": {
+          "name": "crm_account",
+          "relationship": "many_to_one",
+          "sql": "${crm_pipeline}.account_id = ${crm_account}.id"
+        }
+      },
+      "refreshKey": {
+        "every": "1 hour"
+      },
+      "public": false
+    },
+    {
+      "name": "crm_lead_funnel",
+      "title": "CRM Lead Funnel",
+      "description": "Lead volume and conversion rate analytics.",
+      "sql": "crm_lead",
+      "measures": {
+        "count": {
+          "name": "count",
+          "label": "Lead Count",
+          "type": "count",
+          "sql": "*"
+        },
+        "converted_count": {
+          "name": "converted_count",
+          "label": "Converted Leads",
+          "type": "count",
+          "sql": "converted_opportunity_id"
+        }
+      },
+      "dimensions": {
+        "status": {
+          "name": "status",
+          "label": "Lead Status",
+          "type": "string",
+          "sql": "status"
+        },
+        "source": {
+          "name": "source",
+          "label": "Lead Source",
+          "type": "string",
+          "sql": "source"
+        },
+        "created_at": {
+          "name": "created_at",
+          "label": "Created At",
+          "type": "time",
+          "sql": "created_at"
+        }
+      },
+      "refreshKey": {
+        "every": "30 minutes"
+      },
+      "public": false
+    }
+  ],
+  "connectors": [
+    {
+      "name": "hubspot_crm",
+      "label": "HubSpot CRM",
+      "type": "saas",
+      "description": "Bi-directional sync of contacts, companies, and deals with HubSpot.",
+      "icon": "hubspot",
+      "authentication": {
+        "type": "oauth2",
+        "authorizationUrl": "https://app.hubspot.com/oauth/authorize",
+        "tokenUrl": "https://api.hubapi.com/oauth/v1/token",
+        "clientId": "env:HUBSPOT_CLIENT_ID",
+        "clientSecret": "env:HUBSPOT_CLIENT_SECRET",
+        "scopes": [
+          "contacts",
+          "crm.objects.deals.read",
+          "crm.objects.deals.write"
+        ]
+      },
+      "actions": [
+        {
+          "key": "create_contact",
+          "label": "Create Contact",
+          "description": "Create a new contact in HubSpot",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "firstname": {
+                "type": "string"
+              },
+              "lastname": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "email"
+            ]
+          }
+        },
+        {
+          "key": "update_deal",
+          "label": "Update Deal",
+          "description": "Update an existing deal in HubSpot",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "dealId": {
+                "type": "string"
+              },
+              "dealstage": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "dealId"
+            ]
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "key": "contact_created",
+          "label": "Contact Created",
+          "description": "Fires when a contact is created in HubSpot",
+          "type": "webhook"
+        },
+        {
+          "key": "deal_stage_changed",
+          "label": "Deal Stage Changed",
+          "description": "Polls every 5 minutes for deal stage changes",
+          "type": "polling",
+          "interval": 300
+        }
+      ],
+      "syncConfig": {
+        "strategy": "incremental",
+        "direction": "bidirectional",
+        "schedule": {
+          "dialect": "cron",
+          "source": "0 * * * *"
+        },
+        "realtimeSync": false,
+        "conflictResolution": "source_wins",
+        "batchSize": 500,
+        "deleteMode": "soft_delete"
+      },
+      "rateLimitConfig": {
+        "strategy": "sliding_window",
+        "maxRequests": 100,
+        "windowSeconds": 10,
+        "respectUpstreamLimits": true
+      },
+      "retryConfig": {
+        "strategy": "exponential_backoff",
+        "maxAttempts": 3,
+        "initialDelayMs": 1000,
+        "maxDelayMs": 30000,
+        "backoffMultiplier": 2,
+        "retryableStatusCodes": [
+          408,
+          429,
+          500,
+          502,
+          503,
+          504
+        ],
+        "retryOnNetworkError": true,
+        "jitter": true
+      },
+      "connectionTimeoutMs": 10000,
+      "requestTimeoutMs": 30000,
+      "status": "inactive",
+      "enabled": true
+    },
+    {
+      "name": "slack_notifications",
+      "label": "Slack",
+      "type": "api",
+      "description": "Post deal-win and alert notifications to Slack channels.",
+      "icon": "slack",
+      "authentication": {
+        "type": "bearer",
+        "token": "env:SLACK_BOT_TOKEN"
+      },
+      "actions": [
+        {
+          "key": "post_message",
+          "label": "Post Message",
+          "description": "Post a message to a Slack channel",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channel",
+              "text"
+            ]
+          }
+        }
+      ],
+      "rateLimitConfig": {
+        "strategy": "token_bucket",
+        "maxRequests": 50,
+        "windowSeconds": 60,
+        "respectUpstreamLimits": true
+      },
+      "connectionTimeoutMs": 30000,
+      "requestTimeoutMs": 30000,
+      "status": "inactive",
+      "enabled": true
     }
   ],
   "data": [

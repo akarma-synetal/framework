@@ -3,9 +3,24 @@
 import { defineView } from '@objectstack/spec';
 
 export const LeadViews = defineView({
+  list: {
+    label: 'All Leads',
+    type: 'grid',
+    data: { provider: 'object', object: 'crm_lead' },
+    columns: [
+      { field: 'name' },
+      { field: 'company' },
+      { field: 'status' },
+      { field: 'source' },
+      { field: 'lead_score' },
+      { field: 'assigned_to' },
+      { field: 'email' },
+    ],
+  },
   listViews: {
     all: {
       label: 'All Leads',
+      data: { provider: 'object', object: 'crm_lead' },
       type: 'grid',
       columns: [
         { field: 'name' },
@@ -20,6 +35,7 @@ export const LeadViews = defineView({
     pipeline: {
       label: 'Lead Pipeline (Kanban)',
       type: 'kanban',
+      data: { provider: 'object', object: 'crm_lead' },
       columns: ['name', 'company', 'source', 'lead_score'],
       kanban: {
         groupByField: 'status',

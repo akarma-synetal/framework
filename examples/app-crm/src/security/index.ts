@@ -6,3 +6,11 @@ export {
   FinanceApproverRole,
   SalesUserPermissionSet,
 } from './sales-roles.js';
+
+export {
+  HighValueOpportunitySharingRule,
+  RepLeadSharingRule,
+  WonDealActivitySharingRule,
+} from './sharing-rules.js';
+
+export { CrmDefaultPolicy, CrmFinancePolicy } from './crm-policy.js';

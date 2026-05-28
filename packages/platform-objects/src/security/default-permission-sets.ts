@@ -241,6 +241,16 @@ export const defaultPermissionSets: PermissionSet[] = [
         operation: 'all',
         using: 'user_id = current_user.id',
       },
+      // OAuth applications a user has registered themselves (self-service
+      // developer flow exposed in the Account app's Developer section).
+      // `sys_oauth_application` has no `organization_id` so the wildcard
+      // `tenant_isolation` policy would otherwise deny every row.
+      {
+        name: 'sys_oauth_application_self',
+        object: 'sys_oauth_application',
+        operation: 'all',
+        using: 'user_id = current_user.id',
+      },
       // Org-scoped visibility for organization-owned identity-adjacent
       // tables. Org admins may inspect their own org's invitations and
       // memberships (read; writes still flow through better-auth).
@@ -391,6 +401,16 @@ export const defaultPermissionSets: PermissionSet[] = [
       {
         name: 'sys_oauth_consent_self',
         object: 'sys_oauth_consent',
+        operation: 'all',
+        using: 'user_id = current_user.id',
+      },
+      // OAuth applications a user has registered themselves (Account →
+      // Developer → OAuth Applications). `sys_oauth_application` has no
+      // `organization_id`, so without this carve-out the wildcard
+      // `tenant_isolation` policy returns zero rows even for the owner.
+      {
+        name: 'sys_oauth_application_self',
+        object: 'sys_oauth_application',
         operation: 'all',
         using: 'user_id = current_user.id',
       },

@@ -24,8 +24,28 @@ import {
   SalesManagerRole,
   FinanceApproverRole,
   SalesUserPermissionSet,
+  HighValueOpportunitySharingRule,
+  RepLeadSharingRule,
+  WonDealActivitySharingRule,
+  CrmDefaultPolicy,
+  CrmFinancePolicy,
 } from './src/security/index.js';
 import { CrmSeedData } from './src/data/index.js';
+import { LeadCsvImportMapping, ContactJsonSyncMapping } from './src/data/crm-mappings.js';
+import { CrmDatasource, CrmAnalyticsDatasource } from './src/datasources/crm.datasource.js';
+import { CrmTranslationBundle } from './src/translations/crm.translation.js';
+import { ContactExtension } from './src/extensions/contact.extension.js';
+import { CustomerPortal } from './src/portals/customer.portal.js';
+import { CrmLightTheme, CrmDarkTheme } from './src/themes/crm.theme.js';
+import { LeadScoringJob, PipelineReportJob, RenewalSweepJob } from './src/jobs/crm-jobs.js';
+import {
+  PipelineSummaryEndpoint,
+  LeadConvertEndpoint,
+  MarketingWebhookEndpoint,
+} from './src/api/crm-endpoints.js';
+import { OpportunityChangedWebhook, DealWonSlackWebhook } from './src/webhooks/crm-webhooks.js';
+import { PipelineCube, LeadFunnelCube } from './src/analytics/crm.cube.js';
+import { HubSpotConnector, SlackConnector } from './src/connectors/crm-connectors.js';
 
 /**
  * CRM example — exercises the full metadata loading pipeline with at
@@ -48,30 +68,69 @@ export default defineStack({
   // Auto-resolved by the CLI; `ui` enables the Studio shell.
   requires: ['ui'],
 
+  // Infrastructure
+  datasources: [CrmDatasource, CrmAnalyticsDatasource],
+  datasourceMapping: [
+    { namespace: 'crm', datasource: 'crm_primary' },
+    { default: true, datasource: 'crm_primary' },
+  ],
+
+  // Internationalisation
+  translations: [CrmTranslationBundle],
+  i18n: {
+    defaultLocale: 'en',
+    supportedLocales: ['en', 'zh-CN'],
+    fallbackLocale: 'en',
+    messageFormat: 'simple',
+    lazyLoad: false,
+    cache: true,
+  },
+
   // Data
   objects: Object.values(objects),
+  objectExtensions: [ContactExtension],
 
   // UI
   apps: Object.values(apps),
+  portals: [CustomerPortal],
   views: Object.values(views),
   pages: Object.values(pages),
   dashboards: Object.values(dashboards),
   reports: Object.values(reports),
   actions: Object.values(actions),
+  themes: [CrmLightTheme, CrmDarkTheme],
 
   // Logic
   hooks: allHooks,
   flows: allFlows,
   workflows: [HighValueDealWorkflow, StaleOpportunityWorkflow],
   approvals: [DiscountApprovalProcess],
-
-  // AI
-  agents: [SalesAssistantAgent],
-  skills: [DealManagementSkill],
+  jobs: [LeadScoringJob, PipelineReportJob, RenewalSweepJob],
 
   // Security
   roles: [SalesRepRole, SalesManagerRole, FinanceApproverRole],
   permissions: [SalesUserPermissionSet],
+  sharingRules: [
+    HighValueOpportunitySharingRule,
+    RepLeadSharingRule,
+    WonDealActivitySharingRule,
+  ],
+  policies: [CrmDefaultPolicy, CrmFinancePolicy],
+
+  // API
+  apis: [PipelineSummaryEndpoint, LeadConvertEndpoint, MarketingWebhookEndpoint],
+  webhooks: [OpportunityChangedWebhook, DealWonSlackWebhook],
+
+  // Data Extensions
+  mappings: [LeadCsvImportMapping, ContactJsonSyncMapping],
+  analyticsCubes: [PipelineCube, LeadFunnelCube],
+
+  // Integrations
+  connectors: [HubSpotConnector, SlackConnector],
+
+  // AI
+  agents: [SalesAssistantAgent],
+  skills: [DealManagementSkill],
 
   // Seed data
   data: CrmSeedData,

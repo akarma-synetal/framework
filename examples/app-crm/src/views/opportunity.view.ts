@@ -3,9 +3,24 @@
 import { defineView } from '@objectstack/spec';
 
 export const OpportunityViews = defineView({
+  list: {
+    label: 'All Opportunities',
+    type: 'grid',
+    data: { provider: 'object', object: 'crm_opportunity' },
+    columns: [
+      { field: 'name' },
+      { field: 'account' },
+      { field: 'stage' },
+      { field: 'amount' },
+      { field: 'probability' },
+      { field: 'expected_revenue' },
+      { field: 'close_date' },
+    ],
+  },
   listViews: {
     all: {
       label: 'All Opportunities',
+      data: { provider: 'object', object: 'crm_opportunity' },
       type: 'grid',
       columns: [
         { field: 'name' },
@@ -20,6 +35,7 @@ export const OpportunityViews = defineView({
     pipeline: {
       label: 'Pipeline (Kanban)',
       type: 'kanban',
+      data: { provider: 'object', object: 'crm_opportunity' },
       columns: ['name', 'account', 'amount', 'close_date'],
       kanban: {
         groupByField: 'stage',
@@ -31,6 +47,7 @@ export const OpportunityViews = defineView({
   formViews: {
     default: {
       type: 'simple',
+      data: { provider: 'object', object: 'crm_opportunity' },
       sections: [
         {
           label: 'Opportunity',

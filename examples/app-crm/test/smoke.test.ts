@@ -23,9 +23,88 @@ describe('app-crm minimal metadata bundle', () => {
     expect((stack.flows ?? []).length).toBeGreaterThanOrEqual(3);
   });
 
+  it('registers 3 views with data-object bindings for Studio display', () => {
+    expect((stack.views ?? []).length).toBe(3);
+    for (const v of stack.views ?? []) {
+      // Each view must have at least one data-bound list entry so Studio can identify it
+      const listData = (v as any).list?.data ?? (v as any).listViews?.all?.data;
+      expect(listData?.provider).toBe('object');
+      expect(typeof listData?.object).toBe('string');
+    }
+  });
+
   it('ships seed data for every object', () => {
     expect(stack.data).toBeDefined();
     expect((stack.data ?? []).length).toBeGreaterThanOrEqual(3);
+  });
+
+  // Phase 2: full metadata coverage
+  it('has datasources', () => {
+    expect((stack.datasources ?? []).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('has translations (en + zh-CN)', () => {
+    expect((stack.translations ?? []).length).toBeGreaterThanOrEqual(1);
+    const bundle = stack.translations![0] as Record<string, unknown>;
+    expect(bundle.en).toBeDefined();
+    expect(bundle['zh-CN']).toBeDefined();
+  });
+
+  it('has i18n config', () => {
+    expect(stack.i18n).toBeDefined();
+    expect(stack.i18n!.defaultLocale).toBe('en');
+    expect(stack.i18n!.supportedLocales).toContain('zh-CN');
+  });
+
+  it('has object extensions', () => {
+    expect((stack.objectExtensions ?? []).length).toBeGreaterThanOrEqual(1);
+    expect(stack.objectExtensions![0].extend).toBe('crm_contact');
+  });
+
+  it('has a portal', () => {
+    expect((stack.portals ?? []).length).toBeGreaterThanOrEqual(1);
+    expect(stack.portals![0].routePrefix).toBe('/portal/customer');
+  });
+
+  it('has themes (light + dark)', () => {
+    expect((stack.themes ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('has jobs', () => {
+    expect((stack.jobs ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('has sharing rules (criteria + owner types)', () => {
+    const rules = stack.sharingRules ?? [];
+    expect(rules.length).toBeGreaterThanOrEqual(2);
+    expect(rules.some((r) => r.type === 'criteria')).toBe(true);
+    expect(rules.some((r) => r.type === 'owner')).toBe(true);
+  });
+
+  it('has security policies', () => {
+    const policies = stack.policies ?? [];
+    expect(policies.length).toBeGreaterThanOrEqual(1);
+    expect(policies.some((p) => p.isDefault)).toBe(true);
+  });
+
+  it('has API endpoints', () => {
+    expect((stack.apis ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('has webhooks', () => {
+    expect((stack.webhooks ?? []).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('has import/export mappings', () => {
+    expect((stack.mappings ?? []).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('has analytics cubes', () => {
+    expect((stack.analyticsCubes ?? []).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('has connectors', () => {
+    expect((stack.connectors ?? []).length).toBeGreaterThanOrEqual(1);
   });
 });
 

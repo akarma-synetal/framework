@@ -3,9 +3,24 @@
 import { defineView } from '@objectstack/spec';
 
 export const ActivityViews = defineView({
+  list: {
+    label: 'All Activities',
+    type: 'grid',
+    data: { provider: 'object', object: 'crm_activity' },
+    columns: [
+      { field: 'subject' },
+      { field: 'type' },
+      { field: 'status' },
+      { field: 'due_date' },
+      { field: 'contact' },
+      { field: 'account' },
+      { field: 'opportunity' },
+    ],
+  },
   listViews: {
     all: {
       label: 'All Activities',
+      data: { provider: 'object', object: 'crm_activity' },
       type: 'grid',
       columns: [
         { field: 'subject' },
@@ -24,6 +39,7 @@ export const ActivityViews = defineView({
     calendar: {
       label: 'Activity Calendar',
       type: 'calendar',
+      data: { provider: 'object', object: 'crm_activity' },
       columns: ['subject', 'type', 'status', 'due_date'],
       calendar: {
         startDateField: 'due_date',
