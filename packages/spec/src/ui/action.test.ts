@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ActionSchema, ActionParamSchema, Action, type Action as ActionType } from './action.zod';
+import { ActionSchema, ActionParamSchema, Action, type Action as ActionType, ACTION_LOCATIONS, ActionLocationSchema, type ActionLocation } from './action.zod';
 
 describe('ActionParamSchema', () => {
   it('should accept minimal action parameter', () => {
@@ -703,5 +703,60 @@ describe('ActionSchema - target required for non-script types', () => {
       execute: 'my_flow',
     });
     expect(result.target).toBe('my_flow');
+  });
+});
+
+describe('ACTION_LOCATIONS — canonical source of truth', () => {
+  // The platform has ONE definition of the supported action locations,
+  // and every consumer (`@object-ui/types`, `@object-ui/core/ActionEngine`,
+  // designer enums, platform-objects, …) re-exports it. Lock down the
+  // exact set so a typo or accidental removal here breaks loudly instead
+  // of producing a silent runtime mismatch.
+  it('exposes the full set of supported locations', () => {
+    expect([...ACTION_LOCATIONS]).toEqual([
+      'list_toolbar',
+      'list_item',
+      'record_header',
+      'record_more',
+      'record_related',
+      'record_section',
+      'global_nav',
+    ]);
+  });
+
+  it('ActionLocationSchema accepts every value in ACTION_LOCATIONS', () => {
+    for (const loc of ACTION_LOCATIONS) {
+      expect(() => ActionLocationSchema.parse(loc)).not.toThrow();
+    }
+  });
+
+  it('ActionLocationSchema rejects unknown values', () => {
+    expect(() => ActionLocationSchema.parse('record_quick_actions')).toThrow();
+    expect(() => ActionLocationSchema.parse('detail_header')).toThrow();
+    expect(() => ActionLocationSchema.parse('')).toThrow();
+  });
+
+  it('ActionSchema accepts a `locations: ActionLocation[]` field', () => {
+    const all: ActionLocation[] = [...ACTION_LOCATIONS];
+    const action = ActionSchema.parse({
+      name: 'with_locations',
+      label: 'With Locations',
+      type: 'script',
+      execute: 'true',
+      locations: all,
+    });
+    expect(action.locations).toEqual(all);
+  });
+
+  it('ActionSchema rejects an unknown location string', () => {
+    expect(() =>
+      ActionSchema.parse({
+        name: 'bad_location',
+        label: 'Bad',
+        type: 'script',
+        execute: 'true',
+        locations: ['record_section', 'not_a_real_location'],
+      })
+    ).toThrow();
   });
 });
