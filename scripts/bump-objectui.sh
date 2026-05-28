@@ -68,5 +68,5 @@ git -C "$FRAMEWORK_ROOT" commit -m "chore: bump objectui to ${SHORT}
 
 ${SUBJECT_LINE}
 
-objectui@${NEW_SHA}"
+objectui@${NEW_SHA}" -- .objectui-sha
 echo "✓ Committed. Push with: git push"
