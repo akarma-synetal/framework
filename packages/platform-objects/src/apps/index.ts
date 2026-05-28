@@ -2,5 +2,6 @@
 
 export { SETUP_APP } from './setup.app.js';
 export { STUDIO_APP } from './studio.app.js';
+export { ACCOUNT_APP } from './account.app.js';
 export * from './dashboards/index.js';
 export * from './translations/index.js';

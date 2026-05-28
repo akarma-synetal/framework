@@ -321,6 +321,22 @@ export const AppSchema = lazySchema(() => z.object({
 
   /** Is this the default app for new users? */
   isDefault: z.boolean().optional().default(false).describe('Is default app'),
+
+  /**
+   * Hide this app from the top-level App Switcher.
+   *
+   * Hidden apps stay fully routable and permission-checked — they just
+   * don't appear in the apps dropdown. The shell is expected to surface
+   * them through the avatar / user dropdown instead, so this is the
+   * right knob for personal-settings-style apps ("Account") that would
+   * feel out of place next to business apps (CRM, HR, Setup).
+   *
+   * Mirrors GitHub Settings / Google account chip / Salesforce
+   * "Personal Settings" — visible to every user, but reached from the
+   * avatar rather than the app launcher.
+   */
+  hidden: z.boolean().optional()
+    .describe('Hide from the App Switcher; the shell surfaces hidden apps via the avatar menu instead'),
   
   /** 
    * Full Navigation Tree — supports unlimited nesting depth.
