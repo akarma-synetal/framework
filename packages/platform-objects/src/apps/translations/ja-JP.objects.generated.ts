@@ -97,21 +97,21 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "代理ログイン中"
       },
       update_my_profile: {
-        label: "Update Profile",
-        successMessage: "Profile updated"
+        label: "プロフィール更新",
+        successMessage: "プロフィールを更新しました"
       },
       change_my_password: {
-        label: "Change Password",
-        successMessage: "Password changed"
+        label: "パスワード変更",
+        successMessage: "パスワードを変更しました"
       },
       change_my_email: {
-        label: "Change Email",
-        successMessage: "Verification email sent — check the new address to confirm."
+        label: "メールアドレス変更",
+        successMessage: "確認メールを送信しました。新しいメールアドレスで確認してください。"
       },
       delete_my_account: {
-        label: "Delete My Account",
+        label: "アカウント削除",
         confirmText: "Permanently delete your account? This cannot be undone — all your sessions will be terminated and all data you own will be removed per the configured retention policy.",
-        successMessage: "Account deleted"
+        successMessage: "アカウントを削除しました"
       }
     }
   },
@@ -239,12 +239,12 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       link_social: {
-        label: "Link Social Account"
+        label: "ソーシャルアカウント連携"
       },
       unlink_account: {
-        label: "Unlink Account",
+        label: "連携解除",
         confirmText: "Unlink this identity link? The user will no longer be able to sign in with this provider until they re-link it from their account settings.",
-        successMessage: "Identity link removed"
+        successMessage: "アイデンティティ連携を解除しました"
       }
     }
   },
@@ -376,9 +376,9 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "メンバーを削除しました"
       },
       transfer_ownership: {
-        label: "Transfer Ownership",
+        label: "所有権の移譲",
         confirmText: "Transfer ownership of this organization to the selected member? You will be demoted to admin and lose owner-only privileges.",
-        successMessage: "Ownership transferred"
+        successMessage: "所有権を移譲しました"
       }
     }
   },
@@ -460,13 +460,13 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "招待を再送しました"
       },
       accept_invitation: {
-        label: "Accept Invitation",
-        successMessage: "Invitation accepted"
+        label: "招待を受諾",
+        successMessage: "招待を受諾しました"
       },
       reject_invitation: {
-        label: "Decline Invitation",
+        label: "招待を辞退",
         confirmText: "Decline this invitation? The inviter will be notified and you will need a new invitation to join.",
-        successMessage: "Invitation declined"
+        successMessage: "招待を辞退しました"
       }
     }
   },
@@ -780,7 +780,7 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "2FA を無効化しました"
       },
       regenerate_backup_codes: {
-        label: "Regenerate Backup Codes",
+        label: "バックアップコード再生成",
         confirmText: "Regenerate backup codes? All previous backup codes will stop working immediately."
       }
     }
@@ -1023,7 +1023,7 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
         label: "Register OAuth Application"
       },
       rotate_client_secret: {
-        label: "Rotate Client Secret",
+        label: "クライアントシークレット更新",
         confirmText: "Rotate this OAuth client's secret? The previous secret will stop working immediately and any integrations using it will break until they are updated with the new secret. The new secret is shown only once."
       },
       delete_oauth_application: {
@@ -1235,22 +1235,22 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       activate_role: {
-        label: "Activate Role",
-        successMessage: "Role activated"
+        label: "ロールを有効化",
+        successMessage: "ロールが有効化されました"
       },
       deactivate_role: {
-        label: "Deactivate Role",
+        label: "ロールを無効化",
         confirmText: "Deactivate this role? Users with the role keep their assignment but the role stops granting permissions until re-activated.",
-        successMessage: "Role deactivated"
+        successMessage: "ロールが無効化されました"
       },
       set_default_role: {
-        label: "Set as Default",
+        label: "デフォルトに設定",
         confirmText: "Make this the default role for new users? Existing users are unaffected.",
-        successMessage: "Default role updated"
+        successMessage: "デフォルトロールを更新しました"
       },
       clone_role: {
-        label: "Clone Role",
-        successMessage: "Role cloned"
+        label: "ロールを複製",
+        successMessage: "ロールを複製しました"
       }
     }
   },
@@ -1315,17 +1315,17 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       activate_permission_set: {
-        label: "Activate",
-        successMessage: "Permission set activated"
+        label: "有効化",
+        successMessage: "権限セットが有効化されました"
       },
       deactivate_permission_set: {
-        label: "Deactivate",
+        label: "無効化",
         confirmText: "Deactivate this permission set? Existing assignments stay in place but stop granting access until re-activated.",
-        successMessage: "Permission set deactivated"
+        successMessage: "権限セットが無効化されました"
       },
       clone_permission_set: {
-        label: "Clone",
-        successMessage: "Permission set cloned"
+        label: "複製",
+        successMessage: "権限セットを複製しました"
       }
     }
   },
@@ -1954,12 +1954,12 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       mark_read: {
-        label: "Mark as Read",
-        successMessage: "Notification marked as read"
+        label: "既読にする",
+        successMessage: "通知を既読にしました"
       },
       mark_unread: {
-        label: "Mark as Unread",
-        successMessage: "Notification marked as unread"
+        label: "未読にする",
+        successMessage: "通知を未読にしました"
       }
     }
   },

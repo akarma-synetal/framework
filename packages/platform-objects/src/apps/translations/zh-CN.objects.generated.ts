@@ -97,21 +97,21 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "已开始模拟该用户"
       },
       update_my_profile: {
-        label: "Update Profile",
-        successMessage: "Profile updated"
+        label: "更新资料",
+        successMessage: "已更新资料"
       },
       change_my_password: {
-        label: "Change Password",
-        successMessage: "Password changed"
+        label: "修改密码",
+        successMessage: "已修改密码"
       },
       change_my_email: {
-        label: "Change Email",
-        successMessage: "Verification email sent — check the new address to confirm."
+        label: "修改邮箱",
+        successMessage: "已发送验证邮件，请前往新邮箱确认。"
       },
       delete_my_account: {
-        label: "Delete My Account",
+        label: "删除我的账号",
         confirmText: "Permanently delete your account? This cannot be undone — all your sessions will be terminated and all data you own will be removed per the configured retention policy.",
-        successMessage: "Account deleted"
+        successMessage: "已删除账号"
       }
     }
   },
@@ -239,12 +239,12 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       link_social: {
-        label: "Link Social Account"
+        label: "关联社交账号"
       },
       unlink_account: {
-        label: "Unlink Account",
+        label: "解除关联",
         confirmText: "Unlink this identity link? The user will no longer be able to sign in with this provider until they re-link it from their account settings.",
-        successMessage: "Identity link removed"
+        successMessage: "已解除身份关联"
       }
     }
   },
@@ -376,9 +376,9 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "成员已移除"
       },
       transfer_ownership: {
-        label: "Transfer Ownership",
+        label: "转移所有权",
         confirmText: "Transfer ownership of this organization to the selected member? You will be demoted to admin and lose owner-only privileges.",
-        successMessage: "Ownership transferred"
+        successMessage: "已转移所有权"
       }
     }
   },
@@ -460,13 +460,13 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "邀请已重新发送"
       },
       accept_invitation: {
-        label: "Accept Invitation",
-        successMessage: "Invitation accepted"
+        label: "接受邀请",
+        successMessage: "已接受邀请"
       },
       reject_invitation: {
-        label: "Decline Invitation",
+        label: "拒绝邀请",
         confirmText: "Decline this invitation? The inviter will be notified and you will need a new invitation to join.",
-        successMessage: "Invitation declined"
+        successMessage: "已拒绝邀请"
       }
     }
   },
@@ -780,7 +780,7 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "2FA 已停用"
       },
       regenerate_backup_codes: {
-        label: "Regenerate Backup Codes",
+        label: "重新生成备用码",
         confirmText: "Regenerate backup codes? All previous backup codes will stop working immediately."
       }
     }
@@ -1023,7 +1023,7 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
         label: "Register OAuth Application"
       },
       rotate_client_secret: {
-        label: "Rotate Client Secret",
+        label: "轮换 Client Secret",
         confirmText: "Rotate this OAuth client's secret? The previous secret will stop working immediately and any integrations using it will break until they are updated with the new secret. The new secret is shown only once."
       },
       delete_oauth_application: {
@@ -1235,22 +1235,22 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       activate_role: {
-        label: "Activate Role",
-        successMessage: "Role activated"
+        label: "激活角色",
+        successMessage: "角色已激活"
       },
       deactivate_role: {
-        label: "Deactivate Role",
+        label: "停用角色",
         confirmText: "Deactivate this role? Users with the role keep their assignment but the role stops granting permissions until re-activated.",
-        successMessage: "Role deactivated"
+        successMessage: "角色已停用"
       },
       set_default_role: {
-        label: "Set as Default",
+        label: "设为默认",
         confirmText: "Make this the default role for new users? Existing users are unaffected.",
-        successMessage: "Default role updated"
+        successMessage: "已更新默认角色"
       },
       clone_role: {
-        label: "Clone Role",
-        successMessage: "Role cloned"
+        label: "克隆角色",
+        successMessage: "已克隆角色"
       }
     }
   },
@@ -1315,17 +1315,17 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       activate_permission_set: {
-        label: "Activate",
-        successMessage: "Permission set activated"
+        label: "激活",
+        successMessage: "权限集已激活"
       },
       deactivate_permission_set: {
-        label: "Deactivate",
+        label: "停用",
         confirmText: "Deactivate this permission set? Existing assignments stay in place but stop granting access until re-activated.",
-        successMessage: "Permission set deactivated"
+        successMessage: "权限集已停用"
       },
       clone_permission_set: {
-        label: "Clone",
-        successMessage: "Permission set cloned"
+        label: "克隆",
+        successMessage: "已克隆权限集"
       }
     }
   },
@@ -1954,12 +1954,12 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       mark_read: {
-        label: "Mark as Read",
-        successMessage: "Notification marked as read"
+        label: "标记为已读",
+        successMessage: "已标记为已读"
       },
       mark_unread: {
-        label: "Mark as Unread",
-        successMessage: "Notification marked as unread"
+        label: "标记为未读",
+        successMessage: "已标记为未读"
       }
     }
   },

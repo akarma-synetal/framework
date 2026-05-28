@@ -97,21 +97,21 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "Ahora está suplantando al usuario"
       },
       update_my_profile: {
-        label: "Update Profile",
-        successMessage: "Profile updated"
+        label: "Actualizar perfil",
+        successMessage: "Perfil actualizado"
       },
       change_my_password: {
-        label: "Change Password",
-        successMessage: "Password changed"
+        label: "Cambiar contraseña",
+        successMessage: "Contraseña cambiada"
       },
       change_my_email: {
-        label: "Change Email",
-        successMessage: "Verification email sent — check the new address to confirm."
+        label: "Cambiar correo",
+        successMessage: "Correo de verificación enviado; revisa la nueva dirección para confirmar."
       },
       delete_my_account: {
-        label: "Delete My Account",
+        label: "Eliminar mi cuenta",
         confirmText: "Permanently delete your account? This cannot be undone — all your sessions will be terminated and all data you own will be removed per the configured retention policy.",
-        successMessage: "Account deleted"
+        successMessage: "Cuenta eliminada"
       }
     }
   },
@@ -239,12 +239,12 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       link_social: {
-        label: "Link Social Account"
+        label: "Vincular cuenta social"
       },
       unlink_account: {
-        label: "Unlink Account",
+        label: "Desvincular cuenta",
         confirmText: "Unlink this identity link? The user will no longer be able to sign in with this provider until they re-link it from their account settings.",
-        successMessage: "Identity link removed"
+        successMessage: "Vínculo de identidad eliminado"
       }
     }
   },
@@ -376,9 +376,9 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "Miembro eliminado"
       },
       transfer_ownership: {
-        label: "Transfer Ownership",
+        label: "Transferir propiedad",
         confirmText: "Transfer ownership of this organization to the selected member? You will be demoted to admin and lose owner-only privileges.",
-        successMessage: "Ownership transferred"
+        successMessage: "Propiedad transferida"
       }
     }
   },
@@ -460,13 +460,13 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "Invitación reenviada"
       },
       accept_invitation: {
-        label: "Accept Invitation",
-        successMessage: "Invitation accepted"
+        label: "Aceptar invitación",
+        successMessage: "Invitación aceptada"
       },
       reject_invitation: {
-        label: "Decline Invitation",
+        label: "Rechazar invitación",
         confirmText: "Decline this invitation? The inviter will be notified and you will need a new invitation to join.",
-        successMessage: "Invitation declined"
+        successMessage: "Invitación rechazada"
       }
     }
   },
@@ -780,7 +780,7 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
         successMessage: "2FA deshabilitado"
       },
       regenerate_backup_codes: {
-        label: "Regenerate Backup Codes",
+        label: "Regenerar códigos de respaldo",
         confirmText: "Regenerate backup codes? All previous backup codes will stop working immediately."
       }
     }
@@ -1023,7 +1023,7 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
         label: "Register OAuth Application"
       },
       rotate_client_secret: {
-        label: "Rotate Client Secret",
+        label: "Rotar Client Secret",
         confirmText: "Rotate this OAuth client's secret? The previous secret will stop working immediately and any integrations using it will break until they are updated with the new secret. The new secret is shown only once."
       },
       delete_oauth_application: {
@@ -1235,22 +1235,22 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       activate_role: {
-        label: "Activate Role",
-        successMessage: "Role activated"
+        label: "Activar rol",
+        successMessage: "Rol activado"
       },
       deactivate_role: {
-        label: "Deactivate Role",
+        label: "Desactivar rol",
         confirmText: "Deactivate this role? Users with the role keep their assignment but the role stops granting permissions until re-activated.",
-        successMessage: "Role deactivated"
+        successMessage: "Rol desactivado"
       },
       set_default_role: {
-        label: "Set as Default",
+        label: "Establecer como predeterminado",
         confirmText: "Make this the default role for new users? Existing users are unaffected.",
-        successMessage: "Default role updated"
+        successMessage: "Rol predeterminado actualizado"
       },
       clone_role: {
-        label: "Clone Role",
-        successMessage: "Role cloned"
+        label: "Clonar rol",
+        successMessage: "Rol clonado"
       }
     }
   },
@@ -1315,17 +1315,17 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       activate_permission_set: {
-        label: "Activate",
-        successMessage: "Permission set activated"
+        label: "Activar",
+        successMessage: "Conjunto de permisos activado"
       },
       deactivate_permission_set: {
-        label: "Deactivate",
+        label: "Desactivar",
         confirmText: "Deactivate this permission set? Existing assignments stay in place but stop granting access until re-activated.",
-        successMessage: "Permission set deactivated"
+        successMessage: "Conjunto de permisos desactivado"
       },
       clone_permission_set: {
-        label: "Clone",
-        successMessage: "Permission set cloned"
+        label: "Clonar",
+        successMessage: "Conjunto de permisos clonado"
       }
     }
   },
@@ -1954,12 +1954,12 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
     },
     _actions: {
       mark_read: {
-        label: "Mark as Read",
-        successMessage: "Notification marked as read"
+        label: "Marcar como leído",
+        successMessage: "Notificación marcada como leída"
       },
       mark_unread: {
-        label: "Mark as Unread",
-        successMessage: "Notification marked as unread"
+        label: "Marcar como no leído",
+        successMessage: "Notificación marcada como no leída"
       }
     }
   },
