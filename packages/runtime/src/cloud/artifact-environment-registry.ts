@@ -227,14 +227,31 @@ async function createDriver(driverType: string, databaseUrl: string, authToken: 
             // node_modules layout). Self-host installs that need Turso
             // must `npm install @objectstack/driver-turso` from the cloud
             // package (or use the published version) before booting.
+            // pnpm symlinks `@objectstack/runtime` into the host app's
+            // node_modules but Node's ESM resolver follows the file's
+            // realpath, which lives under framework/packages/runtime — from
+            // there `@objectstack/driver-turso` (which lives in cloud/) is
+            // invisible. We resolve explicitly from the host process cwd
+            // (apps/objectos at runtime), which can see the cloud package
+            // via its workspace:* dependency.
             let TursoDriver: any;
             try {
                 ({ TursoDriver } = await import('@objectstack/driver-turso' as any));
-            } catch (err: any) {
-                throw new Error(
-                    `[ArtifactEnvironmentRegistry] libsql/turso driver requested but @objectstack/driver-turso is not installed. ` +
-                    `Install it from the cloud monorepo (cloud/packages/driver-turso) or via npm. (${err?.message ?? err})`,
-                );
+            } catch (primaryErr: any) {
+                try {
+                    const { createRequire } = await import('node:module');
+                    const path = await import('node:path');
+                    const url = await import('node:url');
+                    const hostRequire = createRequire(path.join(process.cwd(), 'noop.js'));
+                    const resolved = hostRequire.resolve('@objectstack/driver-turso');
+                    ({ TursoDriver } = await import(url.pathToFileURL(resolved).href));
+                } catch (fallbackErr: any) {
+                    throw new Error(
+                        `[ArtifactEnvironmentRegistry] libsql/turso driver requested but @objectstack/driver-turso is not resolvable. ` +
+                        `Install it from the cloud monorepo (cloud/packages/driver-turso) or via npm. ` +
+                        `(primary: ${primaryErr?.message ?? primaryErr}; fallback: ${fallbackErr?.message ?? fallbackErr})`,
+                    );
+                }
             }
             return new TursoDriver({ url: databaseUrl, authToken }) as unknown as IDataDriver;
         }
