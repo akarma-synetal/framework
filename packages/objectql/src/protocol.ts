@@ -13,14 +13,14 @@ import type {
 } from '@objectstack/spec/api';
 import type { MetadataCacheRequest, MetadataCacheResponse, ServiceInfo, ApiRoutes, WellKnownCapabilities } from '@objectstack/spec/api';
 import type { IFeedService } from '@objectstack/spec/contracts';
-import { parseFilterAST, isFilterAST, objectForm, fieldForm, hookForm, ObjectSchema, FieldSchema, HookSchema } from '@objectstack/spec/data';
+import { parseFilterAST, isFilterAST, ObjectSchema, FieldSchema, HookSchema } from '@objectstack/spec/data';
 import { PLURAL_TO_SINGULAR, SINGULAR_TO_PLURAL } from '@objectstack/spec/shared';
-import { ListViewSchema, FormViewSchema, DashboardSchema, AppSchema, PageSchema, ReportSchema, ActionSchema, reportForm, viewForm, appForm, dashboardForm, actionForm, pageForm, type FormView } from '@objectstack/spec/ui';
-import { RoleSchema, roleForm } from '@objectstack/spec/identity';
-import { PermissionSetSchema, permissionForm } from '@objectstack/spec/security';
-import { EmailTemplateSchema, emailTemplateForm, JobSchema } from '@objectstack/spec/system';
-import { ToolSchema, SkillSchema, AgentSchema, agentForm, toolForm, skillForm } from '@objectstack/spec/ai';
-import { FlowSchema, WorkflowRuleSchema, ApprovalProcessSchema, flowForm, workflowForm, approvalForm } from '@objectstack/spec/automation';
+import { ListViewSchema, FormViewSchema, DashboardSchema, AppSchema, PageSchema, ReportSchema, ActionSchema, type FormView } from '@objectstack/spec/ui';
+import { RoleSchema } from '@objectstack/spec/identity';
+import { PermissionSetSchema } from '@objectstack/spec/security';
+import { EmailTemplateSchema, JobSchema, METADATA_FORM_REGISTRY } from '@objectstack/spec/system';
+import { ToolSchema, SkillSchema, AgentSchema } from '@objectstack/spec/ai';
+import { FlowSchema, WorkflowRuleSchema, ApprovalProcessSchema } from '@objectstack/spec/automation';
 import { DEFAULT_METADATA_TYPE_REGISTRY } from '@objectstack/spec/kernel';
 import { z } from 'zod';
 
@@ -55,37 +55,15 @@ const TYPE_TO_SCHEMA: Record<string, z.ZodTypeAny> = {
 };
 
 /**
- * Canonical {@link FormView} layout per metadata type. Populated alongside
- * {@link TYPE_TO_SCHEMA} and surfaced as `entry.form` from {@link getMetaTypes}
- * so the generic form renderer in `@object-ui/plugin-form` can lay the
- * editor out as sections/tabs/wizards with widget hints instead of falling
- * back to a flat property list.
+ * Canonical {@link FormView} layout per metadata type. Sourced from the
+ * shared {@link METADATA_FORM_REGISTRY} in `@objectstack/spec/system` so
+ * the runtime form payload, the i18n extractor, and Studio all read from
+ * a single source of truth.
  *
- * Types without an entry here render with the auto-generated single-section
- * layout derived from their JSON Schema (acceptable for simple types like
- * `role`, `permission`, `email_template`).
+ * Types without an entry render with the auto-generated single-section
+ * layout derived from their JSON Schema (acceptable for simple types).
  */
-const TYPE_TO_FORM: Record<string, FormView> = {
-    object: objectForm,
-    field: fieldForm,
-    hook: hookForm,
-    report: reportForm,
-    view: viewForm,
-    app: appForm,
-    dashboard: dashboardForm,
-    role: roleForm,
-    action: actionForm,
-    page: pageForm,
-    agent: agentForm,
-    tool: toolForm,
-    skill: skillForm,
-    flow: flowForm,
-    workflow: workflowForm,
-    approval: approvalForm,
-    permission: permissionForm,
-    profile: permissionForm,
-    email_template: emailTemplateForm,
-};
+const TYPE_TO_FORM: Readonly<Record<string, FormView>> = METADATA_FORM_REGISTRY;
 
 /**
  * Convert a Zod schema to a JSON Schema, returning `undefined` if conversion
