@@ -25,6 +25,7 @@ export * from './integration/index.js';
 export * from './metadata/index.js';
 export * from './system/index.js';
 export * from './apps/index.js';
+export * from './pages/index.js';
 
 /** Runtime plugin contributing platform-default translation bundles. */
 export { PlatformObjectsPlugin, createPlatformObjectsPlugin } from './plugin.js';

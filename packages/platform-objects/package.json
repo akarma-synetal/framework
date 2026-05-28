@@ -46,6 +46,11 @@
       "import": "./dist/apps/index.mjs",
       "require": "./dist/apps/index.js"
     },
+    "./pages": {
+      "types": "./dist/pages/index.d.ts",
+      "import": "./dist/pages/index.mjs",
+      "require": "./dist/pages/index.js"
+    },
     "./metadata-translations": {
       "types": "./dist/metadata-translations/index.d.ts",
       "import": "./dist/metadata-translations/index.mjs",

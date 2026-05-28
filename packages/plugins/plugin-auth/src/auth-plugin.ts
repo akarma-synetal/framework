@@ -9,6 +9,7 @@ import {
   ACCOUNT_APP,
   SystemOverviewDashboard,
 } from '@objectstack/platform-objects/apps';
+import { SysOrganizationDetailPage } from '@objectstack/platform-objects/pages';
 import { AuthManager } from './auth-manager.js';
 import {
   authIdentityObjects,
@@ -142,6 +143,11 @@ export class AuthPlugin implements Plugin {
       // owner of its registration since it loads first among the trio
       // (auth + security + audit) that supplies the underlying objects.
       apps: [SETUP_APP, STUDIO_APP, ACCOUNT_APP],
+      // Slotted record-detail pages for system objects — currently
+      // sys_organization gets a Members / Invitations / Teams tab strip
+      // (see SysOrganizationDetailPage for the rationale and the
+      // intentionally-omitted OAuth / SSO tabs).
+      pages: [SysOrganizationDetailPage],
       // List views for each Setup-nav object are defined on the schema
       // itself via the canonical `listViews` map (e.g.
       // sys_user.listViews.{all_users,unverified,two_factor}). Registering

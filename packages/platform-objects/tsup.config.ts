@@ -12,6 +12,7 @@ export default defineConfig({
     'metadata/index': 'src/metadata/index.ts',
     'system/index': 'src/system/index.ts',
     'apps/index': 'src/apps/index.ts',
+    'pages/index': 'src/pages/index.ts',
     'metadata-translations/index': 'src/metadata-translations/index.ts',
     plugin: 'src/plugin.ts',
   },
