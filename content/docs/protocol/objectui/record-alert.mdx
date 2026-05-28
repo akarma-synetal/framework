@@ -1,0 +1,151 @@
+---
+title: record:alert — Conditional Banners on Record Pages
+description: Surface contextual notices (unverified email, expired trial, locked account…) at the top of any record page using the slotted page schema.
+---
+
+import { AlertTriangle, Info, CheckCircle2, XCircle } from 'lucide-react';
+
+`record:alert` is a UI renderer for **slotted record pages**. It produces a banner-style notice (think Salesforce Lightning info bar) anchored between the page header and the highlights strip. Use it any time you need to draw the user's attention to a state that needs action — without forcing them to hunt for the relevant control.
+
+Common use cases:
+
+- Unverified email reminder on the user record page.
+- Expired-trial warning on the org record page.
+- Locked-account banner that explains why the user can't sign in.
+- Compliance disclosure ("This record is governed by SOC2 retention policy").
+
+## Schema
+
+```ts
+{
+  type: 'record:alert',
+  properties: {
+    severity?: 'info' | 'warning' | 'error' | 'success',   // default 'info'
+    title?: string,
+    body?: string,
+    icon?: string,                                          // lucide icon name (overrides severity default)
+    visible?: string | { dialect, source } | boolean,       // CEL/template predicate
+    action?: {
+      actionName: string,                                   // resolves from the object's actions[]
+      label?: string,                                       // overrides action.label
+      variant?: 'default' | 'destructive' | 'outline' | 'ghost' | 'link',
+    },
+    dismissible?: boolean,                                  // X button in top-right
+    dismissKey?: string,                                    // localStorage key suffix; defaults to title
+  }
+}
+```
+
+## Where it mounts
+
+`record:alert` is registered as a slot component in the slotted page schema. Add it to the `alerts` slot of your `*.page.ts`:
+
+```ts
+import { definePage } from '@objectstack/spec';
+
+export default definePage({
+  name: 'sys_user_record',
+  object: 'sys_user',
+  type: 'record',
+  slots: {
+    alerts: [
+      {
+        type: 'record:alert',
+        properties: {
+          severity: 'warning',
+          icon: 'mail',
+          title: '邮箱未验证',
+          body: '验证你的邮箱以接收密码重置和重要的系统通知。',
+          visible: 'record.id == ctx.user.id && record.email_verified == false',
+          action: {
+            actionName: 'resend_verification_email',
+            label: '重新发送验证邮件',
+          },
+          dismissible: false,
+        },
+      },
+    ],
+    // …other slots: highlights, sections, …
+  },
+});
+```
+
+The `alerts` slot is rendered between the page header (`header/actions`) and the highlights strip — the standard enterprise UX placement for contextual notices.
+
+## Visibility predicate
+
+The `visible` predicate uses the same CEL pipeline every `<ActionButton>` and `<ActionBar>` does. The evaluation scope exposes:
+
+| Identifier | Source |
+|:---|:---|
+| `record` | The loaded record (e.g. `record.email_verified`) |
+| `user` | The authenticated user (also available as `ctx.user`) |
+| `objectName` | The current object name |
+| `ctx.*` | Mirror namespace (canonical) — `ctx.user.id`, `ctx.record.id`, … |
+
+Examples:
+
+```ts
+visible: 'record.id == ctx.user.id && record.email_verified == false'
+visible: 'record.status == "locked"'
+visible: 'record.trial_expires_at != null && record.trial_expires_at < now()'
+```
+
+Rules:
+
+- A missing predicate → always visible.
+- An empty record (page still loading) → hidden, so you never see a flash of stale alert before data arrives.
+- A predicate that throws → hidden (same behavior as action visibility).
+
+## CTA wiring
+
+The optional `action.actionName` resolves against the object's `actions[]` (the same array that backs `record:quick_actions`). When clicked, the renderer dispatches through `useActionEngine`, which means the action inherits:
+
+- Confirm dialog (`confirmText`)
+- Param collection (`params: [...]`)
+- Toast notifications (`successMessage`, `errorMessage`)
+- Navigation / reload (`refreshAfter`, `navigate`)
+- Result dialog (`resultDialog`)
+
+…from the surrounding `<ActionProvider>` — the exact same pipeline as the Lightning-style buttons in the page header. No need to re-declare handlers.
+
+## Severity → defaults
+
+| Severity | Default icon | Tailwind palette | ARIA role |
+|:---|:---|:---|:---|
+| `info` | `Info` | sky blue | `status` (polite live region) |
+| `warning` | `AlertTriangle` | amber | `status` (polite live region) |
+| `success` | `CheckCircle2` | emerald | `status` (polite live region) |
+| `error` | `AlertCircle` | destructive red | `alert` (assertive live region) |
+
+Override the icon by passing `properties.icon` with any lucide icon name.
+
+## Dismissible alerts
+
+Set `dismissible: true` to render the X button in the top-right corner. The dismissed state persists in `localStorage` under:
+
+```
+os.record-alert:<objectName>:<recordId>:<dismissKey || title>
+```
+
+The key is scoped to the **(object, record)** pair so:
+
+- Dismissing the unverified-email alert on user A does **not** silence it for user B.
+- Dismissing it on the current record does **not** silence the same alert on a different record an admin views afterward.
+
+Pick a stable `dismissKey` when the title is i18n'd — otherwise translation changes invalidate the dismiss state.
+
+## When to choose `record:alert` vs other primitives
+
+| Need | Use |
+|:---|:---|
+| One-line warning at the top of a record page | **`record:alert`** |
+| Toolbar/menu with multiple related actions | `record:quick_actions` |
+| Read-only status badge in the header | `record:highlights` |
+| Validation error on a specific field | `field:*` `errors` slot |
+| App-wide notice (across all pages) | App-level banner plugin (not metadata-driven) |
+
+## Related
+
+- [`record:quick_actions`](./actions) — action toolbar that pairs naturally with `record:alert` (the alert nudges the user; the toolbar lets them act).
+- [`ui/page.zod.ts`](../../references/ui/page) — the slotted page schema definition, including the `alerts` slot.
