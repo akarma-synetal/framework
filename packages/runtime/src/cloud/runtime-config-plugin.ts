@@ -108,12 +108,25 @@ export class RuntimeConfigPlugin implements Plugin {
                 let defaultEnvironmentId: string | undefined;
                 let defaultOrgId: string | undefined;
                 let resolvedSingleEnv = this.singleEnvironment;
-                if (envRegistry && host && typeof envRegistry.resolveHostname === 'function') {
+                // EnvironmentDriverRegistry exposes `resolveByHostname()`;
+                // older code paths used `resolveHostname()` on the client.
+                // Accept either so production runtimes (which register the
+                // ArtifactEnvironmentRegistry implementing `resolveByHostname`)
+                // don't silently no-op and leave the SPA showing the env
+                // picker on per-subdomain pages.
+                const resolveFn: ((h: string) => Promise<any>) | null =
+                    typeof envRegistry?.resolveByHostname === 'function'
+                        ? envRegistry.resolveByHostname.bind(envRegistry)
+                        : typeof envRegistry?.resolveHostname === 'function'
+                            ? envRegistry.resolveHostname.bind(envRegistry)
+                            : null;
+                if (resolveFn && host) {
                     try {
-                        const resolved = await envRegistry.resolveHostname(host);
+                        const resolved = await resolveFn(host);
                         if (resolved?.environmentId) {
-                            defaultEnvironmentId = resolved.environmentId;
-                            if (resolved.organizationId) defaultOrgId = String(resolved.organizationId);
+                            defaultEnvironmentId = String(resolved.environmentId);
+                            const orgId = resolved.organizationId ?? resolved.organization_id;
+                            if (orgId) defaultOrgId = String(orgId);
                             // Each subdomain is one environment from the
                             // operator's POV: surface as single-environment
                             // so the SPA hides multi-env affordances.
