@@ -381,8 +381,11 @@ export class AuthManager {
               relatedId: user.id,
             });
           } catch (err: any) {
-            console.error(`[AuthManager] sendResetPassword failed: ${err?.message ?? err}`);
-            throw err;
+            // Do NOT rethrow: the user account exists; an email-transport failure
+            // (missing template, bad credentials, network blip) must not turn
+            // the user-facing reset request into a 500. The user can retry via
+            // the "forgot password" flow.
+            console.error(`[AuthManager] sendResetPassword failed (swallowed): ${err?.message ?? err}`);
           }
         },
         };
@@ -423,8 +426,10 @@ export class AuthManager {
                 relatedId: user.id,
               });
             } catch (err: any) {
-              console.error(`[AuthManager] sendVerificationEmail failed: ${err?.message ?? err}`);
-              throw err;
+              // Do NOT rethrow: the user account exists; an email-transport
+              // failure must not turn signup or /send-verification-email into
+              // a 500. The "Resend verification email" UI lets the user retry.
+              console.error(`[AuthManager] sendVerificationEmail failed (swallowed): ${err?.message ?? err}`);
             }
           },
         },
@@ -790,8 +795,10 @@ export class AuthManager {
               relatedId: invitation.id,
             });
           } catch (err: any) {
-            console.error(`[AuthManager] sendInvitationEmail failed: ${err?.message ?? err}`);
-            throw err;
+            // Do NOT rethrow: the invitation row was already persisted by
+            // better-auth; an email-transport failure must not turn the
+            // invite request into a 500. The admin can resend the invite.
+            console.error(`[AuthManager] sendInvitationEmail failed (swallowed): ${err?.message ?? err}`);
           }
         },
       }));
