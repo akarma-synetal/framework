@@ -563,7 +563,16 @@ export class AuthPlugin implements Plugin {
     // this case (`oauthProviderAuthServerMetadata` /
     // `oauthProviderOpenIdConfigMetadata`) which we mount here so external
     // OIDC clients can discover the IdP at the canonical paths.
-    if (this.options.plugins?.oidcProvider) {
+    //
+    // Honour the same `OS_OIDC_PROVIDER_ENABLED` env-var override that
+    // `AuthManager.buildPlugins()` uses — without this check the
+    // discovery routes would NOT mount when an operator flipped the
+    // env var on without editing the config file, leaving external
+    // OIDC clients unable to discover the IdP.
+    const oidcEnv = (globalThis as any)?.process?.env?.OS_OIDC_PROVIDER_ENABLED;
+    const oidcFromEnv = oidcEnv != null ? String(oidcEnv).toLowerCase() === 'true' : undefined;
+    const oidcEnabled = oidcFromEnv ?? this.options.plugins?.oidcProvider ?? false;
+    if (oidcEnabled) {
       void this.registerOidcDiscoveryRoutes(rawApp, ctx).catch((error) => {
         ctx.logger.error('Failed to register OIDC discovery routes', error as Error);
       });

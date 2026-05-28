@@ -159,6 +159,20 @@ export const SysOauthApplication = ObjectSchema.create({
   ],
 
   listViews: {
+    mine: {
+      type: 'grid',
+      name: 'mine',
+      label: 'My Applications',
+      data: { provider: 'object', object: 'sys_oauth_application' },
+      columns: ['name', 'client_id', 'type', 'disabled', 'created_at'],
+      // Self-service Account view — scope to the signed-in user's own
+      // registrations so they don't see other developers' apps. Admins
+      // get the unfiltered `active` / `disabled_apps` / `all_apps` views
+      // via the Setup → OAuth Applications nav.
+      filter: [{ field: 'user_id', operator: 'equals', value: '{current_user_id}' }],
+      sort: [{ field: 'created_at', order: 'desc' }],
+      pagination: { pageSize: 50 },
+    },
     active: {
       type: 'grid',
       name: 'active',

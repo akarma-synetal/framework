@@ -592,12 +592,20 @@ export class AuthManager {
     // (in @object-ui/app-shell) calls `/api/v1/auth/organization/list` on
     // every load; making the org plugin opt-out (default true) avoids
     // 404s and the noisy "Failed to load organizations" warning.
+    //
+    // `OS_OIDC_PROVIDER_ENABLED` lets operators flip the OIDC IdP on
+    // without re-deploying with a code change (mirrors the
+    // `OS_MULTI_ORG_ENABLED` / `OS_DISABLE_SIGNUP` pattern). When set, the
+    // env var WINS over the config-file setting so platform operators can
+    // override per-environment without touching the application bundle.
+    const oidcEnv = (globalThis as any)?.process?.env?.OS_OIDC_PROVIDER_ENABLED;
+    const oidcFromEnv = oidcEnv != null ? String(oidcEnv).toLowerCase() === 'true' : undefined;
     const enabled = {
       organization: pluginConfig.organization ?? true,
       twoFactor: pluginConfig.twoFactor ?? false,
       passkeys: pluginConfig.passkeys ?? false,
       magicLink: pluginConfig.magicLink ?? false,
-      oidcProvider: pluginConfig.oidcProvider ?? false,
+      oidcProvider: oidcFromEnv ?? pluginConfig.oidcProvider ?? false,
       deviceAuthorization: pluginConfig.deviceAuthorization ?? false,
       admin: pluginConfig.admin ?? false,
     };
@@ -1250,13 +1258,19 @@ export class AuthManager {
     const termsUrl = resolveLegalUrl(rawTermsUrl, DEFAULT_TERMS_URL);
     const privacyUrl = resolveLegalUrl(rawPrivacyUrl, DEFAULT_PRIVACY_URL);
 
+    // OIDC Provider — same env-var override as in `buildPlugins()`. The
+    // /auth/config response MUST match what's actually wired, otherwise the
+    // frontend will render UI for endpoints that 404.
+    const oidcEnv = (globalThis as any)?.process?.env?.OS_OIDC_PROVIDER_ENABLED;
+    const oidcFromEnv = oidcEnv != null ? String(oidcEnv).toLowerCase() === 'true' : undefined;
+
     const features = {
       twoFactor: pluginConfig.twoFactor ?? false,
       passkeys: pluginConfig.passkeys ?? false,
       magicLink: pluginConfig.magicLink ?? false,
       organization: pluginConfig.organization ?? true,
       multiOrgEnabled,
-      oidcProvider: pluginConfig.oidcProvider ?? false,
+      oidcProvider: oidcFromEnv ?? pluginConfig.oidcProvider ?? false,
       deviceAuthorization: pluginConfig.deviceAuthorization ?? false,
       ...(termsUrl ? { termsUrl } : {}),
       ...(privacyUrl ? { privacyUrl } : {}),

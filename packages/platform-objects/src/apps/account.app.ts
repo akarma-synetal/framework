@@ -161,6 +161,7 @@ export const ACCOUNT_APP: App = {
           type: 'object',
           label: 'OAuth Applications',
           objectName: 'sys_oauth_application',
+          viewName: 'mine',
           icon: 'app-window',
           requiresObject: 'sys_oauth_application',
         },
