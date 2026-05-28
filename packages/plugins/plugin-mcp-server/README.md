@@ -297,12 +297,12 @@ Configure in Cline settings:
 // server.ts
 import { defineStack } from '@objectstack/spec';
 import { PluginMCPServer } from '@objectstack/plugin-mcp-server';
-import { DriverTurso } from '@objectstack/driver-turso';
+import { DriverSql } from '@objectstack/driver-sql';
 
 const stack = defineStack({
-  driver: DriverTurso.configure({
-    url: process.env.DATABASE_URL!,
-    authToken: process.env.TURSO_AUTH_TOKEN!,
+  driver: DriverSql.configure({
+    client: 'better-sqlite3',
+    connection: { filename: process.env.DATABASE_URL ?? './data/app.db' },
   }),
   plugins: [
     PluginMCPServer.configure({
@@ -319,7 +319,7 @@ await stack.boot();
 
 ```typescript
 const stack = defineStack({
-  driver: DriverTurso.configure({ /* ... */ }),
+  driver: DriverSql.configure({ /* ... */ }),
   plugins: [
     PluginMCPServer.configure({
       serverName: 'my-crm',

@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_packages_latest
 
 ## Requirements
 
-- A driver plugin that registers an `IDataEngine` under the service name `'objectql'` with `execute()` support — typically [`@objectstack/driver-sql`](../../plugins/driver-sql) or [`@objectstack/driver-turso`](../../plugins/driver-turso). `@objectstack/driver-memory` can be used for tests but does not persist across restarts.
+- A driver plugin that registers an `IDataEngine` under the service name `'objectql'` with `execute()` support — typically [`@objectstack/driver-sql`](../../plugins/driver-sql). `@objectstack/driver-memory` can be used for tests but does not persist across restarts. (ObjectStack Cloud additionally ships `@objectstack/driver-turso` for edge/multi-tenant.)
 
 ## When to use
 
@@ -111,7 +111,7 @@ CREATE INDEX IF NOT EXISTS idx_packages_latest
 
 - [`@objectstack/core`](../../core) — kernel hosting this plugin.
 - [`@objectstack/spec`](../../spec) — provides `ObjectStackManifest` and `IDataEngine` contracts.
-- [`@objectstack/driver-sql`](../../plugins/driver-sql), [`@objectstack/driver-turso`](../../plugins/driver-turso) — supply the `'objectql'` service.
+- [`@objectstack/driver-sql`](../../plugins/driver-sql) — supplies the `'objectql'` service. (ObjectStack Cloud also ships `@objectstack/driver-turso`.)
 
 ## Links
 

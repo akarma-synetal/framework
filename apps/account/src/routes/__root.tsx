@@ -63,7 +63,16 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const pub = isPublic(location.pathname);
-  const fullscreenAuthed = location.pathname.startsWith('/oauth/');
+  // Authed routes that should still render fullscreen without the
+  // TopBar + Sidebar chrome. The post-signup "create your first
+  // organization" wizard should feel like a follow-on auth step
+  // (login → register → create org), not a settings panel —
+  // wrapping it in the account chrome (sidebar, breadcrumbs) hints
+  // the user already has a workspace, which is the opposite of true
+  // at that moment.
+  const fullscreenAuthed =
+    location.pathname.startsWith('/oauth/') ||
+    location.pathname === '/organizations/new';
   const hasOwner = useBootstrapStatus();
   const onSetup = location.pathname === '/setup';
 

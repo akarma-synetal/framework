@@ -10,7 +10,6 @@
  *
  * Auto-detects the appropriate driver from the database URL scheme:
  *   - `memory://*`              → InMemoryDriver
- *   - `libsql://`, `https://`   → TursoDriver
  *   - `postgres[ql]://`, `pg://` → SqlDriver (pg)
  *   - `mongodb[+srv]://`        → MongoDBDriver (peer-dep `@objectstack/driver-mongodb`)
  *   - `file:` / no scheme       → SqlDriver (better-sqlite3)
@@ -18,6 +17,11 @@
  * Unknown URL schemes throw — we never silently fall back to sqlite, since
  * that historically created bogus directories on disk (e.g. `mongodb:/`)
  * when an unsupported URL was treated as a file path.
+ *
+ * NOTE: `libsql://` / Turso support is provided by `@objectstack/driver-turso`,
+ * which ships separately in the ObjectStack Cloud distribution. The open-core
+ * runtime no longer dispatches `libsql://` URLs; cloud builds register the
+ * Turso driver via their own stack composition (`cloud-stack.ts`).
  */
 
 import { resolve as resolvePath } from 'node:path';
@@ -51,7 +55,7 @@ export function resolveObjectStackHome(): string {
 export const StandaloneStackConfigSchema = z.object({
     databaseUrl: z.string().optional(),
     databaseAuthToken: z.string().optional(),
-    databaseDriver: z.enum(['sqlite', 'sqlite-wasm', 'turso', 'memory', 'postgres', 'mongodb']).optional(),
+    databaseDriver: z.enum(['sqlite', 'sqlite-wasm', 'memory', 'postgres', 'mongodb']).optional(),
     environmentId: z.string().optional(),
     artifactPath: z.string().optional(),
     /**
@@ -86,11 +90,10 @@ export interface StandaloneStackResult {
     manifest?: any;
 }
 
-type ResolvedDriverKind = 'memory' | 'turso' | 'postgres' | 'mongodb' | 'sqlite' | 'sqlite-wasm';
+type ResolvedDriverKind = 'memory' | 'postgres' | 'mongodb' | 'sqlite' | 'sqlite-wasm';
 
 function detectDriverFromUrl(dbUrl: string): ResolvedDriverKind {
     if (/^memory:\/\//i.test(dbUrl)) return 'memory';
-    if (/^(libsql|https?):\/\//i.test(dbUrl)) return 'turso';
     if (/^(postgres(ql)?|pg):\/\//i.test(dbUrl)) return 'postgres';
     if (/^mongodb(\+srv)?:\/\//i.test(dbUrl)) return 'mongodb';
     if (/^wasm-sqlite:\/\//i.test(dbUrl)) return 'sqlite-wasm';
@@ -100,7 +103,7 @@ function detectDriverFromUrl(dbUrl: string): ResolvedDriverKind {
     if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(dbUrl)) return 'sqlite';
     throw new Error(
         `[StandaloneStack] Unsupported database URL scheme: ${dbUrl}. ` +
-        `Supported schemes: memory://, libsql://, https://, postgres://, pg://, mongodb://, mongodb+srv://, file:`
+        `Supported schemes: memory://, postgres://, pg://, mongodb://, mongodb+srv://, file:`
     );
 }
 
@@ -131,9 +134,9 @@ export async function createStandaloneStack(config?: StandaloneStackConfig): Pro
             : (cfg.projectRoot
                 ? `file:${resolvePath(cfg.projectRoot, '.objectstack/data/standalone.db')}`
                 : `file:${resolvePath(resolveObjectStackHome(), 'data/standalone.db')}`));
-    const dbAuthToken = cfg.databaseAuthToken
-        ?? process.env.OS_DATABASE_AUTH_TOKEN?.trim()
-        ?? process.env.TURSO_AUTH_TOKEN?.trim();
+    // `databaseAuthToken` / `OS_DATABASE_AUTH_TOKEN` are preserved in the
+    // config schema for cloud builds that compose their own turso driver;
+    // the standalone (open-core) runtime no longer consumes them directly.
     const explicitDriver = cfg.databaseDriver
         ?? (process.env.OS_DATABASE_DRIVER?.trim() as ResolvedDriverKind | undefined);
     const dbDriver: ResolvedDriverKind = explicitDriver ?? detectDriverFromUrl(dbUrl);
@@ -142,20 +145,6 @@ export async function createStandaloneStack(config?: StandaloneStackConfig): Pro
     if (dbDriver === 'memory') {
         const { InMemoryDriver } = await import('@objectstack/driver-memory');
         driverPlugin = new DriverPlugin(new InMemoryDriver());
-    } else if (dbDriver === 'turso') {
-        let TursoDriver: any;
-        try {
-            ({ TursoDriver } = await import('@objectstack/driver-turso'));
-        } catch (err: any) {
-            throw new Error(
-                `[StandaloneStack] libsql/turso URL detected ("${dbUrl}") but @objectstack/driver-turso is not installed. ` +
-                `Install it with: npm install @objectstack/driver-turso  (or use a file: URL to default to better-sqlite3). ` +
-                `(${err?.message ?? err})`
-            );
-        }
-        driverPlugin = new DriverPlugin(
-            new TursoDriver({ url: dbUrl, authToken: dbAuthToken }) as any,
-        );
     } else if (dbDriver === 'postgres') {
         const { SqlDriver } = await import('@objectstack/driver-sql');
         driverPlugin = new DriverPlugin(

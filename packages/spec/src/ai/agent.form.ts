@@ -12,6 +12,7 @@ export const agentForm = defineForm({
   type: 'simple',
   sections: [
     {
+      name: 'identity',
       label: 'Identity',
       description: 'How users see and reference this agent.',
       columns: 2,
@@ -24,6 +25,7 @@ export const agentForm = defineForm({
       ],
     },
     {
+      name: 'ai_configuration',
       label: 'AI Configuration',
       description: 'Model selection, instructions, planning, and memory.',
       fields: [
@@ -35,6 +37,7 @@ export const agentForm = defineForm({
       ],
     },
     {
+      name: 'capabilities',
       label: 'Capabilities',
       description: 'Skills, tools, and knowledge sources the agent can use.',
       fields: [
@@ -44,6 +47,7 @@ export const agentForm = defineForm({
       ],
     },
     {
+      name: 'access',
       label: 'Access & Security',
       description: 'Who can use this agent and what safeguards apply.',
       collapsible: true,

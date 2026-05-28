@@ -106,7 +106,7 @@ describe('EnvironmentArtifactManifestSchema', () => {
   it('accepts plugins, drivers and engine constraints', () => {
     const parsed = EnvironmentArtifactManifestSchema.parse({
       plugins: [{ id: '@objectstack/plugin-auth', version: '^3.0.0' }],
-      drivers: [{ id: '@objectstack/driver-turso' }],
+      drivers: [{ id: '@objectstack/driver-sql' }],
       engine: { objectstack: '>=3.0.0' },
     });
     expect(parsed.plugins?.[0].id).toBe('@objectstack/plugin-auth');

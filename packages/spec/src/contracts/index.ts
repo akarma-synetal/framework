@@ -46,7 +46,6 @@ export * from './knowledge-adapter.js';
 export * from './embedder.js';
 
 // Provisioning & Deployment
-export * from './turso-platform.js';
 export * from './provisioning-service.js';
 export * from './schema-diff-service.js';
 export * from './deploy-pipeline-service.js';

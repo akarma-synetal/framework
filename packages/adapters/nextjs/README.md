@@ -58,7 +58,7 @@ export const { find, findOne, create, update, remove } = createServerActions({ k
 
 ## Edge vs Node
 
-- Default runtime is Node.js. To use Edge, export `runtime = 'edge'` from the route file and pair with an edge-compatible driver ([`@objectstack/driver-turso`](../../plugins/driver-turso)).
+- Default runtime is Node.js. Edge runtimes need an edge-compatible driver (ObjectStack Cloud ships `@objectstack/driver-turso` for that case).
 - `HttpDispatcher` is isomorphic; the adapter emits `NextResponse` which works in both runtimes.
 
 ## When to use

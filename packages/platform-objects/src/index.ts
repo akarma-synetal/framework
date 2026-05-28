@@ -25,3 +25,8 @@ export * from './integration/index.js';
 export * from './metadata/index.js';
 export * from './system/index.js';
 export * from './apps/index.js';
+
+/** Runtime plugin contributing platform-default translation bundles. */
+export { PlatformObjectsPlugin, createPlatformObjectsPlugin } from './plugin.js';
+/** Default i18n bundle for metadata-type configuration forms. */
+export { MetadataFormsTranslations } from './metadata-translations/index.js';

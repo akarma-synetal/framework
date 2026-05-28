@@ -574,24 +574,6 @@ export default class Serve extends Command {
              trackPlugin('MySQLDriver');
              resolvedDriverLabel = 'SqlDriver(mysql2)';
              resolvedDatabaseUrl = databaseUrl;
-           } else if (driverType === 'turso' || driverType === 'libsql') {
-             let TursoDriver: any;
-             try {
-               ({ TursoDriver } = await import('@objectstack/driver-turso'));
-             } catch (err: any) {
-               throw new Error(
-                 `libsql/turso driver selected but @objectstack/driver-turso is not installed. ` +
-                 `Install it with: npm install @objectstack/driver-turso  (or use a file: URL to default to better-sqlite3). ` +
-                 `(${err?.message ?? err})`
-               );
-             }
-             await kernel.use(new DriverPlugin(new TursoDriver({
-               url: databaseUrl ?? 'file:./local.db',
-               authToken: process.env.OS_DATABASE_AUTH_TOKEN,
-             } as any) as any));
-             trackPlugin('TursoDriver');
-             resolvedDriverLabel = 'TursoDriver';
-             resolvedDatabaseUrl = databaseUrl ?? 'file:./local.db';
            } else if (isDev) {
              // Default in dev: in-memory driver
              const { InMemoryDriver } = await import('@objectstack/driver-memory');
@@ -962,7 +944,28 @@ export default class Serve extends Command {
         }
       }
 
-      // 5c. Auto-register AuthPlugin (and paired Security/Audit) when the
+      // 5c. Auto-register PlatformObjectsPlugin so platform-default
+      // translation bundles (Setup App + metadata-type configuration
+      // forms shipped by @objectstack/platform-objects) are contributed
+      // into the kernel's i18n service. Without this, Setup nav labels
+      // and metadata-admin form labels fall back to English literals
+      // even when Accept-Language requests another locale.
+      const hasPlatformObjectsPlugin = plugins.some(
+        (p: any) => p?.name === 'com.objectstack.platform-objects'
+          || p?.constructor?.name === 'PlatformObjectsPlugin'
+      );
+      if (!hasPlatformObjectsPlugin) {
+        try {
+          const platformPkg = '@objectstack/platform-objects/plugin';
+          const { PlatformObjectsPlugin } = await import(/* webpackIgnore: true */ platformPkg);
+          await kernel.use(new PlatformObjectsPlugin());
+          trackPlugin('PlatformObjects');
+        } catch (err: any) {
+          console.warn(chalk.yellow(`  ⚠ PlatformObjectsPlugin auto-inject failed: ${err?.message ?? err}`));
+        }
+      }
+
+      // 5d. Auto-register AuthPlugin (and paired Security/Audit) when the
       // 'auth' tier is enabled and no auth plugin is already configured.
       // The Account portal expects /api/v1/auth/* to be served by
       // better-auth via @objectstack/plugin-auth. Without this block,

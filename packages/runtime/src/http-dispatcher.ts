@@ -1860,7 +1860,7 @@ export class HttpDispatcher {
                     return {
                         handled: true,
                         response: this.error(
-                            'No ObjectQL driver is registered. Register at least one DriverPlugin (e.g. InMemoryDriver or TursoDriver).',
+                            'No ObjectQL driver is registered. Register at least one DriverPlugin (e.g. InMemoryDriver or SqlDriver).',
                             503,
                         ),
                     };

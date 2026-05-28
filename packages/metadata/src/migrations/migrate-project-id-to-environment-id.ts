@@ -56,7 +56,8 @@ export async function migrateProjectIdToEnvironmentId(
     if (typeof driverAny.raw !== 'function') {
         throw new Error(
             'migrateProjectIdToEnvironmentId: driver must expose a .raw(sql, bindings?) method. ' +
-            'SqlDriver (better-sqlite3/knex) and TursoDriver both support this.'
+            'migrateProjectIdToEnvironmentId: driver must expose a .raw(sql, bindings?) method. ' +
+            'SqlDriver (better-sqlite3/knex) supports this; cloud-side TursoDriver also conforms.'
         );
     }
 

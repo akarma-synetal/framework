@@ -207,6 +207,58 @@ export const TranslationDataSchema = lazySchema(() => z.object({
   })).optional().describe('Settings manifest translations keyed by namespace'),
 
   /**
+   * Translations for **metadata-type configuration forms** — the forms
+   * used by admins to author objects, fields, agents, flows, etc. in the
+   * Studio metadata editor.
+   *
+   * Keyed by metadata type (singular: 'object', 'field', 'agent', …).
+   *
+   * Convention (auto-resolved by `resolveMetadataFormLabels` /
+   * `resolveMetadataTypeLabel`):
+   *   metadataForms.<type>.label
+   *   metadataForms.<type>.description
+   *   metadataForms.<type>.sections.<section_name>.label
+   *   metadataForms.<type>.sections.<section_name>.description
+   *   metadataForms.<type>.fields.<field_path>.label
+   *   metadataForms.<type>.fields.<field_path>.helpText
+   *   metadataForms.<type>.fields.<field_path>.placeholder
+   *
+   * `field_path` uses dot-notation for nested composite/repeater fields,
+   * e.g. `"name"`, `"capabilities.trackHistory"`,
+   * `"fields.items.label"` (a repeater "fields" → row → "label" sub-field).
+   *
+   * @example
+   * ```ts
+   * metadataForms: {
+   *   object: {
+   *     label: '对象',
+   *     sections: {
+   *       basics: { label: '基础信息' },
+   *       capabilities: { label: '功能开关' },
+   *     },
+   *     fields: {
+   *       name: { label: '名称', helpText: 'snake_case 唯一标识符（创建后不可修改）' },
+   *       'capabilities.trackHistory': { label: '历史追踪' },
+   *     },
+   *   },
+   * }
+   * ```
+   */
+  metadataForms: z.record(z.string(), z.object({
+    label: z.string().optional().describe('Translated metadata-type display label (overrides registry label)'),
+    description: z.string().optional().describe('Translated metadata-type description'),
+    sections: z.record(z.string(), z.object({
+      label: z.string().optional().describe('Translated section label'),
+      description: z.string().optional().describe('Translated section description'),
+    })).optional().describe('Section translations keyed by section.name'),
+    fields: z.record(z.string(), z.object({
+      label: z.string().optional().describe('Translated field label'),
+      helpText: z.string().optional().describe('Translated field help/hint text'),
+      placeholder: z.string().optional().describe('Translated field placeholder text'),
+    })).optional().describe('Field translations keyed by field path (dot-notation for nested fields)'),
+  })).optional().describe('Translations for metadata-type configuration forms keyed by metadata type'),
+
+  /**
    * Cross-namespace strings used by the Settings UI shell — source
    * badges, inheritance chips, lock reasons, common actions. Resolved
    * via the `resolveSettingsCommon*` helpers in `i18n-resolver.ts`.

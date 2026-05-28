@@ -10,6 +10,7 @@ export const objectForm = defineForm({
   type: 'simple',
   sections: [
     {
+      name: 'basics',
       label: 'Basics',
       description: 'Identity, labels, and taxonomy.',
       columns: 2,
@@ -26,6 +27,7 @@ export const objectForm = defineForm({
       ],
     },
     {
+      name: 'fields',
       label: 'Fields',
       description: 'Define the data model — each row becomes a column in the database table.',
       fields: [
@@ -46,6 +48,7 @@ export const objectForm = defineForm({
       ],
     },
     {
+      name: 'capabilities',
       label: 'Capabilities',
       description: 'System features and API exposure.',
       collapsible: true,
@@ -70,6 +73,7 @@ export const objectForm = defineForm({
       ],
     },
     {
+      name: 'advanced',
       label: 'Advanced',
       description: 'State machines, actions, and storage.',
       collapsible: true,

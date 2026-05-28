@@ -15,7 +15,6 @@ export default defineConfig({
     '@objectstack/driver-memory',
     '@objectstack/driver-sql',
     '@objectstack/driver-sqlite-wasm',
-    '@objectstack/driver-turso',
     '@objectstack/driver-mongodb',
     '@objectstack/metadata',
     '@objectstack/objectql',

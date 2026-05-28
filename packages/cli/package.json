@@ -60,6 +60,7 @@
     "@objectstack/plugin-security": "workspace:*",
     "@objectstack/plugin-sharing": "workspace:*",
     "@objectstack/plugin-webhooks": "workspace:*",
+    "@objectstack/platform-objects": "workspace:*",
     "@objectstack/rest": "workspace:*",
     "@objectstack/runtime": "workspace:^",
     "@objectstack/service-ai": "workspace:*",
@@ -86,13 +87,7 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "@objectstack/core": "workspace:^",
-    "@objectstack/driver-turso": "workspace:^"
-  },
-  "peerDependenciesMeta": {
-    "@objectstack/driver-turso": {
-      "optional": true
-    }
+    "@objectstack/core": "workspace:^"
   },
   "devDependencies": {
     "@oclif/plugin-help": "^6.2.49",

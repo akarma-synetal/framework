@@ -595,6 +595,13 @@ export const FormFieldSchema: z.ZodType<any> = lazySchema(() => z.object({
  * Form Layout Section
  */
 export const FormSectionSchema = lazySchema(() => z.object({
+  /**
+   * Stable identifier for translation lookup. snake_case convention.
+   * When provided, translation bundles can target this section's `label`
+   * and `description` via `metadataForms.<type>.sections.<name>`.
+   * Optional for backward-compat with sections that only have a `label`.
+   */
+  name: z.string().optional().describe('Stable section identifier for i18n lookup (snake_case)'),
   label: I18nLabelSchema.optional(),
   description: z.string().optional().describe('Optional description rendered under the section header.'),
   collapsible: z.boolean().default(false),

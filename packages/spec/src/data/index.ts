@@ -39,6 +39,3 @@ export * from './feed.zod';
 
 // Subscription Protocol
 export * from './subscription.zod';
-
-// Turso Multi-Tenant Driver
-export * from './driver/turso-multi-tenant.zod';

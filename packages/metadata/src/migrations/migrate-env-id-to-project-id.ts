@@ -45,7 +45,7 @@ export async function migrateEnvIdToProjectId(driver: IDataDriver): Promise<Migr
     if (typeof driverAny.raw !== 'function') {
         throw new Error(
             'migrateEnvIdToProjectId: driver must expose a .raw(sql, bindings?) method. ' +
-            'SqlDriver (better-sqlite3/knex) and TursoDriver both support this.'
+            'SqlDriver (better-sqlite3/knex) supports this; cloud-side TursoDriver also conforms.'
         );
     }
 

@@ -7,7 +7,7 @@
  * Manages the complete tenant lifecycle: create → active → suspend → resume → destroy.
  *
  * The provisioning service orchestrates:
- * 1. Turso database creation via ITursoPlatformService
+ * 1. Tenant database creation (e.g. via a Turso platform client in cloud builds)
  * 2. Schema synchronization via ISchemaDiffService
  * 3. Seed data population
  * 4. Tenant record registration in the control plane

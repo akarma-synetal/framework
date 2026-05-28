@@ -40,14 +40,6 @@
   "optionalDependencies": {
     "@objectstack/driver-mongodb": "workspace:*"
   },
-  "peerDependencies": {
-    "@objectstack/driver-turso": "workspace:^"
-  },
-  "peerDependenciesMeta": {
-    "@objectstack/driver-turso": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"

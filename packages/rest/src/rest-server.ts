@@ -884,6 +884,42 @@ export class RestServer {
     }
 
     /**
+     * Translate the `entries` payload returned by `getMetaTypes()` — applies
+     * the active locale to each entry's `label`, `description`, and the
+     * nested `form` layout (section labels, field labels, helpText,
+     * placeholders) via `metadataForms.<type>` translation namespace.
+     *
+     * No-ops when no i18n service / locale / matching bundle entry exists,
+     * so this is safe to call unconditionally from the `/meta` handler.
+     */
+    private async translateMetaTypesResponse(req: any, environmentId: string | undefined, payload: any): Promise<any> {
+        if (!payload || typeof payload !== 'object' || !Array.isArray(payload.entries)) return payload;
+        const i18n = await this.resolveI18nService(environmentId, req);
+        const bundle = this.buildTranslationBundle(i18n);
+        if (!bundle) return payload;
+        const locale = this.extractLocale(req, i18n);
+        if (!locale) return payload;
+        const {
+            resolveMetadataTypeLabel,
+            resolveMetadataTypeDescription,
+            resolveMetadataFormLabels,
+        } = await import('@objectstack/spec/system');
+        const opts = { locale } as const;
+        const entries = payload.entries.map((entry: any) => {
+            if (!entry || typeof entry !== 'object' || typeof entry.type !== 'string') return entry;
+            const next: any = { ...entry };
+            next.label = resolveMetadataTypeLabel(bundle, entry.type, entry.label ?? entry.type, opts);
+            const desc = resolveMetadataTypeDescription(bundle, entry.type, entry.description, opts);
+            if (desc !== undefined) next.description = desc;
+            if (entry.form) {
+                next.form = resolveMetadataFormLabels(entry.form, entry.type, bundle, opts);
+            }
+            return next;
+        });
+        return { ...payload, entries };
+    }
+
+    /**
      * Pull the request hostname (without port) from a Node-style `req` or
      * a Fetch-style request wrapper. Returns undefined when no Host header
      * is available.
@@ -1360,7 +1396,9 @@ export class RestServer {
                         const environmentId = isScoped ? req.params?.environmentId : undefined;
                         const p = await this.resolveProtocol(environmentId, req);
                         const types = await p.getMetaTypes();
-                        res.json(types);
+                        const translated = await this.translateMetaTypesResponse(req, environmentId, types);
+                        res.header('Vary', 'Accept-Language');
+                        res.json(translated);
                     } catch (error: any) {
                         logError("[REST] Unhandled error:", error);
                         sendError(res, error);

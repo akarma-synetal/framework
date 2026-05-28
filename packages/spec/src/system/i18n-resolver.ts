@@ -580,3 +580,210 @@ export function resolveSettingsSourceLabel(
   }
   return fallback;
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// MetadataForms — metadata-type configuration form resolvers
+// ────────────────────────────────────────────────────────────────────────────
+//
+// Translates the `form` payload returned by `getMetaTypes()` (the editor
+// layout for authoring objects/fields/agents/flows/etc.) against the
+// `metadataForms.<type>` namespace of the active translation bundle.
+//
+// Naming conventions:
+//
+//   metadataForms.<type>.label                          -- type display label
+//   metadataForms.<type>.description                    -- type description
+//   metadataForms.<type>.sections.<section_name>.label  -- section header
+//   metadataForms.<type>.sections.<section_name>.description
+//   metadataForms.<type>.fields.<field_path>.label      -- field label
+//   metadataForms.<type>.fields.<field_path>.helpText
+//   metadataForms.<type>.fields.<field_path>.placeholder
+//
+// `field_path` is dot-notation for nested fields. Top-level form fields use
+// just the field name (e.g. `"name"`, `"description"`). Composite and
+// repeater children are addressed via parent path:
+//
+//   "capabilities.trackHistory"  // composite "capabilities" → "trackHistory"
+//   "fields.items.label"         // repeater "fields" → row → "label"
+//
+// All helpers are pure (immutable) — they return a new form object with
+// the translated branches when matches exist, or the input unchanged when
+// no bundle / no locale match.
+
+function lookupMetadataForm(
+  bundle: TranslationBundle | undefined,
+  type: string,
+  opts?: ResolveOptions,
+): { entry: any; locale: string } | undefined {
+  if (!bundle) return undefined;
+  for (const code of localeChain(opts)) {
+    const entry = pickData(bundle, code)?.metadataForms?.[type];
+    if (entry && typeof entry === 'object') return { entry, locale: code };
+  }
+  return undefined;
+}
+
+function lookupMetadataFormSection(
+  bundle: TranslationBundle | undefined,
+  type: string,
+  sectionName: string,
+  attr: 'label' | 'description',
+  opts?: ResolveOptions,
+): string | undefined {
+  if (!bundle) return undefined;
+  for (const code of localeChain(opts)) {
+    const candidate = pickData(bundle, code)?.metadataForms?.[type]?.sections?.[sectionName]?.[attr];
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  return undefined;
+}
+
+function lookupMetadataFormField(
+  bundle: TranslationBundle | undefined,
+  type: string,
+  fieldPath: string,
+  attr: 'label' | 'helpText' | 'placeholder',
+  opts?: ResolveOptions,
+): string | undefined {
+  if (!bundle) return undefined;
+  for (const code of localeChain(opts)) {
+    const candidate = pickData(bundle, code)?.metadataForms?.[type]?.fields?.[fieldPath]?.[attr];
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  return undefined;
+}
+
+/**
+ * Resolve the display label for a metadata type.
+ * Falls back to the literal label (typically the English label from
+ * `DEFAULT_METADATA_TYPE_REGISTRY`) when no translation is available.
+ */
+export function resolveMetadataTypeLabel(
+  bundle: TranslationBundle | undefined,
+  type: string,
+  fallback: string,
+  opts?: ResolveOptions,
+): string {
+  if (!bundle) return fallback;
+  for (const code of localeChain(opts)) {
+    const candidate = pickData(bundle, code)?.metadataForms?.[type]?.label;
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  return fallback;
+}
+
+/**
+ * Resolve the description for a metadata type, returning the literal
+ * (possibly `undefined`) when no translation is available.
+ */
+export function resolveMetadataTypeDescription(
+  bundle: TranslationBundle | undefined,
+  type: string,
+  fallback: string | undefined,
+  opts?: ResolveOptions,
+): string | undefined {
+  if (!bundle) return fallback;
+  for (const code of localeChain(opts)) {
+    const candidate = pickData(bundle, code)?.metadataForms?.[type]?.description;
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  return fallback;
+}
+
+/**
+ * Translate a single form-field node, walking into nested
+ * composite/repeater children. `parentPath` is the dot-notation prefix
+ * accumulated from ancestor field names.
+ */
+function translateFormField(
+  field: any,
+  type: string,
+  bundle: TranslationBundle | undefined,
+  parentPath: string,
+  opts?: ResolveOptions,
+): any {
+  // Legacy: bare-string field reference. Nothing to translate.
+  if (typeof field === 'string') return field;
+  if (!field || typeof field !== 'object') return field;
+
+  const name = typeof field.field === 'string' ? field.field : undefined;
+  const path = name ? (parentPath ? `${parentPath}.${name}` : name) : parentPath;
+
+  const next: any = { ...field };
+  if (path) {
+    const tLabel = lookupMetadataFormField(bundle, type, path, 'label', opts);
+    if (tLabel) next.label = tLabel;
+    const tHelp = lookupMetadataFormField(bundle, type, path, 'helpText', opts);
+    if (tHelp) next.helpText = tHelp;
+    const tPlaceholder = lookupMetadataFormField(bundle, type, path, 'placeholder', opts);
+    if (tPlaceholder) next.placeholder = tPlaceholder;
+  }
+
+  // Recurse into composite / repeater sub-fields. The `fields` array on
+  // a FormField mirrors the section's `fields` array shape, so reuse the
+  // same walker. Children inherit the parent path via dot-notation.
+  if (Array.isArray(field.fields)) {
+    next.fields = field.fields.map((child: any) =>
+      translateFormField(child, type, bundle, path, opts),
+    );
+  }
+
+  return next;
+}
+
+/**
+ * Translate the labels, descriptions, helpTexts, and placeholders of a
+ * metadata-type configuration form against the active translation bundle.
+ *
+ * Sections without a stable `name` are returned unchanged for section-level
+ * attributes — only field labels are translated (field names are always
+ * stable identifiers).
+ *
+ * Returns a new form object; the input is not mutated.
+ *
+ * @example
+ * ```ts
+ * const localized = resolveMetadataFormLabels(objectForm, 'object', bundle, { locale: 'zh-CN' });
+ * ```
+ */
+export function resolveMetadataFormLabels<T extends Record<string, any>>(
+  form: T,
+  type: string,
+  bundle: TranslationBundle | undefined,
+  opts?: ResolveOptions,
+): T {
+  if (!form || typeof form !== 'object') return form;
+  // Cheap escape hatch: if no bundle entry exists for this type at any
+  // locale in the chain, return the form unchanged to avoid the allocation
+  // cost of the recursive walker.
+  if (!lookupMetadataForm(bundle, type, opts)) return form;
+
+  const translateSection = (section: any): any => {
+    if (!section || typeof section !== 'object') return section;
+    const next: any = { ...section };
+    const sectionName: string | undefined =
+      typeof section.name === 'string' ? section.name : undefined;
+    if (sectionName) {
+      const tLabel = lookupMetadataFormSection(bundle, type, sectionName, 'label', opts);
+      if (tLabel) next.label = tLabel;
+      const tDesc = lookupMetadataFormSection(bundle, type, sectionName, 'description', opts);
+      if (tDesc) next.description = tDesc;
+    }
+    if (Array.isArray(section.fields)) {
+      next.fields = section.fields.map((f: any) =>
+        translateFormField(f, type, bundle, '', opts),
+      );
+    }
+    return next;
+  };
+
+  const next: any = { ...form };
+  if (Array.isArray(form.sections)) {
+    next.sections = form.sections.map(translateSection);
+  }
+  // Legacy alias — some forms use `groups` instead of `sections`.
+  if (Array.isArray(form.groups)) {
+    next.groups = form.groups.map(translateSection);
+  }
+  return next as T;
+}

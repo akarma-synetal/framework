@@ -19,6 +19,7 @@ export const viewForm = defineForm({
   type: 'simple',
   sections: [
     {
+      name: 'basics',
       label: 'Basics',
       description: 'Identity and primary surface.',
       columns: 2,
@@ -31,6 +32,7 @@ export const viewForm = defineForm({
       ],
     },
     {
+      name: 'columns_filters',
       label: 'Columns & filters',
       description: 'What rows show and how users filter them.',
       fields: [
@@ -42,6 +44,7 @@ export const viewForm = defineForm({
       ],
     },
     {
+      name: 'table_options',
       label: 'Table options',
       description: 'Grid-only display options.',
       visibleOn: "data.type == 'grid' || data.type == null",
@@ -59,42 +62,49 @@ export const viewForm = defineForm({
       ],
     },
     {
+      name: 'kanban',
       label: 'Kanban',
       description: 'Kanban-specific board configuration.',
       visibleOn: "data.type == 'kanban'",
       fields: [{ field: 'kanban', type: 'composite' }],
     },
     {
+      name: 'calendar',
       label: 'Calendar',
       description: 'Calendar-specific configuration.',
       visibleOn: "data.type == 'calendar'",
       fields: [{ field: 'calendar', type: 'composite' }],
     },
     {
+      name: 'gantt',
       label: 'Gantt',
       description: 'Gantt-specific configuration.',
       visibleOn: "data.type == 'gantt'",
       fields: [{ field: 'gantt', type: 'composite' }],
     },
     {
+      name: 'gallery',
       label: 'Gallery',
       description: 'Gallery-specific configuration.',
       visibleOn: "data.type == 'gallery'",
       fields: [{ field: 'gallery', type: 'composite' }],
     },
     {
+      name: 'timeline',
       label: 'Timeline',
       description: 'Timeline-specific configuration.',
       visibleOn: "data.type == 'timeline'",
       fields: [{ field: 'timeline', type: 'composite' }],
     },
     {
+      name: 'chart',
       label: 'Chart',
       description: 'Chart-specific configuration.',
       visibleOn: "data.type == 'chart'",
       fields: [{ field: 'chart', type: 'composite' }],
     },
     {
+      name: 'navigation_sharing',
       label: 'Navigation & sharing',
       description: 'Where this view appears and who can see it.',
       collapsible: true,

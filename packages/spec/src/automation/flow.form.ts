@@ -12,6 +12,7 @@ export const flowForm = defineForm({
   type: 'simple',
   sections: [
     {
+      name: 'basics',
       label: 'Basics',
       description: 'Flow identity and how it starts.',
       columns: 2,
@@ -24,6 +25,7 @@ export const flowForm = defineForm({
       ],
     },
     {
+      name: 'canvas',
       label: 'Canvas',
       description: 'Nodes, edges, and flow variables — consider the visual designer for complex flows.',
       fields: [
@@ -43,6 +45,7 @@ export const flowForm = defineForm({
       ],
     },
     {
+      name: 'execution',
       label: 'Execution',
       description: 'Deployment status, identity, and error handling.',
       collapsible: true,

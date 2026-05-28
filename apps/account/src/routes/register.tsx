@@ -96,11 +96,30 @@ function RegisterPage() {
         return;
       }
       if (organizations.length > 1) {
+        // Single-tenant deployments only ever have one org per user, so a
+        // multi-org user is by definition multi-tenant — fall through to
+        // the picker. (If single-tenant somehow produced this state, the
+        // picker is still the safe landing.)
         navigate({ to: '/organizations' });
         return;
       }
-      // No orgs at all — the user needs to create one.
-      navigate({ to: '/organizations/new' });
+      // No orgs at all.
+      // - Single-tenant: the platform either auto-binds users on register
+      //   or the deployment is misconfigured. Either way, sending the
+      //   user to `/organizations/new` or `/organizations` is wrong —
+      //   the wizard is gated off and the list is empty. Hand off to
+      //   home (or the original redirect) and let the platform decide
+      //   what to show.
+      // - Multi-tenant: surface the create-org dialog.
+      if (features?.multiOrgEnabled === false) {
+        if (isSafeRedirect(redirect)) {
+          window.location.assign(resolveRedirect(redirect));
+        } else {
+          window.location.assign('/');
+        }
+        return;
+      }
+      navigate({ to: '/organizations/new', search: redirect ? { redirect } : {} });
       return;
     }
 
@@ -121,6 +140,7 @@ function RegisterPage() {
     organizationsFetched,
     autoSelectingOrg,
     setActiveOrganization,
+    features?.multiOrgEnabled,
   ]);
 
   const handleSubmit = async (e: React.FormEvent) => {

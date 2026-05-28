@@ -12,6 +12,7 @@ export const fieldForm = defineForm({
   type: 'simple',
   sections: [
     {
+      name: 'basics',
       label: 'Basics',
       description: 'Core field identity and constraints.',
       columns: 2,
@@ -27,6 +28,7 @@ export const fieldForm = defineForm({
       ],
     },
     {
+      name: 'configuration',
       label: 'Configuration',
       description: 'Field-type specific settings (visible blocks depend on the chosen type).',
       fields: [
@@ -48,6 +50,7 @@ export const fieldForm = defineForm({
       ],
     },
     {
+      name: 'formula',
       label: 'Formula & Computed',
       description: 'Calculated values and roll-up summaries.',
       collapsible: true,
@@ -59,6 +62,7 @@ export const fieldForm = defineForm({
       ],
     },
     {
+      name: 'advanced',
       label: 'Advanced',
       description: 'Database, UI, audit, and security settings.',
       collapsible: true,
