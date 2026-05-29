@@ -1136,7 +1136,18 @@ export class MetadataManager implements IMetadataService {
 
   /**
    * Validate a metadata item against its type schema.
-   * Returns validation result with errors and warnings.
+   *
+   * NOTE: This is a lightweight structural check (presence of `name`,
+   * basic shape). The authoritative spec validation lives in
+   * `protocol.saveMetaItem` (write path) and is surfaced on read
+   * paths via the `_diagnostics` envelope attached by
+   * `protocol.getMetaItems` / `getMetaItem`. Both delegate to
+   * `getMetadataTypeSchema()` — the single source of truth. We
+   * deliberately do NOT run the full Zod schema here because
+   * `MetadataManager`'s registry stores *publish envelopes*
+   * (`{name, packageId, state, metadata: {...spec}}`), not raw spec
+   * documents — running spec validation against the envelope would
+   * yield false negatives.
    */
   async validate(_type: string, data: unknown): Promise<MetadataValidationResult> {
     // Basic structural validation

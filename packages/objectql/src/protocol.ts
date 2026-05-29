@@ -19,6 +19,12 @@ import { type FormView } from '@objectstack/spec/ui';
 import { METADATA_FORM_REGISTRY } from '@objectstack/spec/system';
 import { DEFAULT_METADATA_TYPE_REGISTRY, getMetadataTypeSchema } from '@objectstack/spec/kernel';
 import { z } from 'zod';
+import {
+    computeMetadataDiagnostics,
+    decorateMetadataItem,
+    decorateMetadataItems,
+    type MetadataDiagnostics,
+} from './metadata-diagnostics.js';
 
 /**
  * Canonical Zod schema per metadata type lives in
@@ -950,6 +956,87 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         return { types: allTypes, entries };
     }
 
+    /**
+     * Sweep all (or filtered) metadata types and report entries that
+     * fail spec validation. Powers the Studio governance view
+     * (`GET /api/v1/meta/diagnostics`) and `os doctor`-style CLI
+     * checks.
+     *
+     * `severity` defaults to `'error'` — only entries with at least
+     * one Zod error issue are returned. `'warning'` includes
+     * everything we surface (warnings are reserved for a future lint
+     * layer on top of spec validation).
+     *
+     * `type` may be either a singular (`'view'`) or plural (`'views'`)
+     * identifier; the underlying `getMetaItems` already normalises.
+     *
+     * Implementation note: leverages the `_diagnostics` already
+     * decorated onto items by `getMetaItems()` to avoid running
+     * `safeParse()` twice. For types whose schema is unregistered we
+     * skip silently (they cannot be validated and should not appear
+     * as "valid" either — they are simply opaque to this report).
+     */
+    async getMetaDiagnostics(request: {
+        type?: string;
+        severity?: 'error' | 'warning';
+        organizationId?: string;
+        packageId?: string;
+    } = {}): Promise<{
+        entries: Array<{ type: string; name: string; diagnostics: MetadataDiagnostics }>;
+        total: number;
+        scannedTypes: number;
+        scannedItems: number;
+    }> {
+        const includeWarnings = request.severity === 'warning';
+        const targetTypes = request.type
+            ? [request.type]
+            : DEFAULT_METADATA_TYPE_REGISTRY
+                .filter((e) => getMetadataTypeSchema(e.type))
+                .map((e) => e.type);
+
+        const entries: Array<{ type: string; name: string; diagnostics: MetadataDiagnostics }> = [];
+        let scannedItems = 0;
+
+        for (const t of targetTypes) {
+            let listed: any;
+            try {
+                listed = await this.getMetaItems({
+                    type: t,
+                    organizationId: request.organizationId,
+                    packageId: request.packageId,
+                } as any);
+            } catch {
+                // Type not listable in this kernel scope — skip.
+                continue;
+            }
+            const items: any[] = Array.isArray(listed?.items)
+                ? listed.items
+                : Array.isArray(listed)
+                    ? listed
+                    : [];
+            for (const item of items) {
+                scannedItems += 1;
+                const diag: MetadataDiagnostics | undefined =
+                    item?._diagnostics ?? computeMetadataDiagnostics(t, item);
+                if (!diag) continue;
+                if (diag.valid && !includeWarnings) continue;
+                if (diag.valid && includeWarnings && !diag.warnings?.length) continue;
+                entries.push({
+                    type: t,
+                    name: typeof item?.name === 'string' ? item.name : '<unknown>',
+                    diagnostics: diag,
+                });
+            }
+        }
+
+        return {
+            entries,
+            total: entries.length,
+            scannedTypes: targetTypes.length,
+            scannedItems,
+        };
+    }
+
     async getMetaItems(request: { type: string; packageId?: string; organizationId?: string }) {
         const { packageId } = request;
         let items: unknown[] = [];
@@ -1092,7 +1179,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
 
         return {
             type: request.type,
-            items
+            items: decorateMetadataItems(request.type, items as any[]),
         };
     }
 
@@ -1156,7 +1243,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 err.status = 404;
                 throw err;
             }
-            return { type: request.type, name: request.name, item };
+            return { type: request.type, name: request.name, item: decorateMetadataItem(request.type, item) };
         }
 
         // 2. MetadataService (runtime-registered items: HMR-updated view/page/
@@ -1214,7 +1301,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         return {
             type: request.type,
             name: request.name,
-            item
+            item: decorateMetadataItem(request.type, item),
         };
     }
 

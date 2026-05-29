@@ -448,7 +448,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
 
             // Registry value is still returned (no overlay row exists),
             // but sys_metadata MUST have been queried.
-            expect(result.item).toEqual(sampleApp);
+            expect(result.item).toMatchObject(sampleApp);
             expect(mockEngine.findOne).toHaveBeenCalledWith('sys_metadata', expect.objectContaining({
                 where: expect.objectContaining({ type: 'app', name: 'test_app', state: 'active' }),
             }));
@@ -460,7 +460,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
 
             const result = await protocol.getMetaItem({ type: 'app', name: 'test_app' });
 
-            expect(result.item).toEqual(sampleApp);
+            expect(result.item).toMatchObject(sampleApp);
         });
 
         it('should return overlay row content from DB when present', async () => {
@@ -473,7 +473,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
 
             const result = await protocol.getMetaItem({ type: 'app', name: 'test_app' });
 
-            expect(result.item).toEqual(sampleApp);
+            expect(result.item).toMatchObject(sampleApp);
             expect(mockEngine.findOne).toHaveBeenCalledWith('sys_metadata', {
                 where: { type: 'app', name: 'test_app', state: 'active', organization_id: null }
             });
@@ -508,7 +508,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
 
             const result = await protocol.getMetaItem({ type: 'app', name: 'test_app' });
 
-            expect(result.item).toEqual(sampleApp);
+            expect(result.item).toMatchObject(sampleApp);
             expect(mockEngine.findOne).toHaveBeenCalledTimes(2);
         });
 
@@ -556,7 +556,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
 
             const result = await protocolWithService.getMetaItem({ type: 'view', name: 'case' });
 
-            expect(result.item).toEqual(fresh);
+            expect(result.item).toMatchObject(fresh);
             expect(metadataService.get).toHaveBeenCalledWith('view', 'case');
         });
 
@@ -577,7 +577,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
 
             const result = await protocolWithService.getMetaItem({ type: 'view', name: 'case' });
 
-            expect(result.item).toEqual(fromRegistry);
+            expect(result.item).toMatchObject(fromRegistry);
         });
 
         it('should parse metadata JSON string from DB record', async () => {
@@ -591,7 +591,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
 
             const result = await protocol.getMetaItem({ type: 'object', name: 'complex' });
 
-            expect(result.item).toEqual(complexData);
+            expect(result.item).toMatchObject(complexData);
         });
 
         it('should handle metadata already parsed as object from DB', async () => {
@@ -604,7 +604,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
 
             const result = await protocol.getMetaItem({ type: 'app', name: 'test_app' });
 
-            expect(result.item).toEqual(sampleApp);
+            expect(result.item).toMatchObject(sampleApp);
         });
     });
 
@@ -643,7 +643,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
             const result = await protocol.getMetaItems({ type: 'app' });
 
             expect(result.items).toHaveLength(1);
-            expect(result.items[0]).toEqual(sampleApp);
+            expect(result.items[0]).toMatchObject(sampleApp);
             expect(mockEngine.find).toHaveBeenCalledWith('sys_metadata', {
                 where: { type: 'app', state: 'active', organization_id: null }
             });
@@ -730,7 +730,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
 
             expect(result.items).toHaveLength(1);
             // Overlay wins; the artifact baseline must NOT overwrite it.
-            expect(result.items[0]).toEqual(overlayDashboard);
+            expect(result.items[0]).toMatchObject(overlayDashboard);
             expect(metadataService.list).toHaveBeenCalledWith('dashboard');
         });
     });
@@ -1059,7 +1059,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
 
             const result = await scoped.getMetaItem({ type: 'hook', name: 'my_runtime_hook' });
 
-            expect(result.item).toEqual(userHook);
+            expect(result.item).toMatchObject(userHook);
             // The first call must query sys_metadata — proves the read
             // path consults the DB regardless of supportsOverlay:false.
             expect(mockEngine.findOne).toHaveBeenCalledWith(

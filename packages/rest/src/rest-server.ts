@@ -1470,6 +1470,50 @@ export class RestServer {
             });
         }
 
+        // GET /meta/diagnostics - Cross-type spec-validation sweep
+        //
+        // Returns every metadata entry that fails its registered Zod
+        // schema, scoped to the environment (and optionally org /
+        // package) of the request. Powers the Studio governance
+        // dashboard and `os doctor`-style CLI checks.
+        //
+        // Registered BEFORE `/meta/:type` so the `diagnostics` segment
+        // is not captured as a `:type` parameter.
+        if (metadata.endpoints.items !== false) {
+            this.routeManager.register({
+                method: 'GET',
+                path: `${metaPath}/diagnostics`,
+                handler: async (req: any, res: any) => {
+                    try {
+                        const environmentId = isScoped ? req.params?.environmentId : undefined;
+                        const p = await this.resolveProtocol(environmentId, req);
+                        if (typeof (p as any).getMetaDiagnostics !== 'function') {
+                            res.status(501).json({
+                                error: 'not_implemented',
+                                message: 'protocol.getMetaDiagnostics() is not available in this kernel',
+                            });
+                            return;
+                        }
+                        const severityParam = (req.query?.severity as string | undefined) ?? 'error';
+                        const severity = severityParam === 'warning' ? 'warning' : 'error';
+                        const result = await (p as any).getMetaDiagnostics({
+                            type: (req.query?.type as string | undefined) || undefined,
+                            severity,
+                            packageId: (req.query?.package as string | undefined) || undefined,
+                        });
+                        res.json(result);
+                    } catch (error: any) {
+                        logError("[REST] Unhandled error:", error);
+                        sendError(res, error);
+                    }
+                },
+                metadata: {
+                    summary: 'List metadata entries that fail spec validation',
+                    tags: ['metadata'],
+                },
+            });
+        }
+
         // GET /meta/:type - List items of a type
         if (metadata.endpoints.items !== false) {
             this.routeManager.register({
