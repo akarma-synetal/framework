@@ -384,7 +384,7 @@ page is the *management* surface.
 ### 9.5 Enable / disable hides metadata from the console
 
 `PATCH /api/v1/packages/:id/disable` (and `/enable`) flips the package's
-`enabled`/`status` flags **in memory** (not persisted across restart). A
+`enabled`/`status` flags and **persists the choice across restarts** (§9.7). A
 disabled package's metadata must stop surfacing in the console (app switcher,
 view lists, dashboards, …). This is enforced in two layers of the read path:
 
@@ -400,15 +400,45 @@ view lists, dashboards, …). This is enforced in two layers of the read path:
    pass.
 
 Disable is reversible and non-destructive: items stay registered and reappear
-on enable. (Persisting disable state across restarts is deferred.)
+on enable. Disable state survives restarts (§9.7).
 
-### 9.6 Known gaps / deferred
+### 9.6 `tools` / `skills` round-trip on export & import
 
-- **`tools` / `skills` are exported but not consumed on import** —
-  `engine.registerApp` does not yet iterate those plural keys. Documented gap.
+Export (`assemblePackageManifest`) is driven by the canonical
+`PLURAL_TO_SINGULAR` map, and import consumption by
+`engine.registerApp`'s `metadataArrayKeys`. Both now include `tools` (→ `tool`)
+and `skills` (→ `skill`), and `PLURAL_TO_SINGULAR` gained those entries (so the
+reverse `SINGULAR_TO_PLURAL` and export round-trip them automatically).
+`ObjectStackDefinition` also gained a top-level `tools` field next to `agents`
+and `skills` for authoring completeness. This covers **metadata** round-trip and
+visibility (`getMetaItems('tool' | 'skill')`); turning an imported tool
+definition into an *executable* `ToolRegistry` entry (handler wiring) is a
+deeper AI-runtime concern and remains out of scope.
+
+### 9.7 Persisting package disable state across restarts
+
+The `SchemaRegistry` is rebuilt from the compiled artifact on every boot (always
+enabled), so disable state would otherwise be lost. Persistence is local-first:
+
+1. `SchemaRegistry.setInitialDisabledPackageIds(ids)` seeds a set of ids that
+   `installPackage` honors — any package whose id is in the set is installed in
+   the `disabled` state. Because the set lives on the registry for its lifetime,
+   **every** registration path (boot artifact, marketplace rehydrate, local
+   import) honors it uniformly — no fragile post-boot re-application hook.
+2. `packages/runtime/src/package-state-store.ts` persists the disabled-id set to
+   `<OS_HOME>/package-state/<environmentId>.json`, keyed per environment so
+   disables never leak between environments.
+3. `AppPlugin.init` reads the persisted set and seeds the registry **before** the
+   manifest is decomposed.
+4. The `enable`/`disable` HTTP handlers (`handlePackages`) write the new state to
+   the store after flipping the registry flag.
+
+### 9.8 Known gaps / deferred
+
 - **CLI export/import** (`os package export` / `import`) — deferred; only the
   REST + Studio surfaces ship in the MVP.
-- **Disable state is in-memory only** — lost on server restart.
+- **Executable tool wiring on import** — imported `tool` metadata is visible and
+  re-exportable, but not registered as an executable `ToolRegistry` handler (§9.6).
 - **Cloud one-click publish** (§3.6 step 5, delegated auth) — deferred to the
   cloud phase; the local path above is the interim distribution mechanism.
 
@@ -424,6 +454,11 @@ on enable. (Persisting disable state across restarts is deferred.)
 - `../objectui/.../layout/UnifiedSidebar.tsx` — `active_package` selector (authoring target)
 - `packages/runtime/src/http-dispatcher.ts` — `assemblePackageManifest` + `GET /packages/:id/export` (§9.2)
 - `packages/runtime/src/cloud/marketplace-install-local-plugin.ts` — inline-manifest import + register-before-persist (§9.2–9.3)
-- `packages/objectql/src/registry.ts` — `isPackageDisabled` + `listItems` disabled-package filter (§9.5)
+- `packages/objectql/src/registry.ts` — `isPackageDisabled` + `listItems` disabled-package filter (§9.5); `setInitialDisabledPackageIds` + `installPackage` disable seeding (§9.7)
 - `packages/objectql/src/protocol.ts` — `getMetaItems` final-merge disabled-package filter (§9.5)
+- `packages/objectql/src/engine.ts` — `registerApp` consumes `tools` / `skills` (§9.6)
+- `packages/spec/src/shared/metadata-collection.zod.ts` — `PLURAL_TO_SINGULAR` gains `tools` / `skills` (§9.6)
+- `packages/spec/src/stack.zod.ts` — top-level `tools` on `ObjectStackDefinition` (§9.6)
+- `packages/runtime/src/package-state-store.ts` — per-environment disable-state file (§9.7)
+- `packages/runtime/src/app-plugin.ts` — seeds persisted disable state before manifest decompose (§9.7)
 - `../objectui/.../metadata-admin/PackagesPage.tsx` — Packages page + Export/Import UI (§9.4)

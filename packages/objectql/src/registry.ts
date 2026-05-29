@@ -317,6 +317,25 @@ export class SchemaRegistry {
   /** Type → Name/ID → MetadataItem */
   private metadata = new Map<string, Map<string, any>>();
 
+  /**
+   * Package ids that must be installed in a DISABLED state. Seeded once at
+   * boot (from persisted state) BEFORE any package registration so that every
+   * registration path — boot artifact, marketplace rehydrate, local import —
+   * honors persisted disable state uniformly without a fragile post-boot
+   * re-application hook. See {@link setInitialDisabledPackageIds} and
+   * {@link installPackage}.
+   */
+  private initialDisabledPackageIds = new Set<string>();
+
+  /**
+   * Seed the set of package ids that should be installed disabled. Call this
+   * before package registration begins; later `installPackage` calls for these
+   * ids land in the `disabled` state. Replaces any previously seeded set.
+   */
+  setInitialDisabledPackageIds(ids: Iterable<string>): void {
+    this.initialDisabledPackageIds = new Set(ids);
+  }
+
   // ==========================================
   // Namespace Management
   // ==========================================
@@ -796,12 +815,14 @@ export class SchemaRegistry {
 
   installPackage(manifest: ObjectStackManifest, settings?: Record<string, any>): InstalledPackage {
     const now = new Date().toISOString();
+    const disabled = this.initialDisabledPackageIds.has(manifest.id);
     const pkg: InstalledPackage = {
       manifest,
-      status: 'installed',
-      enabled: true,
+      status: disabled ? 'disabled' : 'installed',
+      enabled: !disabled,
       installedAt: now,
       updatedAt: now,
+      ...(disabled ? { statusChangedAt: now } : {}),
       settings,
     };
     

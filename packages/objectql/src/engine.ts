@@ -774,7 +774,7 @@ export class ObjectQL implements IDataEngine {
         // Security Protocol
         'roles', 'permissions', 'profiles', 'sharingRules', 'policies',
         // AI Protocol
-        'agents', 'ragPipelines',
+        'agents', 'tools', 'skills', 'ragPipelines',
         // API Protocol
         'apis',
         // Data Extensions

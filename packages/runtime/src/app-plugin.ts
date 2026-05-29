@@ -3,6 +3,7 @@
 import { Plugin, PluginContext } from '@objectstack/core';
 import { readEnvWithDeprecation } from '@objectstack/types';
 import { SeedLoaderService } from './seed-loader.js';
+import { loadDisabledPackageIds } from './package-state-store.js';
 import type { IMetadataService, II18nService } from '@objectstack/spec/contracts';
 import { QuickJSScriptRunner } from './sandbox/quickjs-runner.js';
 import { hookBodyRunnerFactory, actionBodyRunnerFactory } from './sandbox/body-runner.js';
@@ -135,6 +136,30 @@ export class AppPlugin implements Plugin {
         console.warn(
             `[AppPlugin:init] appId=${appId} keys=${Object.keys(servicePayload).join(',')} flows=${Array.isArray((servicePayload as any).flows) ? (servicePayload as any).flows.length : 'n/a'}`,
         );
+
+        // Seed persisted package disable-state into the registry BEFORE the
+        // manifest is decomposed, so disabled packages are installed disabled
+        // and stay hidden after restart. Honors every later registration path
+        // (boot artifact, marketplace rehydrate, import) via the registry's
+        // initial-disabled set. Best-effort — never block boot on this.
+        try {
+            const ql = ctx.getService<{ registry?: { setInitialDisabledPackageIds?: (ids: Iterable<string>) => void } }>('objectql');
+            const setter = ql?.registry?.setInitialDisabledPackageIds;
+            if (typeof setter === 'function') {
+                const disabled = loadDisabledPackageIds(this.projectContext?.environmentId);
+                if (disabled.size > 0) {
+                    setter.call(ql!.registry, disabled);
+                    ctx.logger.info('[AppPlugin] seeded persisted disabled packages', {
+                        environmentId: this.projectContext?.environmentId,
+                        disabled: Array.from(disabled),
+                    });
+                }
+            }
+        } catch (err) {
+            ctx.logger.warn('[AppPlugin] failed to seed persisted package state', {
+                error: (err as Error)?.message ?? String(err),
+            });
+        }
 
         ctx.getService<{ register(m: any): void }>('manifest').register(servicePayload);
     }

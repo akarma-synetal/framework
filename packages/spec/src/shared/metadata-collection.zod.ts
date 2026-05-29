@@ -127,6 +127,8 @@ export const PLURAL_TO_SINGULAR: Record<string, string> = {
   apis: 'api',
   webhooks: 'webhook',
   agents: 'agent',
+  tools: 'tool',
+  skills: 'skill',
   ragPipelines: 'rag_pipeline',
   hooks: 'hook',
   mappings: 'mapping',

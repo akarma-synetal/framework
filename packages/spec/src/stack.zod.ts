@@ -41,6 +41,7 @@ import { FeatureFlagSchema } from './kernel/feature.zod';
 // AI Protocol
 import { AgentSchema } from './ai/agent.zod';
 import { SkillSchema } from './ai/skill.zod';
+import { ToolSchema } from './ai/tool.zod';
 
 // Data Protocol (additional)
 import { HookSchema } from './data/hook.zod';
@@ -251,6 +252,7 @@ export const ObjectStackDefinitionSchema = lazySchema(() => z.object({
    *   intent matching, and trigger conditions for context-aware activation.
    */
   agents: z.array(AgentSchema).optional().describe('AI Agents and Assistants'),
+  tools: z.array(ToolSchema).optional().describe('AI Tools (callable functions referenced by Skills/Agents)'),
   skills: z.array(SkillSchema).optional().describe('AI Skills (reusable capability bundles referenced by Agents)'),
 
   /**

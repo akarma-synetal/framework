@@ -6,6 +6,7 @@ import { CoreServiceName } from '@objectstack/spec/system';
 import { pluralToSingular, PLURAL_TO_SINGULAR } from '@objectstack/spec/shared';
 import type { ExecutionContext } from '@objectstack/spec/kernel';
 import type { KernelManager } from './cloud/kernel-manager.js';
+import { setPackageDisabled } from './package-state-store.js';
 
 /** Minimal local interface — full EnvironmentScopeManager was removed in Phase R. */
 interface EnvironmentScopeManager {
@@ -1326,6 +1327,11 @@ export class HttpDispatcher {
                 const id = decodeURIComponent(parts[0]);
                 const pkg = registry.enablePackage(id);
                 if (!pkg) return { handled: true, response: this.error(`Package '${id}' not found`, 404) };
+                try {
+                    setPackageDisabled(_context?.environmentId, id, false);
+                } catch (err) {
+                    console.warn('[handlePackages] failed to persist enable state', { id, error: (err as Error)?.message });
+                }
                 return { handled: true, response: this.success(pkg) };
             }
 
@@ -1334,6 +1340,11 @@ export class HttpDispatcher {
                 const id = decodeURIComponent(parts[0]);
                 const pkg = registry.disablePackage(id);
                 if (!pkg) return { handled: true, response: this.error(`Package '${id}' not found`, 404) };
+                try {
+                    setPackageDisabled(_context?.environmentId, id, true);
+                } catch (err) {
+                    console.warn('[handlePackages] failed to persist disable state', { id, error: (err as Error)?.message });
+                }
                 return { handled: true, response: this.success(pkg) };
             }
 
@@ -1404,8 +1415,9 @@ export class HttpDispatcher {
      *
      * Only the metadata categories that `registerApp` can actually consume
      * are exported. `datasources` and `emailTemplates` are intentionally
-     * excluded (not registered by the import path). `tools` / `skills` are
-     * not yet round-tripped by the local install path.
+     * excluded (not registered by the import path). `tools` / `skills` ARE
+     * round-tripped: they are registered by `registerApp` on import and
+     * surfaced by `getMetaItems('tool' | 'skill')` on export.
      *
      * @returns the manifest object, or `null` if the package id is unknown
      *          AND has no overlay-authored metadata.
