@@ -7,14 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Object metadata preview now mounts real `ObjectGrid`; Airtable widget removed (ADR-0014 addendum)
+
+The first cut of ADR-0014 shipped a parallel `FieldsTable` component
+(used both as the Object preview and as a `widget: 'airtable'` editor
+for `object.fields`). That hybrid surface conflated **data view** with
+**schema editor** and could only honestly expose ~5 of the Field
+protocol's ~30 properties. It has been removed.
+
+**Preview pane** now mounts `<ObjectGrid>` from
+`@object-ui/plugin-grid` — the same runtime renderer production uses —
+with columns derived from `draft.fields` and rows fetched from the
+real REST API. What you preview is what you ship.
+
+**Form panel Fields section** uses the default `RecordField`
+inline-card mode (no widget override). Each card has a drag handle
+(`GripVertical`) for HTML5 drag-to-reorder, expands to a sub-form
+covering the full Field protocol (`label`, `type`, `required`,
+`unique`, `indexed`, `readonly`, `immutable`, `hidden`, `searchable`,
+`sortable`, `filterable`, `defaultValue`, `placeholder`, text/number
+constraints, `options[]` with color+icon for select-likes,
+`reference`/`referenceFilter`/`cascadeDelete`/`multiple` for
+relations, `formula`+`returnType` for formulas,
+`summaryType`+`summaryField` for rollups, `displayFormat`+
+`startingNumber` for autonumber, `language` for code, `validation`+
+`errorMessage`, plus `audit`/`trackHistory`/`pii`/`encrypted`). All
+type-specific fields use `visibleOn` CEL predicates so the form
+adapts as the user picks a type.
+
+**Removed**: `previews/object/FieldsTable.tsx`,
+`previews/object/field-meta.ts`, `ObjectFieldsTableWidget`, the
+`'airtable'` and `'object-fields-table'` keys in `WIDGETS`, the
+`widget: 'airtable'` line in `object.form.ts`.
+
+The `'record'` form-field type, the `keyField` config, the
+`RecordField` engine, and the corrected JSON Schema for
+`object.properties.fields` (introduced in the original ADR-0014)
+remain in place. See
+[`docs/adr/0014-record-form-field-type.md`](docs/adr/0014-record-form-field-type.md)
+§ "Why not Airtable mode" for the full rationale.
+
 ### Added — `record` form field type (ADR-0014)
 
 `Object.fields` (and other `Record<string, X>` properties) can now be
 edited as first-class form fields instead of leaking through as raw
 JSON. New `'record'` entry in the `FieldType` enum, complementary
 `keyField` config on `FormFieldSchema`, native `RecordField` engine in
-the Studio `SchemaForm`, and a registered `'airtable'` widget powering
-the Airtable-style fields editor.
+the Studio `SchemaForm`.
 
 The hand-crafted JSON Schema for `object.properties.fields` in
 `packages/objectql/src/protocol.ts` no longer lies about the shape

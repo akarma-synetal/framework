@@ -159,3 +159,60 @@ Violates Prime Directive #1 (Zod First).
   string map use this widget (with `widget: 'inline'`) or a richer
   matrix editor? Likely the latter — but the structural type stays the
   same.
+
+---
+
+## Addendum (2026-04-18) — Why Not Airtable Mode
+
+The first implementation of this ADR registered a `widget: 'airtable'`
+alias that mounted an in-pane spreadsheet (`FieldsTable`) where each
+field-definition column header doubled as a schema editor (rename,
+retype, toggle Required, drag-reorder). The preview pane mounted the
+same table with placeholder rows so the "preview" looked Airtable-like.
+
+We rolled this back. Three reasons:
+
+1. **Protocol fidelity.** `Field` has ~30 properties: `validation`
+   (CEL), `formula`, `options[]` with `{ color, icon, description }`,
+   `reference` + `referenceFilter`, `cascadeDelete`, `summaryType`,
+   `precision`/`scale`, `audit`, `pii`, `encrypted`, conditional
+   visibility, dependency picklists … A column-header popover can only
+   honestly show 4–5 of these; the rest become "advanced…" escape
+   hatches that contradict the goal of in-place editing.
+
+2. **Separation of concerns.** Salesforce, ServiceNow, NetSuite — every
+   serious enterprise low-code platform splits **Data view** (rows of
+   business records) from **Schema editor** (the metadata that *defines*
+   those rows). Airtable / Notion conflate them because their Field
+   protocol is intentionally tiny (≈8 props). ObjectStack is in the
+   Salesforce camp.
+
+3. **No second renderer.** A bespoke `FieldsTable` is a parallel grid
+   that does not honor the real cell renderers, sort/filter/pagination,
+   row-level security, inline editing, bulk operations, or column
+   conditional formatting — all of which `@object-ui/plugin-grid`'s
+   `ObjectGrid` already implements (≈2000 LOC). A "preview" that does
+   not match production is not a preview.
+
+### What replaces it
+
+| Concern             | Before                                | After                                     |
+|---------------------|---------------------------------------|-------------------------------------------|
+| Preview pane        | `FieldsTable` w/ placeholder rows     | `<ObjectGrid>` w/ real REST data           |
+| Form Fields panel   | `widget: 'airtable'` → `FieldsTable`  | Default `RecordField` inline-card mode    |
+| Reorder UX          | Drag column headers (preview)         | Drag `GripVertical` on each card (form)   |
+| Per-field editing   | Header popover (4 props)              | Expandable card → full sub-form (~30 props w/ `visibleOn`) |
+
+Deleted: `previews/object/FieldsTable.tsx`, `previews/object/field-meta.ts`,
+`ObjectFieldsTableWidget`, the `'airtable'` and `'object-fields-table'`
+keys in `WIDGETS`, and the `widget: 'airtable'` line in `object.form.ts`.
+The `'record'` form-field type, the `RecordField` engine, and the
+overall ADR conclusion stand.
+
+### Generalization
+
+The same separation applies to every other metadata type with a
+`Record<…>`/`Array<…>` shape (`view.columns`, `app.navigation`,
+`flow.steps`, `agent.tools`, …): preview = the real runtime renderer;
+editing = `RecordField` / `RepeaterField` with the protocol-complete
+sub-form. No more parallel "designer surface" components.
