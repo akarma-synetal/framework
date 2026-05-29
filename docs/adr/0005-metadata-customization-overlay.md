@@ -594,3 +594,43 @@ ADR-0005 behavior). Since the silent shadowing can surprise operators
 on package upgrade, `Registry.registerItem` now emits a single
 `[Registry] Collision` console.warn naming both sources so the situation
 is discoverable in startup logs.
+
+### Plugin-registered types (runtime-create gate parity)
+
+`DEFAULT_METADATA_TYPE_REGISTRY` is the *static* spec-defined registry
+(object, view, hook, …). Plugins register additional metadata types at
+runtime — e.g. `theme`, `api`, `connector`, `data`, `mapping`, `policy`,
+`sharing_rule`, `webhook`, `analyticsCube`, `package`. These types have
+no static registry entry.
+
+**Invariant:** the listing endpoint (`protocol.getMetaTypes()`) and the
+write-path gates (`protocol.isRuntimeCreateAllowed`,
+`sys-metadata-repository.assertAllowed`) MUST agree on
+`allowRuntimeCreate` for every type they describe. `getMetaTypes()`
+synthesises descriptors for runtime-registered types with
+`allowRuntimeCreate: true`; both write gates mirror this by treating
+"type has no entry in the static registry" as runtime-creatable.
+
+Without that parity, the admin UI advertises a type as writable, then
+the write endpoint 403s on save — a confusing footgun. Regression
+coverage:
+
+- `protocol-meta.test.ts > two-tier authorization > accepts brand-new
+  plugin-registered type (no static registry entry)`
+- `sys-metadata-repository.test.ts > put accepts plugin-registered type
+  with intent=runtime-only (theme|api)`
+- `sys-metadata-repository.test.ts > put refuses
+  statically-registered type with allowRuntimeCreate:false (function)`
+  — guards against the new "unknown ⇒ permissive" branch over-relaxing
+  statically-declared opt-outs.
+
+### Admin UX: field-level Code-vs-Effective diff
+
+The Layers tab in the metadata editor (`packages/app-shell/.../LayeredDiff.tsx`
+in `objectui`) now defaults to a **Diff** view that compares
+`layered.code` (artifact baseline) against `layered.effective` (merged)
+field-by-field. Each top-level key renders as a row with a colour-coded
+status (modified / added / removed / unchanged) so admins can see at a
+glance what their overlay actually changes — instead of eyeballing
+three blobs of JSON. Code / Overlay / Effective JSON tabs remain
+available for full payload inspection.

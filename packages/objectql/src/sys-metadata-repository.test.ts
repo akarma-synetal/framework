@@ -274,6 +274,60 @@ describe('SysMetadataRepository', () => {
         ).rejects.toMatchObject({ code: 'not_overridable', status: 403 });
     });
 
+    // ── runtime-create gate: plugin-registered types must be accepted ───
+    //
+    // Regression: types like `theme`, `api`, `connector`, `webhook` are
+    // not in DEFAULT_METADATA_TYPE_REGISTRY — they are registered at
+    // runtime by plugins. The listing endpoint (protocol.getMetaTypes())
+    // synthesises descriptors with `allowRuntimeCreate: true` for them,
+    // so the admin UI advertises them as writable. The repo gate must
+    // agree, otherwise the UI 403s on save. Previously the gate keyed
+    // off the static registry only and rejected all 9+ such types.
+
+    it('put accepts plugin-registered type with intent=runtime-only (theme)', async () => {
+        const result = await repo.put(
+            { org: 'org_alpha', type: 'theme', name: 'my_theme' },
+            { name: 'my_theme', label: 'Test', tokens: {} },
+            { parentVersion: null, actor: 'studio', intent: 'runtime-only' },
+        );
+        expect(result.version).toMatch(/^sha256:/);
+    });
+
+    it('put accepts plugin-registered type with intent=runtime-only (api)', async () => {
+        const result = await repo.put(
+            { org: 'org_alpha', type: 'api', name: 'my_api' },
+            { name: 'my_api', path: '/x', method: 'GET' },
+            { parentVersion: null, actor: 'studio', intent: 'runtime-only' },
+        );
+        expect(result.version).toMatch(/^sha256:/);
+    });
+
+    it('put still refuses plugin-registered type without runtime-only intent', async () => {
+        // intent defaults to 'override-artifact'; that path requires
+        // allowOrgOverride, which plugin-registered types do not get
+        // automatically. Keeps the artifact-shadowing security boundary
+        // intact for plugin types until they explicitly opt in.
+        await expect(
+            repo.put(
+                { org: 'org_alpha', type: 'theme', name: 'evil_theme' },
+                { name: 'evil_theme', label: 'X', tokens: {} },
+                { parentVersion: null, actor: 'studio' },
+            ),
+        ).rejects.toMatchObject({ code: 'not_overridable', status: 403 });
+    });
+
+    it('put refuses statically-registered type with allowRuntimeCreate:false (function)', async () => {
+        // `function` IS in the static registry with both flags false.
+        // The new "unknown type ⇒ permissive" branch must NOT relax it.
+        await expect(
+            repo.put(
+                { org: 'org_alpha', type: 'function', name: 'my_fn' },
+                { name: 'my_fn', handler: 'index.ts' },
+                { parentVersion: null, actor: 'studio', intent: 'runtime-only' },
+            ),
+        ).rejects.toMatchObject({ code: 'not_creatable', status: 403 });
+    });
+
     // ── list ────────────────────────────────────────────────────────
 
     it('list yields headers for stored items, body stripped', async () => {

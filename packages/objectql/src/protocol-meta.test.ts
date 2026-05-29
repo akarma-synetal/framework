@@ -954,6 +954,48 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
             });
         });
 
+        // ───────────────────────────────────────────────────────────────
+        // Regression: plugin-registered types (no static registry entry)
+        //
+        // `theme`, `api`, `connector`, `data`, `mapping`, `policy`,
+        // `sharing_rule`, `webhook`, `analyticsCube`, `package` are
+        // registered by plugins at runtime — not in
+        // DEFAULT_METADATA_TYPE_REGISTRY. `getMetaTypes()` synthesises
+        // descriptors with `allowRuntimeCreate: true` for them so the
+        // admin UI advertises them as writable. The write gate must
+        // agree, otherwise users see "writable" types 403 on save.
+        //
+        // Before fix: gate keyed off the static registry only, rejecting
+        // these 10+ types with not_creatable / 403.
+        // ───────────────────────────────────────────────────────────────
+
+        it('accepts brand-new plugin-registered type (no static registry entry)', async () => {
+            mockEngine.findOne.mockResolvedValue(null);
+
+            const themeResult = await scoped.saveMetaItem({
+                type: 'theme',
+                name: 'my_theme',
+                item: { name: 'my_theme', label: 'Test', tokens: {} },
+                organizationId: 'org_alpha',
+            });
+            const apiResult = await scoped.saveMetaItem({
+                type: 'api',
+                name: 'my_api',
+                item: { name: 'my_api', path: '/x', method: 'GET' },
+                organizationId: 'org_alpha',
+            });
+            const webhookResult = await scoped.saveMetaItem({
+                type: 'webhook',
+                name: 'my_webhook',
+                item: { name: 'my_webhook', url: 'https://e.example/x', events: ['x.created'] },
+                organizationId: 'org_alpha',
+            });
+
+            expect(themeResult.success).toBe(true);
+            expect(apiResult.success).toBe(true);
+            expect(webhookResult.success).toBe(true);
+        });
+
         it('artifact-backed view (allowOrgOverride:true) still overlays cleanly', async () => {
             // Regression: types that DO allow overlays must keep working
             // even when the item is artifact-backed.
