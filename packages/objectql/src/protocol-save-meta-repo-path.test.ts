@@ -207,6 +207,34 @@ describe('saveMetaItem — repository write path (post PR-10d.6)', () => {
         expect(row.type).toBe('view');
     });
 
+    it('rejects the layered read envelope as a write body (regression: stub overlay rows)', async () => {
+        // A designer surface that lacks a dedicated editor for a type can
+        // accidentally PUT the layered GET (`?layers=true`) envelope straight
+        // back. That shape — { type, name, code, overlay, overlayScope,
+        // effective } — is never a real metadata body, and persisting it
+        // produced all-null stub rows that surfaced as metadata diagnostic
+        // errors in the admin UI. saveMetaItem must reject it before any write.
+        const { engine, rows } = makeStubEngine();
+        const protocol = new ObjectStackProtocolImplementation(engine);
+        await expect(
+            protocol.saveMetaItem({
+                type: 'report',
+                name: 'accounts_by_industry_type',
+                organizationId: 'org',
+                item: {
+                    type: 'report',
+                    name: 'accounts_by_industry_type',
+                    code: null,
+                    overlay: null,
+                    overlayScope: null,
+                    effective: null,
+                },
+            }),
+        ).rejects.toMatchObject({ code: 'invalid_metadata', status: 422 });
+        // Nothing was persisted.
+        expect(rows.size).toBe(0);
+    });
+
     it('on ConflictError the overlay row body is unchanged (rubber-duck #3 invariant)', async () => {
         const { engine, rows } = makeStubEngine();
         const protocol = new ObjectStackProtocolImplementation(engine);

@@ -84,6 +84,7 @@ const DEFAULT_QUERY_LIMIT = 20;
 
 export const QUERY_RECORDS_TOOL: AIToolDefinition = {
   name: 'query_records',
+  label: 'Query Records',
   description:
     'Query records from a data object with optional filters, field selection, ' +
     'sorting, and pagination. Returns an array of matching records.',
@@ -138,6 +139,7 @@ export const QUERY_RECORDS_TOOL: AIToolDefinition = {
 
 export const GET_RECORD_TOOL: AIToolDefinition = {
   name: 'get_record',
+  label: 'Get Record',
   description: 'Get a single record by its ID from a data object.',
   parameters: {
     type: 'object',
@@ -163,6 +165,7 @@ export const GET_RECORD_TOOL: AIToolDefinition = {
 
 export const AGGREGATE_DATA_TOOL: AIToolDefinition = {
   name: 'aggregate_data',
+  label: 'Aggregate Data',
   description:
     'Perform aggregation/statistical operations on a data object. ' +
     'Supports count, sum, avg, min, max with optional groupBy and where filters.',

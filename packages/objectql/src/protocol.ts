@@ -3191,6 +3191,38 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             }
         }
 
+        // Defense-in-depth: reject the layered *read* envelope as a write body.
+        //
+        // `getMetaItemLayered` returns a 3-state diagnostic shape
+        // `{ type, name, code, overlay, overlayScope, effective, ... }` for the
+        // Studio designer's `?layers=true` GET. That envelope is NOT a metadata
+        // body — but a designer surface that lacks a dedicated editor for a
+        // given type can accidentally PUT the envelope straight back, which (if
+        // the per-type Zod schema below is unavailable — e.g. a type with no
+        // registered schema, or a stale `@objectstack/spec` build that predates
+        // the type being added to the registry) would persist an all-null stub
+        // and surface as a metadata diagnostic error in the admin UI. The
+        // simultaneous presence of `code`, `overlay`, `overlayScope`, and
+        // `effective` is unique to the layered envelope and never appears in a
+        // real metadata body, so we reject it here regardless of type/schema.
+        {
+            const it = request.item as Record<string, unknown>;
+            const looksLikeLayeredEnvelope =
+                it && typeof it === 'object' && !Array.isArray(it)
+                && 'code' in it && 'overlay' in it && 'overlayScope' in it && 'effective' in it;
+            if (looksLikeLayeredEnvelope) {
+                const err = new Error(
+                    `[invalid_metadata] ${request.type}/${request.name}: the request body is a layered read `
+                    + `envelope ({ code, overlay, overlayScope, effective }), not a metadata body. `
+                    + `Unwrap and send the effective/overlay document instead — the layered shape is read-only `
+                    + `(GET ?layers=true) and must never be persisted.`
+                );
+                (err as any).code = 'invalid_metadata';
+                (err as any).status = 422;
+                throw err;
+            }
+        }
+
         // Spec-conformance check: if a Zod schema is registered for this
         // overlay type (see OVERLAY_VALIDATION_SCHEMAS), validate the payload
         // before persisting. We surface invalid payloads as `422

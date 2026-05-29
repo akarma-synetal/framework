@@ -119,6 +119,7 @@ export type QueryPlan = z.infer<typeof QueryPlanSchema>;
  */
 export const QUERY_DATA_TOOL: AIToolDefinition = {
   name: 'query_data',
+  label: 'Query Data (Natural Language)',
   description:
     'Answer a natural-language question about the user\'s data. ' +
     'Internally retrieves the relevant object schema, generates an ObjectQL ' +

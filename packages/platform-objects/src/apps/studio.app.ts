@@ -38,6 +38,31 @@ export const STUDIO_APP: App = {
     primaryColor: '#6366f1', // Indigo-500 — distinct from Setup's slate
   },
   requiredPermissions: ['studio.access'],
+  contextSelectors: [
+    {
+      // Package scope — pinned to the sidebar header. Selecting a package
+      // injects `{active_package}` into every `metadata:resource` nav
+      // item below, so the whole workbench filters to that package in
+      // one click. Options come from the installed-packages REST surface,
+      // narrowed to project-scoped packages: this dropdown exists so
+      // third-party developers can scope to *their* custom package, so we
+      // deliberately hide the platform's own system/cloud kernel packages
+      // (auth, security, audit, queue, …) which are not user-authored.
+      id: 'active_package',
+      label: 'Package',
+      icon: 'package',
+      optionsSource: {
+        endpoint: '/api/v1/packages',
+        valueKey: 'manifest.id',
+        labelKey: 'manifest.name',
+        filter: [{ key: 'manifest.scope', op: 'nin', value: ['system', 'cloud'] }],
+      },
+      includeAll: true,
+      allValue: '',
+      persist: 'query',
+      placement: 'sidebar_header',
+    },
+  ],
   navigation: [
     {
       id: 'group_overview',
@@ -68,7 +93,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Objects',
           componentRef: 'metadata:resource',
-          params: { type: 'object' },
+          params: { type: 'object', package: '{active_package}' },
           icon: 'box',
         },
         {
@@ -76,7 +101,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Validations',
           componentRef: 'metadata:resource',
-          params: { type: 'validation' },
+          params: { type: 'validation', package: '{active_package}' },
           icon: 'check-square',
         },
       ],
@@ -93,7 +118,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Apps',
           componentRef: 'metadata:resource',
-          params: { type: 'app' },
+          params: { type: 'app', package: '{active_package}' },
           icon: 'app-window',
         },
         {
@@ -101,7 +126,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Views',
           componentRef: 'metadata:resource',
-          params: { type: 'view' },
+          params: { type: 'view', package: '{active_package}' },
           icon: 'table',
         },
         {
@@ -109,7 +134,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Pages',
           componentRef: 'metadata:resource',
-          params: { type: 'page' },
+          params: { type: 'page', package: '{active_package}' },
           icon: 'file-text',
         },
         {
@@ -117,7 +142,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Dashboards',
           componentRef: 'metadata:resource',
-          params: { type: 'dashboard' },
+          params: { type: 'dashboard', package: '{active_package}' },
           icon: 'layout-dashboard',
         },
         {
@@ -125,7 +150,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Reports',
           componentRef: 'metadata:resource',
-          params: { type: 'report' },
+          params: { type: 'report', package: '{active_package}' },
           icon: 'bar-chart-3',
         },
       ],
@@ -142,7 +167,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Actions',
           componentRef: 'metadata:resource',
-          params: { type: 'action' },
+          params: { type: 'action', package: '{active_package}' },
           icon: 'mouse-pointer-click',
         },
         {
@@ -150,7 +175,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Hooks',
           componentRef: 'metadata:resource',
-          params: { type: 'hook' },
+          params: { type: 'hook', package: '{active_package}' },
           icon: 'webhook',
         },
       ],
@@ -167,7 +192,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Flows',
           componentRef: 'metadata:resource',
-          params: { type: 'flow' },
+          params: { type: 'flow', package: '{active_package}' },
           icon: 'git-branch',
         },
         {
@@ -175,7 +200,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Workflow Rules',
           componentRef: 'metadata:resource',
-          params: { type: 'workflow' },
+          params: { type: 'workflow', package: '{active_package}' },
           icon: 'zap',
         },
         {
@@ -183,7 +208,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Approval Processes',
           componentRef: 'metadata:resource',
-          params: { type: 'approval' },
+          params: { type: 'approval', package: '{active_package}' },
           icon: 'check-circle',
         },
       ],
@@ -202,7 +227,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Agents',
           componentRef: 'metadata:resource',
-          params: { type: 'agent' },
+          params: { type: 'agent', package: '{active_package}' },
           icon: 'bot',
         },
         {
@@ -210,7 +235,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Tools',
           componentRef: 'metadata:resource',
-          params: { type: 'tool' },
+          params: { type: 'tool', package: '{active_package}' },
           icon: 'wrench',
         },
         {
@@ -218,7 +243,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Skills',
           componentRef: 'metadata:resource',
-          params: { type: 'skill' },
+          params: { type: 'skill', package: '{active_package}' },
           icon: 'brain',
         },
       ],
@@ -271,7 +296,7 @@ export const STUDIO_APP: App = {
           type: 'component',
           label: 'Email Templates',
           componentRef: 'metadata:resource',
-          params: { type: 'email_template' },
+          params: { type: 'email_template', package: '{active_package}' },
           icon: 'mail',
         },
       ],

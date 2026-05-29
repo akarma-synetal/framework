@@ -169,7 +169,7 @@ export class StorageServicePlugin implements Plugin {
         name: 'Storage Service',
         version: '1.0.0',
         type: 'plugin',
-        scope: 'project',
+        scope: 'system',
         objects: [SystemFile, SystemUploadSession],
       });
     } catch {

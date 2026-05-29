@@ -571,7 +571,7 @@ export class AIServicePlugin implements Plugin {
       name: 'AI Service',
       version: '1.0.0',
       type: 'plugin',
-      scope: 'project',
+      scope: 'system',
       namespace: 'ai',
       objects: [AiConversationObject, AiMessageObject, AiTraceObject, AiPendingActionObject, AiEvalCaseObject, AiEvalRunObject],
       views: [AiTraceView, AiMessageView, AiPendingActionView, AiEvalCaseView, AiEvalRunView],
@@ -713,7 +713,11 @@ export class AIServicePlugin implements Plugin {
 
             if (!toolExists) {
               try {
-                await withTimeout(metadataService.register('tool', toolDef.name, toolDef));
+                // `ToolSchema` requires a `label`; the bare `AIToolDefinition`
+                // used for LLM function-calling may omit it. Fall back to a
+                // name-derived label so persisted tool metadata always validates.
+                const label = toolDef.label ?? toToolLabel(toolDef.name);
+                await withTimeout(metadataService.register('tool', toolDef.name, { ...toolDef, label }));
               } catch (err) {
                 ctx.logger.warn('[AI] Failed to persist tool metadata (non-fatal)',
                   err instanceof Error ? { tool: toolDef.name, error: err.message } : { tool: toolDef.name });
@@ -1235,6 +1239,19 @@ export class AIServicePlugin implements Plugin {
   async destroy(): Promise<void> {
     this.service = undefined;
   }
+}
+
+/**
+ * Derive a human-readable label from a snake_case tool name, e.g.
+ * `query_records` → `Query Records`. Used as a fallback when persisting
+ * an `AIToolDefinition` as `tool` metadata that has no explicit `label`.
+ */
+function toToolLabel(name: string): string {
+  return name
+    .split('_')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
 /**

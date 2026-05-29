@@ -299,6 +299,108 @@ export const NavigationAreaSchema = lazySchema(() => z.object({
 }));
 
 /**
+ * App Context Selector Schema
+ *
+ * Declares a sidebar-level "scope" dropdown (e.g. a Package filter, an
+ * Environment switcher, a Locale picker) whose **current value is exposed
+ * as a navigation template variable** named after `id`.
+ *
+ * This is the metadata-driven way to add a control at the top of the
+ * navigation that transparently scopes every child navigation item —
+ * without wiring the value into each item by hand. The shell:
+ *   1. Renders the dropdown (options pulled from `optionsSource.endpoint`).
+ *   2. Holds the selected value (persisted per `persist`).
+ *   3. Substitutes `{<id>}` into any nav item's `params` / `recordId`
+ *      exactly like the built-in `{current_user_id}` / `{current_org_id}`
+ *      variables (see `ObjectNavItem.recordId`).
+ *
+ * @example Package filter for the Studio workbench
+ * ```ts
+ * contextSelectors: [{
+ *   id: 'active_package',
+ *   label: 'Package',
+ *   icon: 'package',
+ *   optionsSource: {
+ *     endpoint: '/api/v1/packages',
+ *     valueKey: 'manifest.id',
+ *     labelKey: 'manifest.name',
+ *     // Only offer third-party / custom (project-scoped) packages;
+ *     // hide the platform's own system/cloud kernel packages.
+ *     filter: [{ key: 'manifest.scope', op: 'nin', value: ['system', 'cloud'] }],
+ *   },
+ * }]
+ * // …then in nav items:
+ * { id: 'nav_objects', type: 'component', componentRef: 'metadata:resource',
+ *   params: { type: 'object', package: '{active_package}' } }
+ * ```
+ */
+export const AppContextSelectorSchema = lazySchema(() => z.object({
+  /**
+   * Identifier — also the template-variable name the selected value is
+   * exposed under. Reference it in nav items as `{<id>}`
+   * (e.g. `id: 'active_package'` → `{active_package}`).
+   */
+  id: SnakeCaseIdentifierSchema.describe('Selector id; selected value is exposed as the nav template var {<id>}'),
+
+  /** Display label for the dropdown. */
+  label: I18nLabelSchema.describe('Dropdown label'),
+
+  /** Icon name (Lucide). */
+  icon: z.string().optional().describe('Icon name'),
+
+  /**
+   * Where the dropdown options come from. The shell fetches `endpoint`
+   * and maps each row to `{ value: row[valueKey], label: row[labelKey] }`.
+   * Re-uses existing REST surfaces (e.g. `/api/v1/packages`) so no
+   * bespoke option API is required.
+   */
+  optionsSource: z.object({
+    endpoint: z.string().describe('REST endpoint returning the option rows (e.g. /api/v1/packages)'),
+    valueKey: z.string().default('id').describe('Row property used as the option value (dotted path allowed, e.g. "manifest.id")'),
+    labelKey: z.string().default('name').describe('Row property used as the option label (dotted path allowed, e.g. "manifest.name")'),
+    /**
+     * Optional predicates applied to each fetched row before it becomes
+     * an option. All predicates must pass (logical AND). Keys are dotted
+     * paths so nested fields (e.g. `manifest.scope`) can be reached.
+     *
+     * This keeps shared REST surfaces (e.g. `/api/v1/packages`) generic
+     * while letting an individual selector narrow the list. For example,
+     * the Studio package scope hides platform/kernel packages so only
+     * `project`-scoped (third-party / custom) packages are selectable —
+     * the scope dropdown is a developer affordance, not a place to
+     * surface the platform's own internal `system`/`cloud` packages:
+     *
+     * ```ts
+     * filter: [{ key: 'manifest.scope', op: 'nin', value: ['system', 'cloud'] }]
+     * ```
+     */
+    filter: z.array(z.object({
+      key: z.string().describe('Dotted path on each row to compare (e.g. "manifest.scope")'),
+      op: z.enum(['eq', 'ne', 'in', 'nin']).default('eq')
+        .describe('Comparison operator: eq | ne | in | nin'),
+      value: z.union([z.string(), z.array(z.string())])
+        .describe('Comparison value (string for eq/ne, string[] for in/nin)'),
+    })).optional().describe('Predicates (AND) each option row must satisfy'),
+  }).describe('Option data source'),
+
+  /** Whether to prepend an "All" option that clears the scope. */
+  includeAll: z.boolean().default(true).describe('Prepend an "All" option that clears the scope'),
+
+  /** Value emitted when "All" is selected (empty string = no filter). */
+  allValue: z.string().default('').describe('Template value when "All" is selected (empty = no filter)'),
+
+  /** How the selection is persisted across navigation. */
+  persist: z.enum(['query', 'session', 'none']).default('query')
+    .describe('Persist selection via URL query, sessionStorage, or not at all'),
+
+  /** Where the dropdown is rendered. */
+  placement: z.enum(['sidebar_header', 'topbar']).default('sidebar_header')
+    .describe('Render location in the app chrome'),
+}));
+
+export type AppContextSelector = z.infer<typeof AppContextSelectorSchema>;
+
+/**
  * Schema for Applications (Apps).
  * A logical container for business functionality (e.g., "Sales CRM", "HR Portal").
  * 
@@ -406,6 +508,16 @@ export const AppSchema = lazySchema(() => z.object({
    */
   areas: z.array(NavigationAreaSchema).optional()
     .describe('Navigation areas for partitioning navigation by business domain'),
+
+  /**
+   * App-level context selectors — sidebar/topbar "scope" dropdowns whose
+   * selected value is injected into navigation items as a template
+   * variable (`{<id>}`). Use to add a Package / Environment / Locale
+   * filter that transparently scopes every child nav item. See
+   * {@link AppContextSelectorSchema}.
+   */
+  contextSelectors: z.array(AppContextSelectorSchema).optional()
+    .describe('App-level scope dropdowns whose value is injected into nav items as {<id>} template vars'),
   
   /** 
    * App-level Home Page Override

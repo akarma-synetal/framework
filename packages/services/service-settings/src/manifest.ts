@@ -14,7 +14,7 @@ export const settingsPluginManifestHeader = {
   namespace: 'sys',
   version: SETTINGS_PLUGIN_VERSION,
   type: 'plugin' as const,
-  scope: 'project' as const,
+  scope: 'system' as const,
   name: 'Settings Service',
   description:
     'Generic settings registry + K/V resolver with Env > Tenant > User > Default precedence. ADR-0007.',

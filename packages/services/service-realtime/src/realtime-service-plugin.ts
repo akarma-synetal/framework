@@ -58,6 +58,7 @@ export class RealtimeServicePlugin implements Plugin {
       name: 'Realtime Service',
       version: '1.0.0',
       type: 'plugin',
+      scope: 'system',
       namespace: 'sys',
       objects: [SysPresence],
     });

@@ -158,6 +158,14 @@ export interface AIResult {
 export interface AIToolDefinition {
     /** Tool name (snake_case identifier) */
     name: string;
+    /**
+     * Human-readable display name. Optional for the LLM function-calling
+     * path (which only needs name/description/parameters), but required
+     * when the tool is registered as `tool` metadata for Studio — see
+     * `ToolSchema`. Registration paths must supply a label (falling back
+     * to a name-derived one) so persisted tool metadata passes validation.
+     */
+    label?: string;
     /** Human-readable description */
     description: string;
     /** JSON Schema describing the tool parameters */
