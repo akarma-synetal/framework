@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   RuntimeConfigSchema,
   SandboxConfigSchema,
-  PermissionSchema,
-  PermissionSetSchema,
+  PluginPermissionSchema,
+  PluginPermissionSetSchema,
   KernelSecurityPolicySchema,
   PluginSecurityManifestSchema,
 } from './plugin-security-advanced.zod';
@@ -159,7 +159,7 @@ describe('Plugin Security Advanced Schemas', () => {
     });
   });
 
-  describe('PermissionSchema', () => {
+  describe('PluginPermissionSchema', () => {
     it('should validate basic permission', () => {
       const permission = {
         id: 'read-objects',
@@ -167,7 +167,7 @@ describe('Plugin Security Advanced Schemas', () => {
         actions: ['read' as const],
         description: 'Read access to data objects',
       };
-      const result = PermissionSchema.parse(permission);
+      const result = PluginPermissionSchema.parse(permission);
       expect(result.id).toBe('read-objects');
       expect(result.scope).toBe('plugin');
       expect(result.required).toBe(true);
@@ -186,13 +186,13 @@ describe('Plugin Security Advanced Schemas', () => {
         description: 'Manage user records',
         justification: 'Required for user profile management',
       };
-      const result = PermissionSchema.parse(permission);
+      const result = PluginPermissionSchema.parse(permission);
       expect(result.scope).toBe('user');
       expect(result.filter?.fields).toHaveLength(3);
     });
   });
 
-  describe('PermissionSetSchema', () => {
+  describe('PluginPermissionSetSchema', () => {
     it('should validate permission set', () => {
       const permissionSet = {
         permissions: [
@@ -212,7 +212,7 @@ describe('Plugin Security Advanced Schemas', () => {
         ],
         defaultGrant: 'prompt' as const,
       };
-      const result = PermissionSetSchema.parse(permissionSet);
+      const result = PluginPermissionSetSchema.parse(permissionSet);
       expect(result.permissions).toHaveLength(1);
       expect(result.groups).toHaveLength(1);
     });

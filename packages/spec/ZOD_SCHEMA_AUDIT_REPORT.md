@@ -770,7 +770,7 @@ All `metadata: z.record()`, `config: z.record()`, `options: z.record()`, `payloa
 | ConnectorSchema | `automation/trigger-registry.zod.ts` vs `integration/connector.zod.ts` | ✅ **Documented** — intentionally differentiated (L1 vs L3), well-documented |
 | DependencyConflict | `hub/plugin-security.zod.ts` vs `kernel/plugin-versioning.zod.ts` | ✅ **Cross-referenced** — different domains (marketplace vs kernel), now with cross-reference JSDoc comments |
 | SecurityVulnerability | `hub/plugin-security.zod.ts` vs `kernel/plugin-security-advanced.zod.ts` | ✅ **Documented** — different contexts with different structural needs |
-| PermissionSetSchema | `security/permission.zod.ts` vs `kernel/plugin-security-advanced.zod.ts` | ✅ **Documented** — different contexts (data permissions vs plugin sandbox) |
+| PermissionSetSchema | `security/permission.zod.ts` vs `kernel/plugin-security-advanced.zod.ts` | ✅ **Resolved (#1383)** — kernel symbol renamed to `PluginPermissionSetSchema` (and `PermissionSchema`→`PluginPermissionSchema`); no collision remains |
 
 ### 2.6 Files Missing `z.infer` Type Exports — ✅ RESOLVED
 

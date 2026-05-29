@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PluginPermissionManager } from './permission-manager.js';
 import { createLogger } from '../logger.js';
-import type { PermissionSet } from '@objectstack/spec/kernel';
+import type { PluginPermissionSet } from '@objectstack/spec/kernel';
 
 describe('PluginPermissionManager', () => {
   let manager: PluginPermissionManager;
@@ -14,7 +14,7 @@ describe('PluginPermissionManager', () => {
 
   describe('registerPermissions', () => {
     it('should register permissions for a plugin', () => {
-      const permissionSet: PermissionSet = {
+      const permissionSet: PluginPermissionSet = {
         permissions: [
           {
             id: 'read-data',
@@ -38,7 +38,7 @@ describe('PluginPermissionManager', () => {
 
   describe('grantPermission', () => {
     it('should grant a permission to a plugin', () => {
-      const permissionSet: PermissionSet = {
+      const permissionSet: PluginPermissionSet = {
         permissions: [
           {
             id: 'read-data',
@@ -59,7 +59,7 @@ describe('PluginPermissionManager', () => {
     });
 
     it('should throw error for non-existent permission', () => {
-      const permissionSet: PermissionSet = {
+      const permissionSet: PluginPermissionSet = {
         permissions: [],
         defaultGrant: 'prompt',
       };
@@ -74,7 +74,7 @@ describe('PluginPermissionManager', () => {
 
   describe('revokePermission', () => {
     it('should revoke a permission from a plugin', () => {
-      const permissionSet: PermissionSet = {
+      const permissionSet: PluginPermissionSet = {
         permissions: [
           {
             id: 'read-data',
@@ -98,7 +98,7 @@ describe('PluginPermissionManager', () => {
 
   describe('checkAccess', () => {
     it('should allow access when permission is granted', () => {
-      const permissionSet: PermissionSet = {
+      const permissionSet: PluginPermissionSet = {
         permissions: [
           {
             id: 'read-data',
@@ -120,7 +120,7 @@ describe('PluginPermissionManager', () => {
     });
 
     it('should deny access when permission is not granted', () => {
-      const permissionSet: PermissionSet = {
+      const permissionSet: PluginPermissionSet = {
         permissions: [
           {
             id: 'read-data',
@@ -141,7 +141,7 @@ describe('PluginPermissionManager', () => {
     });
 
     it('should deny access when permission does not exist', () => {
-      const permissionSet: PermissionSet = {
+      const permissionSet: PluginPermissionSet = {
         permissions: [],
         defaultGrant: 'prompt',
       };
@@ -155,7 +155,7 @@ describe('PluginPermissionManager', () => {
 
   describe('getMissingPermissions', () => {
     it('should return missing required permissions', () => {
-      const permissionSet: PermissionSet = {
+      const permissionSet: PluginPermissionSet = {
         permissions: [
           {
             id: 'read-data',
@@ -188,7 +188,7 @@ describe('PluginPermissionManager', () => {
 
   describe('hasAllRequiredPermissions', () => {
     it('should return true when all required permissions are granted', () => {
-      const permissionSet: PermissionSet = {
+      const permissionSet: PluginPermissionSet = {
         permissions: [
           {
             id: 'read-data',
@@ -209,7 +209,7 @@ describe('PluginPermissionManager', () => {
     });
 
     it('should return false when required permissions are missing', () => {
-      const permissionSet: PermissionSet = {
+      const permissionSet: PluginPermissionSet = {
         permissions: [
           {
             id: 'read-data',
@@ -231,7 +231,7 @@ describe('PluginPermissionManager', () => {
 
   describe('clearPluginPermissions', () => {
     it('should clear all permissions for a plugin', () => {
-      const permissionSet: PermissionSet = {
+      const permissionSet: PluginPermissionSet = {
         permissions: [
           {
             id: 'read-data',

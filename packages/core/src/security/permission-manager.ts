@@ -1,8 +1,8 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import type { 
-  Permission,
-  PermissionSet,
+  PluginPermission,
+  PluginPermissionSet,
   PermissionAction,
   ResourceType
 } from '@objectstack/spec/kernel';
@@ -40,7 +40,7 @@ export class PluginPermissionManager {
   private logger: ObjectLogger;
   
   // Plugin permission definitions
-  private permissionSets = new Map<string, PermissionSet>();
+  private permissionSets = new Map<string, PluginPermissionSet>();
   
   // Granted permissions (pluginId -> Set of permission IDs)
   private grants = new Map<string, Set<string>>();
@@ -55,7 +55,7 @@ export class PluginPermissionManager {
   /**
    * Register permission requirements for a plugin
    */
-  registerPermissions(pluginId: string, permissionSet: PermissionSet): void {
+  registerPermissions(pluginId: string, permissionSet: PluginPermissionSet): void {
     this.permissionSets.set(pluginId, permissionSet);
     
     this.logger.info('Permissions registered for plugin', { 
@@ -231,7 +231,7 @@ export class PluginPermissionManager {
   /**
    * Get all permissions for a plugin
    */
-  getPluginPermissions(pluginId: string): Permission[] {
+  getPluginPermissions(pluginId: string): PluginPermission[] {
     const permissionSet = this.permissionSets.get(pluginId);
     return permissionSet?.permissions || [];
   }
@@ -247,7 +247,7 @@ export class PluginPermissionManager {
   /**
    * Get required but not granted permissions
    */
-  getMissingPermissions(pluginId: string): Permission[] {
+  getMissingPermissions(pluginId: string): PluginPermission[] {
     const permissionSet = this.permissionSets.get(pluginId);
     if (!permissionSet) {
       return [];
@@ -279,7 +279,7 @@ export class PluginPermissionManager {
    * Validate permission against scope constraints
    */
   validatePermissionScope(
-    permission: Permission,
+    permission: PluginPermission,
     context: {
       tenantId?: string;
       userId?: string;

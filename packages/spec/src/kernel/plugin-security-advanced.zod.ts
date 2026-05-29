@@ -72,10 +72,15 @@ export const ResourceTypeSchema = lazySchema(() => z.enum([
 ]).describe('Type of resource being accessed'));
 
 /**
- * Permission Definition
- * Defines a single permission requirement
+ * Plugin Permission Definition
+ * Defines a single plugin-sandbox permission requirement.
+ *
+ * NOTE: This is the plugin-sandbox permission descriptor, NOT the
+ * runtime-editable `permission` metadata type. For the metadata protocol's
+ * permission set (used by the `permission`/`profile` metadata types) see
+ * {@link PermissionSetSchema} in `@objectstack/spec/security`.
  */
-export const PermissionSchema = lazySchema(() => z.object({
+export const PluginPermissionSchema = lazySchema(() => z.object({
   /**
    * Permission identifier
    */
@@ -133,14 +138,18 @@ export const PermissionSchema = lazySchema(() => z.object({
 }));
 
 /**
- * Permission Set
- * Collection of permissions for a plugin
+ * Plugin Permission Set
+ * Collection of plugin-sandbox permissions for a plugin.
+ *
+ * NOTE: This is distinct from the metadata protocol's `PermissionSetSchema`
+ * in `@objectstack/spec/security` (the runtime-editable `permission`/`profile`
+ * metadata type). This one describes what a plugin is allowed to do.
  */
-export const PermissionSetSchema = lazySchema(() => z.object({
+export const PluginPermissionSetSchema = lazySchema(() => z.object({
   /**
    * All permissions required by plugin
    */
-  permissions: z.array(PermissionSchema),
+  permissions: z.array(PluginPermissionSchema),
   
   /**
    * Permission groups for easier management
@@ -627,7 +636,7 @@ export const PluginSecurityManifestSchema = lazySchema(() => z.object({
   /**
    * Required permissions
    */
-  permissions: PermissionSetSchema,
+  permissions: PluginPermissionSetSchema,
   
   /**
    * Sandbox configuration
@@ -694,8 +703,8 @@ export const PluginSecurityManifestSchema = lazySchema(() => z.object({
 export type PermissionScope = z.infer<typeof PermissionScopeSchema>;
 export type PermissionAction = z.infer<typeof PermissionActionSchema>;
 export type ResourceType = z.infer<typeof ResourceTypeSchema>;
-export type Permission = z.infer<typeof PermissionSchema>;
-export type PermissionSet = z.infer<typeof PermissionSetSchema>;
+export type PluginPermission = z.infer<typeof PluginPermissionSchema>;
+export type PluginPermissionSet = z.infer<typeof PluginPermissionSetSchema>;
 export type RuntimeConfig = z.infer<typeof RuntimeConfigSchema>;
 export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
 export type KernelSecurityVulnerability = z.infer<typeof KernelSecurityVulnerabilitySchema>;
