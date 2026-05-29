@@ -167,14 +167,12 @@ export const ACCOUNT_APP: App = {
       ],
     },
 
-    {
-      id: 'nav_account_preferences',
-      type: 'object',
-      label: 'Preferences',
-      objectName: 'sys_user_preference',
-      viewName: 'mine',
-      icon: 'sliders-horizontal',
-      requiresObject: 'sys_user_preference',
-    },
+    // Note: `sys_user_preference` is intentionally NOT exposed in the
+    // Account App. It's an internal key-value store the UI uses for state
+    // like `ui.recent`, `ui.favorites`, theme, sidebar collapse — not
+    // a user-curatable settings surface. A future
+    // `account:preferences_card` React component should provide the
+    // curated theme / locale / timezone / notifications toggles when we
+    // need them; until then there is no nav entry.
   ],
 };

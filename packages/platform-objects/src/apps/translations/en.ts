@@ -38,7 +38,6 @@ export const en: TranslationData = {
         nav_account_sessions: { label: 'Active Sessions' },
         nav_account_api_keys: { label: 'API Keys' },
         nav_account_oauth_apps: { label: 'OAuth Applications' },
-        nav_account_preferences: { label: 'Preferences' },
       },
     },
     setup: {

@@ -25,7 +25,6 @@ export const jaJP: TranslationData = {
         nav_account_sessions: { label: 'アクティブセッション' },
         nav_account_api_keys: { label: 'API キー' },
         nav_account_oauth_apps: { label: 'OAuth アプリケーション' },
-        nav_account_preferences: { label: '環境設定' },
       },
     },
     setup: {

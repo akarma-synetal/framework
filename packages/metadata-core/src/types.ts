@@ -114,7 +114,7 @@ export type MetadataItemHeader = Omit<MetadataItem, 'body'>;
 
 // ─── Change log event ─────────────────────────────────────────────────
 
-export const MetadataOpSchema = z.enum(['create', 'update', 'delete', 'rename']);
+export const MetadataOpSchema = z.enum(['create', 'update', 'delete', 'rename', 'publish', 'revert']);
 export type MetadataOp = z.infer<typeof MetadataOpSchema>;
 
 /**
@@ -130,6 +130,12 @@ export const MetadataEventSchema = z.object({
   ref: MetaRefSchema,
   hash: z.string().nullable(),
   parentHash: z.string().nullable(),
+  /**
+   * Per-(org,type,name) monotonic lineage counter at this event.
+   * Populated by `SysMetadataRepository.history()`; used by
+   * `rollbackMetaItem({ toVersion })` to pin a specific snapshot.
+   */
+  version: z.number().int().positive().optional(),
   previousName: z.string().optional().describe('Set on op="rename"'),
   actor: z.string(),
   message: z.string().optional(),

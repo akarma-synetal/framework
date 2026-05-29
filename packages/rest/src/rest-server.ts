@@ -1596,9 +1596,13 @@ export class RestServer {
                         // For `app` metadata we skip the cache path so the
                         // per-user RBAC filter below can apply without
                         // corrupting shared ETags across admin vs member
-                        // viewers of the same app schema.
+                        // viewers of the same app schema. Drafts also
+                        // bypass cache: the cache is keyed on the
+                        // published checksum and drafts are out-of-band.
                         const isAppType = req.params.type === 'app';
-                        if (metadata.enableCache && p.getMetaItemCached && !isAppType) {
+                        const isDraftRead = typeof req.query?.state === 'string'
+                            && req.query.state.toLowerCase() === 'draft';
+                        if (metadata.enableCache && p.getMetaItemCached && !isAppType && !isDraftRead) {
                             const cacheRequest = {
                                 ifNoneMatch: req.headers['if-none-match'] as string,
                                 ifModifiedSince: req.headers['if-modified-since'] as string,
@@ -1639,10 +1643,14 @@ export class RestServer {
                         } else {
                             // Non-cached version
                             const packageId = req.query?.package || undefined;
+                            const stateParam = typeof req.query?.state === 'string'
+                                ? req.query.state.toLowerCase()
+                                : undefined;
                             const item = await p.getMetaItem({
                                 type: req.params.type,
                                 name: req.params.name,
                                 packageId,
+                                ...(stateParam === 'draft' ? { state: 'draft' } : {}),
                             } as any);
 
                             // Same per-user RBAC filtering as the list endpoint:
@@ -1736,6 +1744,9 @@ export class RestServer {
                         ...(parentVersion !== undefined ? { parentVersion } : {}),
                         ...(actor ? { actor } : {}),
                         ...(force ? { force: true } : {}),
+                        ...((typeof req.query?.mode === 'string'
+                            && req.query.mode.toLowerCase() === 'draft')
+                            ? { mode: 'draft' } : {}),
                     } as any);
                     res.json(result);
                 } catch (error: any) {
@@ -1778,12 +1789,18 @@ export class RestServer {
                         ?? req.user?.id ?? req.userId;
                     const actor = typeof actorHeader === 'string' ? actorHeader : undefined;
 
+                    const stateParam = typeof req.query?.state === 'string'
+                        && req.query.state.toLowerCase() === 'draft'
+                        ? 'draft' as const
+                        : undefined;
+
                     const result = await (p as any).deleteMetaItem({
                         type: req.params.type,
                         name: req.params.name,
                         ...(environmentId ? { environmentId } : {}),
                         ...(parentVersion !== undefined ? { parentVersion } : {}),
                         ...(actor ? { actor } : {}),
+                        ...(stateParam ? { state: stateParam } : {}),
                     });
                     res.json(result);
                 } catch (error: any) {
@@ -1837,6 +1854,135 @@ export class RestServer {
             },
             metadata: {
                 summary: 'List durable history events for a metadata item',
+                tags: ['metadata'],
+            },
+        });
+
+        // POST /meta/:type/:name/publish — promote the pending draft
+        // overlay to live. 404 [no_draft] when nothing to publish.
+        this.routeManager.register({
+            method: 'POST',
+            path: `${metaPath}/:type/:name/publish`,
+            handler: async (req: any, res: any) => {
+                try {
+                    const environmentId = isScoped ? req.params?.environmentId : undefined;
+                    const p = await this.resolveProtocol(environmentId, req);
+                    if (!(p as any).publishMetaItem) {
+                        res.status(501).json({
+                            error: 'Publish operation not supported by protocol implementation',
+                        });
+                        return;
+                    }
+                    const actorHeader = req.headers?.['x-actor'] ?? req.headers?.['X-Actor']
+                        ?? req.user?.id ?? req.userId;
+                    const actor = typeof actorHeader === 'string' ? actorHeader : undefined;
+                    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+                    const message = typeof body.message === 'string' ? body.message : undefined;
+                    const result = await (p as any).publishMetaItem({
+                        type: req.params.type,
+                        name: req.params.name,
+                        ...(environmentId ? { environmentId } : {}),
+                        ...(actor ? { actor } : {}),
+                        ...(message ? { message } : {}),
+                    });
+                    res.json(result);
+                } catch (error: any) {
+                    logError("[REST] Unhandled error:", error);
+                    sendError(res, error);
+                }
+            },
+            metadata: {
+                summary: 'Publish the pending draft overlay (promotes draft → active)',
+                tags: ['metadata'],
+            },
+        });
+
+        // POST /meta/:type/:name/rollback — restore a historical version
+        // as the new live overlay. Body: { toVersion: <number>, message? }.
+        this.routeManager.register({
+            method: 'POST',
+            path: `${metaPath}/:type/:name/rollback`,
+            handler: async (req: any, res: any) => {
+                try {
+                    const environmentId = isScoped ? req.params?.environmentId : undefined;
+                    const p = await this.resolveProtocol(environmentId, req);
+                    if (!(p as any).rollbackMetaItem) {
+                        res.status(501).json({
+                            error: 'Rollback operation not supported by protocol implementation',
+                        });
+                        return;
+                    }
+                    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+                    const toVersionRaw = body.toVersion ?? body.version ?? req.query?.toVersion;
+                    const toVersion = Number(toVersionRaw);
+                    if (!Number.isFinite(toVersion) || toVersion < 1) {
+                        res.status(400).json({
+                            error: `'toVersion' (positive integer) is required`,
+                            code: 'invalid_request',
+                        });
+                        return;
+                    }
+                    const actorHeader = req.headers?.['x-actor'] ?? req.headers?.['X-Actor']
+                        ?? req.user?.id ?? req.userId;
+                    const actor = typeof actorHeader === 'string' ? actorHeader : undefined;
+                    const message = typeof body.message === 'string' ? body.message : undefined;
+                    const result = await (p as any).rollbackMetaItem({
+                        type: req.params.type,
+                        name: req.params.name,
+                        toVersion,
+                        ...(environmentId ? { environmentId } : {}),
+                        ...(actor ? { actor } : {}),
+                        ...(message ? { message } : {}),
+                    });
+                    res.json(result);
+                } catch (error: any) {
+                    logError("[REST] Unhandled error:", error);
+                    sendError(res, error);
+                }
+            },
+            metadata: {
+                summary: 'Restore the body at the given history version as the new live row',
+                tags: ['metadata'],
+            },
+        });
+
+        // GET /meta/:type/:name/diff?from=N&to=M — structural diff
+        // between two historical versions (or one version vs current).
+        this.routeManager.register({
+            method: 'GET',
+            path: `${metaPath}/:type/:name/diff`,
+            handler: async (req: any, res: any) => {
+                try {
+                    const environmentId = isScoped ? req.params?.environmentId : undefined;
+                    const p = await this.resolveProtocol(environmentId, req);
+                    if (!(p as any).diffMetaItem) {
+                        res.status(501).json({
+                            error: 'Diff operation not supported by protocol implementation',
+                        });
+                        return;
+                    }
+                    const parseV = (raw: any): number | undefined => {
+                        if (raw === undefined || raw === null || raw === '') return undefined;
+                        const n = Number(raw);
+                        return Number.isFinite(n) ? n : undefined;
+                    };
+                    const fromVersion = parseV(req.query?.from ?? req.query?.fromVersion);
+                    const toVersion = parseV(req.query?.to ?? req.query?.toVersion);
+                    const result = await (p as any).diffMetaItem({
+                        type: req.params.type,
+                        name: req.params.name,
+                        ...(environmentId ? { environmentId } : {}),
+                        ...(fromVersion !== undefined ? { fromVersion } : {}),
+                        ...(toVersion !== undefined ? { toVersion } : {}),
+                    });
+                    res.json(result);
+                } catch (error: any) {
+                    logError("[REST] Unhandled error:", error);
+                    sendError(res, error);
+                }
+            },
+            metadata: {
+                summary: 'Diff two metadata versions (from/to query params; omit for previous-vs-current)',
                 tags: ['metadata'],
             },
         });

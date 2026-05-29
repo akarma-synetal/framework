@@ -54,7 +54,7 @@ function makeFakeEngine() {
     const historyRows: HistoryRow[] = [];
 
     const keyOf = (where: Record<string, unknown>) =>
-        `${where.type}|${where.name}|${String(where.organization_id ?? 'null')}`;
+        `${where.type}|${where.name}|${String(where.organization_id ?? 'null')}|${String(where.state ?? 'active')}`;
 
     const findRow = (where: Record<string, unknown>): { key: string; row: Row } | null => {
         if (where.id !== undefined) {
@@ -75,6 +75,7 @@ function makeFakeEngine() {
         if (where.name !== undefined && h.name !== where.name) return false;
         if (where.operation_type !== undefined && h.operation_type !== where.operation_type)
             return false;
+        if (where.version !== undefined && h.version !== where.version) return false;
         return true;
     };
 
@@ -546,6 +547,128 @@ describe('SysMetadataRepository', () => {
         }
         expect(events).toHaveLength(1);
         expect(events[0].seq).toBe(2);
+    });
+
+    // ── draft / publish / rollback (per-item lifecycle) ─────────────
+
+    it('put with state=draft creates a separate draft row that does not affect active reads', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        const active = await repo.put(ref, sampleView, {
+            parentVersion: null,
+            actor: 'studio',
+        });
+        const draft = await repo.put(
+            ref,
+            { ...sampleView, label: 'Draft Label' },
+            { parentVersion: null, actor: 'studio', state: 'draft' },
+        );
+        expect(draft.version).not.toBe(active.version);
+        // Active read still sees published body.
+        const live = await repo.get(ref);
+        expect(live!.body.label).toBe('Cases');
+        // Explicit draft read sees the pending body.
+        const pending = await repo.get(ref, { state: 'draft' });
+        expect(pending!.body.label).toBe('Draft Label');
+    });
+
+    it('drafts do not broadcast watch events', async () => {
+        const received: any[] = [];
+        const iter = repo.watch({ type: 'view' });
+        const ai = iter[Symbol.asyncIterator]();
+
+        const consume = (async () => {
+            for (let i = 0; i < 2; i += 1) {
+                const r = await ai.next();
+                if (r.done) break;
+                received.push(r.value);
+            }
+        })();
+
+        await new Promise((r) => setTimeout(r, 0));
+        // Draft write — must NOT be emitted.
+        await repo.put(
+            { org: 'org_alpha', type: 'view', name: 'drafty' },
+            { name: 'drafty' },
+            { parentVersion: null, actor: 'studio', state: 'draft' },
+        );
+        // Active write — should be received.
+        await repo.put(
+            { org: 'org_alpha', type: 'view', name: 'live1' },
+            { name: 'live1' },
+            { parentVersion: null, actor: 'studio' },
+        );
+        // Second active write — should also be received (2nd event).
+        await repo.put(
+            { org: 'org_alpha', type: 'view', name: 'live2' },
+            { name: 'live2' },
+            { parentVersion: null, actor: 'studio' },
+        );
+
+        await consume;
+        await ai.return!();
+        expect(received.map((e) => e.ref.name)).toEqual(['live1', 'live2']);
+    });
+
+    it('promoteDraft promotes the draft body to active and clears the draft', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
+        await repo.put(
+            ref,
+            { ...sampleView, label: 'Draft Label' },
+            { parentVersion: null, actor: 'studio', state: 'draft' },
+        );
+        const result = await repo.promoteDraft(ref, { actor: 'admin' });
+        expect(result.item.body.label).toBe('Draft Label');
+        // Active is now the formerly-draft body.
+        const live = await repo.get(ref);
+        expect(live!.body.label).toBe('Draft Label');
+        // Draft row is gone.
+        expect(await repo.get(ref, { state: 'draft' })).toBeNull();
+        // History records a 'publish' op.
+        const events: any[] = [];
+        for await (const e of repo.history(ref)) events.push(e);
+        const ops = events.map((e) => e.op);
+        expect(ops).toContain('publish');
+    });
+
+    it('promoteDraft throws no_draft when nothing is pending', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
+        await expect(
+            repo.promoteDraft(ref, { actor: 'admin' }),
+        ).rejects.toMatchObject({ code: 'no_draft', status: 404 });
+    });
+
+    it('restoreVersion writes the historical body back as active with op=revert', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        // v1
+        await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
+        // v2
+        const v2 = await repo.put(
+            ref,
+            { ...sampleView, label: 'Renamed' },
+            { parentVersion: hashSpec(sampleView), actor: 'studio' },
+        );
+        // Now rollback to v1.
+        const result = await repo.restoreVersion(ref, 1, { actor: 'admin' });
+        expect(result.item.body.label).toBe('Cases');
+        const live = await repo.get(ref);
+        expect(live!.body.label).toBe('Cases');
+        const events: any[] = [];
+        for await (const e of repo.history(ref)) events.push(e);
+        expect(events.map((e) => e.op)).toContain('revert');
+        // Last event should be the revert; its hash matches v1's body.
+        expect(events[events.length - 1].op).toBe('revert');
+        expect(events[events.length - 1].hash).toBe(hashSpec(sampleView));
+        void v2;
+    });
+
+    it('restoreVersion throws version_not_found for missing version', async () => {
+        const ref = { org: 'org_alpha', type: 'view' as const, name: 'case_grid' };
+        await repo.put(ref, sampleView, { parentVersion: null, actor: 'studio' });
+        await expect(
+            repo.restoreVersion(ref, 99, { actor: 'admin' }),
+        ).rejects.toMatchObject({ code: 'version_not_found', status: 404 });
     });
 
     // ── close ───────────────────────────────────────────────────────

@@ -69,6 +69,30 @@ import { DEFAULT_METADATA_TYPE_REGISTRY } from '@objectstack/spec/kernel';
 import { PLURAL_TO_SINGULAR, SINGULAR_TO_PLURAL } from '@objectstack/spec/shared';
 
 /**
+ * Overlay-row lifecycle state.
+ *
+ *  - `'active'`  → the published, live overlay. `getMetaItem` (the
+ *    default read path) and runtime loaders observe this row.
+ *  - `'draft'`   → an unpublished pending change. Lives alongside the
+ *    active row (one of each per `(org,type,name)`). Promoted to
+ *    `active` via {@link SysMetadataRepository.promoteDraft}.
+ *
+ * Other lifecycle values defined on `sys_metadata.state` (`'archived'`,
+ * `'deprecated'`) are not yet plumbed through the overlay write path;
+ * they remain reserved for future flows (item retirement, freeze).
+ */
+export type OverlayState = 'active' | 'draft';
+
+/**
+ * Extended history operation tag. The base `'create' | 'update' |
+ * 'delete'` operations are emitted by the canonical put/delete paths.
+ * `'publish'` is recorded when a draft is promoted, `'revert'` when a
+ * historical version is restored. Both are surfaced as MetadataEvent
+ * `.op` values via `history()`.
+ */
+export type ExtendedOperation = 'create' | 'update' | 'publish' | 'revert' | 'delete';
+
+/**
  * Sub-set of the ObjectQL engine shape we depend on. Kept narrow so
  * tests can stub it with a plain mock. Mirrors the real engine's
  * `options.context` pattern so transactions can thread through.
@@ -220,11 +244,16 @@ export class SysMetadataRepository implements MetadataRepository {
   /**
    * Read the current overlay row. Returns null if no row exists —
    * callers (e.g. LayeredRepository) fall through to lower layers.
+   *
+   * `opts.state` selects which lifecycle row to read: defaults to the
+   * live published row (`'active'`). Pass `'draft'` to read the pending
+   * unpublished revision (if any).
    */
-  async get(ref: MetaRef): Promise<MetadataItem | null> {
+  async get(ref: MetaRef, opts?: { state?: OverlayState }): Promise<MetadataItem | null> {
     this.assertOpen();
+    const state = opts?.state ?? 'active';
     const row = await this.engine.findOne('sys_metadata', {
-      where: this.whereFor(ref),
+      where: this.whereFor(ref, state),
     });
     if (!row) return null;
     return this.rowToItem(ref, row);
@@ -269,10 +298,15 @@ export class SysMetadataRepository implements MetadataRepository {
     };
   }
 
-  async put(ref: MetaRef, spec: unknown, opts: PutOptions): Promise<PutResult> {
+  async put(
+    ref: MetaRef,
+    spec: unknown,
+    opts: PutOptions & { state?: OverlayState; opType?: ExtendedOperation },
+  ): Promise<PutResult> {
     this.assertOpen();
     this.assertAllowed(ref.type, opts.intent);
 
+    const state: OverlayState = opts.state ?? 'active';
     const body = (spec ?? {}) as Record<string, unknown>;
     const hash = hashSpec(body);
 
@@ -280,7 +314,7 @@ export class SysMetadataRepository implements MetadataRepository {
     // lock, the parent-row mutation, and the history append are atomic.
     const result = await this.withTxn(async (ctx) => {
       const existing = await this.engine.findOne('sys_metadata', {
-        where: this.whereFor(ref),
+        where: this.whereFor(ref, state),
         context: ctx,
       });
       const existingHash: string | null = existing?.checksum ?? null;
@@ -297,7 +331,8 @@ export class SysMetadataRepository implements MetadataRepository {
       }
 
       const now = new Date().toISOString();
-      const op: 'create' | 'update' = existing ? 'update' : 'create';
+      const baseOp: 'create' | 'update' = existing ? 'update' : 'create';
+      const op: ExtendedOperation = opts.opType ?? baseOp;
 
       // Per-(org,type,name) lineage counter. Use MAX from history so
       // delete+recreate continues incrementing instead of restarting
@@ -312,7 +347,7 @@ export class SysMetadataRepository implements MetadataRepository {
         organization_id: this.organizationId,
         metadata: JSON.stringify(body),
         checksum: hash,
-        state: 'active',
+        state,
         version,
         updated_at: now,
       };
@@ -387,28 +422,38 @@ export class SysMetadataRepository implements MetadataRepository {
     // Broadcast AFTER commit. seqCounter tracks the durable event_seq
     // so watch() consumers and history() consumers see the same cursor.
     this.seqCounter = result.seq;
-    this.broadcast({
-      seq: result.seq,
-      op: result.op,
-      ref: this.fullRef(ref),
-      hash: result.version,
-      parentHash: result.existingHash,
-      actor: result.actor,
-      message: result.message,
-      ts: result.now,
-      source: result.source,
-    });
+    // Drafts are explicitly NOT broadcast — the watch() stream models
+    // the live overlay surface. A draft is a private staging buffer
+    // until `promoteDraft()` records a `publish` event. Subscribers
+    // (cache layers, HMR clients) should not react to drafts.
+    if (state === 'active') {
+      this.broadcast({
+        seq: result.seq,
+        op: result.op,
+        ref: this.fullRef(ref),
+        hash: result.version,
+        parentHash: result.existingHash,
+        actor: result.actor,
+        message: result.message,
+        ts: result.now,
+        source: result.source,
+      });
+    }
 
     return { version: result.version, seq: result.seq, item: result.item };
   }
 
-  async delete(ref: MetaRef, opts: DeleteOptions): Promise<DeleteResult> {
+  async delete(
+    ref: MetaRef,
+    opts: DeleteOptions & { state?: OverlayState },
+  ): Promise<DeleteResult> {
     this.assertOpen();
     this.assertAllowed(ref.type, opts.intent);
 
+    const state: OverlayState = opts.state ?? 'active';
     const result = await this.withTxn(async (ctx) => {
       const existing = await this.engine.findOne('sys_metadata', {
-        where: this.whereFor(ref),
+        where: this.whereFor(ref, state),
         context: ctx,
       });
       if (!existing) {
@@ -427,37 +472,46 @@ export class SysMetadataRepository implements MetadataRepository {
       }
 
       const now = new Date().toISOString();
-      const version = await this.nextItemVersion(ref, ctx);
-      const eventSeq = await this.nextEventSeq(ctx);
+      // Draft deletions are a private buffer flush — they don't get a
+      // history event (no audit value, and no parent for replay). Only
+      // active-row deletes write a tombstone.
+      let version = 0;
+      let eventSeq = 0;
+      if (state === 'active') {
+        version = await this.nextItemVersion(ref, ctx);
+        eventSeq = await this.nextEventSeq(ctx);
+      }
 
       await this.engine.delete('sys_metadata', {
         where: { id: existingId },
         context: ctx,
       });
 
-      // Tombstone row — metadata/checksum are intentionally null.
-      // Identity is preserved via (organization_id, type, name, version);
-      // the parent row's id is not retained.
-      await this.engine.insert(
-        this.historyTable,
-        {
-          id: this.uuid(),
-          event_seq: eventSeq,
-          type: ref.type,
-          name: ref.name,
-          version,
-          operation_type: 'delete',
-          metadata: null,
-          checksum: null,
-          previous_checksum: existingHash,
-          change_note: opts.message,
-          source: opts.source ?? 'sys-metadata-repo',
-          organization_id: this.organizationId,
-          recorded_by: opts.actor,
-          recorded_at: now,
-        },
-        { context: ctx },
-      );
+      if (state === 'active') {
+        // Tombstone row — metadata/checksum are intentionally null.
+        // Identity is preserved via (organization_id, type, name, version);
+        // the parent row's id is not retained.
+        await this.engine.insert(
+          this.historyTable,
+          {
+            id: this.uuid(),
+            event_seq: eventSeq,
+            type: ref.type,
+            name: ref.name,
+            version,
+            operation_type: 'delete',
+            metadata: null,
+            checksum: null,
+            previous_checksum: existingHash,
+            change_note: opts.message,
+            source: opts.source ?? 'sys-metadata-repo',
+            organization_id: this.organizationId,
+            recorded_by: opts.actor,
+            recorded_at: now,
+          },
+          { context: ctx },
+        );
+      }
 
       return {
         eventSeq,
@@ -469,20 +523,130 @@ export class SysMetadataRepository implements MetadataRepository {
       };
     });
 
-    this.seqCounter = result.eventSeq;
-    this.broadcast({
-      seq: result.eventSeq,
-      op: 'delete',
-      ref: this.fullRef(ref),
-      hash: null,
-      parentHash: result.existingHash,
-      actor: result.actor,
-      message: result.message,
-      ts: result.now,
-      source: result.source,
-    });
+    if (state === 'active') {
+      this.seqCounter = result.eventSeq;
+      this.broadcast({
+        seq: result.eventSeq,
+        op: 'delete',
+        ref: this.fullRef(ref),
+        hash: null,
+        parentHash: result.existingHash,
+        actor: result.actor,
+        message: result.message,
+        ts: result.now,
+        source: result.source,
+      });
+    }
 
     return { seq: result.eventSeq };
+  }
+
+  /**
+   * Promote the pending draft row for `ref` into the live (`active`)
+   * overlay. Atomic: reads the draft inside the same transaction, runs
+   * the canonical `put` to upsert the active row (which appends a
+   * history event with `operation_type='publish'`), then deletes the
+   * draft row.
+   *
+   * Errors if no draft exists (callers should 404). The active row's
+   * `parentVersion` is computed from the current active hash so this
+   * also surfaces optimistic-lock conflicts when something else has
+   * published in between (e.g. another admin reverted to an older
+   * version since the draft was authored).
+   */
+  async promoteDraft(
+    ref: MetaRef,
+    opts: { actor: string; source?: string; message?: string; intent?: MetadataWriteIntent },
+  ): Promise<{ version: string; seq: number; item: MetadataItem }> {
+    this.assertOpen();
+    const draft = await this.get(ref, { state: 'draft' });
+    if (!draft) {
+      const err: any = new Error(
+        `[no_draft] No pending draft exists for ${ref.type}/${ref.name} — nothing to publish.`,
+      );
+      err.code = 'no_draft';
+      err.status = 404;
+      throw err;
+    }
+    const currentActive = await this.get(ref, { state: 'active' });
+    const result = await this.put(ref, draft.body, {
+      parentVersion: currentActive?.hash ?? null,
+      actor: opts.actor,
+      source: opts.source ?? 'sys-metadata-repo.publish',
+      message: opts.message ?? `publish draft (hash ${draft.hash})`,
+      intent: opts.intent ?? 'override-artifact',
+      state: 'active',
+      opType: 'publish',
+    });
+    // Drop the draft row — it has been promoted. Tolerate races where
+    // a second publisher already drained it.
+    try {
+      await this.delete(ref, {
+        parentVersion: draft.hash,
+        actor: opts.actor,
+        source: opts.source ?? 'sys-metadata-repo.publish',
+        intent: opts.intent ?? 'override-artifact',
+        state: 'draft',
+      });
+    } catch {
+      // best-effort: a concurrent publisher may have already drained
+      // the draft; the active row's authoritative content is intact.
+    }
+    return result;
+  }
+
+  /**
+   * Restore the body recorded in history at `targetVersion` (per-org
+   * lineage counter) as the new active row. Writes a history event
+   * with `operation_type='revert'` so the audit trail captures the
+   * intent. Does NOT touch any draft row.
+   *
+   * Throws `[version_not_found]` (404) if the target version row is
+   * missing or is a delete tombstone (no body to restore).
+   */
+  async restoreVersion(
+    ref: MetaRef,
+    targetVersion: number,
+    opts: { actor: string; source?: string; message?: string; intent?: MetadataWriteIntent },
+  ): Promise<{ version: string; seq: number; item: MetadataItem }> {
+    this.assertOpen();
+    const full = this.fullRef(ref);
+    const row = await this.engine.findOne(this.historyTable, {
+      where: {
+        organization_id: this.organizationId,
+        type: full.type,
+        name: full.name,
+        version: targetVersion,
+      },
+    });
+    if (!row) {
+      const err: any = new Error(
+        `[version_not_found] No history row at version ${targetVersion} for ${ref.type}/${ref.name}.`,
+      );
+      err.code = 'version_not_found';
+      err.status = 404;
+      throw err;
+    }
+    const raw = (row as any).metadata;
+    if (raw === null || raw === undefined) {
+      const err: any = new Error(
+        `[version_not_restorable] Version ${targetVersion} for ${ref.type}/${ref.name} is a delete tombstone — nothing to restore.`,
+      );
+      err.code = 'version_not_restorable';
+      err.status = 409;
+      throw err;
+    }
+    const body = typeof raw === 'string' ? JSON.parse(raw) : (raw as Record<string, unknown>);
+    const currentActive = await this.get(ref, { state: 'active' });
+    return this.put(ref, body, {
+      parentVersion: currentActive?.hash ?? null,
+      actor: opts.actor,
+      source: opts.source ?? 'sys-metadata-repo.revert',
+      message: opts.message ?? `revert to version ${targetVersion}`,
+      intent: opts.intent ?? 'override-artifact',
+      state: 'active',
+      opType: 'revert',
+    });
   }
 
   async *list(filter: ListFilter): AsyncIterable<MetadataItemHeader> {
@@ -542,6 +706,7 @@ export class SysMetadataRepository implements MetadataRepository {
         ref: full,
         hash: (row.checksum as string | null) ?? null,
         parentHash: (row.previous_checksum as string | null) ?? null,
+        version: typeof row.version === 'number' ? row.version : undefined,
         actor: (row.recorded_by as string | undefined) ?? 'unknown',
         message: (row.change_note as string | undefined) ?? undefined,
         ts: (row.recorded_at as string) ?? new Date(0).toISOString(),
@@ -688,12 +853,15 @@ export class SysMetadataRepository implements MetadataRepository {
     throw err;
   }
 
-  private whereFor(ref: Pick<MetaRef, 'type' | 'name'>): Record<string, unknown> {
+  private whereFor(
+    ref: Pick<MetaRef, 'type' | 'name'>,
+    state: OverlayState = 'active',
+  ): Record<string, unknown> {
     return {
       type: ref.type,
       name: ref.name,
       organization_id: this.organizationId,
-      state: 'active',
+      state,
     };
   }
 

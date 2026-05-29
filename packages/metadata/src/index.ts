@@ -23,7 +23,10 @@ export { DatabaseLoader, type DatabaseLoaderOptions } from './loaders/database-l
 export { SysMetadataObject, SysMetadataHistoryObject } from '@objectstack/platform-objects/metadata';
 
 // Routes
-export { registerMetadataHistoryRoutes } from './routes/history-routes.js';
+// NOTE: `registerMetadataHistoryRoutes` (Hono-style) was removed —
+// the canonical history / publish / rollback / diff REST surface
+// lives in `packages/rest/src/rest-server.ts` and is wired by the
+// REST plugin on every running app.
 
 // Utils
 export { calculateChecksum, generateSimpleDiff, generateDiffSummary } from './utils/metadata-history-utils.js';

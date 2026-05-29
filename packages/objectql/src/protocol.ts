@@ -483,6 +483,47 @@ function extractPathValues(item: unknown, path: string): string[] {
  * data-loss footguns for `object` and `field` types. Subsequent passes
  * can layer in relationship changes, enum-value removals, etc.
  */
+/**
+ * Shallow JSON diff used by `diffMetaItem`. Compares the top-level
+ * keys of `from` vs `to`; primitive value changes are reported as
+ * `changed`, nested objects/arrays that differ structurally are also
+ * reported as a single `changed` entry (deep structural diffs are out
+ * of scope — Studio renders the full bodies for a side-by-side view).
+ */
+function diffShallow(
+    from: Record<string, unknown>,
+    to: Record<string, unknown>,
+): {
+    added: Array<{ path: string; value: unknown }>;
+    removed: Array<{ path: string; value: unknown }>;
+    changed: Array<{ path: string; from: unknown; to: unknown }>;
+} {
+    const added: Array<{ path: string; value: unknown }> = [];
+    const removed: Array<{ path: string; value: unknown }> = [];
+    const changed: Array<{ path: string; from: unknown; to: unknown }> = [];
+    const fromKeys = new Set(Object.keys(from ?? {}));
+    const toKeys = new Set(Object.keys(to ?? {}));
+    for (const k of toKeys) {
+        if (!fromKeys.has(k)) {
+            added.push({ path: k, value: (to as any)[k] });
+        } else {
+            const a = (from as any)[k];
+            const b = (to as any)[k];
+            const aStr = JSON.stringify(a);
+            const bStr = JSON.stringify(b);
+            if (aStr !== bStr) {
+                changed.push({ path: k, from: a, to: b });
+            }
+        }
+    }
+    for (const k of fromKeys) {
+        if (!toKeys.has(k)) {
+            removed.push({ path: k, value: (from as any)[k] });
+        }
+    }
+    return { added, removed, changed };
+}
+
 function detectDestructiveObjectChanges(prev: any, next: any): Array<{
     code: string;
     field?: string;
@@ -664,6 +705,30 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     }
                 }
                 // "already exists" or anything else: best-effort
+            }
+            // Mirror the same partial-UNIQUE for draft rows so a second
+            // simultaneous draft cannot be inserted for the same
+            // (type,name,org). The unique-active index above already
+            // guards published rows; the two never collide because the
+            // `state` predicate disambiguates them.
+            const draftPartialSql =
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_metadata_overlay_draft " +
+                "ON sys_metadata (type, name, organization_id) " +
+                "WHERE state = 'draft'";
+            try {
+                await exec(draftPartialSql);
+            } catch (err: any) {
+                const msg = err instanceof Error ? err.message : String(err);
+                if (/partial|where clause|syntax/i.test(msg)) {
+                    try {
+                        await exec(
+                            "CREATE INDEX IF NOT EXISTS idx_sys_metadata_overlay_draft " +
+                            "ON sys_metadata (type, name, organization_id)",
+                        );
+                    } catch {
+                        // ignore — best effort
+                    }
+                }
             }
         } catch {
             // ignore — index is an optimization, not a correctness invariant
@@ -1031,9 +1096,12 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         };
     }
 
-    async getMetaItem(request: { type: string, name: string, packageId?: string, organizationId?: string }) {
+    async getMetaItem(request: { type: string, name: string, packageId?: string, organizationId?: string, state?: 'active' | 'draft' }) {
         let item: unknown;
         const orgId = request.organizationId;
+        // Studio's editor opens a draft buffer with `state: 'draft'`;
+        // runtime loaders omit it and get the live published row.
+        const readState: 'active' | 'draft' = request.state === 'draft' ? 'draft' : 'active';
 
         // 1. Customization overlay lookup (sys_metadata).
         //    Per ADR-0005 (revised), org-scoped row wins; env-wide
@@ -1044,7 +1112,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 const where: Record<string, unknown> = {
                     type: request.type,
                     name: request.name,
-                    state: 'active',
+                    state: readState,
                     organization_id: oid,
                 };
                 const rec = await this.engine.findOne('sys_metadata', { where });
@@ -1054,7 +1122,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     const altWhere: Record<string, unknown> = {
                         type: alt,
                         name: request.name,
-                        state: 'active',
+                        state: readState,
                         organization_id: oid,
                     };
                     return await this.engine.findOne('sys_metadata', { where: altWhere });
@@ -1070,6 +1138,14 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             }
         } catch {
             // DB not available — fall through to registry / MetadataService
+        }
+
+        // Draft reads stop here — they intentionally do NOT fall through
+        // to the runtime registry / MetadataService (which only know
+        // about published values). Returning `undefined` is the
+        // expected signal that "no draft pending".
+        if (readState === 'draft') {
+            return { type: request.type, name: request.name, item };
         }
 
         // 2. MetadataService (runtime-registered items: HMR-updated view/page/
@@ -2519,10 +2595,16 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         }
     }
 
-    async saveMetaItem(request: { type: string, name: string, item?: any, organizationId?: string, parentVersion?: string | null, actor?: string, force?: boolean }) {
+    async saveMetaItem(request: { type: string, name: string, item?: any, organizationId?: string, parentVersion?: string | null, actor?: string, force?: boolean, mode?: 'draft' | 'publish' }) {
         if (!request.item) {
             throw new Error('Item data is required');
         }
+        // Per-item lifecycle (ADR-0005 §"Drafts"). Default is `'publish'`
+        // (legacy semantics — save goes straight live) to keep callers
+        // that predate the draft/publish split working. Studio's
+        // designer surface opts into staged drafts by sending
+        // `?mode=draft`; the `POST /publish` endpoint then promotes it.
+        const mode: 'draft' | 'publish' = request.mode === 'draft' ? 'draft' : 'publish';
 
         // ADR-0005 (extended — two-tier model): project-kernel customization is
         // gated by per-item provenance, not just the type-level flag.
@@ -2692,7 +2774,11 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             if (request.parentVersion !== undefined) {
                 parentVersion = request.parentVersion;
             } else {
-                const current = await repo.get(ref);
+                // Parent is scoped to the lifecycle we're about to write:
+                // a draft's parent is the current draft hash (or null
+                // for the first draft); a publish's parent is the
+                // current published hash.
+                const current = await repo.get(ref, { state: mode === 'draft' ? 'draft' : 'active' });
                 parentVersion = current?.hash ?? null;
             }
             try {
@@ -2701,18 +2787,24 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     actor: request.actor ?? 'system',
                     source: 'protocol.saveMetaItem',
                     intent,
+                    state: mode === 'draft' ? 'draft' : 'active',
                 });
                 // Persistence succeeded — NOW it's safe to mutate the
                 // in-memory object registry. If put() had thrown, the
-                // registry would still reflect the prior state.
-                this.applyObjectRegistryMutation(request);
+                // registry would still reflect the prior state. Drafts
+                // are NOT live: don't propagate them into the runtime
+                // object registry (would defeat the staging buffer).
+                if (mode === 'publish') {
+                    this.applyObjectRegistryMutation(request);
+                }
                 return {
                     success: true,
                     version: result.version,
                     seq: result.seq,
+                    state: mode === 'draft' ? 'draft' : 'active',
                     message: orgId
-                        ? `Saved customization overlay (org=${orgId}) — type=${request.type}, name=${request.name} [seq=${result.seq}]`
-                        : `Saved customization overlay (env-wide) — type=${request.type}, name=${request.name} [seq=${result.seq}]`,
+                        ? `Saved customization overlay (org=${orgId}, state=${mode === 'draft' ? 'draft' : 'active'}) — type=${request.type}, name=${request.name} [seq=${result.seq}]`
+                        : `Saved customization overlay (env-wide, state=${mode === 'draft' ? 'draft' : 'active'}) — type=${request.type}, name=${request.name} [seq=${result.seq}]`,
                 };
             } catch (err: any) {
                 if (err instanceof ConflictError) {
@@ -2850,6 +2942,268 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
     }
 
     /**
+     * Promote the pending draft overlay to the live (`active`) row.
+     * Records a history event with `op='publish'`. 404 (`[no_draft]`)
+     * when there is nothing to publish.
+     */
+    async publishMetaItem(request: {
+        type: string;
+        name: string;
+        organizationId?: string;
+        actor?: string;
+        message?: string;
+    }): Promise<{
+        success: boolean;
+        version: string;
+        seq: number;
+        message?: string;
+    }> {
+        const singularType = PLURAL_TO_SINGULAR[request.type] ?? request.type;
+        if (!ObjectStackProtocolImplementation.isOverlayAllowed(singularType)
+            && !ObjectStackProtocolImplementation.isRuntimeCreateAllowed(singularType)) {
+            const err: any = new Error(
+                `[not_overridable] Metadata type '${request.type}' is not draftable — no overlay/runtime-create permission.`,
+            );
+            err.code = 'not_overridable';
+            err.status = 403;
+            throw err;
+        }
+        await this.ensureOverlayIndex();
+        const orgId = request.organizationId ?? null;
+        const repo = this.getOverlayRepo(orgId);
+        const artifactBacked = this.isArtifactBacked(singularType, request.name);
+        const intent: 'override-artifact' | 'runtime-only' = artifactBacked
+            ? 'override-artifact' : 'runtime-only';
+        const ref = {
+            type: singularType,
+            name: request.name,
+            org: orgId ?? 'env',
+        } as Parameters<typeof repo.promoteDraft>[0];
+        try {
+            const result = await repo.promoteDraft(ref, {
+                actor: request.actor ?? 'system',
+                source: 'protocol.publishMetaItem',
+                ...(request.message ? { message: request.message } : {}),
+                intent,
+            });
+            // Drafts skipped the registry mutation; on publish we now
+            // refresh the runtime object registry so live behaviour
+            // catches up immediately (matches saveMetaItem's
+            // post-persistence registry update path).
+            this.applyObjectRegistryMutation({
+                type: request.type,
+                name: request.name,
+                item: result.item.body,
+            });
+            return {
+                success: true,
+                version: result.version,
+                seq: result.seq,
+                message: `Published draft — type=${request.type}, name=${request.name} [seq=${result.seq}]`,
+            };
+        } catch (err: any) {
+            if (err instanceof ConflictError) {
+                const conflict: any = new Error(
+                    `[metadata_conflict] ${request.type}/${request.name} published row advanced while you held the draft. `
+                    + `Expected parent ${err.expectedParent ?? 'null'} but current is ${err.actualHead ?? 'null'}.`,
+                );
+                conflict.code = 'metadata_conflict';
+                conflict.status = 409;
+                conflict.expectedParent = err.expectedParent;
+                conflict.actualHead = err.actualHead;
+                throw conflict;
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * Restore the body recorded at history `toVersion` as the new
+     * live row. Writes a history event with `op='revert'`. 404
+     * (`[version_not_found]`) when the target version doesn't exist;
+     * 409 (`[version_not_restorable]`) when the target is a delete
+     * tombstone (no body to bring back).
+     */
+    async rollbackMetaItem(request: {
+        type: string;
+        name: string;
+        toVersion: number;
+        organizationId?: string;
+        actor?: string;
+        message?: string;
+    }): Promise<{
+        success: boolean;
+        version: string;
+        seq: number;
+        restoredFromVersion: number;
+        message?: string;
+    }> {
+        if (!Number.isFinite(request.toVersion) || request.toVersion < 1) {
+            const err: any = new Error(
+                `[invalid_request] rollbackMetaItem requires a positive integer 'toVersion' (got ${request.toVersion}).`,
+            );
+            err.code = 'invalid_request';
+            err.status = 400;
+            throw err;
+        }
+        const singularType = PLURAL_TO_SINGULAR[request.type] ?? request.type;
+        if (!ObjectStackProtocolImplementation.isOverlayAllowed(singularType)
+            && !ObjectStackProtocolImplementation.isRuntimeCreateAllowed(singularType)) {
+            const err: any = new Error(
+                `[not_overridable] Metadata type '${request.type}' is not revertable — no overlay/runtime-create permission.`,
+            );
+            err.code = 'not_overridable';
+            err.status = 403;
+            throw err;
+        }
+        await this.ensureOverlayIndex();
+        const orgId = request.organizationId ?? null;
+        const repo = this.getOverlayRepo(orgId);
+        const artifactBacked = this.isArtifactBacked(singularType, request.name);
+        const intent: 'override-artifact' | 'runtime-only' = artifactBacked
+            ? 'override-artifact' : 'runtime-only';
+        const ref = {
+            type: singularType,
+            name: request.name,
+            org: orgId ?? 'env',
+        } as Parameters<typeof repo.restoreVersion>[0];
+        try {
+            const result = await repo.restoreVersion(ref, request.toVersion, {
+                actor: request.actor ?? 'system',
+                source: 'protocol.rollbackMetaItem',
+                ...(request.message ? { message: request.message } : {}),
+                intent,
+            });
+            this.applyObjectRegistryMutation({
+                type: request.type,
+                name: request.name,
+                item: result.item.body,
+            });
+            return {
+                success: true,
+                version: result.version,
+                seq: result.seq,
+                restoredFromVersion: request.toVersion,
+                message: `Reverted to version ${request.toVersion} — type=${request.type}, name=${request.name} [seq=${result.seq}]`,
+            };
+        } catch (err: any) {
+            if (err instanceof ConflictError) {
+                const conflict: any = new Error(
+                    `[metadata_conflict] ${request.type}/${request.name} advanced during rollback. `
+                    + `Expected parent ${err.expectedParent ?? 'null'} but current is ${err.actualHead ?? 'null'}.`,
+                );
+                conflict.code = 'metadata_conflict';
+                conflict.status = 409;
+                conflict.expectedParent = err.expectedParent;
+                conflict.actualHead = err.actualHead;
+                throw conflict;
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * Compute a shallow structural diff between two historical
+     * versions of a metadata item. Either side may be omitted: when
+     * `toVersion` is undefined the current active body is used; when
+     * `fromVersion` is undefined the immediately previous history row
+     * is used. Returns `{ added, removed, changed }` keyed by JSON
+     * pointer-style paths for primitive leaves; nested objects/arrays
+     * are reported as a single change record.
+     */
+    async diffMetaItem(request: {
+        type: string;
+        name: string;
+        fromVersion?: number;
+        toVersion?: number;
+        organizationId?: string;
+    }): Promise<{
+        type: string;
+        name: string;
+        fromVersion: number | null;
+        toVersion: number | null;
+        added: Array<{ path: string; value: unknown }>;
+        removed: Array<{ path: string; value: unknown }>;
+        changed: Array<{ path: string; from: unknown; to: unknown }>;
+    }> {
+        const singularType = PLURAL_TO_SINGULAR[request.type] ?? request.type;
+        const orgId = request.organizationId ?? null;
+        const events = (await this.historyMetaItem({
+            type: singularType,
+            name: request.name,
+            ...(orgId ? { organizationId: orgId } : {}),
+        })).events;
+        const versions = events
+            .map((ev: any) => (ev as any).version as number | undefined)
+            .filter((v): v is number => typeof v === 'number');
+        // The `historyMetaItem` MetadataEvent shape doesn't carry the
+        // per-(type,name) `version` directly — re-fetch via the repo
+        // to read the underlying history rows with their version.
+        const repo = this.getOverlayRepo(orgId);
+        const fullRef = {
+            type: singularType,
+            name: request.name,
+            org: orgId ?? 'env',
+        } as { type: string; name: string; org: string };
+        const histRows: Array<{ version: number; body: Record<string, unknown> | null }> = [];
+        try {
+            const engineAny = this.engine as any;
+            const rows = await engineAny.find('sys_metadata_history', {
+                where: {
+                    organization_id: orgId,
+                    type: singularType,
+                    name: request.name,
+                },
+            });
+            rows.sort((a: any, b: any) => (a.version ?? 0) - (b.version ?? 0));
+            for (const r of rows) {
+                const body = r.metadata == null
+                    ? null
+                    : (typeof r.metadata === 'string' ? JSON.parse(r.metadata) : r.metadata);
+                histRows.push({ version: r.version ?? 0, body });
+            }
+        } catch {
+            // history table unavailable — fall through with empty list
+        }
+        const byVersion = new Map<number, Record<string, unknown> | null>();
+        for (const r of histRows) byVersion.set(r.version, r.body);
+
+        let fromBody: Record<string, unknown> | null = null;
+        let toBody: Record<string, unknown> | null = null;
+        let fromVersion: number | null = null;
+        let toVersion: number | null = null;
+
+        if (request.toVersion !== undefined) {
+            toVersion = request.toVersion;
+            toBody = byVersion.get(request.toVersion) ?? null;
+        } else {
+            const current = await repo.get(fullRef as any, { state: 'active' });
+            toBody = current ? (current.body as Record<string, unknown>) : null;
+            toVersion = histRows.length ? histRows[histRows.length - 1]!.version : null;
+        }
+        if (request.fromVersion !== undefined) {
+            fromVersion = request.fromVersion;
+            fromBody = byVersion.get(request.fromVersion) ?? null;
+        } else if (toVersion !== null) {
+            // Use the version immediately preceding `toVersion`
+            const sorted = histRows.map((r) => r.version).filter((v) => v < toVersion!);
+            if (sorted.length) {
+                fromVersion = sorted[sorted.length - 1]!;
+                fromBody = byVersion.get(fromVersion) ?? null;
+            }
+        }
+        const diff = diffShallow(fromBody ?? {}, toBody ?? {});
+        const _used = versions; void _used;
+        return {
+            type: request.type,
+            name: request.name,
+            fromVersion,
+            toVersion,
+            ...diff,
+        };
+    }
+
+    /**
      * Remove a customization overlay row for the given metadata item, so the
      * next read falls through to the artifact-loaded default. Implements the
      * "Reset to factory default" semantic from ADR-0005. Whitelist is shared
@@ -2861,6 +3215,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
         organizationId?: string;
         parentVersion?: string | null;
         actor?: string;
+        state?: 'active' | 'draft';
     }): Promise<{
         success: boolean;
         message?: string;
@@ -2918,14 +3273,17 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             } as Parameters<typeof repo.delete>[0];
 
             try {
+                const targetState: 'active' | 'draft' = request.state === 'draft' ? 'draft' : 'active';
                 // Probe first — "no overlay exists" is a success/no-op, not
                 // a conflict. The repo would otherwise throw ConflictError.
-                const current = await repo.get(ref);
+                const current = await repo.get(ref, { state: targetState });
                 if (!current) {
                     return {
                         success: true,
                         reset: false,
-                        message: `No customization overlay found for ${request.type}/${request.name} — already at artifact default.`,
+                        message: targetState === 'draft'
+                            ? `No pending draft for ${request.type}/${request.name}.`
+                            : `No customization overlay found for ${request.type}/${request.name} — already at artifact default.`,
                     };
                 }
 
@@ -2943,6 +3301,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     intent: this.isArtifactBacked(singularTypeForRepo, request.name)
                         ? 'override-artifact'
                         : 'runtime-only',
+                    state: targetState,
                 });
 
                 // Refresh the in-memory artifact-side state on control-plane
@@ -2967,7 +3326,9 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     success: true,
                     reset: true,
                     seq: result.seq,
-                    message: `Customization overlay deleted — ${request.type}/${request.name} reset to artifact default. [seq=${result.seq}]`,
+                    message: (request.state === 'draft')
+                        ? `Draft discarded — ${request.type}/${request.name}. [seq=${result.seq}]`
+                        : `Customization overlay deleted — ${request.type}/${request.name} reset to artifact default. [seq=${result.seq}]`,
                 };
             } catch (err: any) {
                 if (err instanceof ConflictError) {

@@ -25,7 +25,6 @@ export const zhCN: TranslationData = {
         nav_account_sessions: { label: '活动会话' },
         nav_account_api_keys: { label: 'API 密钥' },
         nav_account_oauth_apps: { label: 'OAuth 应用' },
-        nav_account_preferences: { label: '偏好设置' },
       },
     },
     setup: {

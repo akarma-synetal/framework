@@ -25,7 +25,6 @@ export const esES: TranslationData = {
         nav_account_sessions: { label: 'Sesiones activas' },
         nav_account_api_keys: { label: 'Claves API' },
         nav_account_oauth_apps: { label: 'Aplicaciones OAuth' },
-        nav_account_preferences: { label: 'Preferencias' },
       },
     },
     setup: {
