@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import { spawnSync, spawn } from 'child_process';
 import dotenvFlow from 'dotenv-flow';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { printHeader, printKV, printStep, printError } from '../utils/format.js';
 
@@ -54,6 +55,28 @@ export default class Dev extends Command {
     }),
     'auth-secret': Flags.string({
       description: 'Secret for @objectstack/plugin-auth (overrides $AUTH_SECRET; dev mode injects an insecure default if neither is set)',
+    }),
+
+    // ── Ephemeral / fresh-environment helpers ────────────────────────
+    // `--fresh` creates an isolated tempdir for OS_HOME / DB / uploads
+    // so every run starts from a clean slate. Combine with `--seed-admin`
+    // (default-on when --fresh) to also provision a logged-in admin
+    // account, so backend debugging never blocks on first-run wizards.
+    fresh: Flags.boolean({
+      description: 'Start with an ephemeral OS_HOME under the OS tempdir (clean DB, uploads, storage); auto-deletes on exit. Implies --seed-admin unless --no-seed-admin is given.',
+      default: false,
+    }),
+    'seed-admin': Flags.boolean({
+      description: 'After the server is ready, POST /api/v1/auth/sign-up/email to seed an admin account. Default: on when --fresh.',
+      allowNo: true,
+    }),
+    'admin-email': Flags.string({
+      description: 'Email for the seeded admin account.',
+      default: 'admin@dev.local',
+    }),
+    'admin-password': Flags.string({
+      description: 'Password for the seeded admin account (min 8 chars).',
+      default: 'admin12345',
     }),
   };
 
@@ -113,6 +136,30 @@ export default class Dev extends Command {
       printStep('Starting dev server (local mode)...');
 
       const environmentId = flags['environment-id'] ?? process.env.OS_ENVIRONMENT_ID ?? 'env_local';
+
+      // ── --fresh: ephemeral OS_HOME under the OS tempdir ─────────────
+      // Creates a unique scratch dir that owns ALL persistent state for
+      // this run: the SQLite DB (via OS_HOME → <home>/data/...), the
+      // storage-service uploads root (OS_STORAGE_ROOT), and any other
+      // state plugins keyed off OS_HOME. Auto-deleted on exit.
+      let freshHome: string | undefined;
+      let freshDbUrl: string | undefined;
+      let freshStorageRoot: string | undefined;
+      if (flags.fresh) {
+        freshHome = fs.mkdtempSync(path.join(os.tmpdir(), 'objectstack-dev-'));
+        fs.mkdirSync(path.join(freshHome, 'data'), { recursive: true });
+        freshDbUrl = `file:${path.join(freshHome, 'data', 'dev.db')}`;
+        freshStorageRoot = path.join(freshHome, 'uploads');
+        fs.mkdirSync(freshStorageRoot, { recursive: true });
+        printKV('Fresh OS_HOME', freshHome, '🧪');
+        const cleanup = () => {
+          try { fs.rmSync(freshHome!, { recursive: true, force: true }); } catch { /* noop */ }
+        };
+        process.on('exit', cleanup);
+        process.on('SIGINT', () => { cleanup(); process.exit(130); });
+        process.on('SIGTERM', () => { cleanup(); process.exit(143); });
+      }
+
       // NOTE: Do NOT set NODE_ENV='development' here. Oclif's tsx-based
       // TypeScript source loader (activated when NODE_ENV is 'test' or
       // 'development') currently mis-handles `.json` requires inside
@@ -122,18 +169,21 @@ export default class Dev extends Command {
       // flag below already opts the serve command into dev semantics,
       // and serve.ts will set NODE_ENV='development' internally before
       // any runtime modules are imported.
+      const effectiveDb = flags.database ?? freshDbUrl;
       const localEnv: NodeJS.ProcessEnv = {
         ...process.env,
         OS_ENVIRONMENT_ID: environmentId,
         OS_ARTIFACT_PATH: artifactPath,
-        ...(flags.database ? { OS_DATABASE_URL: flags.database } : {}),
+        ...(freshHome ? { OS_HOME: freshHome } : {}),
+        ...(freshStorageRoot ? { OS_STORAGE_ROOT: freshStorageRoot } : {}),
+        ...(effectiveDb ? { OS_DATABASE_URL: effectiveDb } : {}),
         ...(flags['database-driver'] ? { OS_DATABASE_DRIVER: flags['database-driver'] } : {}),
         ...(flags['database-auth-token'] ? { OS_DATABASE_AUTH_TOKEN: flags['database-auth-token'] } : {}),
         ...(flags['auth-secret'] ? { AUTH_SECRET: flags['auth-secret'] } : {}),
       };
       printKV('Environment ID', environmentId, '🎯');
       printKV('Artifact', isUrl ? artifactPath : path.relative(process.cwd(), artifactPath), '📦');
-      if (flags.database) printKV('Database', redactDbUrl(flags.database), '🗄️');
+      if (effectiveDb) printKV('Database', redactDbUrl(effectiveDb), '🗄️');
 
       const port = flags.port ?? process.env.PORT;
       const binPath = process.argv[1];
@@ -150,6 +200,21 @@ export default class Dev extends Command {
         ],
         { stdio: 'inherit', env: localEnv },
       );
+
+      // ── Seed admin account after the server is ready ────────────────
+      // `--seed-admin` defaults to ON when `--fresh` is set; otherwise
+      // OFF (so we don't surprise long-lived dev DBs with extra users).
+      // Uses better-auth's public sign-up endpoint, which the dev-mode
+      // bootstrap bypass (auth-manager.ts) lets through even when
+      // OS_DISABLE_SIGNUP=true for the very first user.
+      const seedAdmin = flags['seed-admin'] ?? flags.fresh;
+      if (seedAdmin) {
+        void this.seedAdminAccount({
+          port: port ?? '3000',
+          email: flags['admin-email'],
+          password: flags['admin-password'],
+        });
+      }
 
       // ── Watch-recompile loop ────────────────────────────────────────
       // When the agent edits an objectstack source file (config or
@@ -311,6 +376,63 @@ export default class Dev extends Command {
     })().catch((e) => {
       console.error(chalk.yellow(`  ⚠ watch-recompile failed to start: ${e?.message ?? e}`));
     });
+  }
+
+  /**
+   * Poll `/api/v1/health` until 200, then POST `/api/v1/auth/sign-up/email`
+   * to provision an admin account. Best-effort: any failure is logged
+   * but does not bring down the dev server.
+   *
+   * Pairs naturally with `--fresh`: an ephemeral DB has zero users, so
+   * the first sign-up is automatically the platform admin (promoted by
+   * `bootstrapPlatformAdmin` in @objectstack/plugin-security).
+   */
+  private async seedAdminAccount(opts: {
+    port: string;
+    email: string;
+    password: string;
+  }): Promise<void> {
+    const base = `http://localhost:${opts.port}`;
+    const deadline = Date.now() + 30_000;
+
+    while (Date.now() < deadline) {
+      try {
+        const r = await fetch(`${base}/api/v1/health`);
+        if (r.ok) break;
+      } catch { /* not ready */ }
+      await new Promise(r => setTimeout(r, 250));
+    }
+
+    try {
+      const r = await fetch(`${base}/api/v1/auth/sign-up/email`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          // better-auth enforces a same-origin / trusted-origin check on
+          // POST. localhost is auto-trusted in dev (auth-manager.ts), but
+          // we still must send an Origin header for the check to fire.
+          'origin': base,
+        },
+        body: JSON.stringify({
+          email: opts.email,
+          password: opts.password,
+          name: 'Dev Admin',
+        }),
+      });
+      if (r.ok) {
+        console.log(chalk.green(
+          `\n🔑 Admin seeded: ${chalk.bold(opts.email)} / ${chalk.bold(opts.password)}`,
+        ));
+      } else if (r.status === 422 || r.status === 400) {
+        // User already exists — normal when reusing a non-fresh DB.
+        console.log(chalk.dim(`  (admin ${opts.email} already exists — skipping seed)`));
+      } else {
+        const body = await r.text().catch(() => '');
+        console.log(chalk.yellow(`  ⚠ seed-admin failed (HTTP ${r.status}): ${body.slice(0, 200)}`));
+      }
+    } catch (e: any) {
+      console.log(chalk.yellow(`  ⚠ seed-admin request failed: ${e?.message ?? e}`));
+    }
   }
 }
 

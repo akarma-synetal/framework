@@ -20,15 +20,30 @@ pnpm docs:dev         # docs site
 
 Two distinct scenarios — pick the right one:
 
-| Scenario | Command | Port | Cleanup |
-|:---|:---|:---|:---|
-| **Frontend debugging** (UI in `../objectui` calls backend) | `PORT=3000 pnpm dev:crm` | **Must be 3000** — UI is hard-wired to it | Leave running while UI dev needs it |
-| **Backend-only debugging** (API/protocols, no UI) | `PORT=<random> pnpm dev:crm` (e.g. `PORT=34521`) | Random free port to avoid colliding with someone else's 3000 | **You must kill it when done** (`kill <PID>`) |
+| Scenario | Command | Port | State | Cleanup |
+|:---|:---|:---|:---|:---|
+| **Frontend debugging** (UI in `../objectui` calls backend) | `PORT=3000 pnpm dev:crm` | **Must be 3000** — UI is hard-wired | Persistent (`<cwd>/.objectstack/`) | Leave running |
+| **Backend-only debugging** (API/protocols, no UI) | `pnpm dev:crm -- --fresh -p <random>` | Random high port (e.g. 38421) | **Ephemeral** tempdir, auto-seeded admin | **You must kill it** (`kill <PID>` via `lsof -ti tcp:<port>`) |
+
+`--fresh` (added in `os dev`):
+- Creates a unique tempdir under the OS tempdir and points `OS_HOME` + `OS_DATABASE_URL` + `OS_STORAGE_ROOT` into it.
+- Auto-deletes the tempdir on normal exit.
+- Implies `--seed-admin` — after the server is ready, POSTs to `/api/v1/auth/sign-up/email` and prints the credentials:
+  - default email: `admin@dev.local`
+  - default password: `admin12345`
+  - override with `--admin-email` / `--admin-password`; opt out with `--no-seed-admin`.
 
 Rules:
-- Never start two backends on port 3000 simultaneously — it will collide with the UI dev session.
+- **Never start two backends on port 3000 simultaneously** — it collides with the UI dev session.
 - For backend-only tasks, always pick a random high port AND tear it down after the task — don't leak processes.
-- Use `pnpm dev:crm` (or `pnpm dev:todo`) — not raw `pnpm --filter ... dev` — so the example app is configured correctly.
+- Use `pnpm dev:crm` (not raw `pnpm --filter ... dev`) so the example app is configured correctly. Flags after `--` are forwarded.
+
+Example (backend-only debugging session, clean environment):
+```bash
+pnpm dev:crm -- --fresh -p 38421       # start
+# ... debug via curl, http://localhost:38421 ...
+kill $(lsof -ti tcp:38421)              # tear down — tempdir auto-deletes
+```
 
 ### Frontend (Studio UI) — sibling repo `../objectui`
 
