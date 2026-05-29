@@ -753,10 +753,29 @@ export class SchemaRegistry {
     }
 
     const items = Array.from(this.metadata.get(type)?.values() || []) as T[];
+    let result = items;
     if (packageId) {
-      return items.filter((item: any) => item._packageId === packageId);
+      result = result.filter((item: any) => item._packageId === packageId);
     }
-    return items;
+    // Hide metadata owned by a disabled package so the console (app switcher,
+    // view lists, dashboards, …) stops surfacing it after a disable. The
+    // `package` type itself is never filtered — the Packages page must still
+    // list disabled packages so they can be re-enabled. Disable is reversible:
+    // items remain registered and reappear on enable.
+    if (type !== 'package') {
+      result = result.filter((item: any) => !this.isPackageDisabled((item as any)?._packageId));
+    }
+    return result;
+  }
+
+  /**
+   * Whether a package has been explicitly disabled. Unknown packages and
+   * items with no owning package are treated as enabled.
+   */
+  isPackageDisabled(packageId?: string): boolean {
+    if (!packageId) return false;
+    const pkg = this.getPackage(packageId);
+    return pkg?.enabled === false || pkg?.status === 'disabled';
   }
 
   /**

@@ -1,9 +1,32 @@
 # ADR-0016: Studio Package Authoring & One-Click Publish
 
-**Status**: Proposed (2026-05-29)
+**Status**: Partially implemented (revised 2026-05-30)
 **Deciders**: ObjectStack Protocol Architects
 **Builds on**: [ADR-0003](./0003-package-as-first-class-citizen.md) (package + versioned releases), [ADR-0005](./0005-metadata-customization-overlay.md) (one Zod source per type, org overlay), [ADR-0006 v4](./0006-project-environment-split.v4.md) (drop project, unify on package), [ADR-0008](./0008-metadata-repository-and-change-log.md) (Repository/ChangeLog/Cache/Registry, four write surfaces), [ADR-0010](./0010-metadata-protection-model.md) (L1/L2/L3 protection)
 **Consumers**: `@objectstack/spec/cloud`, `@objectstack/runtime`, `@objectstack/metadata`, `@objectstack/rest`, `@objectstack/cli`, `../objectui` (Studio)
+
+---
+
+> **Revision note (2026-05-30) — read §9 first.** §§1–8 below capture the
+> original *cloud-publish* vision (draft `sys_package_version` sealing,
+> `package_version_id` binding, one-click publish to a cloud control plane).
+> The first shipped slice **pivoted to a local-first path** that needs no cloud
+> account, no draft-version sealing, and no `package_version_id`. The two key
+> divergences from the original design are:
+>
+> 1. **Binding is on `package_id`, not `package_version_id`.** Studio saves bind
+>    a metadata row directly to its owning package (`package_id`); there is no
+>    draft-version workspace in the MVP. Wherever §§1–8 say
+>    `package_version_id` for the *Studio authoring binding*, read `package_id`.
+>    `package_version_id` remains reserved for the future cloud seal/publish
+>    pipeline (§3.5, §4 Phase 4).
+> 2. **Distribution is local export/import, not cloud publish.** A package is
+>    exported to a self-contained JSON manifest and imported on another server
+>    with zero cloud auth (§9.2). Cloud one-click publish (§3.6 step 5) is
+>    deferred.
+>
+> §9 documents what actually shipped; §§1–8 remain the north star for the cloud
+> phase.
 
 ---
 
@@ -285,7 +308,111 @@ the already-shipped Phase B package endpoints.
   published package B, how is the dependency recorded in `manifest_json`?
   (Likely an extension of ADR-0003 dependency edges — out of scope here.)
 
-## 8. References
+## 9. Implemented MVP (revision 2026-05-30) — local-first authoring & distribution
+
+The first shipped slice deliberately avoids the cloud control plane so a user
+can author a package and move it between servers with **no account, no draft
+sealing, and no network publish**. It realizes the *author → bind → list →
+distribute* loop locally; the cloud seal/publish pipeline (§§2–4) layers on top
+later without re-modelling.
+
+### 9.1 Binding on `package_id` (not `package_version_id`)
+
+Studio's save flow (`ResourceEditPage`) now passes the **owning package id**:
+
+```ts
+client.save(type, name, item, {
+  force,
+  mode: 'draft',
+  packageId: activePackageId, // binds the row to the package directly
+});
+```
+
+The REST `save` handler / metadata router persists `package_id` on the
+`sys_metadata` row. When **"no package"** is selected, `packageId` is omitted
+and the row stays an env-local overlay (`package_id` NULL), exactly as §2.2
+describes. There is **no draft `sys_package_version`** in the MVP — a package
+is a flat collection of `package_id`-tagged metadata. This keeps resolution
+trivial (registry items and overlay rows both carry `_packageId`) and defers
+versioning/sealing to the cloud phase.
+
+> Migration note: earlier drafts of this ADR (and some code comments) referred
+> to `package_version_id` as the Studio binding. The implemented binding is
+> `package_id`. `package_version_id` is reserved for sealed cloud versions.
+
+### 9.2 Local export / import (zero cloud auth)
+
+A package is portable as a single self-contained JSON manifest.
+
+| Action | Endpoint | Behaviour |
+|---|---|---|
+| **Export** | `GET /api/v1/packages/:id/export` | Assembles a manifest `{ id, name, version, label?, <pluralKey>: [...] }` from every `package_id`-bound metadata item (objects, views, apps, flows, …). `datasources`/`emailTemplates` are excluded (host-specific). Top-level `_`-prefixed provenance keys are stripped. |
+| **Import** | `POST /api/v1/marketplace/install-local` | Accepts an **inline** `{ manifest }` body. Skips the cloud-URL guard and cloud fetch entirely; derives `packageId`/`version` from the manifest. Still requires an authenticated local session and runs the conflict check. |
+
+Studio surfaces both: an **Export** action in the package detail sheet
+(downloads `<id>.package.json` via a Blob) and an **Import** button in the
+Packages page toolbar (hidden file input → POST inline manifest → result
+banner). See §9.4 for the page entry point.
+
+Export item-set note: export trusts the **query-level `packageId` filter** in
+`getMetaItems` rather than re-filtering by `_packageId === packageId`, because
+objects are tagged with a provenance sentinel (`_packageId='sys_metadata'`),
+not the package id. Re-filtering on equality would wrongly drop objects.
+
+### 9.3 Register-before-persist (hot-register is a hard error on inline import)
+
+On an **inline** import the manifest is **hot-registered into the live engine
+*before* anything is persisted**. If hot-registration fails (e.g. the package's
+objects conflict with already-registered objects — which is exactly what
+happens when re-importing onto the *source* server), the request fails with
+**422 and nothing is written**. This guarantees an import either fully takes
+effect in the running process or leaves no partial state behind.
+
+(The pre-existing *cloud-fetch* import path stays lenient — a hot-register
+failure there only warns, because the persisted rows will be picked up on the
+next boot.)
+
+### 9.4 Packages page entry point
+
+Studio gained a dedicated **Packages page** (`PackagesPage.tsx`) — a full list
+of installed packages with a detail sheet — not just the sidebar `active_package`
+switcher. The page is the home for: viewing a package's metadata, **enable /
+disable**, **export**, and **import**. The sidebar selector remains the
+*authoring-target* picker (which `package_id` new saves bind to); the Packages
+page is the *management* surface.
+
+### 9.5 Enable / disable hides metadata from the console
+
+`PATCH /api/v1/packages/:id/disable` (and `/enable`) flips the package's
+`enabled`/`status` flags **in memory** (not persisted across restart). A
+disabled package's metadata must stop surfacing in the console (app switcher,
+view lists, dashboards, …). This is enforced in two layers of the read path:
+
+1. `SchemaRegistry.listItems(type, …)` filters out items whose owning package
+   is disabled (via `isPackageDisabled(_packageId)`), for every type **except**
+   `package` (the Packages page must still list disabled packages so they can
+   be re-enabled) and `object`/`objects` (filtering object *schemas* would
+   break data queries that depend on them).
+2. `getMetaItems` re-applies the same filter to the **final merged set**,
+   because the `sys_metadata` DB-overlay merge and the MetadataService merge can
+   re-introduce a disabled package's items after the registry filter ran. Apps
+   and views persisted as overlay rows were leaking back without this second
+   pass.
+
+Disable is reversible and non-destructive: items stay registered and reappear
+on enable. (Persisting disable state across restarts is deferred.)
+
+### 9.6 Known gaps / deferred
+
+- **`tools` / `skills` are exported but not consumed on import** —
+  `engine.registerApp` does not yet iterate those plural keys. Documented gap.
+- **CLI export/import** (`os package export` / `import`) — deferred; only the
+  REST + Studio surfaces ship in the MVP.
+- **Disable state is in-memory only** — lost on server restart.
+- **Cloud one-click publish** (§3.6 step 5, delegated auth) — deferred to the
+  cloud phase; the local path above is the interim distribution mechanism.
+
+## 10. References
 
 - [ADR-0003](./0003-package-as-first-class-citizen.md) — Package + versioned releases
 - [ADR-0005](./0005-metadata-customization-overlay.md) — One Zod source, org overlay
@@ -295,3 +422,8 @@ the already-shipped Phase B package endpoints.
 - `packages/cli/src/commands/package/publish.ts` — CLI publish (seal → version → install)
 - `../objectui/.../metadata-admin/ResourceEditPage.tsx` — Studio save flow (binding point)
 - `../objectui/.../layout/UnifiedSidebar.tsx` — `active_package` selector (authoring target)
+- `packages/runtime/src/http-dispatcher.ts` — `assemblePackageManifest` + `GET /packages/:id/export` (§9.2)
+- `packages/runtime/src/cloud/marketplace-install-local-plugin.ts` — inline-manifest import + register-before-persist (§9.2–9.3)
+- `packages/objectql/src/registry.ts` — `isPackageDisabled` + `listItems` disabled-package filter (§9.5)
+- `packages/objectql/src/protocol.ts` — `getMetaItems` final-merge disabled-package filter (§9.5)
+- `../objectui/.../metadata-admin/PackagesPage.tsx` — Packages page + Export/Import UI (§9.4)

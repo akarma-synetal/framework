@@ -1236,6 +1236,24 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
             // MetadataService not available or doesn't support this type
         }
 
+        // Hide metadata owned by a disabled package. `listItems` already drops
+        // disabled-package items from the SchemaRegistry, but the DB overlay and
+        // MetadataService merges above can re-introduce them (e.g. an app/view
+        // persisted in sys_metadata). Re-apply the filter on the final merged
+        // set so a disabled package's metadata stops surfacing in the console.
+        // Never filter `package` (the Packages page must list disabled packages
+        // to re-enable them) nor `object`/`objects` (filtering objects would
+        // break data queries that depend on their schema).
+        if (
+            request.type !== 'package' &&
+            request.type !== 'object' &&
+            request.type !== 'objects'
+        ) {
+            items = (items as any[]).filter(
+                (it) => !this.engine.registry.isPackageDisabled((it as any)?._packageId),
+            );
+        }
+
         return {
             type: request.type,
             items: decorateMetadataItems(
