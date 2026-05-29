@@ -444,6 +444,116 @@ enforces per-tenant data isolation:
 
 ---
 
+## Metadata Protection (`protection`)
+
+Package authors can lock shipped metadata against Studio edits / overlays / deletes.
+See [ADR-0010](../../docs/adr/0010-metadata-protection-model.md) for the full model.
+
+The `protection` block is **declared on the source schema** (`*.object.ts`,
+`*.app.ts`, `*.view.ts`, …) and stripped at load time — it never appears in
+the runtime envelope. The runtime instead populates `_lock`, `_lockReason`,
+`_lockDocsUrl`, `_lockSource`, and `_packageId`, which REST returns to Studio
+and the lock banner reads.
+
+### Schema
+
+```ts
+protection?: {
+  /** Lock level — controls what Studio can do to this item. */
+  lock: 'none' | 'no-overlay' | 'no-delete' | 'full';
+  /** Human-readable reason shown in the Studio lock banner. */
+  reason?: string;
+  /** Optional doc URL — renders as "查看文档 →" link in the banner. */
+  docsUrl?: string;
+}
+```
+
+| `lock` | Edit (overlay) | Delete | Typical use |
+|:---|:---:|:---:|:---|
+| `none` (default) | ✅ | ✅ | Normal authored metadata |
+| `no-overlay` | ❌ | ✅ | Schema is platform-defined but tenant can drop it (e.g. `sys_role`) |
+| `no-delete` | ✅ | ❌ | Tenant may customize fields but the object itself must exist |
+| `full` | ❌ | ❌ | Core admin UI / platform identity (e.g. `sys_user`, `app/setup`) |
+
+### Example — fully locked platform object
+
+```ts
+// packages/platform-objects/src/identity/sys-user.object.ts
+import { defineObject } from '@objectstack/spec';
+
+export const SysUserObject = defineObject({
+  name: 'sys_user',
+  label: 'User',
+  protection: {
+    lock: 'full',
+    reason: 'Core identity object — see ADR-0010.',
+    docsUrl: 'https://docs.objectstack.ai/adr/0010-metadata-protection',
+  },
+  fields: [ /* ... */ ],
+});
+```
+
+### Example — schema-locked but deletable
+
+```ts
+// packages/platform-objects/src/security/sys-role.object.ts
+export const SysRoleObject = defineObject({
+  name: 'sys_role',
+  label: 'Role',
+  protection: {
+    lock: 'no-overlay',
+    reason: 'RBAC schema is platform-defined — see ADR-0010.',
+    docsUrl: 'https://docs.objectstack.ai/adr/0010-metadata-protection',
+  },
+  fields: [ /* ... */ ],
+});
+```
+
+### Example — locking a shipped app
+
+The same block works on non-object metadata (apps, views, dashboards, flows,
+agents, tools, skills, reports, email-templates):
+
+```ts
+// packages/plugin-auth/src/apps/setup.app.ts
+import { defineApp } from '@objectstack/spec';
+
+export const SetupApp = defineApp({
+  name: 'setup',
+  label: 'Setup',
+  protection: {
+    lock: 'full',
+    reason: 'Core admin UI shipped by @objectstack/platform-objects — see ADR-0010.',
+    docsUrl: 'https://docs.objectstack.ai/adr/0010-metadata-protection',
+  },
+  // ...
+});
+```
+
+### Enforcement
+
+- **REST**: `PUT /api/v1/meta/:type/:name` and `DELETE` return `403 item_locked`
+  for any operation the lock forbids. Layered-read endpoints
+  (`GET ?layers=true`) include `lock`, `lockReason`, `lockDocsUrl`, `lockSource`,
+  and `packageId` so Studio can render the banner.
+- **Studio**: `ResourceEditPage` renders a banner with the lock reason and the
+  "查看文档 →" link; edit + delete buttons are hidden according to the lock.
+- **Package vs Artifact source**: `_lockSource: 'package'` when the lock comes
+  from a code-shipped schema, `'artifact'` when set by a workspace artifact.
+  Artifact locks override package locks (workspace wins).
+
+### Authoring guidance
+
+- Default to **no `protection` block** for tenant-authored metadata.
+- Use `full` for anything Studio editing would break at runtime (core identity,
+  platform admin UIs, system flows).
+- Use `no-overlay` for schemas that platform owns but a tenant may legitimately
+  not need (then they can delete it).
+- Always include `reason` — it is the only thing the end-user sees first.
+- Prefer pointing `docsUrl` to an ADR or onboarding doc, not a marketing page.
+
+---
+
 ## Advanced Features Checklist
 
 | Feature | When to Consider |

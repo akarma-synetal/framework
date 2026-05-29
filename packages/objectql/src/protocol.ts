@@ -1028,7 +1028,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
          * sweep so the Studio directory page can render tile counts
          * and a package filter in one round-trip.
          */
-        stats: Record<string, { count: number; packages: string[] }>;
+        stats: Record<string, { count: number; locked: number; packages: string[] }>;
     }> {
         const includeWarnings = request.severity === 'warning';
         const targetTypes = request.type
@@ -1038,7 +1038,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                 .map((e) => e.type);
 
         const entries: Array<{ type: string; name: string; diagnostics: MetadataDiagnostics }> = [];
-        const stats: Record<string, { count: number; packages: string[] }> = {};
+        const stats: Record<string, { count: number; locked: number; packages: string[] }> = {};
         let scannedItems = 0;
 
         for (const t of targetTypes) {
@@ -1059,10 +1059,13 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     ? listed
                     : [];
             const pkgSet = new Set<string>();
+            let lockedCount = 0;
             for (const item of items) {
                 scannedItems += 1;
                 const pkg = (item?._packageId ?? null) as string | null;
                 if (pkg) pkgSet.add(pkg);
+                const lock = item?._lock as string | undefined;
+                if (lock && lock !== 'none') lockedCount += 1;
                 const diag: MetadataDiagnostics | undefined =
                     item?._diagnostics ?? computeMetadataDiagnostics(t, item);
                 if (!diag) continue;
@@ -1074,7 +1077,7 @@ export class ObjectStackProtocolImplementation implements ObjectStackProtocol {
                     diagnostics: diag,
                 });
             }
-            stats[t] = { count: items.length, packages: [...pkgSet].sort() };
+            stats[t] = { count: items.length, locked: lockedCount, packages: [...pkgSet].sort() };
         }
 
         return {
