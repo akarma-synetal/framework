@@ -291,8 +291,9 @@ describe('PLURAL_TO_SINGULAR / SINGULAR_TO_PLURAL', () => {
 
   it('should map irregular plural forms correctly', () => {
     expect(PLURAL_TO_SINGULAR['policies']).toBe('policy');
-    expect(PLURAL_TO_SINGULAR['sharingRules']).toBe('sharingRule');
-    expect(PLURAL_TO_SINGULAR['analyticsCubes']).toBe('analyticsCube');
+    expect(PLURAL_TO_SINGULAR['sharingRules']).toBe('sharing_rule');
+    expect(PLURAL_TO_SINGULAR['analyticsCubes']).toBe('analytics_cube');
+    expect(PLURAL_TO_SINGULAR['ragPipelines']).toBe('rag_pipeline');
   });
 
   it('should have a reverse map that is consistent', () => {
@@ -306,7 +307,7 @@ describe('pluralToSingular', () => {
   it('should convert known plural to singular', () => {
     expect(pluralToSingular('apps')).toBe('app');
     expect(pluralToSingular('policies')).toBe('policy');
-    expect(pluralToSingular('sharingRules')).toBe('sharingRule');
+    expect(pluralToSingular('sharingRules')).toBe('sharing_rule');
   });
 
   it('should return unknown keys unchanged', () => {
@@ -319,7 +320,7 @@ describe('singularToPlural', () => {
   it('should convert known singular to plural', () => {
     expect(singularToPlural('app')).toBe('apps');
     expect(singularToPlural('policy')).toBe('policies');
-    expect(singularToPlural('sharingRule')).toBe('sharingRules');
+    expect(singularToPlural('sharing_rule')).toBe('sharingRules');
   });
 
   it('should return unknown keys unchanged', () => {

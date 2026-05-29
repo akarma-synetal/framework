@@ -977,7 +977,7 @@ describe('ObjectStackProtocolImplementation - Metadata Persistence', () => {
         // Regression: plugin-registered types (no static registry entry)
         //
         // `theme`, `api`, `connector`, `data`, `mapping`, `policy`,
-        // `sharing_rule`, `webhook`, `analyticsCube`, `package` are
+        // `sharing_rule`, `webhook`, `analytics_cube`, `package` are
         // registered by plugins at runtime — not in
         // DEFAULT_METADATA_TYPE_REGISTRY. `getMetaTypes()` synthesises
         // descriptors with `allowRuntimeCreate: true` for them so the

@@ -42,7 +42,7 @@ export const SysAccount = ObjectSchema.create({
       mode: 'create',
       locations: ['list_toolbar'],
       type: 'url',
-      target: '/api/v1/auth/sign-in/social?provider=${param.provider}&callbackURL=${ctx.origin}/apps/account/sys_account',
+      target: '/api/v1/auth/sign-in/social?provider=${param.provider}&callbackURL=${ctx.origin}/_console/apps/account/sys_account',
       params: [
         {
           name: 'provider',
