@@ -16,6 +16,20 @@ pnpm test             # turbo test
 pnpm docs:dev         # docs site
 ```
 
+### Running the dev server
+
+Two distinct scenarios — pick the right one:
+
+| Scenario | Command | Port | Cleanup |
+|:---|:---|:---|:---|
+| **Frontend debugging** (UI in `../objectui` calls backend) | `PORT=3000 pnpm dev:crm` | **Must be 3000** — UI is hard-wired to it | Leave running while UI dev needs it |
+| **Backend-only debugging** (API/protocols, no UI) | `PORT=<random> pnpm dev:crm` (e.g. `PORT=34521`) | Random free port to avoid colliding with someone else's 3000 | **You must kill it when done** (`kill <PID>`) |
+
+Rules:
+- Never start two backends on port 3000 simultaneously — it will collide with the UI dev session.
+- For backend-only tasks, always pick a random high port AND tear it down after the task — don't leak processes.
+- Use `pnpm dev:crm` (or `pnpm dev:todo`) — not raw `pnpm --filter ... dev` — so the example app is configured correctly.
+
 ### Frontend (Studio UI) — sibling repo `../objectui`
 
 This framework repo ships **backend only** (protocols + services + REST). All Studio / Console UI work happens in the sibling repo `../objectui` (separate git repo, separate versions).
