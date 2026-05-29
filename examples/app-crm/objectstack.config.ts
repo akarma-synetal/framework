@@ -107,6 +107,7 @@ export default defineStack({
   workflows: [HighValueDealWorkflow, StaleOpportunityWorkflow],
   approvals: [DiscountApprovalProcess],
   jobs: [LeadScoringJob, PipelineReportJob, RenewalSweepJob],
+  emailTemplates: Object.values(emails),
 
   // Security
   roles: [SalesRepRole, SalesManagerRole, FinanceApproverRole],
@@ -144,5 +145,4 @@ export default defineStack({
  */
 export const referenceMetadata = {
   tools: [LookupContactTool],
-  emailTemplates: Object.values(emails),
 };

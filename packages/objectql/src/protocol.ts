@@ -18,7 +18,7 @@ import { PLURAL_TO_SINGULAR, SINGULAR_TO_PLURAL } from '@objectstack/spec/shared
 import { ListViewSchema, FormViewSchema, ViewSchema, DashboardSchema, AppSchema, PageSchema, ReportSchema, ActionSchema, type FormView } from '@objectstack/spec/ui';
 import { RoleSchema } from '@objectstack/spec/identity';
 import { PermissionSetSchema } from '@objectstack/spec/security';
-import { EmailTemplateSchema, JobSchema, METADATA_FORM_REGISTRY } from '@objectstack/spec/system';
+import { EmailTemplateDefinitionSchema, JobSchema, METADATA_FORM_REGISTRY } from '@objectstack/spec/system';
 import { ToolSchema, SkillSchema, AgentSchema } from '@objectstack/spec/ai';
 import { FlowSchema, WorkflowRuleSchema, ApprovalProcessSchema } from '@objectstack/spec/automation';
 import { DEFAULT_METADATA_TYPE_REGISTRY } from '@objectstack/spec/kernel';
@@ -43,7 +43,7 @@ const TYPE_TO_SCHEMA: Record<string, z.ZodTypeAny> = {
     role: RoleSchema,
     permission: PermissionSetSchema,
     profile: PermissionSetSchema,
-    email_template: EmailTemplateSchema,
+    email_template: EmailTemplateDefinitionSchema,
     tool: ToolSchema,
     skill: SkillSchema,
     agent: AgentSchema,

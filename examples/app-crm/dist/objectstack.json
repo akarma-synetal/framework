@@ -3746,6 +3746,124 @@
       "enabled": true
     }
   ],
+  "emailTemplates": [
+    {
+      "name": "crm.deal_won",
+      "label": "Deal Won — Owner Congrats",
+      "category": "workflow",
+      "locale": "en-US",
+      "subject": "Congratulations — {{opportunity.name}} closed!",
+      "bodyHtml": "<!doctype html><html><body style=\"font-family:-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5;color:#1f2937;margin:0;padding:24px;background:#f9fafb\">\n  <div style=\"max-width:560px;margin:0 auto;background:#ffffff;padding:32px;border-radius:8px;border:1px solid #e5e7eb\">\n    <h1 style=\"margin:0 0 16px 0;font-size:20px;font-weight:600\">Great news!</h1>\n    <p>Hi {{user.name}},</p>\n    <p>The opportunity <strong>{{opportunity.name}}</strong> for {{account.name}} just closed at <strong>${{opportunity.amount}}</strong>.</p>\n    <p>Nice work! 🎉</p>\n  </div>\n</body></html>",
+      "bodyText": "Hi {{user.name}},\n\nThe opportunity {{opportunity.name}} for {{account.name}} just closed at ${{opportunity.amount}}.\n\nNice work!",
+      "variables": [
+        {
+          "name": "user.name",
+          "type": "string",
+          "required": true,
+          "description": "Opportunity owner"
+        },
+        {
+          "name": "opportunity.name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "opportunity.amount",
+          "type": "number",
+          "required": true,
+          "description": "Closed amount in USD"
+        },
+        {
+          "name": "account.name",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "active": true,
+      "isSystem": false,
+      "description": "Internal congrats email fired by the High-Value Deal workflow when stage = Closed Won."
+    },
+    {
+      "name": "crm.lead_followup",
+      "label": "Lead — Follow-Up Reminder",
+      "category": "notification",
+      "locale": "en-US",
+      "subject": "Reminder: follow up on {{lead.name}}",
+      "bodyHtml": "<!doctype html><html><body style=\"font-family:-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5;color:#1f2937;margin:0;padding:24px;background:#f9fafb\">\n  <div style=\"max-width:560px;margin:0 auto;background:#ffffff;padding:32px;border-radius:8px;border:1px solid #e5e7eb\">\n    <h1 style=\"margin:0 0 16px 0;font-size:20px;font-weight:600\">Time to follow up</h1>\n    <p>Hi {{owner.name}},</p>\n    <p>Lead <strong>{{lead.name}}</strong> ({{lead.company}}) has had no activity for <strong>{{days_idle}} days</strong>.</p>\n    <p>Open the lead in CRM and log the next action to keep your pipeline healthy.</p>\n    <p style=\"margin:24px 0\"><a href=\"{{{lead_url}}}\" style=\"display:inline-block;padding:10px 20px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600\">View lead</a></p>\n  </div>\n</body></html>",
+      "bodyText": "Hi {{owner.name}},\n\nLead {{lead.name}} ({{lead.company}}) has had no activity for {{days_idle}} days.\n\nFollow up: {{lead_url}}",
+      "variables": [
+        {
+          "name": "owner.name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lead.name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lead.company",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "days_idle",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "lead_url",
+          "type": "url",
+          "required": true
+        }
+      ],
+      "active": true,
+      "isSystem": false,
+      "description": "Internal reminder fired by the Stale Opportunity workflow."
+    },
+    {
+      "name": "crm.welcome",
+      "label": "Welcome — New Contact",
+      "category": "marketing",
+      "locale": "en-US",
+      "subject": "Welcome to {{account.name}}, {{contact.first_name}}!",
+      "bodyHtml": "<!doctype html><html><body style=\"font-family:-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5;color:#1f2937;margin:0;padding:24px;background:#f9fafb\">\n  <div style=\"max-width:560px;margin:0 auto;background:#ffffff;padding:32px;border-radius:8px;border:1px solid #e5e7eb\">\n    <h1 style=\"margin:0 0 16px 0;font-size:22px;font-weight:600\">Welcome aboard 👋</h1>\n    <p>Hi {{contact.first_name}},</p>\n    <p>Thanks for connecting with <strong>{{account.name}}</strong>. Your account manager <strong>{{owner.name}}</strong> will be in touch shortly.</p>\n    <p style=\"margin:24px 0\"><a href=\"{{{portal_url}}}\" style=\"display:inline-block;padding:12px 24px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600\">Open your customer portal</a></p>\n    <p style=\"font-size:13px;color:#6b7280\">Or copy this link: <span style=\"word-break:break-all\">{{portal_url}}</span></p>\n  </div>\n</body></html>",
+      "bodyText": "Hi {{contact.first_name}},\n\nThanks for connecting with {{account.name}}. Your account manager {{owner.name}} will be in touch shortly.\n\nOpen your portal: {{portal_url}}",
+      "variables": [
+        {
+          "name": "contact.first_name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "account.name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "owner.name",
+          "type": "string",
+          "required": true,
+          "description": "Assigned account manager"
+        },
+        {
+          "name": "portal_url",
+          "type": "url",
+          "required": true,
+          "description": "Customer portal link"
+        }
+      ],
+      "fromOverride": {
+        "name": "Acme Sales",
+        "address": "sales@acme.example"
+      },
+      "replyTo": "support@acme.example",
+      "active": true,
+      "isSystem": false,
+      "description": "Marketing welcome email sent on contact creation."
+    }
+  ],
   "roles": [
     {
       "name": "sales_rep",

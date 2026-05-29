@@ -92,6 +92,7 @@ export const MAP_SUPPORTED_FIELDS = [
   'analyticsCubes',
   'connectors',
   'datasources',
+  'emailTemplates',
 ] as const;
 
 export type MapSupportedField = (typeof MAP_SUPPORTED_FIELDS)[number];
@@ -132,6 +133,7 @@ export const PLURAL_TO_SINGULAR: Record<string, string> = {
   connectors: 'connector',
   datasources: 'datasource',
   views: 'view',
+  emailTemplates: 'email_template',
 };
 
 /** Reverse mapping: singular metadata type → plural manifest field name. */

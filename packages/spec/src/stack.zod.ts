@@ -50,6 +50,9 @@ import { CubeSchema } from './data/analytics.zod';
 // Automation Protocol (additional)
 import { WebhookSchema } from './automation/webhook.zod';
 
+// System Protocol (additional)
+import { EmailTemplateDefinitionSchema } from './system/email-template.zod';
+
 // Integration Protocol
 import { ConnectorSchema } from './integration/connector.zod';
 
@@ -216,6 +219,7 @@ export const ObjectStackDefinitionSchema = lazySchema(() => z.object({
   approvals: z.array(ApprovalProcessSchema).optional().describe('Approval processes'),
   flows: z.array(FlowSchema).optional().describe('Screen Flows'),
   jobs: z.array(JobSchema).optional().describe('Background / Scheduled Jobs (run by IJobService on cron/interval/once schedules)'),
+  emailTemplates: z.array(EmailTemplateDefinitionSchema).optional().describe('Email Templates resolved by IEmailService.sendTemplate({ template, locale })'),
 
   /**
    * ObjectGuard: Security Layer

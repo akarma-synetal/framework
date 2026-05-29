@@ -45,7 +45,7 @@ import { WorkflowRuleSchema } from '../automation/workflow.zod';
 import { ApprovalProcessSchema } from '../automation/approval.zod';
 
 import { JobSchema } from '../system/job.zod';
-import { EmailTemplateSchema } from '../system/notification.zod';
+import { EmailTemplateDefinitionSchema } from '../system/email-template.zod';
 import { AppTranslationBundleSchema } from '../system/translation.zod';
 
 import { PermissionSetSchema } from '../security/permission.zod';
@@ -88,7 +88,7 @@ const BUILTIN_METADATA_TYPE_SCHEMAS: Partial<Record<MetadataType, z.ZodType>> = 
   // System Protocol
   datasource: DatasourceSchema,
   translation: AppTranslationBundleSchema,
-  email_template: EmailTemplateSchema,
+  email_template: EmailTemplateDefinitionSchema,
   // `router` / `function` / `service` are code-only (allowRuntimeCreate: false).
 
   // Security Protocol
