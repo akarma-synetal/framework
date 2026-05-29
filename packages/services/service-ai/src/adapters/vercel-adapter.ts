@@ -20,13 +20,23 @@ import { generateText, streamText, generateObject, tool as vercelTool, jsonSchem
  * options supported by `generateText` / `streamText`.
  *
  * Forwards: temperature, maxTokens, stop (→ stopSequences), tools, toolChoice.
+ *
+ * `modelId` lets the adapter strip sampling parameters that the model
+ * doesn't support — OpenAI's reasoning models (gpt-5*, o1*, o3*, o4-mini)
+ * reject any non-default `temperature` or `top_p`. Without this guard the
+ * agent would crash with a 400 on every call (`Unsupported value:
+ * 'temperature' does not support 0.3 with this model.`).
  */
-function buildVercelOptions(options?: AIRequestOptions): Record<string, unknown> {
+function buildVercelOptions(
+  options?: AIRequestOptions,
+  modelId?: string,
+): Record<string, unknown> {
   if (!options) return {};
 
   const opts: Record<string, unknown> = {};
+  const reasoning = isReasoningModel(modelId);
 
-  if (options.temperature != null) opts.temperature = options.temperature;
+  if (options.temperature != null && !reasoning) opts.temperature = options.temperature;
   if (options.maxTokens != null) opts.maxTokens = options.maxTokens;
   if (options.stop?.length) opts.stopSequences = options.stop;
 
@@ -46,6 +56,26 @@ function buildVercelOptions(options?: AIRequestOptions): Record<string, unknown>
   }
 
   return opts;
+}
+
+/**
+ * Reasoning-class models reject custom sampling parameters
+ * (temperature, top_p). They only accept the default (temperature=1).
+ *
+ * Covers OpenAI's o-series and gpt-5 reasoning family. The check is
+ * deliberately permissive — anything looking like `o1`, `o3`, `o4-mini`,
+ * or `gpt-5*` is treated as reasoning. False positives only mean we
+ * drop a temperature the model would have accepted; false negatives
+ * mean a 400 from the provider.
+ *
+ * Exported for unit tests; callers should not need it.
+ */
+export function isReasoningModel(modelId: string | undefined): boolean {
+  if (!modelId) return false;
+  // Normalise: strip provider prefixes like "openai/" used by Vercel AI Gateway
+  // and Cloudflare's /compat endpoint.
+  const id = modelId.includes('/') ? modelId.slice(modelId.lastIndexOf('/') + 1) : modelId;
+  return /^(o[134](?:-|$)|gpt-5(?:-|$)|o4-mini)/i.test(id);
 }
 
 /**
@@ -76,7 +106,7 @@ export class VercelLLMAdapter implements LLMAdapter {
     const result = await generateText({
       model: this.model,
       messages,
-      ...buildVercelOptions(options),
+      ...buildVercelOptions(options, this.model.modelId),
     });
 
     return {
@@ -95,7 +125,7 @@ export class VercelLLMAdapter implements LLMAdapter {
     const result = await generateText({
       model: this.model,
       prompt,
-      ...buildVercelOptions(options),
+      ...buildVercelOptions(options, this.model.modelId),
     });
 
     return {
@@ -116,7 +146,7 @@ export class VercelLLMAdapter implements LLMAdapter {
     const result = streamText({
       model: this.model,
       messages,
-      ...buildVercelOptions(options),
+      ...buildVercelOptions(options, this.model.modelId),
     });
 
     try {
@@ -153,7 +183,7 @@ export class VercelLLMAdapter implements LLMAdapter {
       schema,
       schemaName,
       schemaDescription,
-      ...buildVercelOptions(rest),
+      ...buildVercelOptions(rest, this.model.modelId),
     });
 
     return {

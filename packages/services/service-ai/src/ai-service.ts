@@ -14,6 +14,7 @@ import type {
   IDataEngine,
   ChatWithToolsOptions,
   LLMAdapter,
+  MessageObservability,
   PendingActionRow,
   PendingActionStatus,
   ProposePendingActionInput,
@@ -347,9 +348,13 @@ export class AIService implements IAIService {
    * must never fail because the history write failed. Mirrors the
    * precedent set by `ObjectQLTraceRecorder.record`.
    */
-  private async persistMessage(conversationId: string, message: ModelMessage): Promise<void> {
+  private async persistMessage(
+    conversationId: string,
+    message: ModelMessage,
+    extras?: MessageObservability,
+  ): Promise<void> {
     try {
-      await this.conversationService.addMessage(conversationId, message);
+      await this.conversationService.addMessage(conversationId, message, extras);
     } catch (err) {
       this.logger.warn('[AI] persist message failed', {
         conversationId,
@@ -357,6 +362,29 @@ export class AIService implements IAIService {
         error: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+
+  /**
+   * Build a {@link MessageObservability} payload from an LLM-call result
+   * and the wall-clock time it took. Returns `undefined` when there's
+   * nothing useful to persist (no usage and no latency) so callers don't
+   * need to special-case empty results.
+   */
+  private static buildObservability(
+    result: { model?: string; usage?: AIResult['usage'] } | undefined,
+    startedAt: number | undefined,
+  ): MessageObservability | undefined {
+    if (!result) return undefined;
+    const usage = result.usage;
+    const latencyMs = startedAt != null ? Date.now() - startedAt : undefined;
+    if (!result.model && !usage && latencyMs == null) return undefined;
+    return {
+      model: result.model,
+      promptTokens: usage?.promptTokens,
+      completionTokens: usage?.completionTokens,
+      totalTokens: usage?.totalTokens,
+      latencyMs,
+    };
   }
 
   /**
@@ -559,16 +587,22 @@ export class AIService implements IAIService {
     let abortedByCallback = false;
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
+      const turnStartedAt = Date.now();
       const result = await this.adapter.chat(conversation, chatOptions);
+      const turnObservability = AIService.buildObservability(result, turnStartedAt);
 
       // If the model did not request any tool calls we're done
       if (!result.toolCalls || result.toolCalls.length === 0) {
         this.logger.debug('[AI] chatWithTools finished', { iteration, content: result.content.slice(0, 80) });
         if (conversationId) {
-          await this.persistMessage(conversationId, {
-            role: 'assistant',
-            content: result.content,
-          } as ModelMessage);
+          await this.persistMessage(
+            conversationId,
+            {
+              role: 'assistant',
+              content: result.content,
+            } as ModelMessage,
+            turnObservability,
+          );
           void this.summarizeConversation(conversationId);
         }
         return autoCreatedConversationId
@@ -591,7 +625,10 @@ export class AIService implements IAIService {
       } as ModelMessage;
       conversation.push(assistantTurn);
       if (conversationId) {
-        await this.persistMessage(conversationId, assistantTurn);
+        // Attribute usage / latency to the assistant turn that triggered
+        // the tool calls — the subsequent role:'tool' messages have no
+        // LLM cost of their own.
+        await this.persistMessage(conversationId, assistantTurn, turnObservability);
       }
 
       // Execute all tool calls in parallel, threading the per-request
@@ -648,16 +685,22 @@ export class AIService implements IAIService {
     }
 
     // Make one last call *without* tools so the model is forced to produce text.
+    const finalStartedAt = Date.now();
     const finalResult = await this.adapter.chat(conversation, {
       ...chatOptions,
       tools: undefined,
       toolChoice: undefined,
     });
+    const finalObservability = AIService.buildObservability(finalResult, finalStartedAt);
     if (conversationId) {
-      await this.persistMessage(conversationId, {
-        role: 'assistant',
-        content: finalResult.content,
-      } as ModelMessage);
+      await this.persistMessage(
+        conversationId,
+        {
+          role: 'assistant',
+          content: finalResult.content,
+        } as ModelMessage,
+        finalObservability,
+      );
       void this.summarizeConversation(conversationId);
     }
     return autoCreatedConversationId
@@ -726,15 +769,21 @@ export class AIService implements IAIService {
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       // Use non-streaming chat for intermediate tool-call rounds
+      const turnStartedAt = Date.now();
       const result = await this.adapter.chat(conversation, chatOptions);
+      const turnObservability = AIService.buildObservability(result, turnStartedAt);
 
       if (!result.toolCalls || result.toolCalls.length === 0) {
         // Final round — return the probed result without an extra model call
         if (conversationId) {
-          await this.persistMessage(conversationId, {
-            role: 'assistant',
-            content: result.content,
-          } as ModelMessage);
+          await this.persistMessage(
+            conversationId,
+            {
+              role: 'assistant',
+              content: result.content,
+            } as ModelMessage,
+            turnObservability,
+          );
           void this.summarizeConversation(conversationId);
         }
         yield textDeltaPart('stream', result.content);
@@ -756,7 +805,7 @@ export class AIService implements IAIService {
       } as ModelMessage;
       conversation.push(assistantTurn);
       if (conversationId) {
-        await this.persistMessage(conversationId, assistantTurn);
+        await this.persistMessage(conversationId, assistantTurn, turnObservability);
       }
 
       const toolResults: ToolExecutionResult[] = await this.toolRegistry.executeAll(
@@ -804,12 +853,18 @@ export class AIService implements IAIService {
       this.logger.warn('[AI] streamChatWithTools max iterations reached');
     }
     const finalOptions = { ...chatOptions, tools: undefined, toolChoice: undefined };
+    const finalStartedAt = Date.now();
     const result = await this.adapter.chat(conversation, finalOptions);
+    const finalObservability = AIService.buildObservability(result, finalStartedAt);
     if (conversationId) {
-      await this.persistMessage(conversationId, {
-        role: 'assistant',
-        content: result.content,
-      } as ModelMessage);
+      await this.persistMessage(
+        conversationId,
+        {
+          role: 'assistant',
+          content: result.content,
+        } as ModelMessage,
+        finalObservability,
+      );
       void this.summarizeConversation(conversationId);
     }
     yield textDeltaPart('stream', result.content);

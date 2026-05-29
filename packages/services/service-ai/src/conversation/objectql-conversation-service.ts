@@ -8,6 +8,7 @@ import type {
   ToolResultPart,
   IAIConversationService,
   IDataEngine,
+  MessageObservability,
 } from '@objectstack/spec/contracts';
 
 /** Object names used for persistence. */
@@ -158,7 +159,11 @@ export class ObjectQLConversationService implements IAIConversationService {
     return conversations;
   }
 
-  async addMessage(conversationId: string, message: ModelMessage): Promise<AIConversation> {
+  async addMessage(
+    conversationId: string,
+    message: ModelMessage,
+    extras?: MessageObservability,
+  ): Promise<AIConversation> {
     // Verify conversation exists
     const row: DbConversationRow | null = await this.engine.findOne(CONVERSATIONS_OBJECT, {
       where: { id: conversationId },
@@ -195,7 +200,10 @@ export class ObjectQLConversationService implements IAIConversationService {
       contentStr = '';
     }
 
-    // Insert the message
+    // Insert the message — observability fields are optional and only
+    // present for messages produced by an LLM call (assistant turns).
+    // null is sent explicitly so existing rows that lack the value
+    // remain distinguishable from "no usage reported".
     await this.engine.insert(MESSAGES_OBJECT, {
       id: msgId,
       conversation_id: conversationId,
@@ -203,6 +211,11 @@ export class ObjectQLConversationService implements IAIConversationService {
       content: contentStr,
       tool_calls: toolCallsJson,
       tool_call_id: toolCallId,
+      model: extras?.model ?? null,
+      prompt_tokens: extras?.promptTokens ?? null,
+      completion_tokens: extras?.completionTokens ?? null,
+      total_tokens: extras?.totalTokens ?? null,
+      latency_ms: extras?.latencyMs ?? null,
       created_at: now,
     });
 

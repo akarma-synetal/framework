@@ -11,9 +11,11 @@ import { buildAgentRoutes } from './routes/agent-routes.js';
 import { buildAssistantRoutes } from './routes/assistant-routes.js';
 import { buildToolRoutes } from './routes/tool-routes.js';
 import { buildPendingActionRoutes } from './routes/pending-action-routes.js';
+import { buildEvalRoutes } from './routes/eval-routes.js';
 import { ObjectQLConversationService } from './conversation/objectql-conversation-service.js';
-import { AiConversationObject, AiMessageObject, AiPendingActionObject, AiTraceObject } from './objects/index.js';
-import { AiTraceView, AiPendingActionView } from './views/index.js';
+import { AiConversationObject, AiMessageObject, AiPendingActionObject, AiTraceObject, AiEvalCaseObject, AiEvalRunObject } from './objects/index.js';
+import { AiTraceView, AiMessageView, AiPendingActionView, AiEvalCaseView, AiEvalRunView } from './views/index.js';
+import { EvalRunner } from './eval/index.js';
 import { registerDataTools } from './tools/data-tools.js';
 import { registerMetadataTools } from './tools/metadata-tools.js';
 import { registerQueryDataTool } from './tools/query-data.tool.js';
@@ -131,6 +133,56 @@ export class AIServicePlugin implements Plugin {
   }
 
   /**
+   * OpenAI-compatible preset providers — these all expose `/v1/chat/completions`
+   * in OpenAI shape, so we re-use the `@ai-sdk/openai` SDK with a preset
+   * base URL. Centralising the mapping here keeps the settings UI ergonomic
+   * (operators pick "DeepSeek", not "openai" + a base URL they have to look up)
+   * without bloating buildAdapterFromValues with a switch per provider.
+   */
+  private static readonly OPENAI_COMPATIBLE_PRESETS: Record<string, { baseURL: string; defaultModel: string }> = {
+    deepseek:    { baseURL: 'https://api.deepseek.com',                  defaultModel: 'deepseek-chat' },
+    dashscope:   { baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen-plus' },
+    siliconflow: { baseURL: 'https://api.siliconflow.cn/v1',             defaultModel: 'Qwen/Qwen2.5-7B-Instruct' },
+    openrouter:  { baseURL: 'https://openrouter.ai/api/v1',              defaultModel: 'openai/gpt-4o-mini' },
+  };
+
+  /**
+   * Normalise OpenAI-compatible preset providers (DeepSeek / DashScope /
+   * Cloudflare / SiliconFlow / OpenRouter) into the `provider=openai` shape
+   * with the appropriate base URL pre-filled. Returns the rewritten values
+   * map; non-preset providers pass through unchanged.
+   */
+  private normalisePresetProvider(values: Record<string, unknown>): Record<string, unknown> {
+    const provider = String(values.provider ?? 'memory');
+
+    // Cloudflare /compat: assemble the URL from account_id + gateway_id and
+    // forward the cfut_ token via openai_api_key. Model id stays in
+    // provider/model form because /compat dispatches on the prefix.
+    if (provider === 'cloudflare') {
+      const accountId = String(values.cloudflare_account_id ?? '').trim();
+      const gatewayId = String(values.cloudflare_gateway_id ?? 'default').trim() || 'default';
+      if (!accountId) return values; // surfaces "missing key" downstream
+      return {
+        ...values,
+        provider: 'openai',
+        openai_api_key: values.cloudflare_api_key,
+        openai_base_url: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/compat`,
+        openai_model: values.cloudflare_model ?? 'openai/gpt-4o-mini',
+      };
+    }
+
+    const preset = AIServicePlugin.OPENAI_COMPATIBLE_PRESETS[provider];
+    if (!preset) return values;
+    return {
+      ...values,
+      provider: 'openai',
+      openai_api_key: values[`${provider}_api_key`],
+      openai_base_url: preset.baseURL,
+      openai_model: values[`${provider}_model`] ?? preset.defaultModel,
+    };
+  }
+
+  /**
    * Build an LLM adapter from a provider/key/model triple. Used both
    * by the boot-time auto-detect path and by the live `settings:changed`
    * rebuild path. Returns `null` if the requested provider cannot be
@@ -138,8 +190,9 @@ export class AIServicePlugin implements Plugin {
    */
   private async buildAdapterFromValues(
     ctx: PluginContext,
-    values: Record<string, unknown>,
+    rawValues: Record<string, unknown>,
   ): Promise<{ adapter: LLMAdapter; description: string } | null> {
+    const values = this.normalisePresetProvider(rawValues);
     const provider = String(values.provider ?? 'memory');
 
     if (provider === 'memory') {
@@ -520,8 +573,8 @@ export class AIServicePlugin implements Plugin {
       type: 'plugin',
       scope: 'project',
       namespace: 'ai',
-      objects: [AiConversationObject, AiMessageObject, AiTraceObject, AiPendingActionObject],
-      views: [AiTraceView, AiPendingActionView],
+      objects: [AiConversationObject, AiMessageObject, AiTraceObject, AiPendingActionObject, AiEvalCaseObject, AiEvalRunObject],
+      views: [AiTraceView, AiMessageView, AiPendingActionView, AiEvalCaseView, AiEvalRunView],
     });
 
     if (this.options.debug) {
@@ -571,11 +624,18 @@ export class AIServicePlugin implements Plugin {
       protocolService = undefined;
     }
 
-    // Data tools require only the data engine
+    // Data tools require only the data engine. When metadata service is
+    // wired we also pass it (+ protocol) so the tools can validate
+    // field references at runtime and reject hallucinated field names
+    // with a structured error instead of silently returning empty data.
     try {
       const dataEngine = ctx.getService<IDataEngine>('data');
       if (dataEngine) {
-        registerDataTools(this.service.toolRegistry, { dataEngine });
+        registerDataTools(this.service.toolRegistry, {
+          dataEngine,
+          metadataService,
+          protocol: protocolService,
+        });
         ctx.logger.info('[AI] Built-in data tools registered');
 
         // Register query_data tool when metadata service is also available —
@@ -872,6 +932,25 @@ export class AIServicePlugin implements Plugin {
       const assistantRoutes = buildAssistantRoutes(this.service, agentRuntime, skillRegistry, ctx.logger);
       routes.push(...assistantRoutes);
       ctx.logger.info(`[AI] Assistant (ambient) routes registered (${assistantRoutes.length} routes)`);
+
+      // ── Eval routes — gated on a wired IDataEngine since the runner
+      //    persists run records. When data is not available we simply
+      //    don't expose the route (the auto-CRUD endpoints stay disabled
+      //    too because the objects can't be migrated).
+      const evalDataEngine = ctx.getService<IDataEngine>('data');
+      if (evalDataEngine && typeof evalDataEngine.insert === 'function') {
+        const evalRunner = new EvalRunner(
+          metadataService,
+          evalDataEngine,
+          this.service,
+          agentRuntime,
+        );
+        const evalRoutes = buildEvalRoutes(evalRunner, ctx.logger);
+        routes.push(...evalRoutes);
+        ctx.logger.info(`[AI] Eval routes registered (${evalRoutes.length} routes)`);
+      } else {
+        ctx.logger.debug('[AI] IDataEngine not available, skipping eval routes');
+      }
     } else {
       ctx.logger.debug('[AI] Metadata service not available, skipping agent and assistant routes');
     }

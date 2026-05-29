@@ -43,6 +43,15 @@ const manifest = {
         { value: 'openai', label: 'OpenAI' },
         { value: 'anthropic', label: 'Anthropic' },
         { value: 'google', label: 'Google Generative AI' },
+        // Below: providers expose an OpenAI-compatible Chat Completions API,
+        // so they reuse the @ai-sdk/openai SDK with a preset base_url. The
+        // plugin's buildAdapterFromValues maps these onto provider="openai"
+        // + an auto-filled openai_base_url at runtime.
+        { value: 'deepseek', label: 'DeepSeek (OpenAI-compatible)' },
+        { value: 'dashscope', label: '阿里通义 DashScope (OpenAI-compatible)' },
+        { value: 'cloudflare', label: 'Cloudflare AI Gateway (OpenAI-compatible)' },
+        { value: 'siliconflow', label: '硅基流动 SiliconFlow (OpenAI-compatible)' },
+        { value: 'openrouter', label: 'OpenRouter (OpenAI-compatible)' },
       ],
     },
 
@@ -93,6 +102,84 @@ const manifest = {
     { type: 'text', key: 'google_model', label: 'Model', required: false,
       default: 'gemini-2.0-flash',
       visible: "${data.provider === 'google'}" },
+
+    // ── OpenAI-compatible presets (DeepSeek / DashScope / Cloudflare / …) ──
+    //
+    // These providers all expose `/v1/chat/completions` in OpenAI shape, so
+    // we reuse the `@ai-sdk/openai` SDK with a preset base URL. The plugin
+    // normalises `provider=deepseek` (etc.) to `provider=openai` at adapter
+    // construction time, injecting the right base URL and a sensible default
+    // model id. Users only fill in API key + (optionally) model — the URL
+    // is preset, eliminating the #1 onboarding mistake.
+    { type: 'group', id: 'deepseek', label: 'DeepSeek', required: false,
+      visible: "${data.provider === 'deepseek'}",
+      description: 'OpenAI-compatible API at https://api.deepseek.com. Base URL is auto-filled.' },
+    { type: 'password', key: 'deepseek_api_key', label: 'DeepSeek API key',
+      required: true, encrypted: true,
+      description: 'sk-... — issued at platform.deepseek.com.',
+      visible: "${data.provider === 'deepseek'}" },
+    { type: 'text', key: 'deepseek_model', label: 'Model', required: false,
+      default: 'deepseek-chat',
+      description: 'Examples: deepseek-chat (V3), deepseek-reasoner (R1 thinking).',
+      visible: "${data.provider === 'deepseek'}" },
+
+    { type: 'group', id: 'dashscope', label: '阿里通义 DashScope', required: false,
+      visible: "${data.provider === 'dashscope'}",
+      description: 'OpenAI-compatible endpoint at dashscope.aliyuncs.com/compatible-mode/v1. Base URL is auto-filled.' },
+    { type: 'password', key: 'dashscope_api_key', label: 'DashScope API key',
+      required: true, encrypted: true,
+      description: 'sk-... — issued at dashscope.console.aliyun.com.',
+      visible: "${data.provider === 'dashscope'}" },
+    { type: 'text', key: 'dashscope_model', label: 'Model', required: false,
+      default: 'qwen-plus',
+      description: 'Examples: qwen-plus, qwen-max, qwen3-max, qwen-turbo.',
+      visible: "${data.provider === 'dashscope'}" },
+
+    { type: 'group', id: 'cloudflare', label: 'Cloudflare AI Gateway', required: false,
+      visible: "${data.provider === 'cloudflare'}",
+      description:
+        'Uses the /compat endpoint so the model id is `provider/model` (e.g. ' +
+        '`openai/gpt-4o-mini`, `anthropic/claude-3-5-sonnet`, `deepseek/deepseek-chat`). ' +
+        'Note: alibaba/qwen* is NOT supported by Cloudflare /compat — use the DashScope provider for Qwen.' },
+    { type: 'text', key: 'cloudflare_account_id', label: 'Cloudflare account id', required: true,
+      description: 'The 32-char hex id from your Cloudflare dashboard URL.',
+      visible: "${data.provider === 'cloudflare'}" },
+    { type: 'text', key: 'cloudflare_gateway_id', label: 'Gateway id', required: false, default: 'default',
+      description: 'Gateway name configured in Cloudflare → AI Gateway. Defaults to `default`.',
+      visible: "${data.provider === 'cloudflare'}" },
+    { type: 'password', key: 'cloudflare_api_key', label: 'Cloudflare AI Gateway token',
+      required: true, encrypted: true,
+      description: 'Issued in AI Gateway → "API tokens" tab (cfut_… or sk_…).',
+      visible: "${data.provider === 'cloudflare'}" },
+    { type: 'text', key: 'cloudflare_model', label: 'Model', required: false,
+      default: 'openai/gpt-4o-mini',
+      description:
+        'Format: provider/model. Allowed providers (per Cloudflare /compat): anthropic, openai, groq, ' +
+        'mistral, cohere, perplexity, workers-ai, google-ai-studio, vertex, grok, deepseek, cerebras, baseten, parallel.',
+      visible: "${data.provider === 'cloudflare'}" },
+
+    { type: 'group', id: 'siliconflow', label: '硅基流动 SiliconFlow', required: false,
+      visible: "${data.provider === 'siliconflow'}",
+      description: 'OpenAI-compatible endpoint at api.siliconflow.cn/v1. Base URL is auto-filled.' },
+    { type: 'password', key: 'siliconflow_api_key', label: 'SiliconFlow API key',
+      required: true, encrypted: true,
+      visible: "${data.provider === 'siliconflow'}" },
+    { type: 'text', key: 'siliconflow_model', label: 'Model', required: false,
+      default: 'Qwen/Qwen2.5-7B-Instruct',
+      description: 'Examples: Qwen/Qwen2.5-72B-Instruct, deepseek-ai/DeepSeek-V3, meta-llama/Meta-Llama-3.1-8B-Instruct.',
+      visible: "${data.provider === 'siliconflow'}" },
+
+    { type: 'group', id: 'openrouter', label: 'OpenRouter', required: false,
+      visible: "${data.provider === 'openrouter'}",
+      description: 'Multi-provider router at openrouter.ai/api/v1. Base URL is auto-filled.' },
+    { type: 'password', key: 'openrouter_api_key', label: 'OpenRouter API key',
+      required: true, encrypted: true,
+      description: 'sk-or-...',
+      visible: "${data.provider === 'openrouter'}" },
+    { type: 'text', key: 'openrouter_model', label: 'Model', required: false,
+      default: 'openai/gpt-4o-mini',
+      description: 'Format: provider/model (e.g. anthropic/claude-3.5-sonnet, deepseek/deepseek-chat).',
+      visible: "${data.provider === 'openrouter'}" },
 
     // ── Generation defaults ──────────────────────────────────────
     { type: 'group', id: 'defaults', label: 'Generation defaults', required: false,
@@ -243,6 +330,21 @@ export const aiTestActionHandler: SettingsActionHandler = async ({ values, paylo
       ok: true,
       severity: 'info',
       message: `Vercel AI Gateway configured (model=${values.gateway_model}). Mount @objectstack/service-ai to exercise live calls.`,
+    };
+  }
+  // Cloudflare needs more than just an API key.
+  if (provider === 'cloudflare') {
+    if (!values.cloudflare_account_id) {
+      return { ok: false, severity: 'error', message: 'Cloudflare account id is required.' };
+    }
+    if (!values.cloudflare_api_key) {
+      return { ok: false, severity: 'error', message: 'Cloudflare AI Gateway token is required.' };
+    }
+    const model = values.cloudflare_model ?? '(default openai/gpt-4o-mini)';
+    return {
+      ok: true,
+      severity: 'info',
+      message: `Cloudflare AI Gateway configured (model=${model}). Mount @objectstack/service-ai to exercise live calls.`,
     };
   }
   const keyField = `${provider}_api_key`;

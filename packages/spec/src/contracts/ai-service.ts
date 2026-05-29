@@ -432,6 +432,31 @@ export interface AIConversation {
 }
 
 /**
+ * Optional per-message observability metadata passed by the AI service
+ * when persisting a message that was produced (or consumed) by an LLM
+ * call. Lets the conversation store record token usage, latency, and
+ * model id alongside each message so analytics surfaces (cost per turn,
+ * latency histograms, A/B comparisons) can read a single table.
+ *
+ * All fields are optional — user-authored messages typically pass none.
+ * Conversation services SHOULD persist supplied fields verbatim and
+ * SHOULD tolerate missing fields gracefully (older callers, in-flight
+ * upgrades).
+ */
+export interface MessageObservability {
+    /** Model id reported by the adapter (e.g. `gpt-4o-mini-2024-07-18`). */
+    model?: string;
+    /** Tokens consumed by the prompt portion of the call. */
+    promptTokens?: number;
+    /** Tokens generated in the completion. */
+    completionTokens?: number;
+    /** prompt + completion. */
+    totalTokens?: number;
+    /** Wall-clock duration of the LLM call that produced this message. */
+    latencyMs?: number;
+}
+
+/**
  * IAIConversationService - Manages persistent AI conversations
  *
  * Provides CRUD operations for conversations and their messages.
@@ -476,9 +501,18 @@ export interface IAIConversationService {
      * Add a message to a conversation
      * @param conversationId - Target conversation ID
      * @param message - Message to append (Vercel `ModelMessage`)
+     * @param extras - Optional per-message observability metadata. When
+     *                supplied, the conversation service persists token
+     *                usage, latency, and model id alongside the message
+     *                so each `ai_messages` row can be analysed without
+     *                joining `ai_traces` by timestamp.
      * @returns The updated conversation
      */
-    addMessage(conversationId: string, message: ModelMessage): Promise<AIConversation>;
+    addMessage(
+        conversationId: string,
+        message: ModelMessage,
+        extras?: MessageObservability,
+    ): Promise<AIConversation>;
 
     /**
      * Update mutable conversation fields (title, metadata).

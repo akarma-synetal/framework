@@ -61,6 +61,43 @@ export const AiMessageObject = ObjectSchema.create({
       description: 'ID of the tool call this message responds to (when role=tool)',
     }),
 
+    // ── Per-message observability ────────────────────────────────────
+    // Populated when this message is the output of an LLM call (most
+    // assistant turns). User and tool messages leave them null. Lets
+    // analytics surfaces (cost per turn, latency histograms, A/B model
+    // comparisons) query a single table instead of joining ai_traces
+    // by timestamp.
+    model: Field.text({
+      label: 'Model',
+      required: false,
+      maxLength: 128,
+      description: 'Model id reported by the adapter for the call that produced this message',
+    }),
+
+    prompt_tokens: Field.number({
+      label: 'Prompt Tokens',
+      required: false,
+      description: 'Tokens in the request that produced this message',
+    }),
+
+    completion_tokens: Field.number({
+      label: 'Completion Tokens',
+      required: false,
+      description: 'Tokens generated in this message',
+    }),
+
+    total_tokens: Field.number({
+      label: 'Total Tokens',
+      required: false,
+      description: 'prompt + completion for the producing call',
+    }),
+
+    latency_ms: Field.number({
+      label: 'Latency (ms)',
+      required: false,
+      description: 'Wall-clock duration of the LLM call that produced this message',
+    }),
+
     created_at: Field.datetime({
       label: 'Created At',
       required: true,
@@ -72,6 +109,7 @@ export const AiMessageObject = ObjectSchema.create({
   indexes: [
     { fields: ['conversation_id'] },
     { fields: ['conversation_id', 'created_at'] },
+    { fields: ['model'] },
   ],
 
   enable: {

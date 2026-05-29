@@ -4,6 +4,7 @@ import type {
   AIConversation,
   ModelMessage,
   IAIConversationService,
+  MessageObservability,
 } from '@objectstack/spec/contracts';
 
 /**
@@ -75,7 +76,14 @@ export class InMemoryConversationService implements IAIConversationService {
     return results;
   }
 
-  async addMessage(conversationId: string, message: ModelMessage): Promise<AIConversation> {
+  async addMessage(
+    conversationId: string,
+    message: ModelMessage,
+    _extras?: MessageObservability,
+  ): Promise<AIConversation> {
+    // Observability extras are accepted for interface parity with
+    // ObjectQLConversationService but not persisted — the in-memory
+    // store is for testing only and doesn't surface analytics views.
     const conversation = this.store.get(conversationId);
     if (!conversation) {
       throw new Error(`Conversation "${conversationId}" not found`);

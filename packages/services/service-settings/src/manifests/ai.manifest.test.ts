@@ -16,13 +16,24 @@ describe('aiSettingsManifest', () => {
     expect(parsed.version).toBe(1);
   });
 
-  it('exposes provider select with memory + gateway + 3 SDK providers', () => {
+  it('exposes provider select with memory + gateway + SDK + OpenAI-compatible presets', () => {
     const provider = (aiSettingsManifest.specifiers as any[]).find(
       (s) => s.key === 'provider' && s.type === 'select',
     );
     expect(provider).toBeDefined();
     const values = provider.options.map((o: any) => o.value).sort();
-    expect(values).toEqual(['anthropic', 'gateway', 'google', 'memory', 'openai']);
+    expect(values).toEqual([
+      'anthropic',
+      'cloudflare',
+      'dashscope',
+      'deepseek',
+      'gateway',
+      'google',
+      'memory',
+      'openai',
+      'openrouter',
+      'siliconflow',
+    ]);
     expect(provider.default).toBe('memory');
   });
 
