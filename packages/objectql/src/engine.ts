@@ -17,6 +17,7 @@ import { pluralToSingular } from '@objectstack/spec/shared';
 import { SchemaRegistry, computeFQN } from './registry.js';
 import { ExpressionEngine } from '@objectstack/formula';
 import type { Expression } from '@objectstack/spec';
+import { isAggregatedViewContainer, expandViewContainer } from '@objectstack/spec';
 import { bindHooksToEngine } from './hook-binder.js';
 import { validateRecord } from './validation/record-validator.js';
 import { applyInMemoryAggregation } from './in-memory-aggregation.js';
@@ -796,6 +797,17 @@ export class ObjectQL implements IDataEngine {
                   if (itemName) {
                       const toRegister = item.name === itemName ? item : { ...item, name: itemName };
                       this._registry.registerItem(pluralToSingular(key), toRegister, 'name' as any, id);
+                      // "Object has-many View" (ADR-0017): a `defineView` document
+                      // aggregates an object's views. Register the container under
+                      // the bare <object> key (above, back-compat) AND expand it
+                      // into independent ViewItems registered under <object>.<key>,
+                      // so `getViewsByObject()` / `GET /meta/view?object=` surface
+                      // the per-view `package` layer the switcher + Studio consume.
+                      if (key === 'views' && isAggregatedViewContainer(toRegister)) {
+                          for (const vi of expandViewContainer(itemName, toRegister)) {
+                              this._registry.registerItem('view', vi, 'name' as any, id);
+                          }
+                      }
                   } else {
                       this.logger.warn(`Skipping ${pluralToSingular(key)} without a derivable name`, { id });
                   }

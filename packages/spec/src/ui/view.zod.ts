@@ -934,6 +934,137 @@ export function defineViewItem(config: z.input<typeof ViewItemSchema>): ViewItem
   return ViewItemSchema.parse(config);
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// defineView container → ViewItem expansion (shared by every loader)
+//
+// `defineView({ list, form, listViews, formViews })` aggregates an object's
+// views into one document. Each registration path that ingests such a
+// container (the ObjectQL engine boot loop AND the metadata HMR plugin) must
+// expand it into N independent ViewItems registered under `<object>.<viewKey>`,
+// so each view is individually addressable and `getViewsByObject()` can rebuild
+// the switcher. The original container is ALSO kept under the bare `<object>`
+// key for backward-compatible reads. This logic lives in `@objectstack/spec`
+// (depended on by both objectql and metadata) so the two loaders cannot drift.
+
+/** A ViewItem materialised from an aggregated container (always `package`). */
+export interface ExpandedViewItem {
+  name: string;
+  object: string;
+  viewKind: 'list' | 'form';
+  label?: unknown;
+  config: any;
+  isDefault?: boolean;
+  order: number;
+  scope: 'package';
+}
+
+/** True when a raw view artifact still uses the aggregated container shape
+ *  (and is not already an independent ViewItem, which carries `viewKind`). */
+export function isAggregatedViewContainer(item: any): boolean {
+  if (!item || typeof item !== 'object') return false;
+  if (item.viewKind) return false; // already an independent ViewItem
+  return Boolean(item.list || item.form || item.listViews || item.formViews);
+}
+
+/** Structural signature used to collapse a container's default `list`/`form`
+ *  with a redundant `listViews`/`formViews` restatement of the same view (the
+ *  common "default == listViews.all" authoring pattern). */
+function viewSignature(v: any): string {
+  if (!v || typeof v !== 'object') return '';
+  try {
+    return JSON.stringify({ type: v.type ?? null, label: v.label ?? null, columns: v.columns ?? null });
+  } catch {
+    return '';
+  }
+}
+
+/** Allocate a collision-free `<object>.<key>` name within one expansion. */
+function uniqueViewName(base: string, used: Set<string>): string {
+  let name = base;
+  let i = 2;
+  while (used.has(name)) name = `${base}_${i++}`;
+  used.add(name);
+  return name;
+}
+
+function cloneViewConfig(v: any): any {
+  try {
+    return structuredClone(v);
+  } catch {
+    return JSON.parse(JSON.stringify(v));
+  }
+}
+
+/**
+ * Expand an aggregated view container into independent ViewItems.
+ *
+ * List family: `listViews` entries first (keys taken from the author), then the
+ * default `list` — deduped by structural signature so a `listViews.all` that
+ * merely restates `list` collapses into one item. The view matching the
+ * declared default is flagged `isDefault`.
+ *
+ * Form family: `formViews` entries, then the default `form`.
+ */
+export function expandViewContainer(object: string, container: any): ExpandedViewItem[] {
+  const out: ExpandedViewItem[] = [];
+  const used = new Set<string>();
+  let order = 0;
+
+  // ---- list family ----
+  const listSigToName = new Map<string, string>();
+  const listViews =
+    container.listViews && typeof container.listViews === 'object' ? container.listViews : {};
+  for (const [k, v] of Object.entries<any>(listViews)) {
+    if (!v || typeof v !== 'object') continue;
+    const name = uniqueViewName(`${object}.${k}`, used);
+    listSigToName.set(viewSignature(v), name);
+    out.push({ name, object, viewKind: 'list', label: v.label, config: cloneViewConfig(v), order: order++, scope: 'package' });
+  }
+  const defaultList = container.list;
+  let defaultListName: string | undefined;
+  if (defaultList && typeof defaultList === 'object') {
+    const dup = listSigToName.get(viewSignature(defaultList));
+    if (dup) {
+      defaultListName = dup; // already represented by a named listViews entry
+    } else {
+      const key = typeof defaultList.name === 'string' && defaultList.name ? defaultList.name : 'default';
+      const name = uniqueViewName(`${object}.${key}`, used);
+      out.push({ name, object, viewKind: 'list', label: defaultList.label, config: cloneViewConfig(defaultList), order: order++, scope: 'package' });
+      defaultListName = name;
+    }
+  }
+  if (!defaultListName && out.length) defaultListName = out[0].name;
+  for (const item of out) {
+    if (item.viewKind === 'list' && item.name === defaultListName) item.isDefault = true;
+  }
+
+  // ---- form family ----
+  const formStart = out.length;
+  const formSigSeen = new Set<string>();
+  const formViews =
+    container.formViews && typeof container.formViews === 'object' ? container.formViews : {};
+  for (const [k, v] of Object.entries<any>(formViews)) {
+    if (!v || typeof v !== 'object') continue;
+    const name = uniqueViewName(`${object}.${k}`, used);
+    formSigSeen.add(viewSignature(v));
+    out.push({ name, object, viewKind: 'form', label: v.label, config: cloneViewConfig(v), order: order++, scope: 'package' });
+  }
+  const defaultForm = container.form;
+  let defaultFormName: string | undefined;
+  if (defaultForm && typeof defaultForm === 'object' && !formSigSeen.has(viewSignature(defaultForm))) {
+    const key = typeof defaultForm.name === 'string' && defaultForm.name ? defaultForm.name : 'form';
+    const name = uniqueViewName(`${object}.${key}`, used);
+    out.push({ name, object, viewKind: 'form', label: defaultForm.label, config: cloneViewConfig(defaultForm), order: order++, scope: 'package' });
+    defaultFormName = name;
+  }
+  if (!defaultFormName && out.length > formStart) defaultFormName = out[formStart].name;
+  for (let i = formStart; i < out.length; i++) {
+    if (out[i].name === defaultFormName) out[i].isDefault = true;
+  }
+
+  return out;
+}
+
 /**
  * Type-safe factory for a standalone {@link FormView} bound to a JSON Schema
  * rather than to an ObjectQL object.
