@@ -778,6 +778,162 @@ export function defineView(config: z.input<typeof ViewSchema>): View {
   return ViewSchema.parse(config);
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// Independent View Item model (Object has-many View)
+// ───────────────────────────────────────────────────────────────────────────
+//
+// The {@link ViewSchema} *container* above aggregates every view of an object
+// into one document. That model cannot express runtime-authored views (a user
+// adding "My high-value leads" at runtime cannot append to a developer's source
+// file), and it forces multiple distinct views into a single designer.
+//
+// {@link ViewItemSchema} promotes each named view to a first-class, independently
+// addressable entity bound to its object by a foreign key. The object↔view
+// switcher is then a *query* (`getViewsByObject`) rather than embedded storage —
+// mirroring Airtable / Salesforce / Notion, where a table/object has-many views.
+//
+// `defineView` is retained as authoring sugar: the backend loader expands an
+// aggregated document into N ViewItems at registration time, so existing
+// `*.view.ts` files and the published spec keep working unchanged.
+
+/**
+ * Qualified view-item identity: `<object>.<viewKey>` — dotted snake_case
+ * segments, e.g. `crm_lead.pipeline`. Globally unique, and the object can be
+ * recovered from the prefix, so the registry key never collides across objects.
+ */
+export const ViewItemNameSchema = z
+  .string()
+  .regex(
+    /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/,
+    'View item name must be a dotted snake_case qualified name, e.g. "crm_lead.pipeline".',
+  )
+  .describe('Globally-unique view id, `<object>.<viewKey>`.');
+
+/**
+ * Identity layer for a view item — its visibility scope and ownership.
+ *
+ * - `package`  — shipped from `*.view.ts` source / an installed package.
+ *                Not deletable (reinstall restores it); customisable via an
+ *                override layer; hideable from the switcher.
+ * - `shared`   — authored at runtime, visible org-wide. Creating one is gated
+ *                by the `view.manageShared` capability.
+ * - `personal` — authored at runtime, scoped to `owner`. Any user with read
+ *                access to the object may create one.
+ *
+ * Named `scope` (not `provenance`) to avoid colliding with the loader-set
+ * `_provenance` envelope field, which tracks a different axis
+ * (package | org | env-forced).
+ */
+export const ViewScopeSchema = z
+  .enum(['package', 'shared', 'personal'])
+  .describe('View identity layer: package | shared | personal.');
+
+/** Discriminator for the kind of view a {@link ViewItemSchema} carries. */
+export const ViewKindSchema = z
+  .enum(['list', 'form'])
+  .describe('Whether `config` is a ListView (list family) or a FormView.');
+
+/**
+ * Fields shared by every independent view item, regardless of kind. Returned
+ * as a raw Zod shape so it composes into each discriminated-union member
+ * without forcing eager schema construction.
+ */
+function viewItemBaseShape() {
+  return {
+    name: ViewItemNameSchema,
+    object: z
+      .string()
+      .describe('Bound object name — the foreign key used to aggregate views.'),
+    label: I18nLabelSchema.optional().describe('Display label (supports i18n).'),
+    isDefault: z
+      .boolean()
+      .optional()
+      .describe("Whether this is the object's default view in the switcher."),
+    order: z
+      .number()
+      .int()
+      .optional()
+      .describe("Sort order within the object's view switcher / left rail."),
+    scope: ViewScopeSchema.optional().describe(
+      'Identity layer (defaults to `package` for source-loaded views).',
+    ),
+    owner: z
+      .string()
+      .optional()
+      .describe('Owner user id — set when `scope` is `personal`.'),
+    hidden: z
+      .boolean()
+      .optional()
+      .describe('Hidden from the switcher (per-user / per-org declutter).'),
+    /**
+     * Package author protection block — same envelope as {@link ViewSchema};
+     * the loader translates it into the private `_lock` envelope.
+     */
+    protection: ProtectionSchema.optional().describe(
+      'Package author protection block — lock policy for this view.',
+    ),
+    // ADR-0010 — runtime protection envelope (internal — set by loader).
+    ...MetadataProtectionFields,
+  };
+}
+
+/**
+ * Independent View Item — a single named view bound to one object.
+ *
+ * Discriminated on `viewKind`: a `list` item carries a {@link ListViewSchema}
+ * config (grid / kanban / calendar / …), a `form` item carries a
+ * {@link FormViewSchema} config.
+ *
+ * @example
+ * ```ts
+ * const pipeline = defineViewItem({
+ *   name: 'crm_lead.pipeline',
+ *   object: 'crm_lead',
+ *   viewKind: 'list',
+ *   label: 'Pipeline',
+ *   config: {
+ *     type: 'kanban',
+ *     data: { provider: 'object', object: 'crm_lead' },
+ *     columns: ['name', 'stage', 'amount'],
+ *   },
+ * });
+ * ```
+ */
+export const ViewItemSchema = lazySchema(() =>
+  z.discriminatedUnion('viewKind', [
+    z.object({
+      viewKind: z.literal('list'),
+      config: ListViewSchema.describe('List-family view configuration.'),
+      ...viewItemBaseShape(),
+    }),
+    z.object({
+      viewKind: z.literal('form'),
+      config: FormViewSchema.describe('Form view configuration.'),
+      ...viewItemBaseShape(),
+    }),
+  ]),
+);
+
+/**
+ * Type-safe factory for an independent {@link ViewItem}.
+ *
+ * Validates the config at creation time using Zod `.parse()`.
+ *
+ * @example
+ * ```ts
+ * const allLeads = defineViewItem({
+ *   name: 'crm_lead.all',
+ *   object: 'crm_lead',
+ *   viewKind: 'list',
+ *   isDefault: true,
+ *   config: { type: 'grid', data: { provider: 'object', object: 'crm_lead' }, columns: ['name'] },
+ * });
+ * ```
+ */
+export function defineViewItem(config: z.input<typeof ViewItemSchema>): ViewItem {
+  return ViewItemSchema.parse(config);
+}
+
 /**
  * Type-safe factory for a standalone {@link FormView} bound to a JSON Schema
  * rather than to an ObjectQL object.
@@ -824,6 +980,9 @@ export function defineForm(
 }
 
 export type View = z.infer<typeof ViewSchema>;
+export type ViewItem = z.infer<typeof ViewItemSchema>;
+export type ViewScope = z.infer<typeof ViewScopeSchema>;
+export type ViewKind = z.infer<typeof ViewKindSchema>;
 export type ListView = z.infer<typeof ListViewSchema>;
 export type FormView = z.infer<typeof FormViewSchema>;
 export type FormSection = z.infer<typeof FormSectionSchema>;
