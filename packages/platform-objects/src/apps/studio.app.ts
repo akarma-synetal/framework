@@ -34,6 +34,11 @@ export const STUDIO_APP: App = {
   icon: 'hammer',
   active: true,
   isDefault: false,
+  // Studio is the metadata-authoring host, so its ambient copilot is
+  // pinned to the schema-architect agent. Resolved by the ambient chat
+  // endpoint via `app.defaultAgent` — no UI-side `?agent=` override
+  // needed. Every other app falls back to the data-query agent.
+  defaultAgent: 'metadata_assistant',
   branding: {
     primaryColor: '#6366f1', // Indigo-500 — distinct from Setup's slate
   },

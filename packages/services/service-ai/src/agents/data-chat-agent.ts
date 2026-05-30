@@ -27,8 +27,19 @@ import type { Agent } from '@objectstack/spec/ai';
  * }
  * ```
  */
+/**
+ * Canonical name of the platform's data-query agent.
+ *
+ * This is the implicit default copilot for every application that does
+ * not pin its own `app.defaultAgent`. Studio is the only built-in app
+ * that overrides it (→ `metadata_assistant`). Keeping the name as an
+ * exported constant lets the runtime resolve the fallback
+ * deterministically instead of guessing "first active agent".
+ */
+export const DEFAULT_DATA_AGENT_NAME = 'data_chat';
+
 export const DATA_CHAT_AGENT: Agent = {
-  name: 'data_chat',
+  name: DEFAULT_DATA_AGENT_NAME,
   label: 'Data Assistant',
   role: 'Business Data Analyst',
   instructions: `You are a helpful data assistant that helps users explore and understand their business data through natural language.

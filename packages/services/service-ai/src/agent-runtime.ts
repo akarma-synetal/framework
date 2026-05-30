@@ -9,6 +9,7 @@ import type {
 import type { Agent, Skill } from '@objectstack/spec/ai';
 import { AgentSchema } from '@objectstack/spec/ai';
 import { SkillRegistry, type SkillContext } from './skill-registry.js';
+import { DEFAULT_DATA_AGENT_NAME } from './agents/index.js';
 
 /**
  * Context passed alongside a user message when chatting with an agent.
@@ -231,9 +232,14 @@ export class AgentRuntime {
    * chat endpoint when the client doesn't specify an `agentName`.
    *
    * Resolution order:
-   * 1. The `defaultAgent` of the app named by `context.appName`.
-   * 2. The first active agent in the registry (deterministic fallback).
-   * 3. `undefined` if no agents are registered.
+   * 1. The `defaultAgent` of the app named by `context.appName`
+   *    (e.g. Studio → `metadata_assistant`).
+   * 2. The platform data-query agent (`data_chat`) — the implicit
+   *    copilot bound to every app that doesn't pin its own. This is
+   *    what end users get by default, so they never have to choose.
+   * 3. The first active agent in the registry (last-resort fallback,
+   *    e.g. in stripped-down deployments without the data agent).
+   * 4. `undefined` if no agents are registered.
    */
   async resolveDefaultAgent(context?: AgentChatContext): Promise<Agent | undefined> {
     if (context?.appName) {
@@ -245,7 +251,14 @@ export class AgentRuntime {
       }
     }
 
-    // Fallback: first active agent in declaration order.
+    // Platform default: the data-query agent is the implicit copilot for
+    // every app without an explicit `defaultAgent`. Resolve it by name so
+    // the fallback is deterministic rather than registration-order
+    // dependent.
+    const dataAgent = await this.loadAgent(DEFAULT_DATA_AGENT_NAME);
+    if (dataAgent && dataAgent.active !== false) return dataAgent;
+
+    // Last resort: first active agent in declaration order.
     const summaries = await this.listAgents();
     if (summaries.length === 0) return undefined;
     return this.loadAgent(summaries[0].name);
