@@ -14,6 +14,7 @@
  */
 
 import type { SchemaDiffEntry } from '../shared/external-errors';
+import type { ExternalCatalog } from '../data/external-catalog.zod';
 
 /**
  * A remote table discovered via introspection, filtered by the datasource's
@@ -64,6 +65,32 @@ export interface ObjectDraft {
   review: Array<{ column: string; remoteType: string; note: string }>;
 }
 
+/**
+ * Options for {@link IExternalDatasourceService.importObject}: a superset of
+ * the draft options, plus the runtime-persona choices the Studio "Import as
+ * Object" action exposes.
+ */
+export interface ImportObjectOpts extends GenerateDraftOpts {
+  /** Override the auto-derived object name (snake_case). */
+  name?: string;
+  /**
+   * Mark the imported object writable (`object.external.writable`). Default
+   * `false` — federated objects are read-only unless explicitly opted in (and
+   * the datasource must also set `external.allowWrites`, ADR-0015 Gate 3).
+   */
+  writable?: boolean;
+}
+
+/** Outcome of importing a remote table as a live federated object. */
+export interface ImportObjectResult {
+  /** The object name as persisted. */
+  name: string;
+  /** The persisted object definition (parseable by `ObjectSchema`). */
+  definition: Record<string, unknown>;
+  /** Review notes carried over from the draft (lossy/unknown column mappings). */
+  review: ObjectDraft['review'];
+}
+
 /** Per-object validation outcome. */
 export interface SchemaValidationResult {
   ok: boolean;
@@ -103,11 +130,26 @@ export interface IExternalDatasourceService {
   ): Promise<ObjectDraft>;
 
   /**
-   * Refresh and persist the cached remote schema snapshot
-   * (`external_catalog`). Returns the snapshot. (Persistence lands with the
-   * `external_catalog` metadata type.)
+   * Persist a remote table as a live, runtime-origin federated `Object` so it
+   * is immediately queryable — the backend of the Studio "Import as Object"
+   * action (ADR-0015 §6.4, Addendum runtime persona). Builds the draft via
+   * {@link generateObjectDraft}, applies the import overrides, and writes it
+   * through the metadata store. Requires a writable metadata store: throws when
+   * none is wired (e.g. a GitOps-only / read-only deployment).
    */
-  refreshCatalog(datasource: string): Promise<unknown>;
+  importObject(
+    datasource: string,
+    remoteName: string,
+    opts?: ImportObjectOpts,
+  ): Promise<ImportObjectResult>;
+
+  /**
+   * Refresh and persist the cached remote schema snapshot as an
+   * `external_catalog` metadata record (conventionally `<datasource>_catalog`).
+   * Returns the snapshot. Persistence is best-effort: when no catalog store is
+   * wired the snapshot is still returned, just not cached.
+   */
+  refreshCatalog(datasource: string): Promise<ExternalCatalog>;
 
   /** Validate one federated object against the live remote table. */
   validateObject(objectName: string): Promise<SchemaValidationResult>;
