@@ -12,6 +12,7 @@ import {
     SysMetadataObject,
     SysMetadataHistoryObject,
     SysMetadataAuditObject,
+    SysViewDefinitionObject,
 } from '@objectstack/platform-objects/metadata';
 
 // `SysMetadataObject` + `SysMetadataHistoryObject` are the customer overlay
@@ -31,6 +32,10 @@ const queryableMetadataObjects = [
     SysMetadataObject,
     SysMetadataHistoryObject,
     SysMetadataAuditObject,
+    // Runtime view storage (shared / personal). Must always be provisioned so
+    // end-user view creation via the generic data API has a place to write —
+    // mirroring why sys_metadata is always provisioned for PUT /meta.
+    SysViewDefinitionObject,
 ];
 
 // Subdirectory under `rootDir` reserved for the ADR-0008 repository's
@@ -69,6 +74,24 @@ const ARTIFACT_FIELD_TO_TYPE: Record<string, string> = {
     emailTemplates: 'email_template',
     data: 'dataset',
 };
+
+// ───────────────────────────────────────────────────────────────────────────
+// View container expansion — "Object has-many View" (ADR-0017)
+// ───────────────────────────────────────────────────────────────────────────
+//
+// `defineView({ list, form, listViews, formViews })` aggregates every view of
+// an object into one document. The loader expands such a container into N
+// independent ViewItems (one per named view) registered under
+// `<object>.<viewKey>`, so each view is individually addressable and the
+// runtime switcher can be rebuilt by querying `object`. The original container
+// is ALSO kept under the bare `<object>` key for backward-compatible reads.
+//
+// The implementation lives in `@objectstack/spec` (`isAggregatedViewContainer`
+// / `expandViewContainer`) so this HMR loader and the ObjectQL engine boot loop
+// share ONE canonical expansion and can never drift. Re-exported here for the
+// callers below and for `view-expand.test.ts`.
+export { isAggregatedViewContainer, expandViewContainer } from '@objectstack/spec';
+import { isAggregatedViewContainer, expandViewContainer } from '@objectstack/spec';
 
 export interface MetadataPluginOptions {
     rootDir?: string;
@@ -489,6 +512,34 @@ export class MetadataPlugin implements Plugin {
             const items = (metadata as any)[field];
             if (!Array.isArray(items) || items.length === 0) continue;
             for (const item of items) {
+                // Expand aggregated view containers into independent ViewItems
+                // ("Object has-many View"), while still registering the
+                // container under the bare <object> key for backward-compatible
+                // reads. Already-independent ViewItems carry a top-level `name`
+                // and fall through to the normal path below.
+                if (metaType === 'view' && isAggregatedViewContainer(item)) {
+                    const viewObject =
+                        (item as any)?.list?.data?.object
+                        ?? (item as any)?.form?.data?.object;
+                    if (!viewObject) continue;
+                    applyProtection(item as any, {
+                        packageId: manifestPackageId,
+                        packageVersion: manifestVersion,
+                    });
+                    await memLoader.save('view', viewObject, item);
+                    await this.manager.register('view', viewObject, item);
+                    totalRegistered++;
+                    for (const vi of expandViewContainer(viewObject, item)) {
+                        applyProtection(vi as any, {
+                            packageId: manifestPackageId,
+                            packageVersion: manifestVersion,
+                        });
+                        await memLoader.save('view', vi.name, vi);
+                        await this.manager.register('view', vi.name, vi);
+                        totalRegistered++;
+                    }
+                    continue;
+                }
                 // Most metadata items carry a top-level `name`. The `View`
                 // container (UI namespace) is an exception: it has no own
                 // `name` — its identity is the target object, encoded under

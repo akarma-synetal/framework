@@ -71,7 +71,8 @@ export type { DefineStackOptions, ComposeStacksOptions, ConflictStrategy, Object
 export * from './stack.zod';
 
 // DX Helper Functions (re-exported for convenience)
-export { defineView, defineForm } from './ui/view.zod';
+export { defineView, defineForm, defineViewItem, isAggregatedViewContainer, expandViewContainer } from './ui/view.zod';
+export type { ExpandedViewItem } from './ui/view.zod';
 export { defineApp } from './ui/app.zod';
 export { defineFlow } from './automation/flow.zod';
 export { defineJob } from './system/job.zod';
