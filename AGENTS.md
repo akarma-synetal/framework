@@ -2,7 +2,7 @@
 
 Primary AI instruction file for this repo. Mirrored at `.github/copilot-instructions.md` — keep both in sync.
 
-> **v5.0 breaking rename: `project` → `environment`.** The per-tenant business workspace (Org/Environment/Branch) is now `environment` everywhere: CLI (`--environment`/`-e`), HTTP (`/api/v1/environments/:environmentId/...`), header `X-Environment-Id`, env `OS_ENVIRONMENT_ID`, exports (`createSystemEnvironmentPlugin`, `SYSTEM_ENVIRONMENT_ID`), DB column `environment_id`, JSON `EnvironmentArtifact`. No aliases, no shims. See `.changeset/v5-project-to-environment-rename.md` and ADR-0006. "Project" only refers to the npm/monorepo sense.
+> **v5.0 breaking rename: `project` → `environment`** everywhere (CLI `-e`, `/api/v1/environments/:id`, header `X-Environment-Id`, `OS_ENVIRONMENT_ID`, DB column `environment_id`). No aliases. See ADR-0006. "Project" now only means the npm/monorepo sense.
 
 ---
 
@@ -18,50 +18,25 @@ pnpm docs:dev         # docs site
 
 ### Running the dev server
 
-Two distinct scenarios — pick the right one:
+| Scenario | Command | Notes |
+|:---|:---|:---|
+| **Frontend debug** (UI in `../objectui` calls backend) | `PORT=3000 pnpm dev:crm` | Port **must** be 3000 (UI hard-wired); persistent state; leave running |
+| **Backend-only debug** | `pnpm dev:crm -- --fresh -p <random>` | Random high port; ephemeral tempdir; **you must kill it** when done |
 
-| Scenario | Command | Port | State | Cleanup |
-|:---|:---|:---|:---|:---|
-| **Frontend debugging** (UI in `../objectui` calls backend) | `PORT=3000 pnpm dev:crm` | **Must be 3000** — UI is hard-wired | Persistent (`<cwd>/.objectstack/`) | Leave running |
-| **Backend-only debugging** (API/protocols, no UI) | `pnpm dev:crm -- --fresh -p <random>` | Random high port (e.g. 38421) | **Ephemeral** tempdir, auto-seeded admin | **You must kill it** (`kill <PID>` via `lsof -ti tcp:<port>`) |
+`--fresh`: ephemeral tempdir (auto-deleted on exit) + `--seed-admin` (POSTs sign-up, prints creds — default `admin@dev.local` / `admin12345`, override via `--admin-email`/`--admin-password`).
 
-`--fresh` (added in `os dev`):
-- Creates a unique tempdir under the OS tempdir and points `OS_HOME` + `OS_DATABASE_URL` + `OS_STORAGE_ROOT` into it.
-- Auto-deletes the tempdir on normal exit.
-- Implies `--seed-admin` — after the server is ready, POSTs to `/api/v1/auth/sign-up/email` and prints the credentials:
-  - default email: `admin@dev.local`
-  - default password: `admin12345`
-  - override with `--admin-email` / `--admin-password`; opt out with `--no-seed-admin`.
+Rules: never run two backends on port 3000; for backend tasks pick a random port and tear it down; always use `pnpm dev:crm` (flags after `--` are forwarded), not raw `pnpm --filter`.
 
-Rules:
-- **Never start two backends on port 3000 simultaneously** — it collides with the UI dev session.
-- For backend-only tasks, always pick a random high port AND tear it down after the task — don't leak processes.
-- Use `pnpm dev:crm` (not raw `pnpm --filter ... dev`) so the example app is configured correctly. Flags after `--` are forwarded.
-
-Example (backend-only debugging session, clean environment):
 ```bash
-pnpm dev:crm -- --fresh -p 38421       # start
-# ... debug via curl, http://localhost:38421 ...
-kill $(lsof -ti tcp:38421)              # tear down — tempdir auto-deletes
+pnpm dev:crm -- --fresh -p 38421   # start; debug via curl
+kill $(lsof -ti tcp:38421)         # tear down — tempdir auto-deletes
 ```
 
 ### Frontend (Studio UI) — sibling repo `../objectui`
 
-This framework repo ships **backend only** (protocols + services + REST). All Studio / Console UI work happens in the sibling repo `../objectui` (separate git repo, separate versions).
+This repo ships **backend only**. All Studio/Console UI work happens in `../objectui` (separate repo, checked out next to `framework/`). Workflow: edit + commit + push in `../objectui`, then in `framework/` run `pnpm objectui:refresh` to pull its build into `packages/console/`.
 
-**Local dev workflow** (this is the assumed environment — `../objectui` is checked out next to `framework/`):
-
-1. `cd ../objectui` — make UI changes there.
-2. Commit & push in `../objectui` (the refresh script pulls from its git state).
-3. Back in `framework/`, run:
-   ```bash
-   pnpm objectui:refresh    # = bump-objectui.sh + build-console.sh
-   ```
-   This pulls the latest `../objectui` build into `packages/console/` so the backend serves the updated UI.
-
-Related scripts: `pnpm objectui:bump` (pull only), `pnpm objectui:build` (rebuild console), `pnpm objectui:clean` (wipe cache).
-
-⚠️ Never hand-edit files under `packages/console/dist/` or `.cache/objectui-*/` — they are regenerated.
+Other scripts: `objectui:bump` (pull only), `objectui:build`, `objectui:clean`. ⚠️ Never hand-edit `packages/console/dist/` or `.cache/objectui-*/` — regenerated.
 
 ---
 
@@ -79,7 +54,7 @@ Related scripts: `pnpm objectui:bump` (pull only), `pnpm objectui:build` (rebuil
 6. **Object name = table name.** The object `name` is the canonical id everywhere (API, ObjectQL, REST, SDK, DB table). **Never** set `namespace` (deprecated) or `tableName` (always equals `name`). For module prefixes, embed in the name (`sys_user`, `ai_conversations`).
 7. **One Zod source per metadata type.** Each type (`view`, `flow`, `agent`, …) has exactly one schema in `packages/spec/src/{domain}/`. Org overlay opt-in lives only in `allowOrgOverride` on `DEFAULT_METADATA_TYPE_REGISTRY` — no parallel whitelists. See ADR-0005.
 8. **North Star alignment.** Read `content/docs/concepts/north-star.mdx` before structural changes. If a change doesn't advance §7 Built, shrink Drift, or unlock Missing — it probably shouldn't ship.
-9. **`OS_` env-var prefix.** All ObjectStack-owned environment variables MUST start with `OS_`. When renaming a legacy var, use `readEnvWithDeprecation('OS_NEW_NAME', 'LEGACY_NAME')` (or pass an array of legacy names) from `@objectstack/types` so the legacy name still works for one release with a one-shot deprecation warning. Documented third-party exceptions (NOT renamed): `NODE_ENV`, `HOME`, `OPENAI_API_KEY`, `TURSO_*`, OAuth `*_CLIENT_ID` / `*_CLIENT_SECRET`, `RESEND_API_KEY`, `POSTMARK_TOKEN`, `AI_GATEWAY_*`, `SMTP_*`. (`PORT`, `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` were absorbed: `OS_PORT`, `OS_DATABASE_URL`, `OS_AUTH_URL`, `OS_AUTH_SECRET` are canonical with the legacy names as fallback.) See issue #1382.
+9. **`OS_` env-var prefix.** All ObjectStack-owned env vars MUST start with `OS_`. When renaming a legacy var, use `readEnvWithDeprecation('OS_NEW', 'LEGACY')` from `@objectstack/types` (keeps legacy working one release). Third-party exceptions kept as-is: `NODE_ENV`, `HOME`, `OPENAI_API_KEY`, `TURSO_*`, OAuth `*_CLIENT_ID/SECRET`, `RESEND_API_KEY`, `POSTMARK_TOKEN`, `AI_GATEWAY_*`, `SMTP_*`. See #1382.
 
 ---
 
@@ -219,8 +194,9 @@ export default {
 ## Post-Task Checklist
 
 1. `pnpm test` — verify nothing broke.
-2. Update `CHANGELOG.md` / `ROADMAP.md` if user-facing or architectural.
-3. **Delete temporary artifacts** — screenshots, traces, scratch logs, `.playwright-mcp/`, throwaway `tmp*.ts`, ad-hoc scripts. Repo must look identical to before, minus intended changes.
+2. **Add a changeset for feature work.** When the change is a feature or functional improvement, run `pnpm changeset` (or add a `.changeset/*.md` entry) describing it before committing. Pure bug fixes do **not** require a changeset.
+3. Update `CHANGELOG.md` / `ROADMAP.md` if user-facing or architectural.
+4. **Delete temporary artifacts** — screenshots, traces, scratch logs, `.playwright-mcp/`, throwaway `tmp*.ts`, ad-hoc scripts. Repo must look identical to before, minus intended changes.
 
 ---
 
