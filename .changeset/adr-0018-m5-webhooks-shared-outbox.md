@@ -1,5 +1,5 @@
 ---
-"@objectstack/plugin-webhooks": major
+"@objectstack/plugin-webhooks": minor
 "@objectstack/service-messaging": minor
 ---
 
