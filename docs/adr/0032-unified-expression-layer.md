@@ -1,27 +1,29 @@
-# ADR-0032: Unified expression layer — one language (CEL), typed envelopes, build-time validation, no silent failure
+# ADR-0032: Expression layer for an AI-authored platform — validate-by-default, schema-aware, one CEL language, no silent failure
 
 **Status**: Proposed (2026-06-02)
 **Deciders**: ObjectStack Protocol Architects
 **Builds on**: [ADR-0010](./0010-nl-to-flow-authoring.md) + [ADR-0011](./0011-actions-as-ai-tools.md) (AI authoring of metadata — **the design center**), [ADR-0018](./0018-unified-node-action-registry.md) (open action registry), [ADR-0031](./0031-advanced-flow-node-executors-and-dag.md) (structured, statically-analyzable constructs for AI)
-**Consumers**: `@objectstack/formula` (CEL engine + stdlib + template interpolation), `@objectstack/spec` (`automation/flow.zod.ts` `ExpressionInputSchema`, every `condition`/`guard`/`value`/template field across data / automation / ui / security), `@objectstack/services/service-automation` (`engine.ts` `evaluateCondition`, `builtin/template.ts`, builtin node executors), `@objectstack/cli` (compile-time validation in `objectstack build`), `../objectui` (flow designer condition/template builders)
+**Consumers**: `@objectstack/formula` (CEL engine + stdlib + template interpolation + validator), `@objectstack/spec` (expression-field types + introspection: every `condition`/`guard`/`value`/template field across data / automation / ui / security; the coercion in `shared/expression.zod.ts`), `@objectstack/services/service-automation` (`engine.ts` `evaluateCondition`, `builtin/template.ts`, builtin node executors), `@objectstack/cli` (compile-time validation in `objectstack build`), the **agent tool layer** (an `validate_expression` / schema-introspection tool surfaced to authoring agents), `../objectui` (flow designer condition/template builders)
 
-**Premise**: the platform is **pre-launch** — no production artifacts, no external authors, no back-compat debt. This ADR therefore specifies the **target end-state directly**, with no deprecation path. This window closes at launch; an expression layer is effectively unchangeable once metadata is in the wild.
+**Premise**: the platform is **pre-launch** — no production artifacts, no external authors, no back-compat debt. This ADR specifies the **target end-state directly**, with no deprecation path. This window closes at launch; an expression layer is effectively unchangeable once metadata is in the wild.
+
+**Design center**: **the long-term author of every expression is an AI.** That single assumption reorders everything below. You cannot make a generative author incapable of the *first* mistake — it pattern-matches, over-generalizes a syntax it saw work elsewhere, and emits plausible-but-wrong text with full confidence. So the design goal is not "a syntax an AI can't get wrong"; it is **"no mistake survives to runtime, and every mistake comes back to the author as a precise, fixable error."** The spine is a *validate-by-default loop*, not a choice of brackets.
 
 ---
 
 ## TL;DR
 
-The platform today exposes **three syntaxes** for referencing the same data, each with a different rule, and **fails silently** when they are mixed up:
+Today the platform exposes **three look-alike syntaxes** for referencing data — bare CEL (`record.amount > 100000`) for predicates, single-brace `{record.name}` for flow node string fields, double-brace `{{record.name}}` for titleFormat/notifications — and when they are mixed up it **fails silently**: a `condition` is typed `string`, any string is coerced to CEL, and a CEL parse/eval error is **swallowed to `false`**. The flow "fires" with `success:true` and does nothing (issue #1491).
 
-1. **Bare CEL** — `record.amount > 100000` — for predicates (`condition` / `guard` / validation / sharing).
-2. **Single-brace template** — `{record.name}`, `{TODAY() + 90}` — for flow node string fields (`notify.title`, `create_record.fields`, `get_record.filter`).
-3. **Double-brace mustache** — `{{record.name}}` — for `Object.titleFormat` and notification templates.
+For an AI-authored platform the fix is not "pick the right brackets." It is, in priority order:
 
-These are easy to confuse and **nothing stops the confusion**: a `condition` is typed `string`, any string is silently coerced to `{dialect:'cel'}`, and a CEL parse/eval error is **swallowed and returned as `false`**. A flow then "fires" with `success:true` and does nothing.
+1. **Validate by default, never fail silently, and feed the failure back to the author** — parse + schema-check every expression at build (and on demand via an agent-callable validator); a malformed expression is a *build error with a fixable message*, never a runtime no-op. **This is the spine.**
+2. **Two structurally un-confusable field shapes, with the field's type naming the dialect** — predicates and computed values are whole-field CEL with **no delimiters**; only genuine text uses templates. The #1491 pattern (`{…}` in a condition) then has nowhere to live.
+3. **Templates: `{{ }}` holes restricted to field-paths + whitelisted formatters**, with defined value→string semantics; single `{ }` deleted.
+4. **Correctness is training data** — remove every anti-pattern from the spec's own examples/skills, ship a golden example set, make the contract self-describing.
+5. **One canonical IR**, emitted identically by GUI, SDK, and AI, behind one validator.
 
-This ADR collapses the three syntaxes into **one expression language (CEL)** with exactly **two field shapes** — a **Predicate** (bare CEL → bool) and a **Template** (a string with `{{ CEL }}` interpolation holes) — makes every expression field a **typed envelope** (never a raw `string`), and **validates every expression at build time against the object schema**, deleting the silent-failure path entirely.
-
-The deciding lens, as in ADR-0010/0011/0031, is **AI/pro-code authoring**. When LLMs and `.ts` are first-class authors, correctness must come from **types that make the wrong thing unrepresentable** and **loud compile-time errors**, not from documentation the author may not read.
+Syntax hygiene (`{{ }}`, typed fields) lowers the *rate* of first-pass errors; the validation loop drives the rate of *shipped* errors to ~zero. Both matter; the loop matters more.
 
 ## Context — current state (verified 2026-06-02)
 
@@ -30,126 +32,116 @@ This came out of a real incident — issue #1491, *"record-change trigger plugin
 What the incident actually was — established by reproducing it end-to-end against hotcrm's own 7.4.1 packages and artifact:
 
 - **The trigger fires.** With logging restored, the record-change trigger registers and binds all four `record_change` flows, and a write to `crm_lead` calls `automation.execute('lead_assignment')` → `success:true`. The reporter's own evidence corroborates this: object-level L2 hooks (`beforeInsert`) fire on the same REST writes, and the trigger's `afterInsert` hook rides the same `triggerHooks` pipeline. The flow **runs**.
-- **But it produces zero effect**, because `lead_assignment`'s `decision`/edge conditions were authored as `'{record.rating} >= 4'`. The single brace makes this **invalid CEL** — CEL reads `{ … }` as a map literal, so it is a parse error (`Expected COLON, got RBRACE`; confirmed against `@objectstack/formula`). `evaluateCondition` returns **`false`** on a non-`ok`/throwing result (verified in 7.4.1 `service-automation/dist`, `evaluateCondition`: `if (!result.ok) return false; … catch { return false }`), so **neither branch is taken**, `update_record` never runs, and the SLA field is never stamped — exactly the reported symptom.
+- **But it produces zero effect**, because `lead_assignment`'s `decision`/edge conditions were authored as `'{record.rating} >= 4'`. The single brace makes this **invalid CEL** — CEL reads `{ … }` as a map literal, so it is a parse error (`Expected COLON, got RBRACE`; confirmed against `@objectstack/formula`). `evaluateCondition` returns **`false`** on a non-`ok`/throwing result (verified in 7.4.1 `service-automation/dist`: `if (!result.ok) return false; … catch { return false }`), so **neither branch is taken**, `update_record` never runs, and the SLA field is never stamped — exactly the reported symptom.
 
-**Not the cause (a related but distinct bug):** the throwing-`__require` stub bug — where an ESM CommonJS `require('@objectstack/formula')` compiled to tsup's throwing stub and made *every* CEL eval throw → `catch → false` → all conditions skip — was a **different** issue (**#1429**, fixed by `a6d4cbb6f`, a static top-level import) and is **already shipped in 7.4.1**. hotcrm's 7.4.1 `service-automation` uses the static `import { ExpressionEngine } from "@objectstack/formula"`, and direct CEL evaluation works there. So #1491 on 7.4.1 is the **brace-in-CEL** failure above, not the stub.
+**Not the cause (a related but distinct bug):** the throwing-`__require` stub — where an ESM CommonJS `require('@objectstack/formula')` compiled to tsup's throwing stub and made *every* CEL eval throw → `catch → false` → all conditions skip — was a **different** issue (**#1429**, fixed by `a6d4cbb6f`, a static top-level import) and is **already shipped in 7.4.1**. So #1491 on 7.4.1 is the **brace-in-CEL** failure above, not the stub.
 
-**The shared villain** behind both #1429 and #1491 is the same and is the deeper point: a CEL parse/eval failure is **silently swallowed to `false`**. A malformed predicate and an unreachable engine are indistinguishable from "condition not met," and both surface as "flow silently does nothing." This is what Decision 4 attacks.
+**The shared villain** behind both is the same and is the deeper point: a CEL parse/eval failure is **silently swallowed to `false`**. A malformed predicate and an unreachable engine are indistinguishable from "condition not met." For an AI author this is the worst possible property: the agent gets **no signal**, believes it succeeded, and ships a dead flow.
 
 Supporting facts (verified in source):
 
-- **Loose contract + coercion.** `ExpressionInputSchema` (`spec/shared/expression.zod.ts:84`) transforms any bare string into `{dialect:'cel', source}`; `flow.zod.ts` only *consumes* it. So a `condition: string` is silently treated as CEL with no opportunity to reject a bad form.
-- **The spec teaches the bad form.** `automation/flow.zod.ts:212-214`'s own `FlowSchema` JSDoc example uses `condition: "{amount} < 500"` / `"{amount} >= 500"` — the **exact single-brace-in-CEL pattern that silently fails**. An AI (or human) reading the canonical spec docs learns the antipattern from the platform itself. This is the concrete answer to *"why did the AI write it wrong"*: not a missing skill — an actively wrong authoritative example.
-- **Three syntaxes coexist.** `service-automation/builtin/template.ts` interpolates **single** `{…}` (`{var}`, `{record.x}`, `{$User.Id}`, `{NOW()}`, `{TODAY()+N}`) for flow node string fields; `Object.titleFormat` / notification templates use **double** `{{…}}` mustache; predicates are bare CEL. CEL date helpers are **lowercase** `today()` / `daysFromNow(int)`; the template engine uses **uppercase** `TODAY()` / `NOW()`. Same intent, three spellings — and the single-brace template delimiter is the one that collides with CEL.
-- **Inconsistent failure policy.** The same evaluation-failure decision is made five different ways across the codebase: `seed-loader` (loud fail), hook-wrappers (warn + false), rule-validator (warn + skip → null), the engine's formula projection (silent null), and flow `evaluateCondition` (silent false). There is no single declared policy.
+- **Loose contract + coercion.** `ExpressionInputSchema` (`spec/shared/expression.zod.ts:84`) transforms any bare string into `{dialect:'cel', source}`; `flow.zod.ts` only *consumes* it. A `condition: string` is silently treated as CEL with no opportunity to reject a bad form.
+- **The spec teaches the bad form.** `automation/flow.zod.ts:212-214`'s own `FlowSchema` JSDoc example uses `condition: "{amount} < 500"` / `"{amount} >= 500"` — the **exact single-brace-in-CEL pattern that silently fails**. This is the concrete answer to *"why did the AI write it wrong"*: not a missing skill — an actively wrong authoritative example the model faithfully copied.
+- **Three syntaxes coexist, at scale.** Across `../templates` (10 packages, 30 flows): only **6** flow `condition`s, but **191** single-brace `{…}` template usages and **40+** double-brace `{{…}}` (titleFormat/notification). So by volume the dominant expression surface is *interpolation*, not predicates — and the single-brace delimiter is the one that collides with CEL. (Date helpers also split: template `TODAY()`/`NOW()` vs CEL `today()`/`daysFromNow(int)`.)
+- **Inconsistent failure policy.** The same evaluation-failure decision is made five different ways: `seed-loader` (loud fail), hook-wrappers (warn + false), rule-validator (warn + skip → null), the engine's formula projection (silent null), flow `evaluateCondition` (silent false). No single declared policy.
 
-## The reframing — the problem is the contract, not "CEL vs template"
+## The reframing — for an AI author, the loop is the product
 
-It is tempting to "just document the difference" or "add a lint." That treats the symptom. The actual defects are:
+It is tempting to "document the difference" or "pick safer brackets." Both treat the symptom. The defects, ranked by how badly they hurt a *generative* author:
 
-1. **The contract is too loose.** `condition?: string` lets you serialize a syntactically illegal predicate. The type system *permits the bug*.
-2. **Failure is silent and at the wrong time.** Errors vanish at runtime instead of surfacing at authoring/build time — the cardinal sin for a low-code platform.
-3. **Three syntaxes** for "reference a field," one of which (`{…}`) is *actively hostile* because it collides with the expression language.
-4. **The author is increasingly an LLM.** The serialized format is now an LLM-facing API. It must be **LLM-safe**: one obvious way, types that reject the wrong way, precise errors that enable self-correction.
+1. **Silent failure is catastrophic for AI.** A human notices "nothing happened" and investigates; an agent records success and moves on. Errors must be loud, located, and returned to the author.
+2. **The contract is too loose and mode-ambiguous.** `condition?: string` lets a syntactically illegal predicate serialize, and three look-alike syntaxes invite the over-generalization that is an LLM's single most common failure (it saw `{x}` work in `notify.title`, so it used it in a `condition`).
+3. **The canon is wrong.** Whatever the spec/skills show, the model emits. Anti-patterns in examples are training data.
+4. **The author can't ask.** An agent that can *introspect* "what dialect does this field expect, what fields/functions are in scope?" and *validate before committing* will self-correct; one that must guess will not.
 
-A low-code expression layer earns its keep by making **illegal states unrepresentable** and **catching errors where they are authored**. Today it does neither.
+A low-code expression layer for AI earns its keep by **making mistakes impossible to ship silently** and **making the rule discoverable and checkable at authoring time**. Today it does neither.
 
 ## Decision
 
-### 1. One expression language: CEL. Templates are not a second language.
+### 1. Validate by default; never fail silently; built for the agent loop. (**The spine.**)
 
-There is exactly one expression language — **CEL**. A "template" is **not** a separate language; it is a **string literal with `{{ CEL }}` interpolation holes**, where each hole contains an ordinary CEL expression.
+- **1a — Build-time parse.** `objectstack build` / `registerFlow` / metadata registration **parses every expression**; a parse error is a **build failure** with `file:line` and the offending source. (#1491's `{record.rating} >= 4` fails here instead of becoming a runtime `false`.)
+- **1b — Schema-aware.** Expressions are parsed against the target object's field/type environment. v1: **field existence + predicate-returns-`bool`** (`record.raitng` → *"crm_lead has no field `raitng` — did you mean `rating`?"*). v2: full type inference (number-vs-string compares, function overloads).
+- **1c — No silent runtime fallback.** Remove every "error → `false`/`null`" swallow. **One declared `EvalResult` policy** replaces today's five: parse failure → build error (1a); runtime fault → **logged, attributed failure** (never a swallowed `false`).
+- **1d — Errors written for self-correction.** The message must state *what is wrong* **and** *the correct form*: e.g. *"conditions are bare CEL, not templates — you wrote `{record.rating} >= 4`; use `record.rating >= 4`."* This message contract is tested, not incidental — it is the interface the agent repairs against.
+- **1e — Author-accessible validation + introspection.** The same validator is exposed as an **agent-callable tool** (`validate_expression(fieldRole, source, objectName)`), and each field's **expected dialect + in-scope fields/functions are introspectable**. The object **schema is fed into the authoring context**. So the agent checks *while writing*, not only at build — collapsing the correction loop and removing guesswork.
 
-```ts
-condition: cel`record.rating >= 4`                       // Predicate — bare CEL → bool
-title:     tpl`Hot lead: {{ record.full_name }}`          // Template — string + CEL holes
-dueDate:   cel`daysFromNow(3)`                            // Computed value
-filter:    { end_date: { $lte: cel`daysFromNow(int(currentContract.renewal_notice_days))` } }
-```
+### 2. Two structurally un-confusable field shapes; the field type names the dialect.
 
-Consequences: "reference this field" is always `record.x` / `previous.x` / `<var>.x`. The `TODAY()` vs `today()` split disappears — it is always CEL's `today()`. There is one parser, one stdlib, one type system, one doc.
+- **Expression fields** (predicate, computed value) = **whole-field CEL, no delimiters.** `condition: Predicate`, `dueDate: Expr<Date>`. Never a raw `string`.
+- **Text fields** = `Template` (Decision 3).
 
-### 2. One interpolation delimiter: `{{ }}`. Single `{ }` is removed.
+Rationale (AI-first): the #1 LLM error is *mode over-generalization* — copying `{x}` across fields with different rules. Make the modes **look nothing alike** (no-braces predicate vs `{{ }}` template) and let the **TS type name the dialect** — an in-context signal the model reads directly off the field type. Because predicates contain no braces by construction, the #1491 pattern has nowhere to live; and because the field is typed `Predicate` not `string`, the wrong *shape* is a type error. (Note the division of labor: the type rejects wrong *shape*; Decision 1 rejects wrong *content*. Neither alone is sufficient — together they close both.)
 
-All template interpolation uses **`{{ … }}`**. Single-brace `{…}` is **deleted** from the template engine. Rationale: `{…}` collides with CEL map-literal syntax (the physical cause of #1491); `{{…}}` does not. A template accidentally pasted into a predicate (`cel\`{{record.x}} ...\``) still fails to parse — and is then caught loudly by Decision 4, not silently swallowed. Three syntaxes collapse to **one language + one delimiter**.
+### 3. Text templates: `{{ }}` holes, restricted to paths + formatters, with defined value→string semantics.
 
-### 3. Expression fields are typed envelopes, never raw `string`.
+- **One delimiter, `{{ }}`; single `{ }` deleted.** `{ }` collides with CEL map literals (the physical #1491 trap); `{{ }}` does not, carries a universal mustache prior (low LLM error), and — decisively for `.ts` authoring — does **not** collide with TypeScript tagged-template `${…}` interception, whereas `${…}` would. A `{{…}}` accidentally pasted into a predicate still fails to parse and is caught loudly by Decision 1.
+- **Holes are a restricted CEL subset**: field/variable paths plus a **whitelisted formatter set** (`format`, `datetime`, `currency`, `number`, …) — **not arbitrary CEL logic.** Rationale: a smaller hole grammar is a smaller error surface for AI, lets the GUI offer a field picker, and keeps display strings declarative — real logic is forced back into validated `Predicate`/`Expr` fields where it is visible and checked.
+- **Defines value→string semantics** (numbers, dates, money, null, locale) that arbitrary-CEL holes left undefined — formatting is explicit (`{{ currency(record.amount) }}`), not implicit coercion.
 
-Every expression-bearing field is a **typed Expression envelope**, constructed only via the SDK tagged templates (or the GUI, see Decision 6) — never a bare `string`:
+### 4. Correctness is training data.
 
-- Predicate field → `Predicate` (CEL constrained to return `bool`).
-- Template/text field → `Template` (string-with-`{{CEL}}`-holes).
-- Computed value field → `Expr<T>` (or `T | Expr<T>` where a literal is also valid).
+- **Fix the canon first.** Remove every anti-pattern from the spec's own JSDoc (`flow.zod.ts:212-214`'s `{amount} < 500`), skills, and guides **before** shipping the contract — the model emits what it is shown.
+- **Ship a golden example set** per field role (predicate / template / computed value), copy-pasteable and correct, that authoring agents are pointed at.
+- **Make the contract self-describing** (Decision 1e) so the agent *discovers* the rule rather than inferring it from priors.
 
-The canonical serialized form remains the existing envelope `{ dialect, source, ast? }`. The change is that the spec **stops accepting bare strings** for these fields: `condition: string` becomes `condition: Predicate`. The #1491 line `condition: '{record.rating} >= 4'` then **fails type-checking** — correctness comes from the type, not from a reader noticing a doc.
+### 5. One canonical IR, three front-ends.
 
-### 4. Zero silent failure — two halves, both required.
+GUI condition/template builders, `.ts` SDK tagged templates (`` cel`…` `` / `` tpl`…` ``), and AI generation all emit the **same canonical Expression IR** (`{ dialect, source, ast? }`) and run through the **same validator**. The surfaces cannot drift; every author — human, dev, LLM — is held to one contract.
 
-The two failure modes from Context need two distinct guards:
+## Design judgment (resolving the forks)
 
-- **4a. Build-time validation (catches malformed expressions).** `objectstack build` (and `registerFlow` / metadata registration) **parses every expression**, failing with a precise source location on any parse error. This catches the **#1491 class**: `condition: '{record.rating} >= 4'` is invalid CEL, so it fails the build at the offending line instead of silently evaluating to `false` at runtime.
-- **4b. No silent runtime fallback (catches runtime faults).** The runtime **"eval error / non-`ok` → return `false`"** branch in `evaluateCondition` (and the four other ad-hoc handlers noted in Context) is **removed**. A runtime evaluation fault — e.g. an unreachable engine like the #1429 stub, which produces *syntactically valid* expressions that throw at eval time and would slip past 4a — must surface as a loud, attributed error, never a swallowed `false`.
-
-One declared `EvalResult` policy replaces today's five (loud-fail / warn+false / warn+skip / silent-null / silent-false). A malformed expression is a **build error**; a runtime fault is a **logged, attributed failure** — neither is ever a silent no-op.
-
-### 5. Schema-aware validation — the greenfield payoff.
-
-The CEL compiler is fed the **object schema as its type environment**, so build-time validation is not merely syntactic:
-
-- `record.raitng` → *"crm_lead has no field `raitng` — did you mean `rating`?"*
-- predicate not returning `bool`, or `amount` (number) compared to a string → **type error**.
-
-This is the line between a serious low-code platform (Salesforce / Airtable formula editors type-check live) and a string-eval toy. It is **especially valuable for AI authors**: a precise, located error closes the self-correction loop. Retrofitting schema-aware checking after launch is prohibitively expensive; pre-launch is the only economical moment.
-
-### 6. One canonical IR, three front-ends.
-
-The GUI flow/condition builder, the `.ts` SDK tagged templates, and AI generation all emit the **same canonical Expression IR** and run through the **same validator**. One language, one IR — the GUI and pro-code surfaces cannot drift, and any author (human, dev, LLM) is held to the same contract.
+- **Looped vs one-shot authoring → design for both.** The validation loop (Decision 1) is the spine and serves agents that can build/iterate; the structural first-pass reductions (Decisions 2–4) keep *one-shot* authoring (NL→flow with no compile loop) safe too. Do **not** rely on the loop alone (fragile when there is none) and do **not** force structured-only authoring (verbose, fights model priors).
+- **Predicates stay free-text CEL, not mandatory structured AST.** Models are strong at CEL, and schema-aware validation (1b) makes free text safe. A structured `{field, op, value}` AST remains available as an *alternate serialization* the GUI/one-shot generators may emit into the same IR — offered, not required.
+- **Schema-aware depth in v1 = field-existence + bool-return** (highest ROI, needs only the resolved object schema at build). Full type inference is v2.
 
 ## Representation / contract summary
 
-| Field role | Author writes | Serialized envelope | Validated as |
+| Field role | Author writes | Serialized IR | Validated as |
 |---|---|---|---|
-| Predicate (`condition`, `guard`, validation, sharing) | `` cel`record.x > 1` `` | `{dialect:'cel', source, ast?}` | parses + returns `bool` + fields exist |
-| Template (`notify.title/body`, `create_record.fields`, titleFormat, notification) | `` tpl`...{{ record.x }}...` `` | `{dialect:'template', source, ast?}` | every `{{…}}` hole parses as CEL + fields exist |
-| Computed value (`dueDate`, filter values) | `` cel`daysFromNow(3)` `` | `{dialect:'cel', …}` | parses + result type compatible with field |
+| Predicate (`condition`, `guard`, validation, sharing, visibility) | `` cel`record.amount > 1e5` `` (no braces) | `{dialect:'cel', source, ast?}` | parses · returns `bool` · fields exist |
+| Computed value (`dueDate`, filter values) | `` cel`daysFromNow(3)` `` (no braces) | `{dialect:'cel', …}` | parses · result type fits field |
+| Text template (`notify.title/body`, `titleFormat`, email/notification) | `` tpl`Hot lead: {{ record.full_name }}` `` | `{dialect:'template', source, ast?}` | each `{{…}}` is a path/formatter · fields exist |
 
-Reserved for future dialects (`sql`, `cron`) via the same envelope; CEL is the default and overwhelmingly dominant.
+Out of scope (separate surfaces, intentionally **not** unified): query-filter operators (`{ field: { $lte: … } }`, MongoDB-style) and cron schedules. "One expression language" means predicates + computed values + template holes resolve to CEL semantics — not literally one syntax for everything.
 
 ## Consequences
 
 **Positive**
-- The #1491 brace class becomes **unrepresentable** (type error) or **caught at build** (4a); the #1429 runtime-fault class becomes a **loud attributed error** (4b). Neither is ever a silent no-op again.
-- One mental model for every author; the format is LLM-safe and LLM-self-correcting.
-- Schema-aware errors raise authoring quality across *all* CEL surfaces (flows, validations, sharing, formula fields), not just flows.
+- Silent failure — the property that is *catastrophic* for an AI author — is gone: parse errors are build failures, runtime faults are loud, and the author gets a fixable message (1a/1c/1d).
+- The #1491 mode-confusion pattern is structurally impossible (predicates have no braces) and would also be a type error (Decision 2) and a build error (Decision 1).
+- The agent can validate and introspect *before committing* (1e) — the correction loop runs at authoring time, not in production.
+- Schema-aware checks raise quality across *all* CEL surfaces (flows, validations, sharing, formula fields), not just flows.
 
 **Costs / risks**
-- Tagged-template envelopes are more verbose than raw strings. Mitigation: `` cel`` `` is terse; AI handles it trivially; the trade buys "wrong = compile error."
-- **Schema-aware checking is real engineering**: the object schema must be projected into a CEL type environment fed to the compiler. Greenfield is when this is affordable.
-- The `{{CEL}}` interpolator replaces the current regex mini-resolver in `template.ts` (modest).
-- CEL surfaces are platform-wide; this contract change touches `spec`, `formula`, `service-automation`, CLI build, and the designer together — must be sequenced as one coherent change while pre-launch.
+- **Schema-aware validation is real engineering**: the resolved object schema must be projected into a CEL type environment fed to the compiler. Pre-launch is when this is affordable; retrofitting is not.
+- **Restricted template holes + a formatter whitelist** is more design work than "interpolate anything," and must cover the real formatting needs (dates/money/percent/locale) or authors hit walls.
+- Typed expression fields are more verbose than raw strings (mitigated: `` cel`` `` is terse, and verbosity buys "wrong = compile error").
+- The change touches `spec` / `formula` / `service-automation` / CLI / agent-tooling / designer together — must be sequenced as one coherent pre-launch change.
 
-## Sequencing (roadmap)
+## Sequencing (roadmap, ordered by AI-safety ROI)
 
-1. **Contract** — `spec`: expression fields become typed envelopes (`Predicate` / `Template` / `Expr<T>`); remove bare-string acceptance and the string→CEL coercion (`shared/expression.zod.ts:84`). Land `` cel`` `` / `` tpl`` `` builders.
-2. **Fix the docs that teach the bug** — replace the single-brace-in-CEL examples in the spec's own JSDoc (`automation/flow.zod.ts:212-214`, `condition: "{amount} < 500"`) and any skill/guide that shows the same, *before* shipping the contract — these are the source the next AI author copies.
-3. **One `EvalResult` policy** — replace today's five ad-hoc handlers (seed loud-fail / hook warn+false / rule warn+skip / formula silent-null / flow silent-false) with one declared policy: parse failure → build error (4a); runtime fault → logged attributed failure (4b). Delete the `eval-error→false` fallback in `evaluateCondition`.
-4. **Engine** — `formula`: `{{CEL}}` template interpolation; unify date helpers under CEL stdlib (`today()`/`daysFromNow`). `service-automation`: route templates through it.
-5. **Build-time validation** — CLI/registration parses every expression; fail with location. (Catches the whole #1491 brace class immediately.)
-6. **Schema-aware validation** — project object schema into the CEL type env; field-existence + return-type checks (see Open Question 1 for v1 depth).
-7. **Designer** — GUI condition/template builders emit the canonical IR; one validator shared with build.
+1. **Stop the silent failure + fix the canon (ship first, decisive).** One `EvalResult` policy: parse → build error, runtime fault → loud attributed failure; delete every `error→false/null` swallow (`evaluateCondition` + the other four). Simultaneously remove the anti-pattern examples from spec JSDoc/skills (`flow.zod.ts:212-214`). This alone kills the #1491/#1429 class.
+2. **Build-time parse validation + error-message contract.** CLI/registration parses every expression; failures carry `file:line`, source, and the *corrective* message (1d).
+3. **Contract/types.** `spec`: expression fields become typed (`Predicate` / `Template` / `Expr<T>`); remove bare-string acceptance + the `shared/expression.zod.ts:84` coercion. Land `` cel`` `` / `` tpl`` `` builders. Two shapes, no single brace.
+4. **Schema-aware validation (v1)** — project resolved object schema into the CEL type env; field-existence + bool-return. (v2: full type inference.)
+5. **Agent tooling** — expose `validate_expression` + field-dialect/scope introspection; feed schema into the authoring context.
+6. **Template engine** — `{{ }}` holes (paths + formatter whitelist) with defined value→string semantics; delete the single-brace resolver; unify date helpers under CEL stdlib.
+7. **Designer** — GUI condition/template builders emit the canonical IR through the shared validator.
 
 ## Non-goals / deferred
 
-- **Full single-language purity** (CEL-only, no template sugar): rejected — interpolation ergonomics matter; `{{CEL}}` holes keep one language *and* ergonomics.
-- **Replacing CEL** with JS/Power Fx: rejected — CEL is sandboxed, statically checkable, non-Turing-complete, and AI-legible; the right base for "safe + checkable + LLM-friendly."
-- **Runtime, non-CEL custom DSLs** in conditions: out of scope.
+- **Mandatory structured/AST authoring** for predicates: rejected — verbose, fights model priors; free-text CEL + schema validation is safe and AST stays available as an option.
+- **Arbitrary CEL inside template holes**: rejected — larger error surface, un-pickable in GUI, invites logic-in-display-strings; holes are paths + whitelisted formatters.
+- **Replacing CEL** with JS/Power Fx: rejected — CEL is sandboxed, statically checkable, non-Turing-complete, and AI-legible.
+- **Unifying query-filter operators / cron** into the expression language: out of scope.
 
 ## Open questions (need a decision)
 
-1. **Depth of schema-aware validation in v1.** Minimum viable is *field existence + predicate-returns-bool* (highest ROI). Full type inference (numeric/date/string compatibility, function-overload resolution against field types) could be v2. **Can the build pipeline obtain the complete, resolved object schema at compile time** to feed the type environment? That gates how much of Decision 5 lands in v1.
-2. **Reference front-end.** This ADR treats the **IR/SDK as the reference implementation and the GUI as its visual producer** (matching today's AI+`.ts` authoring reality). If the intended end-state is "GUI-drag-first, `.ts` is export-only," validation and ergonomics weight shifts toward the designer, and the strictness of the `` cel`` `` tagged templates should be tuned accordingly.
+1. **Resolved schema at build time.** 1b's depth depends on whether the build pipeline can obtain the **fully resolved** object schema (post overlay/extension, ADR-0005/0010) at compile time. If only partial schema is available pre-deploy, v1 schema checks may need to run at registration rather than `build`. **Confirm what schema the build has.**
+2. **Formatter whitelist surface.** Which formatters ship in v1 (`currency`/`datetime`/`number`/`percent`/`truncate`/…) and how locale is threaded into them — needs a short catalog before the template engine work (step 6).
 
 ## Already shipped / observed on this line of work
 
-- **#1429** (`a6d4cbb6f`) fixed the throwing-`__require` stub by switching `service-automation` to a static `import { ExpressionEngine } from '@objectstack/formula'`, and populated `hookContext.previous` for update hooks. **Shipped in 7.4.1.** It removed the *engine-unreachable* runtime fault but left the underlying `catch → false` swallow in place — which is why **#1491** (a malformed predicate on the same swallow) still presents identically. This ADR's Decision 4 closes the swallow itself.
-- `@objectstack/formula` envelope routing exists (`{dialect, source, ast}`), CEL stdlib (`now()`/`today()`/`daysFromNow(int)`/`isBlank`/`coalesce`), and the legacy single-brace template resolver (`service-automation/builtin/template.ts`). This ADR **converges** these onto one language + one delimiter and adds the typed contract + build-time/schema validation that the current seam lacks.
+- **#1429** (`a6d4cbb6f`) fixed the throwing-`__require` stub by switching `service-automation` to a static `import { ExpressionEngine } from '@objectstack/formula'`, and populated `hookContext.previous` for update hooks. **Shipped in 7.4.1.** It removed the *engine-unreachable* runtime fault but left the underlying `catch → false` swallow in place — which is why **#1491** (a malformed predicate on the same swallow) still presents identically. Decision 1 closes the swallow itself.
+- `@objectstack/formula` envelope routing exists (`{dialect, source, ast}`), CEL stdlib (`now()`/`today()`/`daysFromNow(int)`/`isBlank`/`coalesce`), and the legacy single-brace template resolver (`service-automation/builtin/template.ts`). This ADR **converges** these onto one language + one delimiter and, more importantly, adds the **validate-by-default loop, schema-awareness, corrective errors, and agent introspection** the current seam lacks.
