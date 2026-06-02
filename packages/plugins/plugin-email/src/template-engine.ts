@@ -70,23 +70,65 @@ export function requireVars(
 }
 
 /**
+ * Decode the small set of HTML entities `escapeHtml` can emit, in a
+ * SINGLE left-to-right pass. Doing this with one alternation regex —
+ * rather than a chain of `.replace('&amp;','&').replace('&lt;','<')…`
+ * — is deliberate: a sequential chain is order-dependent and can
+ * double-unescape (e.g. `&amp;lt;` → `&lt;` → `<`). Because each match
+ * is consumed and the scan resumes *after* it, `&amp;lt;` decodes to
+ * the literal text `&lt;` and stops, never to `<`.
+ */
+const ENTITIES: Record<string, string> = {
+  '&nbsp;': ' ',
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+};
+const ENTITY_RE = /&(?:nbsp|amp|lt|gt|quot|#39);/g;
+
+function decodeEntities(s: string): string {
+  return s.replace(ENTITY_RE, (m) => ENTITIES[m] ?? m);
+}
+
+const TAG_RE = /<[^>]*>/g;
+
+/**
+ * Remove HTML tags robustly. A single `.replace(/<[^>]*>/g, '')` pass
+ * is not enough: stripping a tag can splice the surrounding text into a
+ * fresh tag (e.g. `<scr<script>ipt>` → `<script>`), so we loop until the
+ * string stops changing. This closes the "incomplete multi-character
+ * sanitization" gap where crafted/overlapping input leaves a `<…>` tag
+ * behind.
+ */
+function stripTags(s: string): string {
+  let prev: string;
+  let out = s;
+  do {
+    prev = out;
+    out = out.replace(TAG_RE, '');
+  } while (out !== prev);
+  return out;
+}
+
+/**
  * Strip HTML tags + collapse whitespace to derive a plain-text body
  * from an HTML template. Conservative: keeps line breaks at block
  * boundaries (<br>, </p>, </div>) so the resulting text is at least
  * paragraph-shaped.
+ *
+ * Order matters for safety: tags are stripped (looping until stable)
+ * *before* entities are decoded, and entities are decoded in a single
+ * pass — so neither tag removal nor entity decoding can re-introduce a
+ * live tag or double-unescape an entity.
  */
 export function htmlToText(html: string): string {
   if (!html) return '';
-  return html
+  const withBreaks = html
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n');
+  return decodeEntities(stripTags(withBreaks))
     .replace(/[ \t]+/g, ' ')
     .replace(/\n[ \t]+/g, '\n')
     .replace(/\n{3,}/g, '\n\n')

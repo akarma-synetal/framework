@@ -72,5 +72,38 @@ describe('template-engine', () => {
     it('collapses 3+ newlines to 2', () => {
       expect(htmlToText('<p>a</p><p>b</p>')).toBe('a\nb');
     });
+
+    describe('adversarial sanitization', () => {
+      it('does not double-unescape entities', () => {
+        // &amp;lt; must decode ONCE to the literal text "&lt;", never to "<".
+        const out = htmlToText('&amp;lt;script&amp;gt;');
+        expect(out).toBe('&lt;script&gt;');
+        expect(out).not.toContain('<');
+        expect(out).not.toContain('>');
+      });
+
+      it('decodes single-escaped entities exactly once', () => {
+        // Sanity counterpart: single-escaped sequences still decode normally.
+        expect(htmlToText('a &amp;&amp; b')).toBe('a && b');
+      });
+
+      it('strips overlapping/nested tags so no tag survives', () => {
+        const out = htmlToText('<scr<script>ipt>alert(1)</script>');
+        expect(out).not.toContain('<');
+        expect(out.toLowerCase()).not.toContain('<script');
+      });
+
+      it('strips tags that re-form after a single pass', () => {
+        const out = htmlToText('<<script>script>alert(1)<</p>/p>');
+        expect(out).not.toContain('<');
+        expect(out.toLowerCase()).not.toContain('<script');
+      });
+
+      it('handles deeply nested entities without producing a live tag', () => {
+        const out = htmlToText('&amp;amp;lt;img src=x onerror=alert(1)&amp;amp;gt;');
+        expect(out).not.toContain('<');
+        expect(out).not.toContain('>');
+      });
+    });
   });
 });
