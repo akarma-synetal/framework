@@ -1,5 +1,16 @@
 # @objectstack/plugin-org-scoping
 
+## 7.8.0
+
+### Patch Changes
+
+- Updated dependencies [06f2bbb]
+- Updated dependencies [36719db]
+- Updated dependencies [424ab26]
+  - @objectstack/spec@7.8.0
+  - @objectstack/core@7.8.0
+  - @objectstack/platform-objects@7.8.0
+
 ## 7.7.0
 
 ### Patch Changes

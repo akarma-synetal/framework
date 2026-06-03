@@ -1,5 +1,73 @@
 # @objectstack/cli
 
+## 7.8.0
+
+### Minor Changes
+
+- 6b60068: fix(cli): `objectstack dev` persists data by default (no more `:memory:` wipe on restart)
+
+  `objectstack dev` historically fell back to a `:memory:` SQLite database when no `--database` / `OS_DATABASE_URL` was given, so **every restart silently wiped all data and AI-authored metadata** — you'd build an app, restart, and it would be gone, which makes local app-building unusable.
+
+  `dev` now defaults to a persistent, project-anchored SQLite file at `<cwd>/.objectstack/data/dev.db` (gitignored, per-project). Existing opt-outs are unchanged and take precedence: `--fresh` (ephemeral temp DB), `--database <url>`, `OS_DATABASE_URL`/`DATABASE_URL`, or an explicit in-memory driver (`--database-driver memory` / `OS_DATABASE_DRIVER=memory`). Resolution is extracted into the testable `resolveDefaultDevDbUrl()` helper.
+
+  The **app-showcase** example drops its explicit `:memory:` datasource override (which would otherwise route data back to memory and defeat the new default), so it persists across restarts out of the box.
+
+### Patch Changes
+
+- Updated dependencies [6b82e68]
+- Updated dependencies [06f2bbb]
+- Updated dependencies [a75823a]
+- Updated dependencies [4fbb86a]
+- Updated dependencies [e631f1e]
+- Updated dependencies [328a7c4]
+- Updated dependencies [f01f9fa]
+- Updated dependencies [4888ea2]
+- Updated dependencies [6fc2678]
+- Updated dependencies [36719db]
+- Updated dependencies [424ab26]
+  - @objectstack/service-ai@7.8.0
+  - @objectstack/spec@7.8.0
+  - @objectstack/objectql@7.8.0
+  - @objectstack/rest@7.8.0
+  - @objectstack/runtime@7.8.0
+  - @objectstack/service-package@7.8.0
+  - @objectstack/formula@7.8.0
+  - @objectstack/account@7.8.0
+  - @objectstack/client@7.8.0
+  - @objectstack/core@7.8.0
+  - @objectstack/observability@7.8.0
+  - @objectstack/platform-objects@7.8.0
+  - @objectstack/driver-memory@7.8.0
+  - @objectstack/driver-mongodb@7.8.0
+  - @objectstack/driver-sql@7.8.0
+  - @objectstack/driver-sqlite-wasm@7.8.0
+  - @objectstack/plugin-approvals@7.8.0
+  - @objectstack/plugin-audit@7.8.0
+  - @objectstack/plugin-auth@7.8.0
+  - @objectstack/plugin-email@7.8.0
+  - @objectstack/plugin-hono-server@7.8.0
+  - @objectstack/plugin-mcp-server@7.8.0
+  - @objectstack/plugin-org-scoping@7.8.0
+  - @objectstack/plugin-reports@7.8.0
+  - @objectstack/plugin-security@7.8.0
+  - @objectstack/plugin-sharing@7.8.0
+  - @objectstack/plugin-trigger-record-change@7.8.0
+  - @objectstack/plugin-trigger-schedule@7.8.0
+  - @objectstack/plugin-webhooks@7.8.0
+  - @objectstack/service-analytics@7.8.0
+  - @objectstack/service-automation@7.8.0
+  - @objectstack/service-cache@7.8.0
+  - @objectstack/service-datasource@7.8.0
+  - @objectstack/service-feed@7.8.0
+  - @objectstack/service-job@7.8.0
+  - @objectstack/service-messaging@7.8.0
+  - @objectstack/service-queue@7.8.0
+  - @objectstack/service-realtime@7.8.0
+  - @objectstack/service-settings@7.8.0
+  - @objectstack/service-storage@7.8.0
+  - @objectstack/types@7.8.0
+  - @objectstack/console@7.8.0
+
 ## 7.7.0
 
 ### Patch Changes

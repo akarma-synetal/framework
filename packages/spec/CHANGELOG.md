@@ -1,5 +1,46 @@
 # @objectstack/spec
 
+## 7.8.0
+
+### Minor Changes
+
+- 36719db: fix: AI-built apps are usable immediately — sync new object tables on publish + emit valid kanban config
+
+  Two gaps found by end-to-end testing of an AI-built app:
+
+  1. **A freshly-published object couldn't accept records until a server restart.** Publishing a drafted object registered it in the in-memory registry but never created its physical table (table sync only ran at boot), so inserts failed with `object_not_found` ("no such table"). Added `ObjectQL.syncObjectSchema(name)` (a targeted, idempotent single-object schema sync) and call it from the publish paths (`protocol.publishMetaItem` and `saveMetaItem` mode:'publish', via `ensureObjectStorage`). Best-effort + non-fatal. New objects are now CRUD-able the moment they're published.
+
+  2. **AI-generated kanban views rendered as plain lists** (and sometimes failed validation). The blueprint `viewBody` emitted `list.type:'kanban'` with no `kanban` config; `KanbanConfigSchema` requires `groupByField` **and** `columns`. Added an optional `groupBy` to the blueprint view schema (lenient + strict) and have `apply_blueprint` set `list.kanban = { groupByField, columns }` — using the view's explicit `groupBy` when given, else inferring the object's first `select` field. AI-built kanban views now validate, publish, and carry a real group-by field.
+
+### Patch Changes
+
+- 06f2bbb: fix(ai): make ADR-0033 blueprint authoring work with OpenAI structured outputs
+
+  Two bugs surfaced by a live end-to-end run (Studio chat → blueprint → draft → review → publish) against a real model (OpenAI via the Vercel AI Gateway) — both invisible to the existing unit tests:
+
+  1. **`propose_blueprint` failed against OpenAI strict structured outputs.** `SolutionBlueprintSchema` uses optional fields and a free-form `seedData` record; OpenAI's strict mode requires every property listed in `required` and rejects open `additionalProperties`, so `generateObject` errored (`'required' … must include every key in properties`) and the agent silently fell back to free-text. Adds `SolutionBlueprintStrictSchema` — a strict-compatible mirror (optional → nullable, no `z.record`) used **only** as the `generateObject` output contract. The lenient `SolutionBlueprintSchema` (and every existing consumer/test) is unchanged; the blueprint tools strip the `null`s the strict contract emits so downstream stays clean.
+
+  2. **Tool-only assistant turns failed to persist.** `ai_messages.content` is required, but an assistant turn that only calls a tool has no text, so the insert failed, the turn was dropped, and the next turn lost context (the agent re-proposed instead of applying the confirmed blueprint). `ObjectQLConversationService.addMessage` now synthesizes a readable placeholder from the tool names (`(called propose_blueprint)`) plus a defensive non-empty fallback.
+
+  With both fixes the full plan-first loop runs end-to-end on OpenAI models: propose → confirm → batch-draft objects/views/dashboards/app → review/diff → publish.
+
+- 424ab26: fix(seed): reject object-wrapped relationship references and constrain them at compile time
+
+  Seed datasets resolve `lookup` / `master_detail` references by matching the value
+  against the target record's externalId — so the value must be the plain natural-key
+  string (e.g. `account: 'Acme Corp'`), never a wrapper object like
+  `account: { externalId: 'Acme Corp' }`. The wrapper was silently skipped by the
+  loader, fell through unresolved, and reached the SQL driver as a non-bindable value —
+  masked on an always-empty `:memory:` DB but crashing on a persistent one with
+  "SQLite3 can only bind numbers, strings, bigints, buffers, and null" once seeds re-ran
+  as updates.
+
+  - `defineDataset` now constrains reference fields to `string | null` at compile time
+    (derived from each field's `type`), so the object form is a type error.
+  - `SeedLoaderService` now fails loudly with an actionable message (and drops the value
+    instead of handing it to the driver) when a reference is an object — consistent
+    behavior across all drivers, no longer silently masked.
+
 ## 7.7.0
 
 ### Minor Changes

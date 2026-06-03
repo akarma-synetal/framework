@@ -1,5 +1,28 @@
 # @objectstack/example-showcase
 
+## 0.1.6
+
+### Patch Changes
+
+- 6b60068: fix(cli): `objectstack dev` persists data by default (no more `:memory:` wipe on restart)
+
+  `objectstack dev` historically fell back to a `:memory:` SQLite database when no `--database` / `OS_DATABASE_URL` was given, so **every restart silently wiped all data and AI-authored metadata** — you'd build an app, restart, and it would be gone, which makes local app-building unusable.
+
+  `dev` now defaults to a persistent, project-anchored SQLite file at `<cwd>/.objectstack/data/dev.db` (gitignored, per-project). Existing opt-outs are unchanged and take precedence: `--fresh` (ephemeral temp DB), `--database <url>`, `OS_DATABASE_URL`/`DATABASE_URL`, or an explicit in-memory driver (`--database-driver memory` / `OS_DATABASE_DRIVER=memory`). Resolution is extracted into the testable `resolveDefaultDevDbUrl()` helper.
+
+  The **app-showcase** example drops its explicit `:memory:` datasource override (which would otherwise route data back to memory and defeat the new default), so it persists across restarts out of the box.
+
+- Updated dependencies [06f2bbb]
+- Updated dependencies [a75823a]
+- Updated dependencies [4fbb86a]
+- Updated dependencies [e631f1e]
+- Updated dependencies [36719db]
+- Updated dependencies [424ab26]
+  - @objectstack/spec@7.8.0
+  - @objectstack/runtime@7.8.0
+  - @objectstack/connector-rest@7.8.0
+  - @objectstack/connector-slack@7.8.0
+
 ## 0.1.5
 
 ### Patch Changes

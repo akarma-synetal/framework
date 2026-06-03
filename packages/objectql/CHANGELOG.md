@@ -1,5 +1,93 @@
 # @objectstack/objectql
 
+## 7.8.0
+
+### Minor Changes
+
+- a75823a: feat(metadata): expose pending DRAFT metadata (ADR-0033 draft discoverability)
+
+  AI-authored metadata lands as drafts (`sys_metadata` rows with `state='draft'`, bound to an app package), but the only list path — `getMetaItems` — reads the active registry, so drafts were invisible: a just-built app package looked empty and there was no "pending changes" surface.
+
+  - `SysMetadataRepository.listDrafts({type?, packageId?})` lists draft rows (mirrors `list()` but scoped to `state='draft'`, optionally narrowed by package), returning a light header projection (no body) with `packageId`.
+  - `protocol.listDrafts({packageId?, type?, organizationId?})` exposes it over the overlay repo.
+  - `GET /api/v1/meta/_drafts?packageId=&type=` surfaces it to the console. Registered in the REST server before the greedy `/meta/:type` route (and mirrored in the dispatcher) so `_drafts` is never captured as a metadata type name.
+
+  Read-only; no behavior change to existing list/publish paths. Powers the upcoming Studio "drafts/pending changes" view and draft-aware package contents.
+
+- 4fbb86a: feat(packages): consolidate the package subsystem so AI-built app packages surface in Studio
+
+  The package subsystem was split across two stores that never met: the in-memory
+  `SchemaRegistry` (what the dispatcher's `/api/v1/packages` list/detail and
+  `getMetaItems({type:'package'})` read — i.e. Studio's package selector) and the durable
+  `sys_packages` table (where the AI's auto app package, and any `package`-service publish,
+  were written). Nothing reconciled the two, so an AI-created `app.<name>` package never
+  appeared in Studio.
+
+  This unifies them around one write primitive and one read source:
+
+  - **`protocol.installPackage`** is now implemented (it was declared-but-missing). It is the
+    single canonical write path: it registers the package in the in-memory registry **and**
+    best-effort persists it to `sys_packages` via the `package` service. Non-fatal when no
+    `package` service is wired (registry write still succeeds).
+  - **Dispatcher `POST /api/v1/packages`** routes through `protocol.installPackage` (falling
+    back to the bare registry write when the protocol is unavailable), so HTTP installs are
+    durable too.
+  - **`@objectstack/service-package`** reconciles `sys_packages` back into the registry on
+    boot, without clobbering filesystem-registered packages — so persisted packages survive a
+    restart and stay visible in the registry-backed read paths.
+  - **`@objectstack/service-ai`** `apply_blueprint` now homes an app via
+    `protocol.installPackage` (falling back to the legacy `package`-service publish), so the
+    app package lands where Studio reads it.
+
+  Still the _legacy_ `package_id` plane — sealed `sys_package_version` versioning and
+  cross-environment promotion remain ADR-0027 follow-ups.
+
+- e631f1e: feat(metadata): publish a whole app's drafts in one shot (ADR-0033)
+
+  After an AI builds an app, its metadata is drafted (bound to an app package) and
+  had to be published one item at a time. The package-level `POST /packages/:id/publish`
+  needs the `metadata` service (503 when absent, e.g. the showcase) and reads the
+  in-memory registry, not the drafts.
+
+  - `protocol.publishPackageDrafts({ packageId })` promotes every `sys_metadata`
+    draft row bound to the package to active by reusing the per-item
+    `publishMetaItem` primitive (overridable/lock guards + runtime registry
+    refresh). Per-item failures are collected, not fatal. No `metadata`-service
+    dependency.
+  - `POST /api/v1/packages/:id/publish-drafts` exposes it (distinct from the
+    registry-based `/publish`), returning `{ success, publishedCount, failedCount, published, failed }`.
+
+  Verified live: an AI-built `app.asset_management` (4 drafts) published in one call —
+  all 4 promoted to active, drafts cleared, draft objects became queryable.
+
+- 36719db: fix: AI-built apps are usable immediately — sync new object tables on publish + emit valid kanban config
+
+  Two gaps found by end-to-end testing of an AI-built app:
+
+  1. **A freshly-published object couldn't accept records until a server restart.** Publishing a drafted object registered it in the in-memory registry but never created its physical table (table sync only ran at boot), so inserts failed with `object_not_found` ("no such table"). Added `ObjectQL.syncObjectSchema(name)` (a targeted, idempotent single-object schema sync) and call it from the publish paths (`protocol.publishMetaItem` and `saveMetaItem` mode:'publish', via `ensureObjectStorage`). Best-effort + non-fatal. New objects are now CRUD-able the moment they're published.
+
+  2. **AI-generated kanban views rendered as plain lists** (and sometimes failed validation). The blueprint `viewBody` emitted `list.type:'kanban'` with no `kanban` config; `KanbanConfigSchema` requires `groupByField` **and** `columns`. Added an optional `groupBy` to the blueprint view schema (lenient + strict) and have `apply_blueprint` set `list.kanban = { groupByField, columns }` — using the view's explicit `groupBy` when given, else inferring the object's first `select` field. AI-built kanban views now validate, publish, and carry a real group-by field.
+
+### Patch Changes
+
+- 6fc2678: fix(metadata): stamp a top-level `name` on `view` bodies at the write path so AI/hand-authored views surface
+
+  `getMetaItems` only overlays a `sys_metadata` row when its parsed body has a top-level `name`. Some view producers — notably loose `{ list: <ListView> }` / `{ form: … }` fragments that AI tools and hand-authoring emit — pass schema validation but carry no top-level `name`, so the view was silently dropped from the object's view list and never appeared as a tab ("validates ≠ surfaces").
+
+  `saveMetaItem` now guarantees a top-level `name` on every view body at the single write chokepoint, BEFORE validation + persistence, so a nameless view is auto-corrected regardless of which authoring path produced it. It deliberately does NOT reshape the document: both the `defineView` container form (`{ list, listViews, … }`, expanded by the loader) and the `{ name, object, viewKind, config }` record form are valid and the console consumes both — reshaping a container into a record risks producing an invalid record (e.g. a non-`<object>.<key>` name) and drops Studio-only fields (`isPinned`, `sortOrder`, …). Exported as `normalizeViewMetadata` and unit-tested.
+
+  (Note for follow-up: the `view` metadata schema is itself a permissive union — it accepts an unknown `viewKind`, a kanban config missing `groupByField`, even `{}`. Tightening it correctly requires first consolidating the four legitimate view shapes — record / container / flat list / flat form — and is a separate spec change.)
+
+- Updated dependencies [06f2bbb]
+- Updated dependencies [f01f9fa]
+- Updated dependencies [36719db]
+- Updated dependencies [424ab26]
+  - @objectstack/spec@7.8.0
+  - @objectstack/formula@7.8.0
+  - @objectstack/core@7.8.0
+  - @objectstack/metadata-core@7.8.0
+  - @objectstack/types@7.8.0
+
 ## 7.7.0
 
 ### Patch Changes

@@ -1,5 +1,107 @@
 # @objectstack/runtime
 
+## 7.8.0
+
+### Patch Changes
+
+- a75823a: feat(metadata): expose pending DRAFT metadata (ADR-0033 draft discoverability)
+
+  AI-authored metadata lands as drafts (`sys_metadata` rows with `state='draft'`, bound to an app package), but the only list path — `getMetaItems` — reads the active registry, so drafts were invisible: a just-built app package looked empty and there was no "pending changes" surface.
+
+  - `SysMetadataRepository.listDrafts({type?, packageId?})` lists draft rows (mirrors `list()` but scoped to `state='draft'`, optionally narrowed by package), returning a light header projection (no body) with `packageId`.
+  - `protocol.listDrafts({packageId?, type?, organizationId?})` exposes it over the overlay repo.
+  - `GET /api/v1/meta/_drafts?packageId=&type=` surfaces it to the console. Registered in the REST server before the greedy `/meta/:type` route (and mirrored in the dispatcher) so `_drafts` is never captured as a metadata type name.
+
+  Read-only; no behavior change to existing list/publish paths. Powers the upcoming Studio "drafts/pending changes" view and draft-aware package contents.
+
+- 4fbb86a: feat(packages): consolidate the package subsystem so AI-built app packages surface in Studio
+
+  The package subsystem was split across two stores that never met: the in-memory
+  `SchemaRegistry` (what the dispatcher's `/api/v1/packages` list/detail and
+  `getMetaItems({type:'package'})` read — i.e. Studio's package selector) and the durable
+  `sys_packages` table (where the AI's auto app package, and any `package`-service publish,
+  were written). Nothing reconciled the two, so an AI-created `app.<name>` package never
+  appeared in Studio.
+
+  This unifies them around one write primitive and one read source:
+
+  - **`protocol.installPackage`** is now implemented (it was declared-but-missing). It is the
+    single canonical write path: it registers the package in the in-memory registry **and**
+    best-effort persists it to `sys_packages` via the `package` service. Non-fatal when no
+    `package` service is wired (registry write still succeeds).
+  - **Dispatcher `POST /api/v1/packages`** routes through `protocol.installPackage` (falling
+    back to the bare registry write when the protocol is unavailable), so HTTP installs are
+    durable too.
+  - **`@objectstack/service-package`** reconciles `sys_packages` back into the registry on
+    boot, without clobbering filesystem-registered packages — so persisted packages survive a
+    restart and stay visible in the registry-backed read paths.
+  - **`@objectstack/service-ai`** `apply_blueprint` now homes an app via
+    `protocol.installPackage` (falling back to the legacy `package`-service publish), so the
+    app package lands where Studio reads it.
+
+  Still the _legacy_ `package_id` plane — sealed `sys_package_version` versioning and
+  cross-environment promotion remain ADR-0027 follow-ups.
+
+- e631f1e: feat(metadata): publish a whole app's drafts in one shot (ADR-0033)
+
+  After an AI builds an app, its metadata is drafted (bound to an app package) and
+  had to be published one item at a time. The package-level `POST /packages/:id/publish`
+  needs the `metadata` service (503 when absent, e.g. the showcase) and reads the
+  in-memory registry, not the drafts.
+
+  - `protocol.publishPackageDrafts({ packageId })` promotes every `sys_metadata`
+    draft row bound to the package to active by reusing the per-item
+    `publishMetaItem` primitive (overridable/lock guards + runtime registry
+    refresh). Per-item failures are collected, not fatal. No `metadata`-service
+    dependency.
+  - `POST /api/v1/packages/:id/publish-drafts` exposes it (distinct from the
+    registry-based `/publish`), returning `{ success, publishedCount, failedCount, published, failed }`.
+
+  Verified live: an AI-built `app.asset_management` (4 drafts) published in one call —
+  all 4 promoted to active, drafts cleared, draft objects became queryable.
+
+- 424ab26: fix(seed): reject object-wrapped relationship references and constrain them at compile time
+
+  Seed datasets resolve `lookup` / `master_detail` references by matching the value
+  against the target record's externalId — so the value must be the plain natural-key
+  string (e.g. `account: 'Acme Corp'`), never a wrapper object like
+  `account: { externalId: 'Acme Corp' }`. The wrapper was silently skipped by the
+  loader, fell through unresolved, and reached the SQL driver as a non-bindable value —
+  masked on an always-empty `:memory:` DB but crashing on a persistent one with
+  "SQLite3 can only bind numbers, strings, bigints, buffers, and null" once seeds re-ran
+  as updates.
+
+  - `defineDataset` now constrains reference fields to `string | null` at compile time
+    (derived from each field's `type`), so the object form is a type error.
+  - `SeedLoaderService` now fails loudly with an actionable message (and drops the value
+    instead of handing it to the driver) when a reference is an object — consistent
+    behavior across all drivers, no longer silently masked.
+
+- Updated dependencies [06f2bbb]
+- Updated dependencies [a75823a]
+- Updated dependencies [4fbb86a]
+- Updated dependencies [e631f1e]
+- Updated dependencies [f01f9fa]
+- Updated dependencies [6fc2678]
+- Updated dependencies [36719db]
+- Updated dependencies [424ab26]
+  - @objectstack/spec@7.8.0
+  - @objectstack/objectql@7.8.0
+  - @objectstack/rest@7.8.0
+  - @objectstack/formula@7.8.0
+  - @objectstack/core@7.8.0
+  - @objectstack/metadata@7.8.0
+  - @objectstack/observability@7.8.0
+  - @objectstack/driver-memory@7.8.0
+  - @objectstack/driver-sql@7.8.0
+  - @objectstack/driver-sqlite-wasm@7.8.0
+  - @objectstack/plugin-auth@7.8.0
+  - @objectstack/plugin-org-scoping@7.8.0
+  - @objectstack/plugin-security@7.8.0
+  - @objectstack/service-cluster@7.8.0
+  - @objectstack/service-i18n@7.8.0
+  - @objectstack/types@7.8.0
+
 ## 7.7.0
 
 ### Patch Changes
