@@ -1,5 +1,17 @@
 # @objectstack/hono
 
+## 7.8.0
+
+### Patch Changes
+
+- Updated dependencies [a75823a]
+- Updated dependencies [4fbb86a]
+- Updated dependencies [e631f1e]
+- Updated dependencies [424ab26]
+  - @objectstack/runtime@7.8.0
+  - @objectstack/plugin-hono-server@7.8.0
+  - @objectstack/types@7.8.0
+
 ## 7.7.0
 
 ### Patch Changes

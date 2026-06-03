@@ -1,5 +1,29 @@
 # @objectstack/plugin-dev
 
+## 7.8.0
+
+### Patch Changes
+
+- Updated dependencies [06f2bbb]
+- Updated dependencies [a75823a]
+- Updated dependencies [4fbb86a]
+- Updated dependencies [e631f1e]
+- Updated dependencies [6fc2678]
+- Updated dependencies [36719db]
+- Updated dependencies [424ab26]
+  - @objectstack/spec@7.8.0
+  - @objectstack/objectql@7.8.0
+  - @objectstack/rest@7.8.0
+  - @objectstack/runtime@7.8.0
+  - @objectstack/core@7.8.0
+  - @objectstack/driver-memory@7.8.0
+  - @objectstack/plugin-auth@7.8.0
+  - @objectstack/plugin-hono-server@7.8.0
+  - @objectstack/plugin-org-scoping@7.8.0
+  - @objectstack/plugin-security@7.8.0
+  - @objectstack/service-i18n@7.8.0
+  - @objectstack/types@7.8.0
+
 ## 7.7.0
 
 ### Patch Changes
