@@ -31,156 +31,246 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "snake_case の一意識別子（作成後は変更不可）"
       },
       label: {
+        label: "表示名",
         helpText: "単数表示名（例: \"Account\"）"
       },
       pluralLabel: {
+        label: "複数表示名",
         helpText: "複数表示名（例: \"Accounts\"）"
       },
       icon: {
+        label: "アイコン",
         helpText: "Lucide アイコン名（例: \"building\", \"users\"）"
       },
       description: {
+        label: "説明",
         helpText: "開発者向けドキュメント"
       },
       tags: {
+        label: "タグ",
         helpText: "分類タグ（例: \"sales\", \"system\"）"
       },
       active: {
+        label: "有効",
         helpText: "オブジェクトが有効で使用可能か"
       },
       isSystem: {
+        label: "システム組み込み",
         helpText: "システムオブジェクト（削除から保護）"
       },
       abstract: {
+        label: "抽象",
         helpText: "抽象ベース（インスタンス化不可）"
       },
       fields: {
+        label: "フィールド",
         helpText: "このオブジェクトが保存する列を追加"
       },
       "fields.label": {
+        label: "表示名",
         helpText: "表示ラベル"
       },
       "fields.type": {
+        label: "型",
         helpText: "フィールド型"
       },
       "fields.description": {
-        helpText: "Developer documentation for this column"
+        label: "説明",
+        helpText: "この列の開発者向けドキュメント"
       },
       "fields.required": {
-        helpText: "Must be set on every record"
+        label: "必須",
+        helpText: "すべてのレコードで必須"
       },
       "fields.unique": {
-        helpText: "Disallow duplicate values"
+        label: "一意",
+        helpText: "重複値を許可しない"
       },
       "fields.indexed": {
-        helpText: "Create a database index for faster querying"
+        label: "インデックス済み",
+        helpText: "高速検索のためにデータベースインデックスを作成"
       },
       "fields.readonly": {
-        helpText: "Visible but never user-editable"
+        label: "読み取り専用",
+        helpText: "表示されるがユーザーは編集不可"
       },
       "fields.immutable": {
-        helpText: "Editable on create, locked thereafter"
+        label: "変更不可",
+        helpText: "作成時のみ編集可能、その後はロック"
       },
       "fields.hidden": {
-        helpText: "Hidden from default UI"
+        label: "非表示",
+        helpText: "既定 UI では非表示"
       },
       "fields.searchable": {
-        helpText: "Include in full-text search"
+        label: "検索可能",
+        helpText: "全文検索に含める"
       },
       "fields.sortable": {
-        helpText: "Allow sorting on this column"
+        label: "並び替え可能",
+        helpText: "この列での並び替えを許可"
       },
       "fields.filterable": {
-        helpText: "Allow filtering on this column"
+        label: "フィルター可能",
+        helpText: "この列でのフィルターを許可"
       },
       "fields.defaultValue": {
-        helpText: "Default value for new records (JSON literal)"
+        label: "既定値",
+        helpText: "新規レコードの既定値（JSON リテラル）"
       },
       "fields.placeholder": {
-        helpText: "Placeholder hint"
+        label: "プレースホルダー",
+        helpText: "プレースホルダーのヒント"
       },
       "fields.maxLength": {
-        helpText: "Max characters"
+        label: "最大長",
+        helpText: "最大文字数"
       },
       "fields.minLength": {
-        helpText: "Min characters"
+        label: "最小長",
+        helpText: "最小文字数"
       },
       "fields.min": {
-        helpText: "Minimum value"
+        label: "最小値",
+        helpText: "最小値"
       },
       "fields.max": {
-        helpText: "Maximum value"
+        label: "最大値",
+        helpText: "最大値"
       },
       "fields.precision": {
-        helpText: "Total digits"
+        label: "精度",
+        helpText: "総桁数"
       },
       "fields.scale": {
-        helpText: "Decimal places"
+        label: "小数桁",
+        helpText: "小数桁数"
       },
       "fields.options": {
-        helpText: "Available choices"
+        label: "選択肢",
+        helpText: "選択肢"
+      },
+      "fields.options.label": {
+        label: "表示名"
+      },
+      "fields.options.value": {
+        label: "値"
+      },
+      "fields.options.color": {
+        label: "色"
       },
       "fields.options.icon": {
-        helpText: "Lucide icon name"
+        label: "アイコン",
+        helpText: "Lucide アイコン名"
+      },
+      "fields.options.description": {
+        label: "説明"
       },
       "fields.reference": {
+        label: "参照",
         helpText: "対象オブジェクト（lookup/master_detail 用）"
       },
       "fields.referenceFilter": {
-        helpText: "CEL filter applied to the picker"
+        label: "参照フィルター",
+        helpText: "ピッカーに適用する CEL フィルター"
       },
       "fields.cascadeDelete": {
-        helpText: "Delete children when parent is deleted"
+        label: "カスケード削除",
+        helpText: "親の削除時に子も削除"
       },
       "fields.multiple": {
-        helpText: "Allow selecting multiple records"
+        label: "複数選択",
+        helpText: "複数レコードの選択を許可"
       },
       "fields.formula": {
-        helpText: "CEL formula expression"
+        label: "数式",
+        helpText: "CEL 公式式"
       },
       "fields.returnType": {
-        helpText: "Result type for formulas"
+        label: "戻り値の型",
+        helpText: "公式の結果型"
       },
       "fields.summaryType": {
-        helpText: "Aggregation"
+        label: "集計タイプ",
+        helpText: "集計方法"
       },
       "fields.summaryField": {
-        helpText: "Field on child object to aggregate"
+        label: "集計フィールド",
+        helpText: "集計対象の子オブジェクトのフィールド"
       },
       "fields.displayFormat": {
-        helpText: "e.g. \"INV-{0000}\""
+        label: "表示形式",
+        helpText: "例: \"INV-{0000}\""
       },
       "fields.startingNumber": {
-        helpText: "Starting sequence value"
+        label: "開始番号",
+        helpText: "連番の開始値"
       },
       "fields.language": {
-        helpText: "Editor language (e.g. sql, javascript)"
+        label: "言語",
+        helpText: "エディター言語（例: sql, javascript）"
       },
       "fields.validation": {
-        helpText: "CEL predicate — must evaluate true"
+        label: "検証",
+        helpText: "CEL 述語。true と評価される必要があります"
       },
       "fields.errorMessage": {
-        helpText: "Shown when validation fails"
+        label: "エラーメッセージ",
+        helpText: "検証失敗時に表示"
       },
       "fields.audit": {
-        helpText: "Audit changes to this field"
+        label: "監査",
+        helpText: "このフィールドの変更を監査"
       },
       "fields.trackHistory": {
-        helpText: "Keep change history"
+        label: "履歴追跡",
+        helpText: "変更履歴を保持"
       },
       "fields.pii": {
-        helpText: "Personally identifiable information"
+        label: "個人情報",
+        helpText: "個人識別情報"
       },
       "fields.encrypted": {
-        helpText: "Encrypt at rest"
+        label: "暗号化",
+        helpText: "保存時に暗号化"
       },
       capabilities: {
+        label: "機能",
         helpText: "システム機能の有効/無効"
       },
+      "capabilities.trackHistory": {
+        label: "履歴追跡"
+      },
+      "capabilities.searchable": {
+        label: "検索可能"
+      },
+      "capabilities.apiEnabled": {
+        label: "API 有効"
+      },
+      "capabilities.files": {
+        label: "ファイル"
+      },
+      "capabilities.feeds": {
+        label: "フィード"
+      },
+      "capabilities.activities": {
+        label: "活動"
+      },
+      "capabilities.trash": {
+        label: "ごみ箱"
+      },
+      "capabilities.mru": {
+        label: "最近使用"
+      },
+      "capabilities.clone": {
+        label: "複製"
+      },
       datasource: {
+        label: "データソース",
         helpText: "対象データソース ID（既定: \"default\"）"
       }
     }
@@ -207,102 +297,135 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "一意識別子（snake_case、作成後は変更不可）"
       },
       label: {
+        label: "表示名",
         helpText: "ユーザー向け表示名"
       },
       type: {
+        label: "型",
         helpText: "このフィールドのデータ型"
       },
       group: {
+        label: "グループ",
         helpText: "フォームレイアウトのグループ名"
       },
       description: {
+        label: "説明",
         helpText: "ユーザーに表示するヘルプテキスト"
       },
       required: {
+        label: "必須",
         helpText: "ユーザーによる値入力が必須"
       },
       unique: {
+        label: "一意",
         helpText: "複数レコードで同じ値を不可"
       },
       multiple: {
+        label: "複数選択",
         helpText: "複数値を許可（select/lookup 用）"
       },
       defaultValue: {
+        label: "既定値",
         helpText: "新規レコードの既定値"
       },
       minLength: {
+        label: "最小長",
         helpText: "最小文字数"
       },
       maxLength: {
+        label: "最大長",
         helpText: "最大文字数"
       },
       min: {
+        label: "最小値",
         helpText: "最小値"
       },
       max: {
+        label: "最大値",
         helpText: "最大値"
       },
       precision: {
+        label: "精度",
         helpText: "小数桁数（例: $10.50 なら 2）"
       },
       scale: {
+        label: "小数桁",
         helpText: "小数部の桁数"
       },
       options: {
+        label: "選択肢",
         helpText: "使用可能な選択肢（label/value ペア）"
       },
       reference: {
+        label: "参照",
         helpText: "参照先オブジェクト名"
       },
       referenceFilters: {
+        label: "参照フィルター",
         helpText: "フィルター式（例: \"active = true\"）"
       },
       deleteBehavior: {
+        label: "削除動作",
         helpText: "参照先レコード削除時の動作"
       },
       expression: {
+        label: "式",
         helpText: "このフィールドを計算する CEL 式（読み取り専用化）"
       },
       summaryOperations: {
+        label: "集計操作",
         helpText: "ロールアップ集計設定（親子関係用）"
       },
       cached: {
+        label: "キャッシュ",
         helpText: "計算フィールドのキャッシュ設定"
       },
       columnName: {
+        label: "列名",
         helpText: "データベース上の物理列名（既定はフィールド名）"
       },
       index: {
+        label: "インデックス",
         helpText: "高速クエリ用のデータベースインデックスを作成"
       },
       externalId: {
+        label: "外部 ID",
         helpText: "upsert 操作用の外部 ID としてマーク"
       },
       readonly: {
+        label: "読み取り専用",
         helpText: "フォームでフィールドを読み取り専用にする"
       },
       hidden: {
+        label: "非表示",
         helpText: "既定 UI ビューからフィールドを非表示"
       },
       searchable: {
+        label: "検索可能",
         helpText: "グローバル検索結果に含める"
       },
       sortable: {
+        label: "並び替え可能",
         helpText: "このフィールドでリストの並べ替えを許可"
       },
       auditTrail: {
+        label: "監査証跡",
         helpText: "ユーザーとタイムスタンプ付きで詳細変更を追跡"
       },
       trackFeedHistory: {
+        label: "フィード履歴追跡",
         helpText: "アクティビティフィードに変更を表示"
       },
       encryptionConfig: {
+        label: "暗号化設定",
         helpText: "フィールドレベル暗号化（GDPR/HIPAA/PCI-DSS）"
       },
       maskingRule: {
+        label: "マスキングルール",
         helpText: "PII 保護用データマスキングルール"
       }
     }
@@ -334,39 +457,60 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "snake_case 識別子（作成後は変更不可）"
       },
+      label: {
+        label: "表示名"
+      },
+      description: {
+        label: "説明"
+      },
       object: {
+        label: "オブジェクト",
         helpText: "対象オブジェクト名（グローバルは \"*\"）"
       },
       events: {
+        label: "イベント",
         helpText: "ライフサイクルイベント（例: beforeInsert, afterUpdate）"
       },
       priority: {
+        label: "優先度",
         helpText: "小さい数値ほど先に実行"
       },
       body: {
+        label: "本文",
         helpText: "L1 式または L2 サンドボックス JS body"
       },
       "body.language": {
+        label: "言語",
         helpText: "expression = 純粋な数式; js = サンドボックス化 JavaScript"
       },
       "body.source": {
+        label: "ソース",
         helpText: "関数 body ソース — トップレベル import 不可"
       },
       "body.capabilities": {
+        label: "機能",
         helpText: "許可する ctx API（api.read, api.write, crypto.uuid, log, …）"
       },
       "body.timeoutMs": {
+        label: "タイムアウト（ms）",
         helpText: "呼び出しごとのタイムアウト（ms）"
       },
       handler: {
+        label: "ハンドラー",
         helpText: "ハンドラー関数名（非推奨 — `body` を推奨）"
       },
       async: {
+        label: "非同期",
         helpText: "バックグラウンドで実行し、トランザクションをブロックしない"
       },
+      onError: {
+        label: "エラー時"
+      },
       condition: {
+        label: "条件",
         helpText: "任意の数式 — false 評価時はフックをスキップ"
       }
     }
@@ -417,28 +561,87 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "snake_case、environment ごとに一意"
       },
+      label: {
+        label: "表示名"
+      },
+      description: {
+        label: "説明"
+      },
       type: {
+        label: "型",
         helpText: "主要ビューサーフェス"
       },
       data: {
+        label: "データ",
         helpText: "データソース — 例: {\"provider\":\"object\",\"object\":\"task\"}"
       },
       columns: {
+        label: "列",
         helpText: "表示する列（選択オブジェクトのフィールド名）"
       },
       filter: {
+        label: "フィルター",
         helpText: "フィルター条件"
       },
       sort: {
+        label: "並び替え",
         helpText: "既定の並び順"
       },
       searchableFields: {
+        label: "検索対象フィールド",
         helpText: "クイック検索で使用可能なフィールド名"
       },
       filterableFields: {
+        label: "フィルター対象フィールド",
         helpText: "フィルターで使用可能なフィールド名"
+      },
+      resizable: {
+        label: "サイズ変更可"
+      },
+      striped: {
+        label: "縞表示"
+      },
+      bordered: {
+        label: "枠線"
+      },
+      compactToolbar: {
+        label: "コンパクトツールバー"
+      },
+      rowHeight: {
+        label: "行の高さ"
+      },
+      selection: {
+        label: "選択"
+      },
+      pagination: {
+        label: "ページネーション"
+      },
+      kanban: {
+        label: "カンバン"
+      },
+      calendar: {
+        label: "カレンダー"
+      },
+      gantt: {
+        label: "ガント"
+      },
+      gallery: {
+        label: "ギャラリー"
+      },
+      timeline: {
+        label: "タイムライン"
+      },
+      chart: {
+        label: "チャート"
+      },
+      navigation: {
+        label: "ナビゲーション"
+      },
+      sharing: {
+        label: "共有"
       }
     }
   },
@@ -464,42 +667,55 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "一意識別子（snake_case）"
       },
       label: {
+        label: "表示名",
         helpText: "ユーザーに表示するページタイトル"
       },
       icon: {
+        label: "アイコン",
         helpText: "ナビゲーションメニューのアイコン"
       },
       type: {
+        label: "型",
         helpText: "ページ種別（record, home, app, dashboard など）"
       },
       template: {
+        label: "テンプレート",
         helpText: "レイアウトテンプレート（例: \"header-sidebar-main\"）"
       },
       description: {
+        label: "説明",
         helpText: "ナビゲーション用ページ説明"
       },
       object: {
+        label: "オブジェクト",
         helpText: "バインド先オブジェクト（Record ページ用）"
       },
       variables: {
+        label: "変数",
         helpText: "ページローカル状態変数"
       },
       regions: {
+        label: "リージョン",
         helpText: "コンポーネントを含むレイアウト領域（header, main, sidebar, footer）"
       },
       isDefault: {
+        label: "既定",
         helpText: "このページ種別の既定ページに設定"
       },
       kind: {
+        label: "モード",
         helpText: "ページ上書きモード: full または slotted（record ページ用）"
       },
       assignedProfiles: {
+        label: "割り当てプロファイル",
         helpText: "このページにアクセス可能なプロファイル"
       },
       aria: {
+        label: "アクセシビリティ",
         helpText: "アクセシビリティ属性（ARIA ラベル、ロール）"
       }
     }
@@ -530,36 +746,50 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "snake_case の一意識別子"
       },
       label: {
+        label: "表示名",
         helpText: "表示名"
       },
+      description: {
+        label: "説明"
+      },
       columns: {
+        label: "列",
         helpText: "グリッド列（既定 12）"
       },
       gap: {
+        label: "間隔",
         helpText: "グリッド間隔（Tailwind 単位）"
       },
       refreshInterval: {
+        label: "更新間隔",
         helpText: "自動更新（秒）"
       },
       header: {
+        label: "ヘッダー",
         helpText: "ダッシュボードヘッダー設定（title, subtitle, actions）"
       },
       widgets: {
+        label: "ウィジェット",
         helpText: "位置とサイズを持つダッシュボードウィジェット"
       },
       dateRange: {
+        label: "日付範囲",
         helpText: "既定の日付範囲セレクター"
       },
       globalFilters: {
+        label: "グローバルフィルター",
         helpText: "全ウィジェットに適用するフィルター"
       },
       aria: {
+        label: "アクセシビリティ",
         helpText: "アクセシビリティラベル"
       },
       performance: {
+        label: "パフォーマンス",
         helpText: "キャッシュと最適化設定"
       }
     }
@@ -590,48 +820,75 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "snake_case、一意"
       },
+      label: {
+        label: "表示名"
+      },
+      description: {
+        label: "説明"
+      },
+      version: {
+        label: "バージョン"
+      },
       icon: {
+        label: "アイコン",
         helpText: "Lucide アイコン名（例: \"users\", \"briefcase\"）"
       },
+      active: {
+        label: "有効"
+      },
       isDefault: {
+        label: "既定",
         helpText: "新規ユーザーの既定アプリにする"
       },
       navigation: {
+        label: "ナビゲーション",
         helpText: "ナビツリー — 再帰構造"
       },
       areas: {
+        label: "領域",
         helpText: "項目を折りたたみ可能なエリアにグループ化"
       },
       homePageId: {
+        label: "ホームページ ID",
         helpText: "アプリ起動時のランディングページ"
       },
       mobileNavigation: {
+        label: "モバイルナビゲーション",
         helpText: "モバイル用ボトムタブバー設定"
       },
       objects: {
+        label: "オブジェクト権限",
         helpText: "このアプリが公開するオブジェクト名"
       },
       apis: {
+        label: "API",
         helpText: "API エンドポイント定義"
       },
       defaultAgent: {
+        label: "既定エージェント",
         helpText: "常駐アシスタントボタン用 AI エージェント"
       },
       branding: {
+        label: "ブランド",
         helpText: "プライマリ/セカンダリカラー、ロゴ、テーマ"
       },
       requiredPermissions: {
+        label: "必要な権限",
         helpText: "このアプリへのアクセスに必要な権限"
       },
       sharing: {
+        label: "共有",
         helpText: "公開/内部/制限付きアクセス制御"
       },
       embed: {
+        label: "埋め込み",
         helpText: "iFrame 埋め込み設定"
       },
       aria: {
+        label: "アクセシビリティ",
         helpText: "アクセシビリティラベル"
       }
     }
@@ -658,72 +915,95 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "一意識別子（snake_case）"
       },
       label: {
+        label: "表示名",
         helpText: "ユーザーに表示するボタンテキスト"
       },
       objectName: {
+        label: "オブジェクト名",
         helpText: "このアクションが属するオブジェクト（任意）"
       },
       icon: {
+        label: "アイコン",
         helpText: "Lucide アイコン名（例: \"check\", \"x-circle\"）"
       },
       type: {
+        label: "型",
         helpText: "クリック時の動作"
       },
       variant: {
+        label: "ボタン種別",
         helpText: "ボタンスタイル（primary=blue, danger=red, ghost=transparent）"
       },
       target: {
+        label: "ターゲット",
         helpText: "呼び出す URL、フロー名、または API エンドポイント"
       },
       method: {
+        label: "メソッド",
         helpText: "HTTP メソッド（GET, POST, PUT, DELETE）"
       },
       body: {
+        label: "本文",
         helpText: "実行する JavaScript コード"
       },
       params: {
+        label: "パラメーター",
         helpText: "ユーザー入力パラメーター（実行前にフォームを表示）"
       },
       confirmText: {
+        label: "確認文",
         helpText: "確認メッセージ（例: \"Are you sure?\"）"
       },
       successMessage: {
+        label: "成功メッセージ",
         helpText: "完了後の成功メッセージ"
       },
       refreshAfter: {
+        label: "完了後に更新",
         helpText: "アクション完了後にリスト/ページを更新"
       },
       locations: {
+        label: "表示位置",
         helpText: "このアクションの表示場所（toolbar, row menu など）"
       },
       component: {
+        label: "コンポーネント",
         helpText: "レンダリング方法（button, icon, menu item）"
       },
       visible: {
+        label: "表示",
         helpText: "CEL 式: 条件が true の場合のみ表示"
       },
       disabled: {
+        label: "無効",
         helpText: "CEL 式: 条件が true の場合に無効化"
       },
       shortcut: {
+        label: "ショートカット",
         helpText: "キーボードショートカット（例: \"Ctrl+S\", \"Cmd+Enter\"）"
       },
       bulkEnabled: {
+        label: "一括操作有効",
         helpText: "選択した複数レコードへの適用を許可"
       },
       aiExposed: {
+        label: "AI に公開",
         helpText: "AI エージェントによるこのアクションの呼び出しを許可"
       },
       recordIdParam: {
+        label: "レコード ID パラメーター",
         helpText: "レコード ID 用 body パラメーター名"
       },
       recordIdField: {
+        label: "レコード ID フィールド",
         helpText: "レコード ID として使用するフィールド（既定: \"id\"）"
       },
       bodyShape: {
+        label: "本文構造",
         helpText: "リクエスト body 構造（flat または nested）"
       }
     }
@@ -758,36 +1038,53 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "snake_case の一意識別子"
       },
+      label: {
+        label: "表示名"
+      },
+      description: {
+        label: "説明"
+      },
       objectName: {
+        label: "オブジェクト名",
         helpText: "データソースオブジェクト"
       },
       type: {
+        label: "型",
         helpText: "レポート種別: tabular/summary/matrix/joined"
       },
       columns: {
+        label: "列",
         helpText: "レポートに表示する列"
       },
       groupingsDown: {
+        label: "縦グループ",
         helpText: "行グループ化レベル"
       },
       groupingsAcross: {
+        label: "横グループ",
         helpText: "列グループ化レベル（matrix のみ）"
       },
       blocks: {
+        label: "ブロック",
         helpText: "複数オブジェクトを結合（joined レポートのみ）"
       },
       filter: {
+        label: "フィルター",
         helpText: "レポートレベルのフィルター"
       },
       chart: {
+        label: "チャート",
         helpText: "チャート設定（type, legend, colors）"
       },
       aria: {
+        label: "アクセシビリティ",
         helpText: "アクセシビリティラベル"
       },
       performance: {
+        label: "パフォーマンス",
         helpText: "キャッシュと最適化"
       }
     }
@@ -810,39 +1107,51 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "一意識別子（snake_case）"
       },
       label: {
+        label: "表示名",
         helpText: "ユーザー向け表示名"
       },
       type: {
+        label: "型",
         helpText: "フローの開始方法（autolaunched, record_change, schedule, screen, api）"
       },
       template: {
+        label: "テンプレート",
         helpText: "再利用可能なサブフローか（他のフローから呼び出し可）"
       },
       description: {
+        label: "説明",
         helpText: "このフローの処理内容"
       },
       nodes: {
+        label: "ノード",
         helpText: "⚠️ JSON ではなく Flow Designer ビジュアルエディターの利用を検討"
       },
       edges: {
+        label: "エッジ",
         helpText: "ノード間の接続 — 編集しやすい Flow Designer を使用"
       },
       variables: {
+        label: "変数",
         helpText: "フロー変数（inputs/outputs）"
       },
       status: {
+        label: "状態",
         helpText: "デプロイ状態: draft → active → obsolete"
       },
       version: {
+        label: "バージョン",
         helpText: "バージョン番号（自動インクリメント）"
       },
       runAs: {
+        label: "実行主体",
         helpText: "system（admin）または user（現在のユーザー権限）として実行"
       },
       errorHandling: {
+        label: "エラー処理",
         helpText: "ノード失敗時の処理（fail, retry, continue）"
       }
     }
@@ -854,7 +1163,7 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     label: "データソース"
   },
   external_catalog: {
-    label: "External Catalog"
+    label: "外部カタログ"
   },
   translation: {
     label: "翻訳"
@@ -880,46 +1189,71 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
         description: "件名行。{{var.path}} 補間をサポート。"
       },
       html_body: {
-        label: "HTML body",
-        description: "Rich HTML body. Most clients strip <head>, so use inline styles."
+        label: "HTML 本文",
+        description: "リッチ HTML 本文。多くのクライアントは <head> を削除するため、インラインスタイルを使用してください。"
       },
       plain_text_body: {
-        label: "Plain-text body",
-        description: "Optional plain-text alternative. When omitted, the service strips tags from the HTML body to derive one. Providing one improves spam scoring."
+        label: "プレーンテキスト本文",
+        description: "任意のプレーンテキスト代替本文。省略時は HTML 本文からタグを除去して生成します。明示するとスパム判定の改善に役立ちます。"
       },
       variables: {
-        label: "Variables",
-        description: "Declared variables. Rendered as hints in Studio and validated by sendTemplate() when required."
+        label: "変数",
+        description: "宣言済み変数。Studio ではヒントとして表示され、必須時は sendTemplate() で検証されます。"
       },
       delivery_overrides: {
-        label: "Delivery overrides",
-        description: "Optional per-template overrides for From / Reply-To."
+        label: "配信オーバーライド",
+        description: "テンプレートごとの任意の From / Reply-To オーバーライド。"
       },
       status: {
-        label: "Status"
+        label: "状態"
       }
     },
     fields: {
       name: {
-        helpText: "Dotted snake_case (e.g. auth.password_reset, crm.welcome)"
+        label: "名前",
+        helpText: "ドット区切りの snake_case（例: auth.password_reset, crm.welcome）"
+      },
+      label: {
+        label: "表示名"
+      },
+      category: {
+        label: "カテゴリ"
       },
       locale: {
-        helpText: "BCP-47 tag — e.g. en-US, zh-CN"
+        label: "ロケール",
+        helpText: "BCP-47 タグ（例: en-US, zh-CN）"
+      },
+      description: {
+        label: "説明"
+      },
+      subject: {
+        label: "件名"
+      },
+      bodyHtml: {
+        label: "HTML 本文"
+      },
+      bodyText: {
+        label: "テキスト本文"
       },
       variables: {
+        label: "変数",
         helpText: "subject/body で参照する変数名リスト"
       },
       fromOverride: {
-        helpText: "{ \"name\": \"Acme Sales\", \"address\": \"sales@acme.com\" }"
+        label: "送信者オーバーライド",
+        helpText: "例: { \"name\": \"Acme Sales\", \"address\": \"sales@acme.com\" }"
       },
       replyTo: {
-        helpText: "Reply-To email address"
+        label: "返信先",
+        helpText: "Reply-To メールアドレス"
       },
       active: {
-        helpText: "When unchecked, sendTemplate() returns TEMPLATE_INACTIVE."
+        label: "有効",
+        helpText: "未チェックの場合、sendTemplate() は TEMPLATE_INACTIVE を返します。"
       },
       isSystem: {
-        helpText: "Built-in template; tenants may override but should not delete."
+        label: "システム組み込み",
+        helpText: "組み込みテンプレート。テナントは上書きできますが、削除すべきではありません。"
       }
     }
   },
@@ -945,30 +1279,39 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "マシン名（snake_case）"
       },
       label: {
+        label: "表示名",
         helpText: "管理者向け表示ラベル"
       },
       isProfile: {
+        label: "プロファイルか",
         helpText: "Profile = ユーザーに割り当てる基本セット。Permission Set = 追加権限。"
       },
       systemPermissions: {
+        label: "システム権限",
         helpText: "システム機能キーのリスト"
       },
       objects: {
-        helpText: "{ \"account\": { allowRead: true, allowEdit: true, ... } }"
+        label: "オブジェクト権限",
+        helpText: "例: { \"account\": { allowRead: true, allowEdit: true, ... } }"
       },
       fields: {
-        helpText: "{ \"account.amount\": { readable: true, editable: false } }"
+        label: "フィールド",
+        helpText: "例: { \"account.amount\": { readable: true, editable: false } }"
       },
       tabPermissions: {
-        helpText: "{ \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
+        label: "タブ権限",
+        helpText: "例: { \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
       },
       rowLevelSecurity: {
+        label: "行レベルセキュリティ",
         helpText: "RLS ポリシーの配列（rls.zod.ts 参照）"
       },
       contextVariables: {
+        label: "コンテキスト変数",
         helpText: "RLS 述語で参照するカスタム変数"
       }
     }
@@ -995,30 +1338,39 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "マシン名（snake_case）"
       },
       label: {
+        label: "表示名",
         helpText: "管理者向け表示ラベル"
       },
       isProfile: {
+        label: "プロファイルか",
         helpText: "Profile = ユーザーに割り当てる基本セット。Permission Set = 追加権限。"
       },
       systemPermissions: {
+        label: "システム権限",
         helpText: "システム機能キーのリスト"
       },
       objects: {
-        helpText: "{ \"account\": { allowRead: true, allowEdit: true, ... } }"
+        label: "オブジェクト権限",
+        helpText: "例: { \"account\": { allowRead: true, allowEdit: true, ... } }"
       },
       fields: {
-        helpText: "{ \"account.amount\": { readable: true, editable: false } }"
+        label: "フィールド",
+        helpText: "例: { \"account.amount\": { readable: true, editable: false } }"
       },
       tabPermissions: {
-        helpText: "{ \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
+        label: "タブ権限",
+        helpText: "例: { \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
       },
       rowLevelSecurity: {
+        label: "行レベルセキュリティ",
         helpText: "RLS ポリシーの配列（rls.zod.ts 参照）"
       },
       contextVariables: {
+        label: "コンテキスト変数",
         helpText: "RLS 述語で参照するカスタム変数"
       }
     }
@@ -1033,10 +1385,18 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
-        helpText: "snake_case"
+        label: "名前",
+        helpText: "snake_case 形式"
+      },
+      label: {
+        label: "表示名"
       },
       parent: {
+        label: "親",
         helpText: "親ロールのマシン名（Reports To）"
+      },
+      description: {
+        label: "説明"
       }
     }
   },
@@ -1062,57 +1422,75 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "一意識別子（snake_case）"
       },
       label: {
+        label: "表示名",
         helpText: "表示名（例: \"Sales Assistant\"）"
       },
       role: {
+        label: "ペルソナロール",
         helpText: "エージェントペルソナ（例: \"Customer Support Specialist\"）"
       },
       avatar: {
+        label: "アバター",
         helpText: "アバター画像 URL"
       },
       active: {
+        label: "有効",
         helpText: "このエージェントの有効/無効"
       },
       instructions: {
+        label: "指示",
         helpText: "システムプロンプト — エージェントの振る舞いと可能な操作を指定"
       },
       model: {
+        label: "モデル",
         helpText: "AI モデル設定（provider, model name, temperature など）"
       },
       planning: {
+        label: "計画",
         helpText: "自律推論設定（strategy, max iterations, replan）"
       },
       memory: {
+        label: "メモリ",
         helpText: "メモリ管理（short-term, long-term, reflection）"
       },
       lifecycle: {
+        label: "ライフサイクル",
         helpText: "会話フローを定義するステートマシン"
       },
       skills: {
+        label: "スキル",
         helpText: "スキル名（Agent→Skill→Tool アーキテクチャ）"
       },
       tools: {
+        label: "ツール",
         helpText: "直接ツール参照（レガシーモード）"
       },
       knowledge: {
+        label: "ナレッジ",
         helpText: "RAG ナレッジアクセス設定"
       },
       visibility: {
+        label: "可視範囲",
         helpText: "スコープ: global, organization, または private"
       },
       access: {
+        label: "アクセス",
         helpText: "このエージェントとチャット可能なユーザー ID またはロール名"
       },
       permissions: {
+        label: "権限",
         helpText: "このエージェントの使用に必要な権限"
       },
       tenantId: {
+        label: "テナント ID",
         helpText: "特定 organization ID に制限"
       },
       guardrails: {
+        label: "ガードレール",
         helpText: "安全ルールとコンテンツポリシー"
       }
     }
@@ -1135,36 +1513,47 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "一意識別子（snake_case）"
       },
       label: {
+        label: "表示名",
         helpText: "Studio UI 向け表示名"
       },
       description: {
+        label: "説明",
         helpText: "AI にこのツールの使用タイミングを指示 — 具体的に！"
       },
       category: {
+        label: "カテゴリ",
         helpText: "ツールカテゴリ（data, action, flow, integration など）"
       },
       objectName: {
+        label: "オブジェクト名",
         helpText: "関連オブジェクト（このツールが特定オブジェクトを扱う場合）"
       },
       active: {
+        label: "有効",
         helpText: "このツールの有効/無効"
       },
       builtIn: {
+        label: "組み込み",
         helpText: "プラットフォーム組み込みツール（ユーザー定義との対比）"
       },
       parameters: {
+        label: "パラメーター",
         helpText: "入力パラメーター — 次のようなプロパティを定義: {name: {type: \"string\", description: \"...\"}}"
       },
       outputSchema: {
+        label: "出力スキーマ",
         helpText: "検証用出力スキーマ（任意）"
       },
       requiresConfirmation: {
+        label: "確認が必要",
         helpText: "実行前にユーザー承認を求める（破壊的アクション用）"
       },
       permissions: {
+        label: "権限",
         helpText: "このツールの使用に必要な権限"
       }
     }
@@ -1191,30 +1580,39 @@ export const jaJPMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "名前",
         helpText: "一意識別子（snake_case）"
       },
       label: {
+        label: "表示名",
         helpText: "表示名（例: \"Case Management\"）"
       },
       description: {
+        label: "説明",
         helpText: "このスキルの処理内容"
       },
       active: {
+        label: "有効",
         helpText: "このスキルの有効/無効"
       },
       instructions: {
+        label: "指示",
         helpText: "AI への指示 — これらのツールを併用する方法を指定"
       },
       tools: {
+        label: "ツール",
         helpText: "ツール名（ワイルドカード対応: action_*）"
       },
       triggerPhrases: {
+        label: "トリガーフレーズ",
         helpText: "このスキルを起動する自然言語フレーズ"
       },
       triggerConditions: {
+        label: "トリガー条件",
         helpText: "プログラム条件（例: objectName == \"case\"）"
       },
       permissions: {
+        label: "権限",
         helpText: "このスキルの使用に必要な権限"
       }
     }

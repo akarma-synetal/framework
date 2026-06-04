@@ -159,6 +159,7 @@ describe('computeI18nCoverage', () => {
     const objectSources = new Set(['object', 'field', 'option', 'view', 'action', 'globalAction']);
     expect(report.issues.filter((i) => objectSources.has(i.source))).toEqual([]);
     expect(report.totals.expectedKeys).toBeGreaterThan(0); // metadataForms baseline
+    expect(report.issues.some((i) => i.key === 'metadataForms.flow.fields.name.label')).toBe(true);
   });
 
   it('treats data.object as fallback for view objectName', () => {

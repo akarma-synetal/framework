@@ -31,156 +31,246 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Identificador único snake_case (inmutable tras la creación)"
       },
       label: {
+        label: "Etiqueta",
         helpText: "Nombre mostrado en singular (p. ej. \"Account\")"
       },
       pluralLabel: {
+        label: "Etiqueta plural",
         helpText: "Nombre mostrado en plural (p. ej. \"Accounts\")"
       },
       icon: {
+        label: "Icono",
         helpText: "Nombre de icono Lucide (p. ej. \"building\", \"users\")"
       },
       description: {
+        label: "Descripción",
         helpText: "Documentación para desarrolladores"
       },
       tags: {
+        label: "Etiquetas",
         helpText: "Etiquetas de categorización (p. ej. \"sales\", \"system\")"
       },
       active: {
+        label: "Activo",
         helpText: "Indica si el objeto está activo y usable"
       },
       isSystem: {
+        label: "Integrado del sistema",
         helpText: "Objeto de sistema (protegido contra eliminación)"
       },
       abstract: {
+        label: "Abstracto",
         helpText: "Base abstracta (no se puede instanciar)"
       },
       fields: {
+        label: "Campos",
         helpText: "Añade las columnas que almacenará este objeto"
       },
       "fields.label": {
+        label: "Etiqueta",
         helpText: "Etiqueta mostrada"
       },
       "fields.type": {
+        label: "Tipo",
         helpText: "Tipo de campo"
       },
       "fields.description": {
-        helpText: "Developer documentation for this column"
+        label: "Descripción",
+        helpText: "Documentación para desarrolladores de esta columna"
       },
       "fields.required": {
-        helpText: "Must be set on every record"
+        label: "Obligatorio",
+        helpText: "Debe estar definido en cada registro"
       },
       "fields.unique": {
-        helpText: "Disallow duplicate values"
+        label: "Único",
+        helpText: "No permite valores duplicados"
       },
       "fields.indexed": {
-        helpText: "Create a database index for faster querying"
+        label: "Indexado",
+        helpText: "Crea un índice de base de datos para consultas más rápidas"
       },
       "fields.readonly": {
-        helpText: "Visible but never user-editable"
+        label: "Solo lectura",
+        helpText: "Visible, pero nunca editable por usuarios"
       },
       "fields.immutable": {
-        helpText: "Editable on create, locked thereafter"
+        label: "Inmutable",
+        helpText: "Editable al crear; bloqueado después"
       },
       "fields.hidden": {
-        helpText: "Hidden from default UI"
+        label: "Oculto",
+        helpText: "Oculto en la UI predeterminada"
       },
       "fields.searchable": {
-        helpText: "Include in full-text search"
+        label: "Buscable",
+        helpText: "Incluir en búsqueda de texto completo"
       },
       "fields.sortable": {
-        helpText: "Allow sorting on this column"
+        label: "Ordenable",
+        helpText: "Permitir ordenar por esta columna"
       },
       "fields.filterable": {
-        helpText: "Allow filtering on this column"
+        label: "Filtrable",
+        helpText: "Permitir filtrar por esta columna"
       },
       "fields.defaultValue": {
-        helpText: "Default value for new records (JSON literal)"
+        label: "Valor predeterminado",
+        helpText: "Valor predeterminado para registros nuevos (literal JSON)"
       },
       "fields.placeholder": {
-        helpText: "Placeholder hint"
+        label: "Marcador",
+        helpText: "Texto de marcador"
       },
       "fields.maxLength": {
-        helpText: "Max characters"
+        label: "Longitud máxima",
+        helpText: "Máximo de caracteres"
       },
       "fields.minLength": {
-        helpText: "Min characters"
+        label: "Longitud mínima",
+        helpText: "Mínimo de caracteres"
       },
       "fields.min": {
-        helpText: "Minimum value"
+        label: "Mínimo",
+        helpText: "Valor mínimo"
       },
       "fields.max": {
-        helpText: "Maximum value"
+        label: "Máximo",
+        helpText: "Valor máximo"
       },
       "fields.precision": {
-        helpText: "Total digits"
+        label: "Precisión",
+        helpText: "Total de dígitos"
       },
       "fields.scale": {
-        helpText: "Decimal places"
+        label: "Decimales",
+        helpText: "Decimales"
       },
       "fields.options": {
-        helpText: "Available choices"
+        label: "Opciones",
+        helpText: "Opciones disponibles"
+      },
+      "fields.options.label": {
+        label: "Etiqueta"
+      },
+      "fields.options.value": {
+        label: "Valor"
+      },
+      "fields.options.color": {
+        label: "Color de opción"
       },
       "fields.options.icon": {
-        helpText: "Lucide icon name"
+        label: "Icono",
+        helpText: "Nombre de icono Lucide"
+      },
+      "fields.options.description": {
+        label: "Descripción"
       },
       "fields.reference": {
+        label: "Referencia",
         helpText: "Objeto de destino (para lookup/master_detail)"
       },
       "fields.referenceFilter": {
-        helpText: "CEL filter applied to the picker"
+        label: "Filtro de referencia",
+        helpText: "Filtro CEL aplicado al selector"
       },
       "fields.cascadeDelete": {
-        helpText: "Delete children when parent is deleted"
+        label: "Eliminación en cascada",
+        helpText: "Eliminar registros hijos cuando se elimine el padre"
       },
       "fields.multiple": {
-        helpText: "Allow selecting multiple records"
+        label: "Selección múltiple",
+        helpText: "Permitir seleccionar varios registros"
       },
       "fields.formula": {
-        helpText: "CEL formula expression"
+        label: "Fórmula",
+        helpText: "Expresión de fórmula CEL"
       },
       "fields.returnType": {
-        helpText: "Result type for formulas"
+        label: "Tipo de retorno",
+        helpText: "Tipo de resultado para fórmulas"
       },
       "fields.summaryType": {
-        helpText: "Aggregation"
+        label: "Tipo de resumen",
+        helpText: "Agregación"
       },
       "fields.summaryField": {
-        helpText: "Field on child object to aggregate"
+        label: "Campo de resumen",
+        helpText: "Campo del objeto hijo que se agregará"
       },
       "fields.displayFormat": {
-        helpText: "e.g. \"INV-{0000}\""
+        label: "Formato de visualización",
+        helpText: "p. ej. \"INV-{0000}\""
       },
       "fields.startingNumber": {
-        helpText: "Starting sequence value"
+        label: "Número inicial",
+        helpText: "Valor inicial de la secuencia"
       },
       "fields.language": {
-        helpText: "Editor language (e.g. sql, javascript)"
+        label: "Idioma",
+        helpText: "Lenguaje del editor (p. ej. sql, javascript)"
       },
       "fields.validation": {
-        helpText: "CEL predicate — must evaluate true"
+        label: "Validación",
+        helpText: "Predicado CEL; debe evaluar a true"
       },
       "fields.errorMessage": {
-        helpText: "Shown when validation fails"
+        label: "Mensaje de error",
+        helpText: "Se muestra cuando falla la validación"
       },
       "fields.audit": {
-        helpText: "Audit changes to this field"
+        label: "Auditoría",
+        helpText: "Auditar cambios en este campo"
       },
       "fields.trackHistory": {
-        helpText: "Keep change history"
+        label: "Seguimiento de historial",
+        helpText: "Conservar historial de cambios"
       },
       "fields.pii": {
-        helpText: "Personally identifiable information"
+        label: "Información personal",
+        helpText: "Información de identificación personal"
       },
       "fields.encrypted": {
-        helpText: "Encrypt at rest"
+        label: "Cifrado",
+        helpText: "Cifrar en reposo"
       },
       capabilities: {
+        label: "Capacidades",
         helpText: "Activa/desactiva funciones del sistema"
       },
+      "capabilities.trackHistory": {
+        label: "Seguimiento de historial"
+      },
+      "capabilities.searchable": {
+        label: "Buscable"
+      },
+      "capabilities.apiEnabled": {
+        label: "API activada"
+      },
+      "capabilities.files": {
+        label: "Archivos"
+      },
+      "capabilities.feeds": {
+        label: "Feed de actividad"
+      },
+      "capabilities.activities": {
+        label: "Actividades"
+      },
+      "capabilities.trash": {
+        label: "Papelera"
+      },
+      "capabilities.mru": {
+        label: "Uso reciente"
+      },
+      "capabilities.clone": {
+        label: "Clonar"
+      },
       datasource: {
+        label: "Fuente de datos",
         helpText: "ID de fuente de datos de destino (valor predeterminado: \"default\")"
       }
     }
@@ -207,102 +297,135 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Identificador único (snake_case, inmutable tras la creación)"
       },
       label: {
+        label: "Etiqueta",
         helpText: "Nombre mostrado a los usuarios"
       },
       type: {
+        label: "Tipo",
         helpText: "Tipo de datos de este campo"
       },
       group: {
+        label: "Grupo",
         helpText: "Nombre de grupo para el diseño del formulario"
       },
       description: {
+        label: "Descripción",
         helpText: "Texto de ayuda mostrado a los usuarios"
       },
       required: {
+        label: "Obligatorio",
         helpText: "El usuario debe proporcionar un valor"
       },
       unique: {
+        label: "Único",
         helpText: "No puede haber dos registros con el mismo valor"
       },
       multiple: {
+        label: "Selección múltiple",
         helpText: "Permite varios valores (para select/lookup)"
       },
       defaultValue: {
+        label: "Valor predeterminado",
         helpText: "Valor predeterminado para registros nuevos"
       },
       minLength: {
+        label: "Longitud mínima",
         helpText: "Longitud mínima de caracteres"
       },
       maxLength: {
+        label: "Longitud máxima",
         helpText: "Longitud máxima de caracteres"
       },
       min: {
+        label: "Mínimo",
         helpText: "Valor mínimo"
       },
       max: {
+        label: "Máximo",
         helpText: "Valor máximo"
       },
       precision: {
+        label: "Precisión",
         helpText: "Decimales (p. ej., 2 para $10.50)"
       },
       scale: {
+        label: "Decimales",
         helpText: "Número de dígitos decimales"
       },
       options: {
+        label: "Opciones",
         helpText: "Opciones disponibles (pares label/value)"
       },
       reference: {
+        label: "Referencia",
         helpText: "Nombre del objeto referenciado"
       },
       referenceFilters: {
+        label: "Filtros de referencia",
         helpText: "Expresiones de filtro (p. ej., \"active = true\")"
       },
       deleteBehavior: {
+        label: "Comportamiento al eliminar",
         helpText: "Qué ocurre cuando se elimina el registro referenciado"
       },
       expression: {
+        label: "Expresión",
         helpText: "Expresión CEL para calcular este campo (lo hace de solo lectura)"
       },
       summaryOperations: {
+        label: "Operaciones de resumen",
         helpText: "Configuración de resumen roll-up (para relaciones padre-hijo)"
       },
       cached: {
+        label: "En caché",
         helpText: "Configuración de caché para campos calculados"
       },
       columnName: {
+        label: "Nombre de columna",
         helpText: "Nombre de columna física en la base de datos (por defecto, el nombre del campo)"
       },
       index: {
+        label: "Índice",
         helpText: "Crea un índice de base de datos para consultas más rápidas"
       },
       externalId: {
+        label: "ID externo",
         helpText: "Marca como ID externo para operaciones upsert"
       },
       readonly: {
+        label: "Solo lectura",
         helpText: "El campo es de solo lectura en formularios"
       },
       hidden: {
+        label: "Oculto",
         helpText: "Oculta el campo en las vistas UI predeterminadas"
       },
       searchable: {
+        label: "Buscable",
         helpText: "Incluye en los resultados de búsqueda global"
       },
       sortable: {
+        label: "Ordenable",
         helpText: "Permite ordenar listas por este campo"
       },
       auditTrail: {
+        label: "Rastro de auditoría",
         helpText: "Registra cambios detallados con usuario y marca temporal"
       },
       trackFeedHistory: {
+        label: "Historial de feed",
         helpText: "Muestra cambios en el feed de actividad"
       },
       encryptionConfig: {
+        label: "Configuración de cifrado",
         helpText: "Cifrado a nivel de campo (GDPR/HIPAA/PCI-DSS)"
       },
       maskingRule: {
+        label: "Regla de enmascaramiento",
         helpText: "Reglas de enmascaramiento de datos para protección de PII"
       }
     }
@@ -314,7 +437,7 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     label: "Regla de validación"
   },
   hook: {
-    label: "Hook",
+    label: "Gancho",
     sections: {
       identity: {
         label: "Identidad",
@@ -334,39 +457,60 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Identificador snake_case (inmutable tras la creación)"
       },
+      label: {
+        label: "Etiqueta"
+      },
+      description: {
+        label: "Descripción"
+      },
       object: {
+        label: "Objeto",
         helpText: "Nombre del objeto de destino (o \"*\" para global)"
       },
       events: {
+        label: "Eventos",
         helpText: "Eventos de ciclo de vida (p. ej. beforeInsert, afterUpdate)"
       },
       priority: {
+        label: "Prioridad",
         helpText: "Los números menores se ejecutan primero"
       },
       body: {
+        label: "Cuerpo",
         helpText: "Una expresión L1 o un body JS L2 en sandbox"
       },
       "body.language": {
+        label: "Idioma",
         helpText: "expression = fórmula pura; js = JavaScript en sandbox"
       },
       "body.source": {
+        label: "Código fuente",
         helpText: "Código fuente del body de la función — sin imports de nivel superior"
       },
       "body.capabilities": {
+        label: "Capacidades",
         helpText: "API ctx permitidas (api.read, api.write, crypto.uuid, log, …)"
       },
       "body.timeoutMs": {
+        label: "Tiempo de espera (ms)",
         helpText: "Tiempo de espera por invocación (ms)"
       },
       handler: {
+        label: "Manejador",
         helpText: "Nombre de función manejadora (obsoleto — preferir `body`)"
       },
       async: {
+        label: "Asíncrono",
         helpText: "Ejecutar en segundo plano, sin bloquear la transacción"
       },
+      onError: {
+        label: "Al error"
+      },
       condition: {
+        label: "Condición",
         helpText: "Fórmula opcional — omite el hook cuando evalúa a false"
       }
     }
@@ -387,7 +531,7 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
         description: "Opciones de visualización solo de cuadrícula."
       },
       kanban: {
-        label: "Kanban",
+        label: "Tablero Kanban",
         description: "Configuración de tablero específica de Kanban."
       },
       calendar: {
@@ -395,7 +539,7 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
         description: "Configuración específica de calendario."
       },
       gantt: {
-        label: "Gantt",
+        label: "Diagrama de Gantt",
         description: "Configuración específica de Gantt."
       },
       gallery: {
@@ -417,28 +561,87 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "snake_case, único por environment"
       },
+      label: {
+        label: "Etiqueta"
+      },
+      description: {
+        label: "Descripción"
+      },
       type: {
+        label: "Tipo",
         helpText: "Superficie principal de la vista"
       },
       data: {
+        label: "Datos",
         helpText: "Fuente de datos — p. ej. {\"provider\":\"object\",\"object\":\"task\"}"
       },
       columns: {
+        label: "Columnas",
         helpText: "Columnas que mostrar (nombres de campo del objeto seleccionado)"
       },
       filter: {
+        label: "Filtro",
         helpText: "Condiciones de filtro"
       },
       sort: {
+        label: "Orden",
         helpText: "Orden predeterminado"
       },
       searchableFields: {
+        label: "Campos buscables",
         helpText: "Nombres de campo disponibles para búsqueda rápida"
       },
       filterableFields: {
+        label: "Campos filtrables",
         helpText: "Nombres de campo disponibles para filtrado"
+      },
+      resizable: {
+        label: "Redimensionable"
+      },
+      striped: {
+        label: "Con franjas"
+      },
+      bordered: {
+        label: "Con borde"
+      },
+      compactToolbar: {
+        label: "Barra compacta"
+      },
+      rowHeight: {
+        label: "Altura de fila"
+      },
+      selection: {
+        label: "Selección"
+      },
+      pagination: {
+        label: "Paginación"
+      },
+      kanban: {
+        label: "Configuración Kanban"
+      },
+      calendar: {
+        label: "Calendario"
+      },
+      gantt: {
+        label: "Configuración Gantt"
+      },
+      gallery: {
+        label: "Galería"
+      },
+      timeline: {
+        label: "Cronología"
+      },
+      chart: {
+        label: "Gráfico"
+      },
+      navigation: {
+        label: "Navegación"
+      },
+      sharing: {
+        label: "Compartición"
       }
     }
   },
@@ -464,42 +667,55 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Identificador único (snake_case)"
       },
       label: {
+        label: "Etiqueta",
         helpText: "Título de página mostrado a los usuarios"
       },
       icon: {
+        label: "Icono",
         helpText: "Icono para el menú de navegación"
       },
       type: {
+        label: "Tipo",
         helpText: "Tipo de página (record, home, app, dashboard, etc.)"
       },
       template: {
+        label: "Plantilla",
         helpText: "Plantilla de diseño (p. ej., \"header-sidebar-main\")"
       },
       description: {
+        label: "Descripción",
         helpText: "Descripción de página para navegación"
       },
       object: {
+        label: "Objeto",
         helpText: "Objeto vinculado (para páginas Record)"
       },
       variables: {
+        label: "Variables de página",
         helpText: "Variables de estado local de página"
       },
       regions: {
+        label: "Regiones",
         helpText: "Regiones de diseño (header, main, sidebar, footer) con componentes"
       },
       isDefault: {
+        label: "Predeterminado",
         helpText: "Establece como página predeterminada para este tipo de página"
       },
       kind: {
+        label: "Modo",
         helpText: "Modo de anulación de página: full o slotted (para páginas record)"
       },
       assignedProfiles: {
+        label: "Perfiles asignados",
         helpText: "Perfiles que pueden acceder a esta página"
       },
       aria: {
+        label: "Accesibilidad",
         helpText: "Atributos de accesibilidad (etiquetas ARIA, roles)"
       }
     }
@@ -516,7 +732,7 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
         description: "Tamaño de cuadrícula y cadencia de actualización."
       },
       widgets: {
-        label: "Widgets",
+        label: "Widgets del panel",
         description: "Tarjetas y gráficos colocados en la cuadrícula."
       },
       filters: {
@@ -530,36 +746,50 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Identificador único snake_case"
       },
       label: {
+        label: "Etiqueta",
         helpText: "Nombre mostrado"
       },
+      description: {
+        label: "Descripción"
+      },
       columns: {
+        label: "Columnas",
         helpText: "Columnas de cuadrícula (predeterminado 12)"
       },
       gap: {
+        label: "Separación",
         helpText: "Separación de cuadrícula (unidades Tailwind)"
       },
       refreshInterval: {
+        label: "Intervalo de actualización",
         helpText: "Actualización automática (segundos)"
       },
       header: {
+        label: "Encabezado",
         helpText: "Configuración de cabecera del panel (title, subtitle, actions)"
       },
       widgets: {
+        label: "Widgets del panel",
         helpText: "Widgets del panel con posición y tamaño"
       },
       dateRange: {
+        label: "Rango de fechas",
         helpText: "Selector predeterminado de intervalo de fechas"
       },
       globalFilters: {
+        label: "Filtros globales",
         helpText: "Filtros aplicados a todos los widgets"
       },
       aria: {
+        label: "Accesibilidad",
         helpText: "Etiquetas de accesibilidad"
       },
       performance: {
+        label: "Rendimiento",
         helpText: "Configuración de caché y optimización"
       }
     }
@@ -590,48 +820,75 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "snake_case, único"
       },
+      label: {
+        label: "Etiqueta"
+      },
+      description: {
+        label: "Descripción"
+      },
+      version: {
+        label: "Versión"
+      },
       icon: {
+        label: "Icono",
         helpText: "Nombre de icono Lucide (p. ej. \"users\", \"briefcase\")"
       },
+      active: {
+        label: "Activo"
+      },
       isDefault: {
+        label: "Predeterminado",
         helpText: "Convierte esta app en la predeterminada para usuarios nuevos"
       },
       navigation: {
+        label: "Navegación",
         helpText: "Árbol de navegación — estructura recursiva"
       },
       areas: {
+        label: "Áreas",
         helpText: "Agrupa elementos en áreas plegables"
       },
       homePageId: {
+        label: "ID de página inicial",
         helpText: "Página de inicio al abrir la app"
       },
       mobileNavigation: {
+        label: "Navegación móvil",
         helpText: "Configuración de barra de pestañas inferior para móvil"
       },
       objects: {
+        label: "Permisos de objeto",
         helpText: "Nombres de objeto que expone esta app"
       },
       apis: {
+        label: "API",
         helpText: "Definiciones de endpoints API"
       },
       defaultAgent: {
+        label: "Agente predeterminado",
         helpText: "Agente de IA para el botón de asistente ambiental"
       },
       branding: {
+        label: "Marca",
         helpText: "Colores primario/secundario, logotipo, tema"
       },
       requiredPermissions: {
+        label: "Permisos requeridos",
         helpText: "Permisos necesarios para acceder a esta app"
       },
       sharing: {
+        label: "Compartición",
         helpText: "Control de acceso público/interno/restringido"
       },
       embed: {
+        label: "Incrustación",
         helpText: "Configuración de incrustación iFrame"
       },
       aria: {
+        label: "Accesibilidad",
         helpText: "Etiquetas de accesibilidad"
       }
     }
@@ -658,72 +915,95 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Identificador único (snake_case)"
       },
       label: {
+        label: "Etiqueta",
         helpText: "Texto de botón mostrado a los usuarios"
       },
       objectName: {
+        label: "Nombre de objeto",
         helpText: "Objeto al que pertenece esta acción (opcional)"
       },
       icon: {
+        label: "Icono",
         helpText: "Nombre de icono Lucide (p. ej., \"check\", \"x-circle\")"
       },
       type: {
+        label: "Tipo",
         helpText: "Qué ocurre al hacer clic"
       },
       variant: {
+        label: "Variante visual",
         helpText: "Estilo de botón (primary=blue, danger=red, ghost=transparent)"
       },
       target: {
+        label: "Destino",
         helpText: "URL, nombre de flujo o endpoint API que llamar"
       },
       method: {
+        label: "Método",
         helpText: "Método HTTP (GET, POST, PUT, DELETE)"
       },
       body: {
+        label: "Cuerpo",
         helpText: "Código JavaScript que ejecutar"
       },
       params: {
+        label: "Parámetros",
         helpText: "Parámetros de entrada de usuario (muestra el formulario antes de ejecutar)"
       },
       confirmText: {
+        label: "Texto de confirmación",
         helpText: "Mensaje de confirmación (p. ej., \"Are you sure?\")"
       },
       successMessage: {
+        label: "Mensaje de éxito",
         helpText: "Mensaje de éxito tras completar"
       },
       refreshAfter: {
+        label: "Actualizar después",
         helpText: "Actualiza la lista/página tras completar la acción"
       },
       locations: {
+        label: "Ubicaciones",
         helpText: "Dónde mostrar esta acción (toolbar, row menu, etc.)"
       },
       component: {
+        label: "Componente",
         helpText: "Cómo renderizar (button, icon, menu item)"
       },
       visible: {
+        label: "Condición de visibilidad",
         helpText: "Expresión CEL: mostrar solo cuando la condición sea true"
       },
       disabled: {
+        label: "Deshabilitado",
         helpText: "Expresión CEL: desactivar cuando la condición sea true"
       },
       shortcut: {
+        label: "Atajo",
         helpText: "Atajo de teclado (p. ej., \"Ctrl+S\", \"Cmd+Enter\")"
       },
       bulkEnabled: {
+        label: "Acción masiva",
         helpText: "Permite aplicar a varios registros seleccionados"
       },
       aiExposed: {
+        label: "Expuesto a IA",
         helpText: "Permite que agentes de IA llamen a esta acción"
       },
       recordIdParam: {
+        label: "Parámetro de ID de registro",
         helpText: "Nombre del parámetro body para ID de registro"
       },
       recordIdField: {
+        label: "Campo de ID de registro",
         helpText: "Campo que usar como ID de registro (valor predeterminado: \"id\")"
       },
       bodyShape: {
+        label: "Forma del cuerpo",
         helpText: "Estructura del cuerpo de solicitud (flat o nested)"
       }
     }
@@ -758,36 +1038,53 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Identificador único snake_case"
       },
+      label: {
+        label: "Etiqueta"
+      },
+      description: {
+        label: "Descripción"
+      },
       objectName: {
+        label: "Nombre de objeto",
         helpText: "Objeto de fuente de datos"
       },
       type: {
+        label: "Tipo",
         helpText: "Tipo de informe: tabular/summary/matrix/joined"
       },
       columns: {
+        label: "Columnas",
         helpText: "Columnas que mostrar en el informe"
       },
       groupingsDown: {
+        label: "Agrupaciones verticales",
         helpText: "Niveles de agrupación de filas"
       },
       groupingsAcross: {
+        label: "Agrupaciones horizontales",
         helpText: "Niveles de agrupación de columnas (solo matrix)"
       },
       blocks: {
+        label: "Bloques",
         helpText: "Une varios objetos (solo informe joined)"
       },
       filter: {
+        label: "Filtro",
         helpText: "Filtros a nivel de informe"
       },
       chart: {
+        label: "Gráfico",
         helpText: "Configuración de gráfico (type, legend, colors)"
       },
       aria: {
+        label: "Accesibilidad",
         helpText: "Etiquetas de accesibilidad"
       },
       performance: {
+        label: "Rendimiento",
         helpText: "Caché y optimización"
       }
     }
@@ -810,39 +1107,51 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Identificador único (snake_case)"
       },
       label: {
+        label: "Etiqueta",
         helpText: "Nombre mostrado a los usuarios"
       },
       type: {
+        label: "Tipo",
         helpText: "Cómo se inicia el flujo (autolaunched, record_change, schedule, screen, api)"
       },
       template: {
+        label: "Plantilla",
         helpText: "Indica si es un subflujo reutilizable (puede llamarse desde otros flujos)"
       },
       description: {
+        label: "Descripción",
         helpText: "Qué hace este flujo"
       },
       nodes: {
+        label: "Nodos",
         helpText: "⚠️ Considera usar el editor visual Flow Designer en lugar de JSON"
       },
       edges: {
+        label: "Conexiones",
         helpText: "Conexiones entre nodos — usa Flow Designer para editar más fácilmente"
       },
       variables: {
+        label: "Variables de flujo",
         helpText: "Variables de flujo (inputs/outputs)"
       },
       status: {
+        label: "Estado",
         helpText: "Estado de despliegue: draft → active → obsolete"
       },
       version: {
+        label: "Versión",
         helpText: "Número de versión (autoincrementado)"
       },
       runAs: {
+        label: "Ejecutar como",
         helpText: "Ejecutar como system (admin) o user (permisos del usuario actual)"
       },
       errorHandling: {
+        label: "Manejo de errores",
         helpText: "Qué hacer cuando falla un nodo (fail, retry, continue)"
       }
     }
@@ -854,7 +1163,7 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     label: "Fuente de datos"
   },
   external_catalog: {
-    label: "External Catalog"
+    label: "Catálogo externo"
   },
   translation: {
     label: "Traducción"
@@ -880,46 +1189,71 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
         description: "Línea de asunto. Admite interpolación {{var.path}}."
       },
       html_body: {
-        label: "HTML body",
-        description: "Rich HTML body. Most clients strip <head>, so use inline styles."
+        label: "Cuerpo HTML",
+        description: "Cuerpo HTML enriquecido. La mayoría de clientes elimina <head>, así que usa estilos en línea."
       },
       plain_text_body: {
-        label: "Plain-text body",
-        description: "Optional plain-text alternative. When omitted, the service strips tags from the HTML body to derive one. Providing one improves spam scoring."
+        label: "Cuerpo en texto plano",
+        description: "Alternativa opcional en texto plano. Si se omite, el servicio elimina etiquetas del HTML para derivarla; proporcionarla mejora la puntuación antispam."
       },
       variables: {
-        label: "Variables",
-        description: "Declared variables. Rendered as hints in Studio and validated by sendTemplate() when required."
+        label: "Variables declaradas",
+        description: "Variables declaradas. Studio las muestra como ayudas y sendTemplate() las valida cuando son obligatorias."
       },
       delivery_overrides: {
-        label: "Delivery overrides",
-        description: "Optional per-template overrides for From / Reply-To."
+        label: "Sobrescrituras de entrega",
+        description: "Sobrescrituras opcionales por plantilla para From / Reply-To."
       },
       status: {
-        label: "Status"
+        label: "Estado"
       }
     },
     fields: {
       name: {
-        helpText: "Dotted snake_case (e.g. auth.password_reset, crm.welcome)"
+        label: "Nombre",
+        helpText: "snake_case con puntos (p. ej. auth.password_reset, crm.welcome)"
+      },
+      label: {
+        label: "Etiqueta"
+      },
+      category: {
+        label: "Categoría"
       },
       locale: {
-        helpText: "BCP-47 tag — e.g. en-US, zh-CN"
+        label: "Configuración regional",
+        helpText: "Etiqueta BCP-47, p. ej. en-US, zh-CN"
+      },
+      description: {
+        label: "Descripción"
+      },
+      subject: {
+        label: "Asunto"
+      },
+      bodyHtml: {
+        label: "Cuerpo HTML"
+      },
+      bodyText: {
+        label: "Cuerpo de texto"
       },
       variables: {
+        label: "Variables de plantilla",
         helpText: "Lista de nombres de variable referenciados en subject/body"
       },
       fromOverride: {
-        helpText: "{ \"name\": \"Acme Sales\", \"address\": \"sales@acme.com\" }"
+        label: "Sobrescritura de remitente",
+        helpText: "Ejemplo: { \"name\": \"Acme Sales\", \"address\": \"sales@acme.com\" }"
       },
       replyTo: {
-        helpText: "Reply-To email address"
+        label: "Responder a",
+        helpText: "Dirección de email Reply-To"
       },
       active: {
-        helpText: "When unchecked, sendTemplate() returns TEMPLATE_INACTIVE."
+        label: "Activo",
+        helpText: "Si no está marcado, sendTemplate() devuelve TEMPLATE_INACTIVE."
       },
       isSystem: {
-        helpText: "Built-in template; tenants may override but should not delete."
+        label: "Integrado del sistema",
+        helpText: "Plantilla integrada; los tenants pueden sobrescribirla, pero no deberían eliminarla."
       }
     }
   },
@@ -945,30 +1279,39 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Nombre de máquina (snake_case)"
       },
       label: {
+        label: "Etiqueta",
         helpText: "Etiqueta mostrada para administradores"
       },
       isProfile: {
+        label: "Es perfil",
         helpText: "Profile = conjunto base asignado a usuarios. Permission Set = concesión adicional."
       },
       systemPermissions: {
+        label: "Permisos del sistema",
         helpText: "Lista de claves de capacidades del sistema"
       },
       objects: {
-        helpText: "{ \"account\": { allowRead: true, allowEdit: true, ... } }"
+        label: "Permisos de objeto",
+        helpText: "Ejemplo: { \"account\": { allowRead: true, allowEdit: true, ... } }"
       },
       fields: {
-        helpText: "{ \"account.amount\": { readable: true, editable: false } }"
+        label: "Campos",
+        helpText: "Ejemplo: { \"account.amount\": { readable: true, editable: false } }"
       },
       tabPermissions: {
-        helpText: "{ \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
+        label: "Permisos de pestaña",
+        helpText: "Ejemplo: { \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
       },
       rowLevelSecurity: {
+        label: "Seguridad a nivel de fila",
         helpText: "Array de políticas RLS (ver rls.zod.ts)"
       },
       contextVariables: {
+        label: "Variables de contexto",
         helpText: "Variables personalizadas referenciadas en predicados RLS"
       }
     }
@@ -995,30 +1338,39 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Nombre de máquina (snake_case)"
       },
       label: {
+        label: "Etiqueta",
         helpText: "Etiqueta mostrada para administradores"
       },
       isProfile: {
+        label: "Es perfil",
         helpText: "Profile = conjunto base asignado a usuarios. Permission Set = concesión adicional."
       },
       systemPermissions: {
+        label: "Permisos del sistema",
         helpText: "Lista de claves de capacidades del sistema"
       },
       objects: {
-        helpText: "{ \"account\": { allowRead: true, allowEdit: true, ... } }"
+        label: "Permisos de objeto",
+        helpText: "Ejemplo: { \"account\": { allowRead: true, allowEdit: true, ... } }"
       },
       fields: {
-        helpText: "{ \"account.amount\": { readable: true, editable: false } }"
+        label: "Campos",
+        helpText: "Ejemplo: { \"account.amount\": { readable: true, editable: false } }"
       },
       tabPermissions: {
-        helpText: "{ \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
+        label: "Permisos de pestaña",
+        helpText: "Ejemplo: { \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
       },
       rowLevelSecurity: {
+        label: "Seguridad a nivel de fila",
         helpText: "Array de políticas RLS (ver rls.zod.ts)"
       },
       contextVariables: {
+        label: "Variables de contexto",
         helpText: "Variables personalizadas referenciadas en predicados RLS"
       }
     }
@@ -1033,10 +1385,18 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
-        helpText: "snake_case"
+        label: "Nombre",
+        helpText: "Formato snake_case"
+      },
+      label: {
+        label: "Etiqueta"
       },
       parent: {
+        label: "Padre",
         helpText: "Nombre de máquina del rol padre (Reports To)"
+      },
+      description: {
+        label: "Descripción"
       }
     }
   },
@@ -1062,57 +1422,75 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Identificador único (snake_case)"
       },
       label: {
+        label: "Etiqueta",
         helpText: "Nombre mostrado (p. ej., \"Sales Assistant\")"
       },
       role: {
+        label: "Rol del agente",
         helpText: "Persona del agente (p. ej., \"Customer Support Specialist\")"
       },
       avatar: {
+        label: "Avatar del agente",
         helpText: "URL de imagen de avatar"
       },
       active: {
+        label: "Activo",
         helpText: "Activa/desactiva este agente"
       },
       instructions: {
+        label: "Instrucciones",
         helpText: "Prompt del sistema — indica al agente cómo comportarse y qué puede hacer"
       },
       model: {
+        label: "Modelo",
         helpText: "Configuración del modelo de IA (provider, model name, temperature, etc.)"
       },
       planning: {
+        label: "Planificación",
         helpText: "Configuración de razonamiento autónomo (strategy, max iterations, replan)"
       },
       memory: {
+        label: "Memoria",
         helpText: "Gestión de memoria (short-term, long-term, reflection)"
       },
       lifecycle: {
+        label: "Ciclo de vida",
         helpText: "Máquina de estado que define el flujo de conversación"
       },
       skills: {
+        label: "Habilidades",
         helpText: "Nombres de skill (arquitectura Agent→Skill→Tool)"
       },
       tools: {
+        label: "Herramientas",
         helpText: "Referencias directas a herramientas (modo heredado)"
       },
       knowledge: {
+        label: "Conocimiento",
         helpText: "Configuración de acceso a conocimiento RAG"
       },
       visibility: {
+        label: "Visibilidad",
         helpText: "Ámbito: global, organization o private"
       },
       access: {
+        label: "Acceso",
         helpText: "IDs de usuario o nombres de rol que pueden chatear con este agente"
       },
       permissions: {
+        label: "Permisos",
         helpText: "Permisos necesarios para usar este agente"
       },
       tenantId: {
+        label: "ID de tenant",
         helpText: "Restringe a un ID de organization específico"
       },
       guardrails: {
+        label: "Reglas de protección",
         helpText: "Reglas de seguridad y políticas de contenido"
       }
     }
@@ -1135,36 +1513,47 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Identificador único (snake_case)"
       },
       label: {
+        label: "Etiqueta",
         helpText: "Nombre mostrado para Studio UI"
       },
       description: {
+        label: "Descripción",
         helpText: "Indica a IA cuándo usar esta herramienta — sé específico."
       },
       category: {
+        label: "Categoría",
         helpText: "Categoría de herramienta (data, action, flow, integration, etc.)"
       },
       objectName: {
+        label: "Nombre de objeto",
         helpText: "Objeto relacionado (si esta herramienta opera sobre un objeto específico)"
       },
       active: {
+        label: "Activo",
         helpText: "Activa/desactiva esta herramienta"
       },
       builtIn: {
+        label: "Integrado",
         helpText: "Herramienta integrada de la plataforma (frente a definida por usuario)"
       },
       parameters: {
+        label: "Parámetros",
         helpText: "Parámetros de entrada — define propiedades como: {name: {type: \"string\", description: \"...\"}}"
       },
       outputSchema: {
+        label: "Esquema de salida",
         helpText: "Esquema de salida para validación (opcional)"
       },
       requiresConfirmation: {
+        label: "Requiere confirmación",
         helpText: "Pide aprobación al usuario antes de ejecutar (para acciones destructivas)"
       },
       permissions: {
+        label: "Permisos",
         helpText: "Permisos necesarios para usar esta herramienta"
       }
     }
@@ -1191,30 +1580,39 @@ export const esESMetadataForms: NonNullable<TranslationData['metadataForms']> = 
     },
     fields: {
       name: {
+        label: "Nombre",
         helpText: "Identificador único (snake_case)"
       },
       label: {
+        label: "Etiqueta",
         helpText: "Nombre mostrado (p. ej., \"Case Management\")"
       },
       description: {
+        label: "Descripción",
         helpText: "Qué hace esta skill"
       },
       active: {
+        label: "Activo",
         helpText: "Activa/desactiva esta skill"
       },
       instructions: {
+        label: "Instrucciones",
         helpText: "Instrucciones para IA — indica cómo usar estas herramientas juntas"
       },
       tools: {
+        label: "Herramientas",
         helpText: "Nombres de herramienta (admite comodín: action_*)"
       },
       triggerPhrases: {
+        label: "Frases disparadoras",
         helpText: "Frases de lenguaje natural que activan esta skill"
       },
       triggerConditions: {
+        label: "Condiciones disparadoras",
         helpText: "Condiciones programáticas (p. ej., objectName == \"case\")"
       },
       permissions: {
+        label: "Permisos",
         helpText: "Permisos necesarios para usar esta skill"
       }
     }

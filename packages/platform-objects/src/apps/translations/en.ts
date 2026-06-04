@@ -108,6 +108,7 @@ export const en: TranslationData = {
       navigation: {
         group_overview: { label: 'Overview' },
         nav_metadata_directory: { label: 'All Metadata Types' },
+        nav_packages: { label: 'Packages' },
         group_data_model: { label: 'Data Model' },
         nav_objects: { label: 'Objects' },
         nav_validations: { label: 'Validations' },

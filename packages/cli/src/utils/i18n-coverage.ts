@@ -259,9 +259,7 @@ function walkMetadataFormField(field: any, type: string, parentPath: string, out
   const name = typeof field.field === 'string' ? field.field : undefined;
   const path = name ? (parentPath ? `${parentPath}.${name}` : name) : parentPath;
   if (path) {
-    if (typeof field.label === 'string' && field.label.length > 0) {
-      pushKey(out, ['metadataForms', type, 'fields', path, 'label'], 'metadataForm', `Metadata form ${type}.fields.${path} label`);
-    }
+    pushKey(out, ['metadataForms', type, 'fields', path, 'label'], 'metadataForm', `Metadata form ${type}.fields.${path} label`);
     if (typeof field.helpText === 'string' && field.helpText.length > 0) {
       pushKey(out, ['metadataForms', type, 'fields', path, 'helpText'], 'metadataForm', `Metadata form ${type}.fields.${path} helpText`);
     }
