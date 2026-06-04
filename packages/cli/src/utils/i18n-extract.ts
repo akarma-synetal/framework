@@ -356,9 +356,10 @@ function walkFormField(field: any, type: string, parentPath: string, out: Expect
   const name = typeof field.field === 'string' ? field.field : undefined;
   const path = name ? (parentPath ? `${parentPath}.${name}` : name) : parentPath;
   if (path) {
-    if (typeof field.label === 'string' && field.label.length > 0) {
-      pushEntry(out, ['metadataForms', type, 'fields', path, 'label'], field.label, 'metadataFormField', { metadataType: type });
-    }
+    const label = typeof field.label === 'string' && field.label.length > 0
+      ? field.label
+      : humanizeFieldPath(path);
+    pushEntry(out, ['metadataForms', type, 'fields', path, 'label'], label, 'metadataFormField', { metadataType: type });
     if (typeof field.helpText === 'string' && field.helpText.length > 0) {
       pushEntry(out, ['metadataForms', type, 'fields', path, 'helpText'], field.helpText, 'metadataFormField', { metadataType: type });
     }
@@ -369,6 +370,15 @@ function walkFormField(field: any, type: string, parentPath: string, out: Expect
   if (Array.isArray(field.fields)) {
     for (const child of field.fields) walkFormField(child, type, path, out);
   }
+}
+
+/** Match the metadata form renderer's fallback label for fields without an explicit label. */
+function humanizeFieldPath(path: string): string {
+  const leaf = path.split('.').pop() ?? path;
+  return leaf
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**

@@ -80,6 +80,7 @@ describe('collectExpectedEntries', () => {
     expect(paths).toContain('objects.sys_role._actions.merge.successMessage');
     expect(paths).toContain('globalActions.export_csv.label');
     expect(paths).toContain('globalActions.export_csv.successMessage');
+    expect(paths).toContain('metadataForms.flow.fields.name.label');
   });
 
   it('carries source values from the schema', () => {
@@ -89,6 +90,7 @@ describe('collectExpectedEntries', () => {
     expect(byPath['objects.sys_role.fields.status.options.on']).toBe('On');
     expect(byPath['objects.sys_role.fields.kind.options.internal']).toBe('Internal');
     expect(byPath['objects.sys_role._actions.merge.label']).toBe('Merge');
+    expect(byPath['metadataForms.flow.fields.name.label']).toBe('Name');
   });
 });
 

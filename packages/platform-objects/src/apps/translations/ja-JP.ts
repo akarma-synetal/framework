@@ -85,6 +85,7 @@ export const jaJP: TranslationData = {
       navigation: {
         group_overview: { label: '概要' },
         nav_metadata_directory: { label: 'すべてのメタデータタイプ' },
+        nav_packages: { label: 'パッケージ' },
         group_data_model: { label: 'データモデル' },
         nav_objects: { label: 'オブジェクト' },
         nav_validations: { label: 'バリデーション' },

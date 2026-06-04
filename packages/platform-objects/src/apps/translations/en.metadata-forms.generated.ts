@@ -31,156 +31,246 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "snake_case unique identifier (immutable after creation)"
       },
       label: {
+        label: "Label",
         helpText: "Singular display name (e.g. \"Account\")"
       },
       pluralLabel: {
+        label: "Plural Label",
         helpText: "Plural display name (e.g. \"Accounts\")"
       },
       icon: {
+        label: "Icon",
         helpText: "Lucide icon name (e.g. \"building\", \"users\")"
       },
       description: {
+        label: "Description",
         helpText: "Developer documentation"
       },
       tags: {
+        label: "Tags",
         helpText: "Categorization tags (e.g. \"sales\", \"system\")"
       },
       active: {
+        label: "Active",
         helpText: "Is the object active and usable"
       },
       isSystem: {
+        label: "Is System",
         helpText: "System object (protected from deletion)"
       },
       abstract: {
+        label: "Abstract",
         helpText: "Abstract base (cannot be instantiated)"
       },
       fields: {
+        label: "Fields",
         helpText: "Add the columns this object will store"
       },
       "fields.label": {
+        label: "Label",
         helpText: "Display label"
       },
       "fields.type": {
+        label: "Type",
         helpText: "Field type"
       },
       "fields.description": {
+        label: "Description",
         helpText: "Developer documentation for this column"
       },
       "fields.required": {
+        label: "Required",
         helpText: "Must be set on every record"
       },
       "fields.unique": {
+        label: "Unique",
         helpText: "Disallow duplicate values"
       },
       "fields.indexed": {
+        label: "Indexed",
         helpText: "Create a database index for faster querying"
       },
       "fields.readonly": {
+        label: "Readonly",
         helpText: "Visible but never user-editable"
       },
       "fields.immutable": {
+        label: "Immutable",
         helpText: "Editable on create, locked thereafter"
       },
       "fields.hidden": {
+        label: "Hidden",
         helpText: "Hidden from default UI"
       },
       "fields.searchable": {
+        label: "Searchable",
         helpText: "Include in full-text search"
       },
       "fields.sortable": {
+        label: "Sortable",
         helpText: "Allow sorting on this column"
       },
       "fields.filterable": {
+        label: "Filterable",
         helpText: "Allow filtering on this column"
       },
       "fields.defaultValue": {
+        label: "Default Value",
         helpText: "Default value for new records (JSON literal)"
       },
       "fields.placeholder": {
+        label: "Placeholder",
         helpText: "Placeholder hint"
       },
       "fields.maxLength": {
+        label: "Max Length",
         helpText: "Max characters"
       },
       "fields.minLength": {
+        label: "Min Length",
         helpText: "Min characters"
       },
       "fields.min": {
+        label: "Min",
         helpText: "Minimum value"
       },
       "fields.max": {
+        label: "Max",
         helpText: "Maximum value"
       },
       "fields.precision": {
+        label: "Precision",
         helpText: "Total digits"
       },
       "fields.scale": {
+        label: "Scale",
         helpText: "Decimal places"
       },
       "fields.options": {
+        label: "Options",
         helpText: "Available choices"
       },
+      "fields.options.label": {
+        label: "Label"
+      },
+      "fields.options.value": {
+        label: "Value"
+      },
+      "fields.options.color": {
+        label: "Color"
+      },
       "fields.options.icon": {
+        label: "Icon",
         helpText: "Lucide icon name"
       },
+      "fields.options.description": {
+        label: "Description"
+      },
       "fields.reference": {
+        label: "Reference",
         helpText: "Target object (for lookup/master_detail)"
       },
       "fields.referenceFilter": {
+        label: "Reference Filter",
         helpText: "CEL filter applied to the picker"
       },
       "fields.cascadeDelete": {
+        label: "Cascade Delete",
         helpText: "Delete children when parent is deleted"
       },
       "fields.multiple": {
+        label: "Multiple",
         helpText: "Allow selecting multiple records"
       },
       "fields.formula": {
+        label: "Formula",
         helpText: "CEL formula expression"
       },
       "fields.returnType": {
+        label: "Return Type",
         helpText: "Result type for formulas"
       },
       "fields.summaryType": {
+        label: "Summary Type",
         helpText: "Aggregation"
       },
       "fields.summaryField": {
+        label: "Summary Field",
         helpText: "Field on child object to aggregate"
       },
       "fields.displayFormat": {
+        label: "Display Format",
         helpText: "e.g. \"INV-{0000}\""
       },
       "fields.startingNumber": {
+        label: "Starting Number",
         helpText: "Starting sequence value"
       },
       "fields.language": {
+        label: "Language",
         helpText: "Editor language (e.g. sql, javascript)"
       },
       "fields.validation": {
+        label: "Validation",
         helpText: "CEL predicate — must evaluate true"
       },
       "fields.errorMessage": {
+        label: "Error Message",
         helpText: "Shown when validation fails"
       },
       "fields.audit": {
+        label: "Audit",
         helpText: "Audit changes to this field"
       },
       "fields.trackHistory": {
+        label: "Track History",
         helpText: "Keep change history"
       },
       "fields.pii": {
+        label: "Pii",
         helpText: "Personally identifiable information"
       },
       "fields.encrypted": {
+        label: "Encrypted",
         helpText: "Encrypt at rest"
       },
       capabilities: {
+        label: "Capabilities",
         helpText: "Enable/disable system features"
       },
+      "capabilities.trackHistory": {
+        label: "Track History"
+      },
+      "capabilities.searchable": {
+        label: "Searchable"
+      },
+      "capabilities.apiEnabled": {
+        label: "Api Enabled"
+      },
+      "capabilities.files": {
+        label: "Files"
+      },
+      "capabilities.feeds": {
+        label: "Feeds"
+      },
+      "capabilities.activities": {
+        label: "Activities"
+      },
+      "capabilities.trash": {
+        label: "Trash"
+      },
+      "capabilities.mru": {
+        label: "Mru"
+      },
+      "capabilities.clone": {
+        label: "Clone"
+      },
       datasource: {
+        label: "Datasource",
         helpText: "Target datasource ID (default: \"default\")"
       }
     }
@@ -207,102 +297,135 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "Unique identifier (snake_case, immutable after creation)"
       },
       label: {
+        label: "Label",
         helpText: "Display name for users"
       },
       type: {
+        label: "Type",
         helpText: "Data type of this field"
       },
       group: {
+        label: "Group",
         helpText: "Group name for form layout"
       },
       description: {
+        label: "Description",
         helpText: "Help text shown to users"
       },
       required: {
+        label: "Required",
         helpText: "User must provide a value"
       },
       unique: {
+        label: "Unique",
         helpText: "No two records can have the same value"
       },
       multiple: {
+        label: "Multiple",
         helpText: "Allow multiple values (for select/lookup)"
       },
       defaultValue: {
+        label: "Default Value",
         helpText: "Default value for new records"
       },
       minLength: {
+        label: "Min Length",
         helpText: "Minimum character length"
       },
       maxLength: {
+        label: "Max Length",
         helpText: "Maximum character length"
       },
       min: {
+        label: "Min",
         helpText: "Minimum value"
       },
       max: {
+        label: "Max",
         helpText: "Maximum value"
       },
       precision: {
+        label: "Precision",
         helpText: "Decimal places (e.g., 2 for $10.50)"
       },
       scale: {
+        label: "Scale",
         helpText: "Number of decimal digits"
       },
       options: {
+        label: "Options",
         helpText: "Available options (label/value pairs)"
       },
       reference: {
+        label: "Reference",
         helpText: "Referenced object name"
       },
       referenceFilters: {
+        label: "Reference Filters",
         helpText: "Filter expressions (e.g., \"active = true\")"
       },
       deleteBehavior: {
+        label: "Delete Behavior",
         helpText: "What happens when referenced record is deleted"
       },
       expression: {
+        label: "Expression",
         helpText: "CEL expression to calculate this field (makes it read-only)"
       },
       summaryOperations: {
+        label: "Summary Operations",
         helpText: "Roll-up summary configuration (for parent-child relationships)"
       },
       cached: {
+        label: "Cached",
         helpText: "Caching configuration for computed fields"
       },
       columnName: {
+        label: "Column Name",
         helpText: "Physical column name in database (defaults to field name)"
       },
       index: {
+        label: "Index",
         helpText: "Create database index for faster queries"
       },
       externalId: {
+        label: "External Id",
         helpText: "Mark as external ID for upsert operations"
       },
       readonly: {
+        label: "Readonly",
         helpText: "Field is read-only in forms"
       },
       hidden: {
+        label: "Hidden",
         helpText: "Hide field from default UI views"
       },
       searchable: {
+        label: "Searchable",
         helpText: "Include in global search results"
       },
       sortable: {
+        label: "Sortable",
         helpText: "Allow sorting lists by this field"
       },
       auditTrail: {
+        label: "Audit Trail",
         helpText: "Track detailed changes with user and timestamp"
       },
       trackFeedHistory: {
+        label: "Track Feed History",
         helpText: "Show changes in activity feed"
       },
       encryptionConfig: {
+        label: "Encryption Config",
         helpText: "Field-level encryption (GDPR/HIPAA/PCI-DSS)"
       },
       maskingRule: {
+        label: "Masking Rule",
         helpText: "Data masking rules for PII protection"
       }
     }
@@ -334,39 +457,60 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "snake_case identifier (immutable after creation)"
       },
+      label: {
+        label: "Label"
+      },
+      description: {
+        label: "Description"
+      },
       object: {
+        label: "Object",
         helpText: "Target object name (or \"*\" for global)"
       },
       events: {
+        label: "Events",
         helpText: "Lifecycle events (e.g. beforeInsert, afterUpdate)"
       },
       priority: {
+        label: "Priority",
         helpText: "Lower numbers run first"
       },
       body: {
+        label: "Body",
         helpText: "Either an L1 expression or an L2 sandboxed JS body"
       },
       "body.language": {
+        label: "Language",
         helpText: "expression = pure formula; js = sandboxed JavaScript"
       },
       "body.source": {
+        label: "Source",
         helpText: "Function body source — no top-level imports"
       },
       "body.capabilities": {
+        label: "Capabilities",
         helpText: "Allowed ctx APIs (api.read, api.write, crypto.uuid, log, …)"
       },
       "body.timeoutMs": {
+        label: "Timeout Ms",
         helpText: "Per-invocation timeout (ms)"
       },
       handler: {
+        label: "Handler",
         helpText: "Handler function name (deprecated — prefer `body`)"
       },
       async: {
+        label: "Async",
         helpText: "Run in background, do not block the transaction"
       },
+      onError: {
+        label: "On Error"
+      },
       condition: {
+        label: "Condition",
         helpText: "Optional formula — skip the hook when this evaluates to false"
       }
     }
@@ -417,28 +561,87 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "snake_case, unique per environment"
       },
+      label: {
+        label: "Label"
+      },
+      description: {
+        label: "Description"
+      },
       type: {
+        label: "Type",
         helpText: "Primary view surface"
       },
       data: {
+        label: "Data",
         helpText: "Data source — e.g. {\"provider\":\"object\",\"object\":\"task\"}"
       },
       columns: {
+        label: "Columns",
         helpText: "Columns to display (field names from selected object)"
       },
       filter: {
+        label: "Filter",
         helpText: "Filter conditions"
       },
       sort: {
+        label: "Sort",
         helpText: "Default sort order"
       },
       searchableFields: {
+        label: "Searchable Fields",
         helpText: "Field names available for quick search"
       },
       filterableFields: {
+        label: "Filterable Fields",
         helpText: "Field names available for filtering"
+      },
+      resizable: {
+        label: "Resizable"
+      },
+      striped: {
+        label: "Striped"
+      },
+      bordered: {
+        label: "Bordered"
+      },
+      compactToolbar: {
+        label: "Compact Toolbar"
+      },
+      rowHeight: {
+        label: "Row Height"
+      },
+      selection: {
+        label: "Selection"
+      },
+      pagination: {
+        label: "Pagination"
+      },
+      kanban: {
+        label: "Kanban"
+      },
+      calendar: {
+        label: "Calendar"
+      },
+      gantt: {
+        label: "Gantt"
+      },
+      gallery: {
+        label: "Gallery"
+      },
+      timeline: {
+        label: "Timeline"
+      },
+      chart: {
+        label: "Chart"
+      },
+      navigation: {
+        label: "Navigation"
+      },
+      sharing: {
+        label: "Sharing"
       }
     }
   },
@@ -464,42 +667,55 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "Unique identifier (snake_case)"
       },
       label: {
+        label: "Label",
         helpText: "Page title shown to users"
       },
       icon: {
+        label: "Icon",
         helpText: "Icon for navigation menu"
       },
       type: {
+        label: "Type",
         helpText: "Page type (record, home, app, dashboard, etc.)"
       },
       template: {
+        label: "Template",
         helpText: "Layout template (e.g., \"header-sidebar-main\")"
       },
       description: {
+        label: "Description",
         helpText: "Page description for navigation"
       },
       object: {
+        label: "Object",
         helpText: "Bound object (for Record pages)"
       },
       variables: {
+        label: "Variables",
         helpText: "Local page state variables"
       },
       regions: {
+        label: "Regions",
         helpText: "Layout regions (header, main, sidebar, footer) with components"
       },
       isDefault: {
+        label: "Is Default",
         helpText: "Set as default page for this page type"
       },
       kind: {
+        label: "Kind",
         helpText: "Page override mode: full or slotted (for record pages)"
       },
       assignedProfiles: {
+        label: "Assigned Profiles",
         helpText: "Profiles that can access this page"
       },
       aria: {
+        label: "Aria",
         helpText: "Accessibility attributes (ARIA labels, roles)"
       }
     }
@@ -530,36 +746,50 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "snake_case unique identifier"
       },
       label: {
+        label: "Label",
         helpText: "Display name"
       },
+      description: {
+        label: "Description"
+      },
       columns: {
+        label: "Columns",
         helpText: "Grid columns (default 12)"
       },
       gap: {
+        label: "Gap",
         helpText: "Grid gap (Tailwind units)"
       },
       refreshInterval: {
+        label: "Refresh Interval",
         helpText: "Auto-refresh (seconds)"
       },
       header: {
+        label: "Header",
         helpText: "Dashboard header config (title, subtitle, actions)"
       },
       widgets: {
+        label: "Widgets",
         helpText: "Dashboard widgets with position and sizing"
       },
       dateRange: {
+        label: "Date Range",
         helpText: "Default date range selector"
       },
       globalFilters: {
+        label: "Global Filters",
         helpText: "Filters applied to all widgets"
       },
       aria: {
+        label: "Aria",
         helpText: "Accessibility labels"
       },
       performance: {
+        label: "Performance",
         helpText: "Caching and optimization config"
       }
     }
@@ -590,48 +820,75 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "snake_case, unique"
       },
+      label: {
+        label: "Label"
+      },
+      description: {
+        label: "Description"
+      },
+      version: {
+        label: "Version"
+      },
       icon: {
+        label: "Icon",
         helpText: "Lucide icon name (e.g. \"users\", \"briefcase\")"
       },
+      active: {
+        label: "Active"
+      },
       isDefault: {
+        label: "Is Default",
         helpText: "Make this the default app for new users"
       },
       navigation: {
+        label: "Navigation",
         helpText: "Nav tree — recursive structure"
       },
       areas: {
+        label: "Areas",
         helpText: "Group items into collapsible areas"
       },
       homePageId: {
+        label: "Home Page Id",
         helpText: "Landing page when app opens"
       },
       mobileNavigation: {
+        label: "Mobile Navigation",
         helpText: "Bottom tab bar config for mobile"
       },
       objects: {
+        label: "Objects",
         helpText: "Object names this app exposes"
       },
       apis: {
+        label: "Apis",
         helpText: "API endpoint definitions"
       },
       defaultAgent: {
+        label: "Default Agent",
         helpText: "AI agent for the ambient assistant button"
       },
       branding: {
+        label: "Branding",
         helpText: "Primary/secondary colors, logo, theme"
       },
       requiredPermissions: {
+        label: "Required Permissions",
         helpText: "Permissions needed to access this app"
       },
       sharing: {
+        label: "Sharing",
         helpText: "Public/internal/restricted access control"
       },
       embed: {
+        label: "Embed",
         helpText: "iFrame embed configuration"
       },
       aria: {
+        label: "Aria",
         helpText: "Accessibility labels"
       }
     }
@@ -658,72 +915,95 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "Unique identifier (snake_case)"
       },
       label: {
+        label: "Label",
         helpText: "Button text shown to users"
       },
       objectName: {
+        label: "Object Name",
         helpText: "Object this action belongs to (optional)"
       },
       icon: {
+        label: "Icon",
         helpText: "Lucide icon name (e.g., \"check\", \"x-circle\")"
       },
       type: {
+        label: "Type",
         helpText: "What happens when clicked"
       },
       variant: {
+        label: "Variant",
         helpText: "Button style (primary=blue, danger=red, ghost=transparent)"
       },
       target: {
+        label: "Target",
         helpText: "URL, flow name, or API endpoint to call"
       },
       method: {
+        label: "Method",
         helpText: "HTTP method (GET, POST, PUT, DELETE)"
       },
       body: {
+        label: "Body",
         helpText: "JavaScript code to execute"
       },
       params: {
+        label: "Params",
         helpText: "User input parameters (show form before executing)"
       },
       confirmText: {
+        label: "Confirm Text",
         helpText: "Confirmation message (e.g., \"Are you sure?\")"
       },
       successMessage: {
+        label: "Success Message",
         helpText: "Success message after completion"
       },
       refreshAfter: {
+        label: "Refresh After",
         helpText: "Refresh the list/page after action completes"
       },
       locations: {
+        label: "Locations",
         helpText: "Where to show this action (toolbar, row menu, etc.)"
       },
       component: {
+        label: "Component",
         helpText: "How to render (button, icon, menu item)"
       },
       visible: {
+        label: "Visible",
         helpText: "CEL expression: show only when condition is true"
       },
       disabled: {
+        label: "Disabled",
         helpText: "CEL expression: disable when condition is true"
       },
       shortcut: {
+        label: "Shortcut",
         helpText: "Keyboard shortcut (e.g., \"Ctrl+S\", \"Cmd+Enter\")"
       },
       bulkEnabled: {
+        label: "Bulk Enabled",
         helpText: "Allow applying to multiple selected records"
       },
       aiExposed: {
+        label: "Ai Exposed",
         helpText: "Allow AI agents to call this action"
       },
       recordIdParam: {
+        label: "Record Id Param",
         helpText: "Body parameter name for record ID"
       },
       recordIdField: {
+        label: "Record Id Field",
         helpText: "Field to use as record ID (default: \"id\")"
       },
       bodyShape: {
+        label: "Body Shape",
         helpText: "Request body structure (flat or nested)"
       }
     }
@@ -758,36 +1038,53 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "snake_case unique identifier"
       },
+      label: {
+        label: "Label"
+      },
+      description: {
+        label: "Description"
+      },
       objectName: {
+        label: "Object Name",
         helpText: "Data source object"
       },
       type: {
+        label: "Type",
         helpText: "Report type: tabular/summary/matrix/joined"
       },
       columns: {
+        label: "Columns",
         helpText: "Columns to display in the report"
       },
       groupingsDown: {
+        label: "Groupings Down",
         helpText: "Row grouping levels"
       },
       groupingsAcross: {
+        label: "Groupings Across",
         helpText: "Column grouping levels (matrix only)"
       },
       blocks: {
+        label: "Blocks",
         helpText: "Join multiple objects (joined report only)"
       },
       filter: {
+        label: "Filter",
         helpText: "Report-level filters"
       },
       chart: {
+        label: "Chart",
         helpText: "Chart config (type, legend, colors)"
       },
       aria: {
+        label: "Aria",
         helpText: "Accessibility labels"
       },
       performance: {
+        label: "Performance",
         helpText: "Caching and optimization"
       }
     }
@@ -810,39 +1107,51 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "Unique identifier (snake_case)"
       },
       label: {
+        label: "Label",
         helpText: "Display name for users"
       },
       type: {
+        label: "Type",
         helpText: "How the flow starts (autolaunched, record_change, schedule, screen, api)"
       },
       template: {
+        label: "Template",
         helpText: "Is this a reusable subflow (can be called from other flows)"
       },
       description: {
+        label: "Description",
         helpText: "What this flow does"
       },
       nodes: {
+        label: "Nodes",
         helpText: "⚠️ Consider using Flow Designer visual editor instead of JSON"
       },
       edges: {
+        label: "Edges",
         helpText: "Connections between nodes — use Flow Designer for easier editing"
       },
       variables: {
+        label: "Variables",
         helpText: "Flow variables (inputs/outputs)"
       },
       status: {
+        label: "Status",
         helpText: "Deployment status: draft → active → obsolete"
       },
       version: {
+        label: "Version",
         helpText: "Version number (auto-incremented)"
       },
       runAs: {
+        label: "Run As",
         helpText: "Execute as system (admin) or user (current user permissions)"
       },
       errorHandling: {
+        label: "Error Handling",
         helpText: "What to do when a node fails (fail, retry, continue)"
       }
     }
@@ -901,24 +1210,49 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "Dotted snake_case (e.g. auth.password_reset, crm.welcome)"
       },
+      label: {
+        label: "Label"
+      },
+      category: {
+        label: "Category"
+      },
       locale: {
+        label: "Locale",
         helpText: "BCP-47 tag — e.g. en-US, zh-CN"
       },
+      description: {
+        label: "Description"
+      },
+      subject: {
+        label: "Subject"
+      },
+      bodyHtml: {
+        label: "Body Html"
+      },
+      bodyText: {
+        label: "Body Text"
+      },
       variables: {
+        label: "Variables",
         helpText: "List of variable names referenced in subject/body"
       },
       fromOverride: {
+        label: "From Override",
         helpText: "{ \"name\": \"Acme Sales\", \"address\": \"sales@acme.com\" }"
       },
       replyTo: {
+        label: "Reply To",
         helpText: "Reply-To email address"
       },
       active: {
+        label: "Active",
         helpText: "When unchecked, sendTemplate() returns TEMPLATE_INACTIVE."
       },
       isSystem: {
+        label: "Is System",
         helpText: "Built-in template; tenants may override but should not delete."
       }
     }
@@ -945,30 +1279,39 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "Machine name (snake_case)"
       },
       label: {
+        label: "Label",
         helpText: "Display label for admins"
       },
       isProfile: {
+        label: "Is Profile",
         helpText: "Profile = base set assigned to users. Permission Set = additive grant."
       },
       systemPermissions: {
+        label: "System Permissions",
         helpText: "List of system capability keys"
       },
       objects: {
+        label: "Objects",
         helpText: "{ \"account\": { allowRead: true, allowEdit: true, ... } }"
       },
       fields: {
+        label: "Fields",
         helpText: "{ \"account.amount\": { readable: true, editable: false } }"
       },
       tabPermissions: {
+        label: "Tab Permissions",
         helpText: "{ \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
       },
       rowLevelSecurity: {
+        label: "Row Level Security",
         helpText: "Array of RLS policies (see rls.zod.ts)"
       },
       contextVariables: {
+        label: "Context Variables",
         helpText: "Custom variables referenced in RLS predicates"
       }
     }
@@ -995,30 +1338,39 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "Machine name (snake_case)"
       },
       label: {
+        label: "Label",
         helpText: "Display label for admins"
       },
       isProfile: {
+        label: "Is Profile",
         helpText: "Profile = base set assigned to users. Permission Set = additive grant."
       },
       systemPermissions: {
+        label: "System Permissions",
         helpText: "List of system capability keys"
       },
       objects: {
+        label: "Objects",
         helpText: "{ \"account\": { allowRead: true, allowEdit: true, ... } }"
       },
       fields: {
+        label: "Fields",
         helpText: "{ \"account.amount\": { readable: true, editable: false } }"
       },
       tabPermissions: {
+        label: "Tab Permissions",
         helpText: "{ \"app_crm\": \"visible\", \"app_admin\": \"hidden\" }"
       },
       rowLevelSecurity: {
+        label: "Row Level Security",
         helpText: "Array of RLS policies (see rls.zod.ts)"
       },
       contextVariables: {
+        label: "Context Variables",
         helpText: "Custom variables referenced in RLS predicates"
       }
     }
@@ -1033,10 +1385,18 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "snake_case"
       },
+      label: {
+        label: "Label"
+      },
       parent: {
+        label: "Parent",
         helpText: "Parent role machine name (Reports To)"
+      },
+      description: {
+        label: "Description"
       }
     }
   },
@@ -1062,57 +1422,75 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "Unique identifier (snake_case)"
       },
       label: {
+        label: "Label",
         helpText: "Display name (e.g., \"Sales Assistant\")"
       },
       role: {
+        label: "Role",
         helpText: "Agent persona (e.g., \"Customer Support Specialist\")"
       },
       avatar: {
+        label: "Avatar",
         helpText: "Avatar image URL"
       },
       active: {
+        label: "Active",
         helpText: "Enable/disable this agent"
       },
       instructions: {
+        label: "Instructions",
         helpText: "System prompt — tell the agent how to behave and what it can do"
       },
       model: {
+        label: "Model",
         helpText: "AI model configuration (provider, model name, temperature, etc.)"
       },
       planning: {
+        label: "Planning",
         helpText: "Autonomous reasoning configuration (strategy, max iterations, replan)"
       },
       memory: {
+        label: "Memory",
         helpText: "Memory management (short-term, long-term, reflection)"
       },
       lifecycle: {
+        label: "Lifecycle",
         helpText: "State machine defining conversation flow"
       },
       skills: {
+        label: "Skills",
         helpText: "Skill names (Agent→Skill→Tool architecture)"
       },
       tools: {
+        label: "Tools",
         helpText: "Direct tool references (legacy mode)"
       },
       knowledge: {
+        label: "Knowledge",
         helpText: "RAG knowledge access configuration"
       },
       visibility: {
+        label: "Visibility",
         helpText: "Scope: global, organization, or private"
       },
       access: {
+        label: "Access",
         helpText: "User IDs or role names who can chat with this agent"
       },
       permissions: {
+        label: "Permissions",
         helpText: "Required permissions to use this agent"
       },
       tenantId: {
+        label: "Tenant Id",
         helpText: "Restrict to specific organization ID"
       },
       guardrails: {
+        label: "Guardrails",
         helpText: "Safety rules and content policies"
       }
     }
@@ -1135,36 +1513,47 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "Unique identifier (snake_case)"
       },
       label: {
+        label: "Label",
         helpText: "Display name for Studio UI"
       },
       description: {
+        label: "Description",
         helpText: "Tell AI when to use this tool — be specific!"
       },
       category: {
+        label: "Category",
         helpText: "Tool category (data, action, flow, integration, etc.)"
       },
       objectName: {
+        label: "Object Name",
         helpText: "Related object (if this tool operates on a specific object)"
       },
       active: {
+        label: "Active",
         helpText: "Enable/disable this tool"
       },
       builtIn: {
+        label: "Built In",
         helpText: "Platform built-in tool (vs user-defined)"
       },
       parameters: {
+        label: "Parameters",
         helpText: "Input parameters — define properties like: {name: {type: \"string\", description: \"...\"}}"
       },
       outputSchema: {
+        label: "Output Schema",
         helpText: "Output schema for validation (optional)"
       },
       requiresConfirmation: {
+        label: "Requires Confirmation",
         helpText: "Ask user to approve before executing (for destructive actions)"
       },
       permissions: {
+        label: "Permissions",
         helpText: "Required permissions to use this tool"
       }
     }
@@ -1191,30 +1580,39 @@ export const enMetadataForms: NonNullable<TranslationData['metadataForms']> = {
     },
     fields: {
       name: {
+        label: "Name",
         helpText: "Unique identifier (snake_case)"
       },
       label: {
+        label: "Label",
         helpText: "Display name (e.g., \"Case Management\")"
       },
       description: {
+        label: "Description",
         helpText: "What this skill does"
       },
       active: {
+        label: "Active",
         helpText: "Enable/disable this skill"
       },
       instructions: {
+        label: "Instructions",
         helpText: "Instructions for AI — tell it how to use these tools together"
       },
       tools: {
+        label: "Tools",
         helpText: "Tool names (supports wildcard: action_*)"
       },
       triggerPhrases: {
+        label: "Trigger Phrases",
         helpText: "Natural language phrases that activate this skill"
       },
       triggerConditions: {
+        label: "Trigger Conditions",
         helpText: "Programmatic conditions (e.g., objectName == \"case\")"
       },
       permissions: {
+        label: "Permissions",
         helpText: "Required permissions to use this skill"
       }
     }

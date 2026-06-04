@@ -85,6 +85,7 @@ export const esES: TranslationData = {
       navigation: {
         group_overview: { label: 'Resumen' },
         nav_metadata_directory: { label: 'Todos los tipos de metadatos' },
+        nav_packages: { label: 'Paquetes' },
         group_data_model: { label: 'Modelo de datos' },
         nav_objects: { label: 'Objetos' },
         nav_validations: { label: 'Validaciones' },
