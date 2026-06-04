@@ -88,7 +88,14 @@ export interface IApprovalService {
       object?: string;
       recordId?: string;
       status?: ApprovalStatus | ApprovalStatus[];
-      approverId?: string;
+      /**
+       * Match requests where ANY of these identities is a pending approver.
+       * Accepts a single id or a list (a user typically has several
+       * identities: their user id, email, and `role:<r>` entries). Passing
+       * the list lets a caller resolve "my pending approvals" in ONE request
+       * instead of one request per identity.
+       */
+      approverId?: string | string[];
       submitterId?: string;
     } | undefined,
     context: SharingExecutionContext,

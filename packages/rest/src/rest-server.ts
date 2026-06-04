@@ -3990,11 +3990,21 @@ export class RestServer {
                         return;
                     }
                     const q = req.query ?? {};
+                    // `approverId` accepts a single id, a comma-separated
+                    // list, or the param repeated (→ array). Normalise all
+                    // three to a string[] so the Console can resolve "my
+                    // pending approvals" across every identity (user id /
+                    // email / role:<r>) in ONE request rather than looping.
+                    const rawApprover = q.approverId ?? q.approver_id;
+                    const approverIds = (Array.isArray(rawApprover) ? rawApprover : (rawApprover != null ? [rawApprover] : []))
+                        .flatMap((s: any) => String(s).split(','))
+                        .map((s: string) => s.trim())
+                        .filter(Boolean);
                     const rows = await svc.listRequests({
                         object: q.object,
                         recordId: q.recordId ?? q.record_id,
                         status: q.status,
-                        approverId: q.approverId ?? q.approver_id,
+                        approverId: approverIds.length ? approverIds : undefined,
                         submitterId: q.submitterId ?? q.submitter_id,
                     }, context ?? {});
                     res.json({ data: rows });
