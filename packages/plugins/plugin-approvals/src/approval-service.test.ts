@@ -264,6 +264,22 @@ describe('ApprovalService (node era)', () => {
     expect(none).toHaveLength(0);
   });
 
+  it('listRequests: approverId accepts a list and matches ANY identity', async () => {
+    await svc.openNodeRequest(openInput(['u9']), CTX);
+    // None of these identities individually except the last is the approver.
+    const hit = await svc.listRequests(
+      { status: 'pending', approverId: ['someone-else', 'user@example.com', 'u9'] },
+      SYS,
+    );
+    expect(hit).toHaveLength(1);
+    // A list with no matching identity returns nothing.
+    const miss = await svc.listRequests({ approverId: ['a', 'b', 'role:viewer'] }, SYS);
+    expect(miss).toHaveLength(0);
+    // Empty / whitespace-only ids are ignored, not treated as a match-all.
+    const ignored = await svc.listRequests({ approverId: ['', '  '] }, SYS);
+    expect(ignored).toHaveLength(1);
+  });
+
   it('listActions: returns the audit trail for a request', async () => {
     const req = await svc.openNodeRequest(openInput(['u9']), CTX);
     await svc.decideNode(req.id, { decision: 'approve', actorId: 'u9' }, SYS);

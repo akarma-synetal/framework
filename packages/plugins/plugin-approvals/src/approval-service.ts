@@ -470,7 +470,7 @@ export class ApprovalService implements IApprovalService {
       object?: string;
       recordId?: string;
       status?: ApprovalStatus | ApprovalStatus[];
-      approverId?: string;
+      approverId?: string | string[];
       submitterId?: string;
     } | undefined,
     context: SharingExecutionContext,
@@ -498,8 +498,20 @@ export class ApprovalService implements IApprovalService {
     let list = Array.isArray(rows) ? rows.map(rowFromRequest) : [];
     if (statusFilter) list = list.filter(r => statusFilter!.includes(r.status));
     if (filter?.approverId) {
-      const target = filter.approverId;
-      list = list.filter(r => (r.pending_approvers ?? []).includes(target));
+      // Accept one identity or a list: a request matches when ANY of the
+      // caller's identities (user id / email / role:<r>) is a pending
+      // approver. This lets the Console badge fetch "my pending approvals"
+      // in a single request instead of one-per-identity (previously the
+      // client looped, firing N near-simultaneous calls per poll).
+      const targets = (Array.isArray(filter.approverId) ? filter.approverId : [filter.approverId])
+        .map(t => String(t).trim())
+        .filter(Boolean);
+      if (targets.length) {
+        list = list.filter(r => {
+          const pending = r.pending_approvers ?? [];
+          return targets.some(t => pending.includes(t));
+        });
+      }
     }
     return list;
   }

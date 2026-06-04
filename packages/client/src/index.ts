@@ -2519,7 +2519,7 @@ export class ObjectStackClient {
       object?: string;
       recordId?: string;
       status?: ApprovalStatus | ApprovalStatus[];
-      approverId?: string;
+      approverId?: string | string[];
       submitterId?: string;
     }): Promise<ApprovalRequestRow[]> => {
       const route = this.getRoute('approvals');
@@ -2529,7 +2529,9 @@ export class ObjectStackClient {
       if (filter?.status) {
         params.set('status', Array.isArray(filter.status) ? filter.status.join(',') : filter.status);
       }
-      if (filter?.approverId) params.set('approverId', filter.approverId);
+      if (filter?.approverId) {
+        params.set('approverId', Array.isArray(filter.approverId) ? filter.approverId.join(',') : filter.approverId);
+      }
       if (filter?.submitterId) params.set('submitterId', filter.submitterId);
       const qs = params.toString();
       const res = await this.fetch(`${this.baseUrl}${route}/requests${qs ? `?${qs}` : ''}`);
