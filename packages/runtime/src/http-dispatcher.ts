@@ -1775,10 +1775,14 @@ export class HttpDispatcher {
                     readErrors.push(`read ${name}: ${(e as Error)?.message ?? String(e)}`);
                 }
             }
-            // getMetaItem returns the item body directly; tolerate a wrapper.
+            // protocol.getMetaItem (called directly, unlike the HTTP endpoint
+            // which unwraps) returns a WRAPPER: `{ type, name, item, lock,
+            // editable, … }` — the seed body (object/records) lives under
+            // `.item`. Tolerate the wrapper (`.item`) plus the body-direct and
+            // `.metadata`/`.body` shapes other protocols may return.
             const seed = item?.object && Array.isArray(item?.records)
                 ? item
-                : (item?.metadata ?? item?.body);
+                : (item?.item ?? item?.metadata ?? item?.body);
             if (seed?.object && Array.isArray(seed?.records)) {
                 datasets.push(seed);
             } else {
@@ -1795,9 +1799,6 @@ export class HttpDispatcher {
         const { SeedLoaderRequestSchema } = await import('@objectstack/spec/data');
         const loader = new SeedLoaderService(ql, metadata, (this as any).logger ?? console);
         const request = SeedLoaderRequestSchema.parse({
-            // ADR field is `seeds` (renamed from `datasets`); this constructor
-            // was added in the same PR and the rename missed it — passing
-            // `datasets` left `seeds` undefined and the loader saw nothing.
             seeds: datasets,
             config: {
                 defaultMode: 'upsert',
