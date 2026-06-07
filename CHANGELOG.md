@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — ObjectUI one-month frontend scan + backend alignment summary
+
+Scanning `../objectui` from 2026-05-08 through 2026-06-08 shows a broad Studio
+and renderer push, not just the most recent commits. Major frontend changes
+include live field-level conditional rules in forms (`visibleWhen`,
+`readonlyWhen`, `requiredWhen`), row-scoped inline-grid rules,
+required-on-submit handling, spreadsheet-style master-detail line-item editing,
+atomic parent+child form saves, derived related lists, record-page authoring,
+page block/property inspectors, flow-designer typed config panels and
+simulator, dataset designer/preview, dataset-bound dashboard widgets and
+reports, report matrix/joined/drill-down renderers, dashboard drill-downs and
+type-aware cells, metadata-admin draft/publish/rollback and skew protection,
+AI draft review/publish surfaces, public/developer API pages, settings,
+notifications/approvals, marketplace/package management, and wide i18n polish.
+
+The scan covered 910 non-merge commits in `../objectui`: 369 `feat`, 213 `fix`,
+108 `chore`, 37 `refactor`, plus docs/tests/CI/perf work. The largest touched
+areas were `packages/app-shell`, `apps/console`, `packages/plugin-detail`,
+`packages/plugin-dashboard`, `packages/plugin-grid`, `packages/fields`,
+`packages/plugin-report`, `packages/plugin-form`, `packages/plugin-list`, and
+`skills/objectui`.
+
+The framework backend now mirrors the critical enforcement boundaries:
+`@objectstack/plugin-security` exposes `security.getReadFilter(object,
+context)` as a reusable RLS read scope, `@objectstack/service-analytics`
+auto-bridges to it for dataset/dashboard/report queries and fails closed when
+scope cannot be safely applied, and ObjectQL enforces field conditional rules
+by validating `requiredWhen` and ignoring writes to fields locked by
+`readonlyWhen`.
+
 ### Fixed — First-boot platform-admin promotion no longer stolen by the `usr_system` seed identity
 
 `5e831dea3` (#1392) added `ensureSeedIdentity` to the runtime SeedLoader, which

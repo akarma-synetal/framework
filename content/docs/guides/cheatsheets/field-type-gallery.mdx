@@ -631,7 +631,10 @@ These properties are available on **all** field types:
 | `maskingRule` | `object` | — | Data masking configuration |
 | `dependencies` | `object` | — | Dependent field configuration |
 | `dataQuality` | `object` | — | Data quality validation rules |
-| `conditionalRequired` | `object` | — | Conditional requirement rules |
+| `visibleWhen` | `Expression` | — | Show field only when predicate is true |
+| `readonlyWhen` | `Expression` | — | Make field read-only when predicate is true |
+| `requiredWhen` | `Expression` | — | Require field when predicate is true |
+| `conditionalRequired` | `Expression` | — | Deprecated alias of `requiredWhen` |
 
 ---
 

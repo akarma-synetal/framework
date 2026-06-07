@@ -1,5 +1,5 @@
 ---
-"@objectstack/mcp": minor
+"@objectstack/mcp": patch
 ---
 
 ai

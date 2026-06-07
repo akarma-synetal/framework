@@ -15,14 +15,14 @@ authoritative Zod sources in `node_modules/@objectstack/spec/src/...`.
 | Skill | Use when you are… |
 |:------|:------------------|
 | [objectstack-platform](./objectstack-platform/SKILL.md) | Bootstrapping or operating a runtime — `defineStack`, drivers, adapters, plugins, services, CLI, deploy. |
-| [objectstack-data](./objectstack-data/SKILL.md) | Modelling objects, fields, relationships, validations, indexes, lifecycle hooks, permissions / RLS, or seed datasets. |
+| [objectstack-data](./objectstack-data/SKILL.md) | Modelling objects, fields, field conditional rules, relationships, validations, indexes, lifecycle hooks, permissions / RLS, or seed datasets. |
 | [objectstack-query](./objectstack-query/SKILL.md) | Writing ObjectQL — filters, sorting, pagination, aggregation, joins, window functions, full-text search. |
-| [objectstack-ui](./objectstack-ui/SKILL.md) | Designing Views, Apps, Pages, Dashboards, Reports, Charts, or Actions. |
+| [objectstack-ui](./objectstack-ui/SKILL.md) | Designing Views, Apps, Pages, Dashboards, dataset-bound widgets, Reports, Charts, or Actions. |
 | [objectstack-automation](./objectstack-automation/SKILL.md) | Wiring Flows, Workflows, Triggers, Approvals, scheduled jobs, or webhooks. |
 | [objectstack-ai](./objectstack-ai/SKILL.md) | Designing Agents, Tools, Skills, Conversations, Model Registry entries, or MCP integrations. |
 | [objectstack-api](./objectstack-api/SKILL.md) | Exposing server-side API surface — REST/GraphQL endpoints, auth, realtime, error envelopes. |
 | [objectstack-i18n](./objectstack-i18n/SKILL.md) | Authoring translation bundles, configuring locale fallback, or reading coverage reports. |
-| [objectstack-formula](./objectstack-formula/SKILL.md) | Writing CEL expressions — formula fields, predicates (validation / sharing / visibility), conditions, dynamic seed values. |
+| [objectstack-formula](./objectstack-formula/SKILL.md) | Writing CEL expressions — formula fields, field rules, predicates (validation / sharing / visibility), conditions, dynamic seed values. |
 
 ---
 

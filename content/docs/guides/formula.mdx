@@ -9,9 +9,10 @@ ObjectStack uses a **single canonical expression language** for every place a
 piece of metadata needs to compute a value or evaluate a condition:
 
 - **Formula fields** (`type: 'formula'`)
-- **Predicates** — validation `condition`, sharing `condition`, conditional
-  visibility (`visibleOn`), conditional required (`conditionalRequired`),
-  action `disabled`, view filter `criteria`, hook `condition`, flow decisions
+- **Predicates** — validation `condition`, sharing `condition`, field
+  conditional rules (`visibleWhen`, `readonlyWhen`, `requiredWhen`),
+  conditional visibility (`visibleOn`), action `disabled`, view filter
+  `criteria`, hook `condition`, flow decisions
 - **Dynamic seed values** — fixtures whose value depends on the install-time
   clock or identity context
 
@@ -92,7 +93,7 @@ export const Invoice = ObjectSchema.create({
       formula: F`record.subtotal + record.subtotal * record.tax_rate`,
     }),
     po_number: Field.text({
-      conditionalRequired: P`record.amount > 10000`,
+      requiredWhen: P`record.amount > 10000`,
     }),
     // M9.9b — declarative default, evaluated at insert time
     issued_date: Field.date({
@@ -196,7 +197,7 @@ CEL throws on `null + string`, so wrap every nullable operand in
 }
 ```
 
-### Predicate (visibility, conditional required)
+### Predicate (visibility, read-only, conditional required)
 
 ```ts
 {
@@ -204,6 +205,12 @@ CEL throws on `null + string`, so wrap every nullable operand in
   type: 'picklist',
   visibleOn: P`record.status == 'qualified'`,
 }
+
+Field.text({
+  visibleWhen: P`record.type == 'business'`,
+  readonlyWhen: P`record.status == 'approved'`,
+  requiredWhen: P`record.amount > 10000`,
+})
 ```
 
 ### Dynamic seed dates

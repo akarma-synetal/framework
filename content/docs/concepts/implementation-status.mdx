@@ -186,7 +186,7 @@ This matrix is generated from actual codebase analysis and represents the curren
 
 | Protocol | Implementation | Status | Notes |
 |:---------|:-------------:|:------:|:------|
-| **Analytics** | ✅ | ✅ | Protocol implemented in ObjectQL (driver-level aggregation) |
+| **Analytics** | ✅ | ✅ | ObjectQL aggregation plus `@objectstack/service-analytics` dataset execution; analytics read scope auto-bridges to `security.getReadFilter` for RLS-aware dashboards/reports |
 | **OData** | ❌ | 📋 | Protocol defined, not implemented |
 | **GraphQL** | ❌ | 📋 | Protocol defined, not implemented |
 | **Realtime** | ❌ | 📋 | Protocol defined, not implemented |
@@ -200,24 +200,35 @@ This matrix is generated from actual codebase analysis and represents the curren
 
 | Protocol | @objectstack/spec | Implementation | Status |
 |:---------|:-----------------:|:-------------:|:------:|
-| **View** | ✅ | ❌ | ❌ Spec only |
-| **ListView** | ✅ | ❌ | ❌ Spec only |
-| **FormView** | ✅ | ❌ | ❌ Spec only |
-| **Page** | ✅ | ❌ | ❌ Spec only |
-| **App** | ✅ | ❌ | ❌ Spec only |
-| **Dashboard** | ✅ | ❌ | ❌ Spec only |
-| **Report** | ✅ | ❌ | ❌ Spec only |
-| **Action** | ✅ | ❌ | ❌ Spec only |
-| **Component** | ✅ | ❌ | ❌ Spec only |
+| **View** | ✅ | 🟡 | 🟡 Studio/ObjectUI renders authored metadata surfaces; general-purpose renderer coverage is still incomplete |
+| **ListView** | ✅ | 🟡 | 🟡 ObjectUI grid/list surfaces support per-view persistence, filters, row actions, density, galleries, and permission-aware affordances; full protocol parity is ongoing |
+| **FormView** | ✅ | 🟡 | 🟡 ObjectUI forms support live field rules (`visibleWhen` / `readonlyWhen` / `requiredWhen`), inline-grid row rules, and server-aligned required enforcement |
+| **Page** | ✅ | 🟡 | 🟡 Record-page authoring, page create flows, block canvas editing, slotted record pages, and selected page blocks are implemented in ObjectUI; full component catalogue remains in progress |
+| **App** | ✅ | 🟡 | 🟡 Navigation metadata is consumed by the console/app shell; full renderer parity remains in progress |
+| **Dashboard** | ✅ | 🟡 | 🟡 ObjectUI renders metric/chart/list/pivot/funnel/table widgets, drill-downs, type-aware cells, and dataset-bound widgets; Studio can author per-widget dataset bindings (`dataset` / `dimensions` / `values`) |
+| **Report** | ✅ | 🟡 | 🟡 ObjectUI renders spec-native tabular/summary/matrix/joined reports, chart/KPI blocks, drill-downs, and dataset-bound reports |
+| **Action** | ✅ | 🟡 | 🟡 ObjectUI supports row/global/header actions, action modal transport, parameter collection, visibility CEL, and nested action runners |
+| **Component** | ✅ | 🟡 | 🟡 Selected page/record components render in ObjectUI (`record:alert`, related lists, highlights, page blocks); catalogue parity remains in progress |
 | **Theme** | ✅ | ❌ | ❌ Spec only |
-| **Widget** | ✅ | ❌ | ❌ Spec only |
-| **Chart** | ✅ | ❌ | ❌ Spec only |
+| **Widget** | ✅ | 🟡 | 🟡 Dashboard/report/list/form widgets render in ObjectUI; custom widget manifest/runtime parity remains in progress |
+| **Chart** | ✅ | 🟡 | 🟡 Recharts-backed dashboard/report charts cover bar/line/pie/area/scatter/funnel/gauge/treemap/sankey with formatting and field-coverage guards |
 
 **Notes:**
 - All UI protocols are fully defined in spec
-- Metadata API can retrieve UI definitions (views, apps)
-- No built-in UI renderer yet - designed for custom implementations
-- React SDK provides data hooks, UI rendering is application responsibility
+- Metadata API can retrieve UI definitions (views, apps, pages, dashboards,
+  reports, actions)
+- Active Studio/ObjectUI source lives in the sibling `../objectui` repo and is
+  bundled into `packages/console` via the objectui refresh workflow
+- Metadata-admin curated forms now merge server-only fields back into the save
+  payload, so a Studio form that exposes only part of a metadata type should
+  not strip newer protocol properties
+- The 2026-05-08 → 2026-06-08 ObjectUI scan covered 910 non-merge frontend
+  commits. The largest functional clusters were metadata-admin/Studio,
+  master-detail forms, reports/dashboards, record detail/related lists,
+  action transport, flow designer, developer/API pages, AI draft publishing,
+  and i18n.
+- React SDK provides data hooks; the cross-surface renderer is still being
+  completed in ObjectUI rather than in this backend repo
 
 ---
 
@@ -273,7 +284,7 @@ The `auth` service in `CoreServiceName` covers both **authentication** (identity
 - Client SDK supports bearer token header — but token validation requires the auth plugin
 - Auth route (`/auth/*`) only appears in Discovery when the auth plugin is registered
 - Fine-grained authorization (RLS, sharing, territory) is internal to the auth plugin
-- **Phase-1 RBAC enforcement is live end-to-end**: REST → ObjectQL → SecurityPlugin middleware now receives a populated `ExecutionContext` (userId, tenantId, roles, permissions). Default `member_default` permission set ships a wildcard RLS rule `organization_id = current_user.organization_id` plus per-object overrides `sys_organization_self` (`id = current_user.organization_id`) and `sys_user_self` (`id = current_user.id`) for the global tables that lack an `organization_id` column. The earlier `tenantField` indirection (RLS expressions written against an abstract `tenant_id` column then rewritten to the configured physical column at compile time) was removed — the placeholder, the column name, and `RLSUserContext.organization_id` are now the same name end-to-end. The legacy `objectql.registerTenantMiddleware` (hardcoded `where.tenant_id` injection that pre-dated SecurityPlugin) has been removed; SecurityPlugin is the sole authority for tenant isolation. Verified cross-organization isolation on `pnpm dev:crm` across `sys_organization`, `sys_member`, `sys_user`, `sys_user_permission_set`, `sys_role_permission_set`. **Anonymous traffic still bypasses enforcement** until a default-deny pass lands.
+- **Phase-1 RBAC enforcement is live end-to-end**: REST → ObjectQL → SecurityPlugin middleware now receives a populated `ExecutionContext` (userId, tenantId, roles, permissions). Default `member_default` permission set ships a wildcard RLS rule `organization_id = current_user.organization_id` plus per-object overrides `sys_organization_self` (`id = current_user.organization_id`) and `sys_user_self` (`id = current_user.id`) for the global tables that lack an `organization_id` column. The earlier `tenantField` indirection (RLS expressions written against an abstract `tenant_id` column then rewritten to the configured physical column at compile time) was removed — the placeholder, the column name, and `RLSUserContext.organization_id` are now the same name end-to-end. The legacy `objectql.registerTenantMiddleware` (hardcoded `where.tenant_id` injection that pre-dated SecurityPlugin) has been removed; SecurityPlugin is the sole authority for tenant isolation. Analytics now uses the same reusable read scope via `security.getReadFilter`, so dataset-bound dashboards/reports do not bypass RLS. Verified cross-organization isolation on `pnpm dev:crm` across `sys_organization`, `sys_member`, `sys_user`, `sys_user_permission_set`, `sys_role_permission_set`. **Anonymous traffic still bypasses enforcement** until a default-deny pass lands.
 
 ---
 
@@ -373,11 +384,19 @@ The `auth` service in `CoreServiceName` covers both **authentication** (identity
 - [ ] Realtime Subscriptions
 - [ ] WebSocket Support
 
-### Phase 7: UI Layer 📋 **PLANNED**
+### Phase 7: UI Layer 🟡 **IN PROGRESS**
 - [ ] UI Renderer
-- [ ] Form Builder
-- [ ] List View Renderer
-- [ ] Dashboard Renderer
+- [x] Studio metadata-admin engine — generic metadata list/detail/edit surfaces, live preview, draft/publish/rollback, create-mode forms, server-side diagnostics, package scoping, and skew-safe curated inspectors
+- [x] Form conditional rules — ObjectUI supports `visibleWhen`, `readonlyWhen`, `requiredWhen`, row-scoped inline-grid rules, and required-on-submit enforcement
+- [x] Master-detail forms — inline subforms, spreadsheet-style line items, atomic batch create/edit, lookup auto-fill, line ordering, duplicate/reorder, and subtotal/tax/total stack
+- [x] Record detail + related lists — derived related lists, record-page assignment, action slots, system/audit sections, and opt-in reference rail
+- [x] Dashboard renderer/editor — widget layout persistence, drill-downs, pivot/funnel/table/list widgets, type-aware cells, and per-widget dataset binding authoring (`dataset`, `dimensions`, `values`)
+- [x] Report renderer/editor — spec-native summary/matrix/joined reports, chart/KPI blocks, drill-downs, dataset-bound reports, and i18n labels
+- [x] Flow/page designers — typed flow node config panels, simulator/debug runner, page block canvas, slotted record pages, and schema-driven block inspectors
+- [x] Action transport — row/global/header actions, modal parameter collection, visible CEL, popup-safe open actions, and nested action runner sharing
+- [x] Developer/admin console surfaces — Integrations & APIs, public forms, flow runs, approvals inbox, settings, marketplace/package management, AI draft review/publish
+- [ ] List View Renderer full protocol parity
+- [ ] Cross-surface UI Renderer full protocol parity
 - [ ] Theme Engine
 
 ### Phase 8: Automation (Plugin) 🟡 **IN PROGRESS**
@@ -390,6 +409,7 @@ The `auth` service in `CoreServiceName` covers both **authentication** (identity
 - [x] Authentication Plugin (`@objectstack/plugin-auth`, better-auth)
 - [x] Authorization Plugin — `@objectstack/plugin-security` enforces CRUD/FLS/RLS in the ObjectQL middleware chain; REST → ObjectQL now propagates `ExecutionContext` end-to-end (Phase-1)
 - [x] Row-Level Security — default `member_default` permission set applies a wildcard `organization_id = current_user.organization_id` rule plus per-object overrides `sys_organization_self` / `sys_user_self`. The earlier `tenantField` rewrite indirection was removed: RLS column, placeholder, and `RLSUserContext.organization_id` use the same canonical name end-to-end
+- [x] Analytics RLS bridge — `@objectstack/service-analytics` auto-bridges to `security.getReadFilter(object, context)` and fails closed when read-scope resolution cannot be safely applied
 - [x] Multi-tenancy — verified cross-organization isolation on `pnpm dev:crm` (Alice@OrgAlpha vs. Bob@OrgBeta only see their own records across `sys_organization`, `sys_member`, `sys_user`, and `sys_*_permission_set` link tables)
 - [x] Legacy `objectql.registerTenantMiddleware` removed — SecurityPlugin is now the sole tenant-isolation authority
 - [ ] Default-deny for anonymous traffic

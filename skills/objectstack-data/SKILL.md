@@ -1,14 +1,16 @@
 ---
 name: objectstack-data
 description: >
-  Design ObjectStack data schemas — objects, fields, relationships,
-  validations, indexes, lifecycle hooks, permissions, row-level security —
+  Design ObjectStack data schemas — objects, fields, field conditional
+  rules, relationships, validations, indexes, lifecycle hooks, permissions,
+  row-level security —
   and the seed datasets (`defineDataset()`) that load fixtures and
   reference data alongside them. Use when the user is creating or
   modifying `*.object.ts` / `*.seed.ts` files, picking field types,
   modelling relationships, writing `beforeInsert`/`afterUpdate` hooks,
   configuring per-object access control, or authoring bootstrap / demo
-  data. Do not use for querying data (see objectstack-query) or for
+  data. Use for `visibleWhen` / `readonlyWhen` / `requiredWhen` rules that
+  belong on fields. Do not use for querying data (see objectstack-query) or for
   plugin / kernel hooks (see objectstack-platform). CEL expressions in
   formulas / validations / sharing rules / dynamic seed values: load
   objectstack-formula alongside.
@@ -136,6 +138,53 @@ export default ObjectSchema.create({
 **Supported migrations at this layer:** add / rename / delete / reorder groups
 (edit the `fieldGroups` array), assign a field to a group (edit `Field.group`).
 Explicit per-field in-group ordering is deferred to a future iteration.
+
+---
+
+## Conditional Field Rules
+
+Put conditional UI/data-entry rules on the **field definition** when the rule
+belongs to the data model and should apply everywhere the field is edited:
+default forms, Studio-authored forms, inline master-detail grids, public forms,
+and API-backed writes.
+
+```typescript
+import { P } from '@objectstack/spec';
+import { ObjectSchema, Field } from '@objectstack/spec/data';
+
+export const Invoice = ObjectSchema.create({
+  name: 'invoice',
+  fields: {
+    status: Field.select({
+      options: [
+        { label: 'Draft', value: 'draft' },
+        { label: 'Sent', value: 'sent' },
+        { label: 'Paid', value: 'paid' },
+        { label: 'Void', value: 'void' },
+      ],
+    }),
+    paid_at: Field.datetime({
+      visibleWhen: P`record.status == 'paid'`,
+      requiredWhen: P`record.status == 'paid'`,
+    }),
+    locked_total: Field.currency({
+      readonlyWhen: P`record.status == 'paid'`,
+    }),
+  },
+});
+```
+
+- Use `visibleWhen` to hide irrelevant fields in ObjectUI forms.
+- Use `readonlyWhen` for state-locked fields; the ObjectQL write path ignores
+  incoming changes when the predicate is `TRUE`.
+- Use `requiredWhen` for conditional requiredness; the ObjectQL validator
+  enforces it on submit. `conditionalRequired` is a deprecated compatibility
+  alias, not the preferred authoring field.
+- For inline `master_detail` grids, predicates are evaluated row-by-row against
+  the child row's `record`, so line-item rules should live on child fields.
+- For complex predicates, load **objectstack-formula** and emit CEL via
+  `P\`...\``; do not use Salesforce-style `AND`, `IN (...)`, or `{field}`
+  syntax.
 
 ---
 
@@ -748,4 +797,3 @@ See [references/_index.md](./references/_index.md) for the full list of Zod
 schemas (with one-line descriptions) — pointers into
 `node_modules/@objectstack/spec/src/`. Always `Read` the source for exact field
 shapes; do not rely on memory of property names.
-

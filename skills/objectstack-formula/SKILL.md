@@ -2,6 +2,7 @@
 name: objectstack-formula
 description: >
   Author CEL expressions used across ObjectStack — formula fields,
+  field conditional rules (`visibleWhen`, `readonlyWhen`, `requiredWhen`),
   validation / sharing / visibility predicates, flow conditions, and dynamic
   seed values. Use whenever the user is writing an `F`, `P`, or `cel`
   tagged-template literal, or asks "how do I express X as a formula /
@@ -167,7 +168,7 @@ F`coalesce(record.cost, 0) > 0
   : 0.0`
 ```
 
-### 3. Predicate (visibility / required / validation)
+### 3. Predicate (field rules / visibility / validation)
 
 ✅
 
@@ -176,6 +177,10 @@ P`record.status == 'qualified'`
 P`record.amount > 10000 && record.region in ['us', 'eu']`
 P`!isBlank(record.po_number)`
 ```
+
+For field-level conditional rules, emit the canonical field properties:
+`visibleWhen`, `readonlyWhen`, and `requiredWhen`. Treat
+`conditionalRequired` as a read/compatibility alias only.
 
 ❌ Salesforce-flavor — will compile but evaluate to `null`:
 
@@ -250,7 +255,8 @@ to the envelope.
 | Surface | Field | Dialect |
 |:---|:---|:---|
 | `Field` | `formula` (when `type: 'formula'`) | cel |
-| `Field` | `conditionalRequired` | cel |
+| `Field` | `visibleWhen` / `readonlyWhen` / `requiredWhen` | cel |
+| `Field` | `conditionalRequired` (deprecated alias of `requiredWhen`) | cel |
 | `Field` | `visibleOn` | cel |
 | `Field` | `defaultValue` (M9.9b) | cel |
 | `ConditionalValidation` | `when` | cel |

@@ -4,8 +4,9 @@ description: >
   Author ObjectStack UI metadata — Views (list/form/kanban/calendar/gantt),
   Apps (navigation), Pages, Dashboards, Reports, Charts, Actions. Use when
   the user is adding `*.view.ts` / `*.app.ts` / `*.dashboard.ts` /
-  `*.action.ts` files or designing a Studio-rendered UI surface. Do not use
-  for: data schema (see objectstack-data), interactive screen flows /
+  `*.action.ts` files or designing a Studio-rendered UI surface, including
+  dataset-bound dashboard/report widgets. Do not use for: data schema (see
+  objectstack-data), interactive screen flows /
   wizards (those are `*.flow.ts` with `type: 'screen'` — see
   objectstack-automation), the React renderer implementation (lives in
   `packages/client-react`, not metadata), or Studio's own admin UI (that
@@ -144,6 +145,21 @@ noisy child, `relatedListTitle` / `relatedListColumns` to override title /
 columns (see objectstack-data → Relationships → Detail-page related lists).
 Authored record pages can still place an explicit `record:related_list` (or
 inline-editable `record:line_items`) when they need bespoke placement.
+
+### Field Conditional Rules in Forms
+
+For conditions that belong to a field's lifecycle, declare the rule on the
+DATA MODEL field, not in the form view. ObjectUI forms consume:
+
+| Field property | UI behavior | Server behavior |
+|:--|:--|:--|
+| `visibleWhen` | Hide the field when the CEL predicate is false | UX-only visibility hint |
+| `readonlyWhen` | Render read-only when true | ObjectQL ignores incoming writes when true |
+| `requiredWhen` | Mark required when true | ObjectQL validates requiredness on submit |
+
+Inline master-detail grids evaluate these rules row-by-row against the child
+row. Use `requiredWhen` for new metadata; `conditionalRequired` is only a
+back-compat alias. Load **objectstack-formula** when authoring non-trivial CEL.
 
 ---
 
@@ -336,6 +352,35 @@ global filters, widget options, and the period-over-period (`compareTo`)
 / date-bucketing (`categoryGranularity`) modifiers available on every
 data-bound widget.
 
+### Dataset-Bound Widgets
+
+For shared metrics, prefer the ADR-0021 dataset shape over per-widget inline
+queries. A widget binds to `dataset` and selects named `dimensions` and
+`values`; the dataset owns the base object, allowed joins, intrinsic filter,
+dimensions, and certified measures.
+
+```typescript
+{
+  id: 'revenue_by_region',
+  type: 'bar',
+  title: 'Revenue by Region',
+  dataset: 'sales',
+  dimensions: ['region'],
+  values: ['revenue'],
+  layout: { x: 0, y: 0, w: 6, h: 4 },
+}
+```
+
+- Dataset-bound widgets need at least one `values` entry.
+- Do not mix `dataset` with inline `object` / `valueField` / `aggregate`
+  unless you are intentionally keeping a legacy inline widget shape.
+- Studio's Dashboard Widget Inspector can author per-widget `dataset`,
+  `dimensions`, and `values`; curated metadata-admin forms merge
+  server-only fields back into the payload, so saving through Studio should
+  not drop newer schema fields.
+- The analytics runtime applies SecurityPlugin read scope via
+  `security.getReadFilter`, so dashboard/report datasets remain RLS-aware.
+
 ---
 
 ## Report Types
@@ -492,6 +537,31 @@ Use this CRM-style structure as the canonical UI assembly reference:
 | User actions | `src/actions/*.actions.ts` | Use `flow` for orchestration and `modal` for parameterized bulk mutations |
 
 This blueprint is the default for “build a complete metadata app UI” tasks.
+
+---
+
+## ObjectUI Runtime Coverage (2026-05-08 → 2026-06-08 scan)
+
+Recent `../objectui` work moved many UI metadata surfaces from "spec only" to
+partial or full frontend implementation. When authoring metadata, assume these
+ObjectUI capabilities exist and prefer the protocol-native shape:
+
+| Area | Current ObjectUI capability | Authoring guidance |
+|:--|:--|:--|
+| Metadata admin / Studio | Generic metadata list/detail/edit, live preview, diagnostics, draft/publish/rollback, package scoping, skew-safe curated inspectors | Prefer spec-driven inspectors and canonical metadata shapes; do not invent designer-only shadow fields |
+| Object designer | Field groups, drag/drop fields, object create canvas, field-level conditional rules, bulk field selection, live validation | Put durable behavior on object/field metadata; use CEL via `P\`...\`` |
+| Form views | Modal/drawer/full-page subforms, inline master-detail, atomic batch create/edit, submit feedback | Model parent-child entry with `master_detail.inlineEdit` or form `subforms` |
+| Line-item grids | Spreadsheet editing, computed cells, ghost row, lookup auto-fill, duplicate, drag reorder, subtotal/tax/total | Keep line fields on the child object; use `position`/`sort_order` and summary fields |
+| Record detail | Derived related lists, action slots, system/audit sections, record-page assignment, optional reference rail | Let relationships derive related lists unless a record page needs bespoke placement |
+| Pages | Page create flows, block canvas, slotted record pages, block property inspectors, nested container blocks | Use Page metadata for layout; use full Action objects in `page:header.properties.actions` |
+| Dashboards | Metric/chart/list/pivot/funnel/table widgets, drill-downs, type-aware cells, date bucketing, dataset-bound widgets | Prefer dataset-bound widgets for governed metrics; inline object widgets remain valid |
+| Reports | Spec-native tabular/summary/matrix/joined reports, chart/KPI blocks, drill-downs, dataset-bound reports | Prefer `groupingsDown` / `groupingsAcross` / `dataset` over ad hoc client shaping |
+| Actions | Row/global/header actions, modal parameter collection, visible CEL, popup-safe opens, nested action runner sharing | Define actions as metadata; use row context/defaultFromRow instead of custom code |
+| Flow designer | Typed node config panels, trigger/decision forms, reference pickers, simulator/debug runner | Author flows with typed config, not advanced JSON fallbacks |
+| Console utilities | Integrations & APIs, public forms, flow runs, approvals inbox, settings, marketplace/package management, AI draft review/publish | Link app navigation to these surfaces with capability gates where appropriate |
+
+Still treat broad "universal renderer parity" as in progress: verify uncommon
+component/widget combinations in ObjectUI before documenting them as shipped.
 
 ---
 
@@ -884,4 +954,3 @@ See [references/_index.md](./references/_index.md) for the full list of Zod
 schemas (with one-line descriptions) — pointers into
 `node_modules/@objectstack/spec/src/`. Always `Read` the source for exact field
 shapes; do not rely on memory of property names.
-

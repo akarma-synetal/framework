@@ -7,7 +7,7 @@ description: "Complete guide to implementing enterprise-grade security in Object
 
 Complete guide to implementing enterprise-grade security in ObjectStack with fine-grained permissions and data access controls.
 
-> **Implementation status — Phase-1 RBAC is live.** REST → ObjectQL now propagates a populated `ExecutionContext` (userId, tenantId, roles, permissions) into the SecurityPlugin middleware, so CRUD / FLS / RLS checks actually fire on every authenticated request. The default `member_default` permission set ships a wildcard RLS rule `organization_id = current_user.organization_id` plus explicit per-object overrides `sys_organization_self` (`id = current_user.organization_id`) and `sys_user_self` (`id = current_user.id`) for the two global tables that lack an `organization_id` column. RLS expressions, the physical column, and `RLSUserContext.organization_id` all use the same canonical name — there is no `tenantField` rewrite indirection (schemas with a different physical tenant column should fork the defaults). The legacy `objectql.registerTenantMiddleware` has been removed; SecurityPlugin is the sole authority for tenant isolation. End-to-end verified on `pnpm dev:crm` across `sys_organization`, `sys_member`, `sys_user`, `sys_user_permission_set`, `sys_role_permission_set`. **Anonymous traffic still bypasses enforcement** until a default-deny pass lands; Sharing Rules, Studio RLS visual editor, per-user×org permission cache, and audit UI for denied access are queued. See `CHANGELOG.md` and `concepts/implementation-status.mdx` for the latest matrix.
+> **Implementation status — Phase-1 RBAC is live.** REST → ObjectQL now propagates a populated `ExecutionContext` (userId, tenantId, roles, permissions) into the SecurityPlugin middleware, so CRUD / FLS / RLS checks actually fire on every authenticated request. The default `member_default` permission set ships a wildcard RLS rule `organization_id = current_user.organization_id` plus explicit per-object overrides `sys_organization_self` (`id = current_user.organization_id`) and `sys_user_self` (`id = current_user.id`) for the two global tables that lack an `organization_id` column. RLS expressions, the physical column, and `RLSUserContext.organization_id` all use the same canonical name — there is no `tenantField` rewrite indirection (schemas with a different physical tenant column should fork the defaults). The legacy `objectql.registerTenantMiddleware` has been removed; SecurityPlugin is the sole authority for tenant isolation. Analytics also reuses the same read scope: `@objectstack/service-analytics` auto-bridges to `security.getReadFilter(object, context)` when the security service is registered, so dataset-bound dashboards/reports do not bypass RLS. End-to-end verified on `pnpm dev:crm` across `sys_organization`, `sys_member`, `sys_user`, `sys_user_permission_set`, `sys_role_permission_set`. **Anonymous traffic still bypasses enforcement** until a default-deny pass lands; Sharing Rules, Studio RLS visual editor, per-user×org permission cache, and audit UI for denied access are queued. See `CHANGELOG.md` and `concepts/implementation-status.mdx` for the latest matrix.
 
 ## Table of Contents
 
@@ -503,6 +503,21 @@ export const TerritorySharingRules = [
   },
 ];
 ```
+
+### Analytics and Dataset Read Scope
+
+Dataset-bound dashboards and reports often execute through the analytics
+service, including the NativeSQL strategy. That path still has to honor the
+same row-level security rules as ObjectQL. `@objectstack/plugin-security`
+therefore registers a public `security` service with
+`getReadFilter(object, context)`, and `@objectstack/service-analytics`
+auto-bridges to it unless an explicit `getReadScope` option is supplied.
+
+The bridge is context-aware and may be async because permission-set and RLS
+resolution can hit the database. The analytics service applies the returned
+filter to the base object and to joined objects declared by a dataset. If read
+scope resolution fails or an unsupported predicate would have to be translated
+into SQL, the analytics query fails closed instead of dropping the filter.
 
 ---
 

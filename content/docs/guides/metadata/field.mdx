@@ -304,21 +304,40 @@ These properties are available on all field types:
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| `conditionalRequired` | `string` | Formula expression that makes field required when `TRUE` |
+| `visibleWhen` | `string \| Expression` | CEL predicate; field is shown only when `TRUE` |
+| `readonlyWhen` | `string \| Expression` | CEL predicate; field is read-only when `TRUE` |
+| `requiredWhen` | `string \| Expression` | CEL predicate; field is required when `TRUE` |
+| `conditionalRequired` | `string \| Expression` | Deprecated alias of `requiredWhen` |
 | `multiple` | `boolean` | Allow multiple values (for select, lookup, file) |
 
 ```typescript
-// Conditional required example
+import { P } from '@objectstack/spec';
+import { Field } from '@objectstack/spec/data';
+
 close_reason: Field.select({
   label: 'Close Reason',
-  conditionalRequired: "status = 'closed'",
+  visibleWhen: P`record.status == 'closed'`,
+  requiredWhen: P`record.status == 'closed'`,
   options: [
     { label: 'Won', value: 'won' },
     { label: 'Lost', value: 'lost' },
     { label: 'Cancelled', value: 'cancelled' },
   ],
 }),
+
+invoice_total: Field.currency({
+  label: 'Invoice Total',
+  readonlyWhen: P`record.status == 'paid'`,
+}),
 ```
+
+Conditional field rules are evaluated in both tiers. ObjectUI forms update
+visibility, read-only state, and required markers live as the draft record
+changes, including row-scoped rules inside inline master-detail grids. The
+server enforces `requiredWhen` on submit and ignores writes to fields whose
+`readonlyWhen` predicate is `TRUE`, so client-side affordances are not the
+only guard. Use `requiredWhen` for new metadata; keep `conditionalRequired`
+only for older packages that already emitted it.
 
 ## Naming Conventions
 

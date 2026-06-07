@@ -98,6 +98,74 @@ Each widget defines a data visualization:
 | `options` | `object` | optional | Additional display options |
 | `responsive` | `object` | optional | Responsive behavior |
 
+## Dataset-Bound Widgets
+
+Dashboards support two additive query shapes:
+
+- **Inline widgets** use `object`, `categoryField`, `valueField`, `aggregate`,
+  and `filter` directly on the widget.
+- **Dataset-bound widgets** use the semantic-layer `dataset` plus named
+  `dimensions` and `values`.
+
+Prefer dataset-bound widgets for shared business metrics. A dataset defines
+the base object, allowed relationship joins, reusable dimensions, certified
+measures, and intrinsic filters once; dashboards and reports then reference
+the same names so "revenue", "pipeline", or "win rate" stay consistent across
+surfaces.
+
+```typescript
+import { defineDataset } from '@objectstack/spec/ui';
+
+export const salesDataset = defineDataset({
+  name: 'sales',
+  label: 'Sales',
+  object: 'opportunity',
+  include: ['account'],
+  dimensions: [
+    { name: 'region', field: 'account.region', type: 'string' },
+    { name: 'close_month', field: 'close_date', type: 'date', dateGranularity: 'month' },
+  ],
+  measures: [
+    { name: 'revenue', field: 'amount', aggregate: 'sum', certified: true },
+    { name: 'deal_count', aggregate: 'count' },
+  ],
+});
+
+export const salesDashboard = {
+  name: 'sales_overview',
+  label: 'Sales Overview',
+  widgets: [
+    {
+      id: 'revenue_by_region',
+      title: 'Revenue by Region',
+      type: 'bar',
+      dataset: 'sales',
+      dimensions: ['region'],
+      values: ['revenue'],
+      layout: { x: 0, y: 0, w: 6, h: 4 },
+    },
+  ],
+};
+```
+
+Dataset-bound widgets require at least one `values` entry. Do not also set
+`object`, `valueField`, or `aggregate` unless you are intentionally keeping an
+inline widget. Studio's Dashboard Widget Inspector can author the dataset,
+dimensions, and values per widget; curated metadata-admin forms preserve any
+server-only fields that are not exposed by the current inspector, so saving a
+dashboard from Studio should not strip newer protocol fields.
+
+At runtime, dataset queries are executed through the analytics service. When
+`@objectstack/plugin-security` is registered, analytics auto-bridges to
+`security.getReadFilter(object, context)` and applies the caller's RLS scope to
+the base object and joined objects.
+
+ObjectUI currently renders object-backed and dataset-backed metric, chart,
+table/list, pivot, funnel, and gauge-style widgets with type-aware cells,
+field/option labels, date bucketing, numeric/currency formatting, and
+drill-down affordances. Use declarative drill-down settings and preserve raw
+group keys so the generated filter can navigate to the underlying records.
+
 ### Chart Types
 
 | Type | Description | Best For |
