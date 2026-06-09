@@ -26,12 +26,29 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
     const cube = ctx.getCube(query.cube!)!;
     const objectName = this.extractObjectName(cube);
 
-    // Build groupBy from dimensions
-    const groupBy: string[] = [];
+    // Build groupBy from dimensions, honouring `timeDimensions` granularity.
+    // A date dimension with a granularity becomes a STRUCTURED groupBy item
+    // `{ field, dateGranularity }` — which `engine.aggregate()` buckets (driver
+    // date_trunc or in-memory). Without this the ObjectQL path grouped raw
+    // timestamps (one bucket per row) and date-bucketed dataset widgets never
+    // matched their legacy `categoryGranularity` counterpart.
+    type GroupByItem = string | { field: string; dateGranularity: string };
+    const granByDim = new Map<string, string>();
+    for (const td of query.timeDimensions ?? []) {
+      if (td.granularity) granByDim.set(td.dimension, td.granularity);
+    }
+    const groupBy: GroupByItem[] = [];
     if (query.dimensions && query.dimensions.length > 0) {
       for (const dim of query.dimensions) {
-        groupBy.push(this.resolveFieldName(cube, dim, 'dimension'));
+        const field = this.resolveFieldName(cube, dim, 'dimension');
+        const gran = granByDim.get(dim);
+        groupBy.push(gran ? { field, dateGranularity: gran } : field);
+        granByDim.delete(dim);
       }
+    }
+    // Time dimensions not also listed in `dimensions` still bucket + group.
+    for (const [dim, gran] of granByDim) {
+      groupBy.push({ field: this.resolveFieldName(cube, dim, 'dimension'), dateGranularity: gran });
     }
 
     // Build aggregations from measures
@@ -43,18 +60,30 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
       }
     }
 
-    // Build filter from query filters
+    // Build filter from query filters. A single field may carry MULTIPLE
+    // operators (e.g. a range `{$gte, $lte}` from `close_date` between two
+    // bounds). Merge same-field operator objects instead of overwriting, or a
+    // range would silently lose a bound (only the last operator would survive).
     const filter: Record<string, unknown> = {};
     const normalizedFilters = normalizeAnalyticsFilters(query);
     if (normalizedFilters.length > 0) {
       for (const f of normalizedFilters) {
         const fieldName = this.resolveFieldName(cube, f.member, 'any');
-        filter[fieldName] = this.convertFilter(f.operator, f.values);
+        const converted = this.convertFilter(f.operator, f.values);
+        const existing = filter[fieldName];
+        const mergeable = (v: unknown): v is Record<string, unknown> =>
+          !!v && typeof v === 'object' && !Array.isArray(v);
+        filter[fieldName] = mergeable(existing) && mergeable(converted)
+          ? { ...existing, ...converted }
+          : converted;
       }
     }
 
     const rows = await ctx.executeAggregate!(objectName, {
-      groupBy: groupBy.length > 0 ? groupBy : undefined,
+      // Structured groupBy items ({field, dateGranularity}) pass through the
+      // executeAggregate bridge to engine.aggregate, which buckets them. The
+      // contract types groupBy as string[]; the cast carries the richer shape.
+      groupBy: groupBy.length > 0 ? (groupBy as unknown as string[]) : undefined,
       aggregations: aggregations.length > 0 ? aggregations : undefined,
       filter: Object.keys(filter).length > 0 ? filter : undefined,
     });

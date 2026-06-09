@@ -6,6 +6,7 @@ import * as objects from './src/objects/index.js';
 import * as views from './src/views/index.js';
 import * as apps from './src/apps/index.js';
 import * as dashboards from './src/dashboards/index.js';
+import * as datasets from './src/datasets/index.js';
 import * as reports from './src/reports/index.js';
 import * as pages from './src/pages/index.js';
 import * as actions from './src/actions/index.js';
@@ -98,6 +99,7 @@ export default defineStack({
   views: Object.values(views),
   pages: Object.values(pages),
   dashboards: Object.values(dashboards),
+  datasets: Object.values(datasets),
   reports: Object.values(reports),
   actions: Object.values(actions),
   themes: [CrmLightTheme, CrmDarkTheme],

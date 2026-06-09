@@ -92,6 +92,21 @@ export const JoinedReportBlockSchema: z.ZodTypeAny = lazySchema(() => z.object({
   filter: FilterConditionSchema.optional(),
   /** Optional inline chart configuration. */
   chart: ReportChartSchema.optional(),
+
+  /**
+   * ADR-0021 — bind this block to a semantic-layer `dataset` (the governed
+   * alternative to the block's inline `objectName` + `columns` query), mirroring
+   * the top-level report dual-form. An analytics block (summary/matrix) selects
+   * dataset measures by name; a record-list block stays inline (it becomes a
+   * ListView/embed in the terminal form). Additive / dual-form.
+   */
+  dataset: SnakeCaseIdentifierSchema.optional().describe('Dataset name to bind (ADR-0021)'),
+  /** Dimension names (from the dataset) to group rows by. Dataset-bound only. */
+  rows: z.array(z.string()).optional().describe('Dimension names down (dataset-bound)'),
+  /** Measure names (from the dataset) to display. Dataset-bound only. */
+  values: z.array(z.string()).optional().describe('Measure names to show (dataset-bound)'),
+  /** Render-time scope filter, ANDed at query time. Dataset-bound only. */
+  runtimeFilter: FilterConditionSchema.optional().describe('Render-time scope filter (dataset-bound)'),
 }));
 
 /**

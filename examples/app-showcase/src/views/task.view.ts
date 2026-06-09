@@ -28,6 +28,22 @@ export const TaskViews = defineView({
   },
 
   listViews: {
+    // 0 ── Tabular ───────────────────────────────────────────────────────
+    // ADR-0021 Phase 2: replaces the former `showcase_task_list` report
+    // (a flat record list — a ListView concern, not analytics).
+    tabular: {
+      label: 'Task List',
+      type: 'grid',
+      data,
+      columns: [
+        { field: 'title' },
+        { field: 'project' },
+        { field: 'assignee' },
+        { field: 'status' },
+        { field: 'estimate_hours' },
+      ],
+    },
+
     // 1 ── Grid ─────────────────────────────────────────────────────────
     grid: {
       label: 'Grid',

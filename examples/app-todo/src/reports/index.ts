@@ -3,11 +3,12 @@
 /**
  * Report Definitions Barrel
  */
+// ADR-0021 Phase 2: `OverdueTasksReport` (a flat record list) was converted to
+// an `overdue` ListView on todo_task — see src/views/task.view.ts.
 export {
   TasksByStatusReport,
   TasksByPriorityReport,
   TasksByOwnerReport,
-  OverdueTasksReport,
   CompletedTasksReport,
   TimeTrackingReport,
 } from './task.report';
