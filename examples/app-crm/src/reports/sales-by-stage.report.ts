@@ -4,6 +4,12 @@ import type { UI } from '@objectstack/spec';
 
 /**
  * Example report — total opportunity amount grouped by stage.
+ *
+ * ADR-0021 Phase 2: bound to the `opportunity_metrics` dataset (rows = stage,
+ * values = total_amount) alongside the legacy inline query. The legacy form was
+ * also corrected to actually group + sum (it previously listed rows flat despite
+ * its "grouped by stage" label), so both forms compute the same number and the
+ * reconciliation harness can verify them.
  */
 export const SalesByStageReport: UI.Report = {
   name: 'crm_sales_by_stage',
@@ -13,7 +19,10 @@ export const SalesByStageReport: UI.Report = {
   type: 'summary',
   columns: [
     { field: 'stage', label: 'Stage' },
-    { field: 'name', label: 'Opportunity' },
-    { field: 'amount', label: 'Amount' },
+    { field: 'amount', label: 'Amount', aggregate: 'sum' },
   ],
+  groupingsDown: [{ field: 'stage', sortOrder: 'asc' }],
+  dataset: 'opportunity_metrics',
+  rows: ['stage'],
+  values: ['total_amount'],
 };

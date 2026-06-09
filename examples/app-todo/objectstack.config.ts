@@ -6,7 +6,9 @@ import { defineStack } from '@objectstack/spec';
 import * as objects from './src/objects/index.js';
 import * as actions from './src/actions/index.js';
 import * as dashboards from './src/dashboards/index.js';
+import * as datasets from './src/datasets/index.js';
 import * as reports from './src/reports/index.js';
+import * as views from './src/views/index.js';
 import { allFlows } from './src/flows/index.js';
 import * as apps from './src/apps/index.js';
 import { TodoSeedData } from './src/data/index.js';
@@ -41,8 +43,10 @@ export default defineStack({
 
   // Auto-collected from barrel index files via Object.values()
   objects: Object.values(objects),
+  views: Object.values(views),
   actions: Object.values(actions),
   dashboards: Object.values(dashboards),
+  datasets: Object.values(datasets),
   reports: Object.values(reports),
   flows: allFlows,
   apps: Object.values(apps),
