@@ -161,7 +161,11 @@ export const BudgetApprovalFlow = defineFlow({
       config: {
         objectName: 'showcase_project',
         triggerType: 'record-after-update',
-        condition: 'budget > 100000',
+        // Gate on the budget CHANGING, not on every update of a large-budget
+        // project — otherwise any unrelated edit (status, health, …) re-opens
+        // an approval and collides with other approval flows on the same
+        // record (the approvals service dedupes pending requests per record).
+        condition: 'budget > 100000 && budget != previous.budget',
       },
     },
     {
@@ -505,6 +509,129 @@ export const TaskDoneNotifyOwnerFlow = defineFlow({
 });
 
 /**
+ * Closure Sign-off — a reusable **approval subflow**: pauses on a manager
+ * approval and reports the decision as its output. Together with
+ * {@link ProjectClosureFlow} this is the worked example of **nested durable
+ * pause** (linked-runs model): a pausing node (`approval`) inside a `subflow`
+ * suspends BOTH runs — the child at the approval, the parent at its subflow
+ * node (`correlation: subflow:<childRunId>`) — and the eventual decision
+ * bubbles back up through the chain.
+ */
+export const ClosureSignoffSubflow = defineFlow({
+  name: 'showcase_closure_signoff',
+  label: 'Closure Sign-off (approval subflow)',
+  description: 'Reusable subflow: requests a manager sign-off and outputs the decision. Demonstrates approval inside a subflow (nested durable pause).',
+  type: 'autolaunched',
+  template: true,
+  variables: [
+    { name: 'reason', type: 'text', isInput: true },
+    { name: 'decision', type: 'text', isOutput: true },
+  ],
+  nodes: [
+    { id: 'start', type: 'start', label: 'Start' },
+    {
+      id: 'ask_signoff',
+      type: 'approval',
+      label: 'Manager Sign-off',
+      config: {
+        approvers: [{ type: 'role', value: 'manager' }],
+        behavior: 'first_response',
+        // The parent project just hit a terminal status — no point locking it.
+        lockRecord: false,
+      },
+    },
+    {
+      id: 'mark_approved',
+      type: 'assignment',
+      label: 'Record Approval',
+      config: { assignments: { decision: 'approved' } },
+    },
+    {
+      id: 'mark_rejected',
+      type: 'assignment',
+      label: 'Record Rejection',
+      config: { assignments: { decision: 'rejected' } },
+    },
+    { id: 'end_ok', type: 'end', label: 'Signed Off' },
+    { id: 'end_no', type: 'end', label: 'Declined' },
+  ],
+  edges: [
+    { id: 'e1', source: 'start', target: 'ask_signoff' },
+    { id: 'e2', source: 'ask_signoff', target: 'mark_approved', label: 'approve' },
+    { id: 'e3', source: 'ask_signoff', target: 'mark_rejected', label: 'reject' },
+    { id: 'e4', source: 'mark_approved', target: 'end_ok' },
+    { id: 'e5', source: 'mark_rejected', target: 'end_no' },
+  ],
+});
+
+/**
+ * Project Closure with Sign-off — the worked **nested durable pause** example.
+ *
+ * When a project is marked Completed, the flow invokes
+ * {@link ClosureSignoffSubflow} through a `subflow` node. The child suspends on
+ * its `approval` node, which suspends THIS run too — both continuations are
+ * persisted as linked runs (`sys_automation_run`), surviving restarts. When a
+ * manager decides (approvals API / inbox), the child resumes down the matching
+ * branch, completes, and **bubbles** its `decision` output back into this run
+ * (`signoffResult`), which continues to notify the project owner.
+ *
+ * Observe it end-to-end: complete a project → both runs show `paused` in the
+ * Runs panel (parent at `signoff`, child at `ask_signoff`) → approve via
+ * `POST /api/v1/approvals/requests/:id/approve` → both runs complete and the
+ * owner's inbox gets the decision.
+ */
+export const ProjectClosureFlow = defineFlow({
+  name: 'showcase_project_closure',
+  label: 'Project Closure with Sign-off (nested pause)',
+  description: 'On project completion, requests sign-off via an approval-inside-subflow, then notifies the owner — demonstrates nested durable pause.',
+  type: 'autolaunched',
+  nodes: [
+    {
+      id: 'start',
+      type: 'start',
+      label: 'On Project Completed',
+      config: {
+        objectName: 'showcase_project',
+        triggerType: 'record-after-update',
+        condition: 'status == "completed" && previous.status != "completed"',
+      },
+    },
+    {
+      id: 'signoff',
+      type: 'subflow',
+      label: 'Request Sign-off',
+      config: {
+        flowName: 'showcase_closure_signoff',
+        input: {
+          reason: 'Project "{record.name}" was marked completed — please sign off the closure.',
+        },
+        outputVariable: 'signoffResult',
+      },
+    },
+    {
+      id: 'notify_owner',
+      type: 'notify',
+      label: 'Notify Owner of Decision',
+      config: {
+        topic: 'project.closure',
+        recipients: ['{record.owner}'],
+        channels: ['inbox'],
+        severity: 'info',
+        title: 'Closure sign-off: {record.name}',
+        message: 'Closure sign-off decision for "{record.name}": {signoffResult.decision}.',
+        actionUrl: '/showcase_project/{record.id}',
+      },
+    },
+    { id: 'end', type: 'end', label: 'End' },
+  ],
+  edges: [
+    { id: 'e1', source: 'start', target: 'signoff' },
+    { id: 'e2', source: 'signoff', target: 'notify_owner' },
+    { id: 'e3', source: 'notify_owner', target: 'end' },
+  ],
+});
+
+/**
  * Batch Reminders — demonstrates the ADR-0031 **structured loop container**.
  *
  * The `loop` node owns a bounded **body region** (`config.body`, a
@@ -716,6 +843,8 @@ export const allFlows = [
   TaskFollowUpFlow,
   NotifyOwnerSubflow,
   TaskDoneNotifyOwnerFlow,
+  ClosureSignoffSubflow,
+  ProjectClosureFlow,
   BatchRemindersFlow,
   FanOutNotifyFlow,
   ResilientSyncFlow,
