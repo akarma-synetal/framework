@@ -110,9 +110,9 @@ Each node performs a specific action in the flow.
 | `get_record` | Query records |
 | `http_request` | Make an HTTP API call |
 | `script` | Execute custom JavaScript |
-| `screen` | Display a user form/screen |
-| `wait` | Pause and wait for an event or time |
-| `subflow` | Invoke another flow |
+| `screen` | Display a user form/screen (durable pause) |
+| `wait` | Pause for a timer or named signal (durable pause; timers auto-resume) |
+| `subflow` | Invoke another flow — a pause inside the child suspends both runs as a linked chain |
 | `connector_action` | Execute an external connector action |
 
 ### Node Structure
@@ -295,6 +295,60 @@ events).
 > BPMN `parallel_gateway` / `join_gateway` / `boundary_event` remain in the
 > protocol as the **interop** representation and map onto these constructs on
 > import/export — they are not the native authoring model.
+
+## Durable pause & resume (ADR-0019)
+
+Some nodes don't finish in one pass — they **suspend** the run and wait for
+the outside world. The engine snapshots the run (variables, step log, position)
+to the `sys_automation_run` table and returns
+`{ status: 'paused', runId }`; the pause **survives a process restart** and is
+continued later through a single entry point:
+
+```
+POST /api/v1/automation/{flow}/runs/{runId}/resume
+{ "inputs": { … }, "branchLabel": "approve", "output": { … } }
+```
+
+| Pausing node | Suspends until… | Resumed by |
+| :--- | :--- | :--- |
+| `approval` | a human decision | the approvals service (`POST /api/v1/approvals/requests/:id/approve\|reject`) — resumes down the matching `approve` / `reject` edge. **Always decide through the approvals API**, never by calling `resume` directly: a direct resume strands the pending `sys_approval_request`, so the record stays locked and later approvals on the same record hit `DUPLICATE_REQUEST`. |
+| `screen` | a user submits the form | the UI runner posting the collected `inputs`; a `paused` response carrying the next `screen` chains multi-step wizards under one stable `runId` |
+| `wait` (timer) | an ISO-8601 duration elapses | **automatically** — a one-shot job resumes the run; after a cold boot the engine re-arms pending timers from the durable store (overdue timers resume immediately) |
+| `wait` (signal) | a named external event | any caller invoking `resume(runId)` |
+
+### Nested pause — pausing inside a subflow
+
+A pausing node inside a `subflow` suspends the **whole chain as linked runs**:
+the child run pauses at its node, and the parent pauses at the `subflow` node
+(`correlation: 'subflow:<childRunId>'`). Both continuations are durable, and
+the chain resolves from either end:
+
+- deciding the child's approval (or its timer firing) completes the child and
+  **bubbles** its output back into the parent, which continues with the same
+  `${nodeId}.output` / `outputVariable` mapping as a synchronous subflow;
+- resuming the **parent** run id (what a UI holds from the original launch)
+  **delegates** down to the suspended child — multi-screen child wizards keep
+  the parent run id stable.
+
+A child that fails terminally after the pause fails every waiting ancestor, so
+no run is stranded as resumable-forever. See the worked example pair in the
+showcase app: `showcase_project_closure` invokes the reusable
+`showcase_closure_signoff` approval subflow and notifies the owner with the
+bubbled decision.
+
+### Observing runs
+
+```
+GET /api/v1/automation/{flow}/runs                 # run history (status, steps, error)
+GET /api/v1/automation/{flow}/runs/{runId}         # one run
+GET /api/v1/automation/{flow}/runs/{runId}/screen  # re-fetch a paused screen
+```
+
+Each run's `steps[]` records every executed node — including loop iterations,
+parallel branch bodies, and try/catch region steps — and the Studio flow
+designer surfaces the same data in its **Runs** side panel. Run history is an
+in-memory ring buffer (the durable rows in `sys_automation_run` hold only
+*live pauses*), so history starts fresh on each boot.
 
 ## Edges
 
