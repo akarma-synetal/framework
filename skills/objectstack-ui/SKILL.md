@@ -349,8 +349,8 @@ an `aggregate` measure or chart spec, and a `layout: {x,y,w,h}`.
 See the **Production Pattern** section below for the full
 `Dashboard` shape with `refreshInterval`, header actions, date range,
 global filters, widget options, and the period-over-period (`compareTo`)
-/ date-bucketing (`categoryGranularity`) modifiers available on every
-data-bound widget.
+modifier; date bucketing comes from the bound dataset dimension's
+`dateGranularity` (ADR-0021).
 
 ### Dataset-Bound Widgets
 
@@ -403,27 +403,29 @@ filter; keep `filter` on the widget when binding a dataset.
 ```typescript
 import type { ReportInput } from '@objectstack/spec/ui';
 
+// ADR-0021: a report binds a `dataset` and selects `rows` (dimensions) +
+// `values` (measures) BY NAME. The `opportunity_metrics` dataset defines the
+// object, the `amount_sum` measure, and the `forecast_category` + `close_date`
+// (dateGranularity: 'quarter') dimensions — see Guides → Analytics Datasets.
 export const PipelineCoverageReport: ReportInput = {
   name: 'pipeline_coverage_by_quarter',
   label: 'Pipeline Coverage (Quarter)',
-  objectName: 'opportunity',
   type: 'matrix',
-  columns: [
-    { field: 'name',   label: 'Opportunity' },
-    { field: 'amount', label: 'Amount', aggregate: 'sum' },
-  ],
-  groupingsDown:   [{ field: 'forecast_category', sortOrder: 'asc' }],
-  groupingsAcross: [{ field: 'close_date', dateGranularity: 'quarter' }],
-  filter: { stage: { $ne: 'closed_lost' } },
-  chart: { type: 'bar', xAxis: 'forecast_category', yAxis: 'amount' },
+  dataset: 'opportunity_metrics',
+  rows: ['forecast_category', 'close_date'],
+  values: ['amount_sum'],
+  runtimeFilter: { stage: { $ne: 'closed_lost' } },
+  chart: { type: 'bar', xAxis: 'forecast_category', yAxis: 'amount_sum' },
 };
 ```
 
-> **`dateGranularity`** on a grouping (`day | week | month | quarter | year`)
-> tells the server to bucket date fields in a single aggregate query — do
-> **not** pre-compute virtual columns for this.
-> **`groupingsDown`** drives row groupings (summary). Add `groupingsAcross`
-> to upgrade to a matrix. Multi-level grouping = multiple entries in the array.
+> **`dateGranularity`** lives on the dataset's date **dimension**
+> (`day | week | month | quarter | year`); selecting that dimension buckets the
+> field server-side in a single aggregate query — do **not** pre-compute virtual
+> columns for this.
+> **`rows`** are the report's grouping dimensions (selected from the dataset by
+> name). A `summary` groups by them; a `matrix` cross-tabs them. Multi-level
+> grouping = multiple dimension names in the array.
 
 ---
 
@@ -537,7 +539,7 @@ Use this CRM-style structure as the canonical UI assembly reference:
 | **Public / anonymous form** | `src/views/*.view.ts` (formView with `sharing.allowAnonymous: true`) | Web-to-Lead / Web-to-Case. Auto-exposed at `GET/POST /api/v1/forms/:slug`. See `guides/public-forms.mdx` |
 | App navigation | `src/apps/*.app.ts` | Use grouped nav trees, `viewName` shortcuts, and `requiresObject` for capability-aware visibility |
 | Dashboards | `src/dashboards/*.dashboard.ts` | Combine KPI + chart + table widgets with shared `dateRange` and `globalFilters` |
-| Reports | `src/reports/*.report.ts` | Prefer `groupingsDown` + `groupingsAcross` + `dateGranularity` for matrix/summary analytics |
+| Reports | `src/reports/*.report.ts` | Bind a `dataset` + `rows` (dimensions) + `values` (measures) for tabular/summary/matrix/joined analytics |
 | Record pages | `src/pages/*.page.ts` | Compose `regions` + components (`page:header`, `record:highlights`, related lists, tabs) |
 | User actions | `src/actions/*.actions.ts` | Use `flow` for orchestration and `modal` for parameterized bulk mutations |
 
@@ -559,8 +561,8 @@ ObjectUI capabilities exist and prefer the protocol-native shape:
 | Line-item grids | Spreadsheet editing, computed cells, ghost row, lookup auto-fill, duplicate, drag reorder, subtotal/tax/total | Keep line fields on the child object; use `position`/`sort_order` and summary fields |
 | Record detail | Derived related lists, action slots, system/audit sections, record-page assignment, optional reference rail | Let relationships derive related lists unless a record page needs bespoke placement |
 | Pages | Page create flows, block canvas, slotted record pages, block property inspectors, nested container blocks | Use Page metadata for layout; use full Action objects in `page:header.properties.actions` |
-| Dashboards | Metric/chart/list/pivot/funnel/table widgets, drill-downs, type-aware cells, date bucketing, dataset-bound widgets | Prefer dataset-bound widgets for governed metrics; inline object widgets remain valid |
-| Reports | Spec-native tabular/summary/matrix/joined reports, chart/KPI blocks, drill-downs, dataset-bound reports | Prefer `groupingsDown` / `groupingsAcross` / `dataset` over ad hoc client shaping |
+| Dashboards | Metric/chart/list/pivot/funnel/table widgets, drill-downs, type-aware cells, date bucketing, dataset-bound widgets | Bind every widget to a `dataset` + `values` (+ `dimensions`); the inline object/valueField/aggregate form was removed (ADR-0021) |
+| Reports | Spec-native tabular/summary/matrix/joined reports, chart/KPI blocks, drill-downs, dataset-bound reports | Bind a `dataset` + `rows` + `values`; joined reports carry dataset-bound `blocks` |
 | Actions | Row/global/header actions, modal parameter collection, visible CEL, popup-safe opens, nested action runner sharing | Define actions as metadata; use row context/defaultFromRow instead of custom code |
 | Flow designer | Typed node config panels, trigger/decision forms, reference pickers, simulator/debug runner | Author flows with typed config, not advanced JSON fallbacks |
 | Console utilities | Integrations & APIs, public forms, flow runs, approvals inbox, settings, marketplace/package management, AI draft review/publish | Link app navigation to these surfaces with capability gates where appropriate |
@@ -603,15 +605,18 @@ export const SalesDashboard: Dashboard = {
       optionsFrom: { object: 'user', valueField: 'id', labelField: 'name' } },
   ],
 
+  // ADR-0021: widgets bind a semantic `dataset` and select dimensions/measures
+  // BY NAME (the `opportunity_metrics` / `order_metrics` datasets define the base
+  // object, measures, and date dimensions — see Guides → Analytics Datasets). The
+  // widget `filter` is the presentation-scope runtimeFilter.
   widgets: [
     {
       id: 'total_pipeline_value', type: 'metric',
       title: 'Total Pipeline',
-      object: 'opportunity',
+      dataset: 'opportunity_metrics', values: ['total_amount'],
       filter: { stage: { $nin: ['closed_won', 'closed_lost'] } },
-      valueField: 'amount', aggregate: 'sum',
       layout: { x: 0, y: 0, w: 3, h: 2 },
-      options: { icon: 'DollarSign', format: '0,0' },
+      options: { icon: 'DollarSign' },   // the measure's own `format` drives the number
       // Period-over-period: renderer fetches the prior quarter and
       // surfaces a secondary value + delta arrow automatically.
       compareTo: 'previousPeriod',
@@ -620,13 +625,13 @@ export const SalesDashboard: Dashboard = {
 
     // Chart widget with comparison overlay (M2). The renderer issues a
     // second query with the time window shifted by `compareTo` and
-    // overlays it as a muted/dashed series.
+    // overlays it as a muted/dashed series. The date axis is a dataset
+    // dimension whose monthly bucketing lives on the dataset (`dateGranularity`).
     {
       id: 'revenue_vs_last_year', type: 'line',
       title: 'Revenue — This Year vs Last',
-      object: 'order',
+      dataset: 'order_metrics', dimensions: ['closed_at'], values: ['total_sum'],
       filter: { closed_at: { $gte: '{current_year_start}', $lte: '{current_year_end}' } },
-      categoryField: 'closed_at', valueField: 'total', aggregate: 'sum',
       compareTo: 'previousYear',
       layout: { x: 3, y: 0, w: 9, h: 4 },
     },
@@ -670,62 +675,62 @@ no second `filter` is required.
   date-bound clauses.
 
 ```typescript
-// Metric — WoW delta
-{ id: 'done_this_week', type: 'metric', object: 'task',
+// Metric — WoW delta (binds the task_metrics dataset; filter = runtimeFilter)
+{ id: 'done_this_week', type: 'metric', dataset: 'task_metrics', values: ['task_count'],
   filter: { assignee: '{current_user_id}', status: 'done',
             completed_at: { $gte: '{week_start}' } },
-  aggregate: 'count',
   compareTo: 'previousPeriod' }
 
 // Bar — YoY overlay on a stable category set
-{ id: 'headcount_by_dept', type: 'bar', object: 'employee',
+{ id: 'headcount_by_dept', type: 'bar', dataset: 'employee_metrics',
+  dimensions: ['department'], values: ['headcount'],
   filter: { status: { $ne: 'terminated' } },
-  aggregate: 'count', categoryField: 'department',
   compareTo: 'previousYear' }
 ```
 
-### Server-side date bucketing — `categoryGranularity`
+### Server-side date bucketing — `dateGranularity` (ADR-0021)
 
-For any chart with `categoryField` pointing at a date/datetime field, set
-`categoryGranularity` to bucket values server-side. Without it every
-distinct timestamp becomes its own category, which collapses a 12-row
-seed dataset into a 12-point flat-line chart.
-
-| Value | Bucket key |
-|:--|:--|
-| `'day'` | Calendar day (`YYYY-MM-DD`) |
-| `'week'` | ISO week (`YYYY-Www`) |
-| `'month'` | Calendar month (`YYYY-MM`) |
-| `'quarter'` | Calendar quarter (`YYYY-Qn`) |
-| `'year'` | Calendar year (`YYYY`) |
-
-* **Engine support** — Postgres `date_trunc`, MySQL `date_format`, SQLite
-  `strftime`, MongoDB `$dateTrunc`, in-memory `bucketDateValue` fallback.
-  All emitted by the analytics service, not the client.
-* **Rule of thumb** — `day` for ≤30d windows, `week` for ~90d, `month`
-  for 6–12 months, `quarter` for multi-year, `year` for retention /
-  compliance scopes.
-* **Combines with `compareTo`** — the comparison query is issued with the
-  same granularity, so the muted overlay aligns bucket-for-bucket.
-* **xAxis format** — pair with a matching `chartConfig.xAxis.format`
-  (`%b %d` for day, `%b %Y` for month, etc.) so the rendered labels
-  match the bucket grain.
+Date bucketing lives on the **dataset dimension**, not the widget. Give a date
+dimension a `dateGranularity` and any presentation that selects it groups by that
+bucket server-side — without it every distinct timestamp becomes its own
+category, collapsing a 12-row seed into a 12-point flat line. (The old widget-level
+`categoryGranularity` was removed in the single-form cutover.)
 
 ```typescript
-// Line chart — monthly trend with YoY overlay
-{ id: 'signed_by_month', type: 'line', object: 'contract',
+// In the dataset (Guides → Analytics Datasets):
+defineDataset({
+  name: 'contract_metrics', object: 'contract',
+  dimensions: [{ name: 'signed_date', field: 'signed_date', type: 'date', dateGranularity: 'month' }],
+  measures: [{ name: 'signed_count', aggregate: 'count' }],
+});
+
+// The widget just selects the dimension by name:
+{ id: 'signed_by_month', type: 'line',
+  dataset: 'contract_metrics', dimensions: ['signed_date'], values: ['signed_count'],
   filter: { signed_date: { $gte: '{12_months_ago}' } },
-  aggregate: 'count',
-  categoryField: 'signed_date',
-  categoryGranularity: 'month',
-  compareTo: 'previousYear',
-  chartConfig: {
-    type: 'line',
-    xAxis: { field: 'signed_date', format: '%b %Y' },
-    yAxis: [{ field: 'value', format: '0,0' }],
-  },
-}
+  compareTo: 'previousYear' }
 ```
+
+| `dateGranularity` | Rendered bucket label |
+|:--|:--|
+| `'day'` | `YYYY-MM-DD` |
+| `'week'` | ISO date of the bucket (`YYYY-MM-DD`) |
+| `'month'` | `YYYY-MM` |
+| `'quarter'` | `YYYY-Qn` |
+| `'year'` | `YYYY` |
+
+* **Engine support** — Postgres `date_trunc`, MySQL `date_format`, SQLite
+  `strftime`, MongoDB `$dateTrunc`, in-memory fallback. All emitted by the
+  analytics service, not the client.
+* **Human labels are automatic** — the analytics layer formats the bucket value
+  to the label above, and resolves `select`/`lookup` dimension values to their
+  option label / related-record name. Measures carry their `label` + `format`
+  (e.g. `$0,0`) so KPIs and legends read "Total Spent / $616,000", not
+  "spent_sum / 616000". Authors do not format dimension/measure values by hand.
+* **Combines with `compareTo`** — the comparison query is issued with the same
+  granularity, so the muted overlay aligns bucket-for-bucket.
+* **Rule of thumb** — `day` for ≤30d windows, `week` for ~90d, `month` for
+  6–12 months, `quarter` for multi-year, `year` for retention / compliance.
 
 ---
 
