@@ -18,6 +18,7 @@ import { NativeSQLStrategy } from './strategies/native-sql-strategy.js';
 import { ObjectQLStrategy } from './strategies/objectql-strategy.js';
 import { compileDataset, type CompiledDataset, type RelationshipResolver } from './dataset-compiler.js';
 import { DatasetExecutor } from './dataset-executor.js';
+import { resolveDimensionLabels, type DimensionLabelDeps } from './dimension-labels.js';
 
 /**
  * Configuration for AnalyticsService.
@@ -92,6 +93,14 @@ export interface AnalyticsServiceConfig {
   relationshipResolver?: RelationshipResolver;
   /** Pre-defined datasets to compile + register at construction (ADR-0021). */
   datasets?: Dataset[];
+  /**
+   * ADR-0021 — resolve raw dimension values to human display labels. When
+   * provided, `queryDataset` post-processes result rows so a `select` dimension
+   * shows its option label (not the stored value) and a `lookup`/`master_detail`
+   * dimension shows the related record's display name (not the FK id). Injected
+   * by the plugin from the `data` engine; omit to keep raw values.
+   */
+  labelResolver?: DimensionLabelDeps;
 }
 
 /**
@@ -131,6 +140,8 @@ export class AnalyticsService implements IAnalyticsService {
   private readonly datasetRegistry = new Map<string, CompiledDataset>();
   /** Optional object-graph resolver used when compiling datasets. */
   private readonly relationshipResolver?: RelationshipResolver;
+  /** Optional dimension display-label resolver (select options / lookup names). */
+  private readonly labelResolver?: DimensionLabelDeps;
   readonly cubeRegistry: CubeRegistry;
   private readonly logger: Logger;
 
@@ -145,6 +156,7 @@ export class AnalyticsService implements IAnalyticsService {
 
     this.readScopeProvider = config.getReadScope;
     this.relationshipResolver = config.relationshipResolver;
+    this.labelResolver = config.labelResolver;
 
     // Compile + register pre-defined datasets (ADR-0021).
     if (config.datasets) {
@@ -311,7 +323,26 @@ export class AnalyticsService implements IAnalyticsService {
   ): Promise<AnalyticsResult> {
     const compiled = this.registerDataset(dataset);
     this.logger.debug(`[Analytics] queryDataset "${dataset.name}" (object=${dataset.object}, include=${(dataset.include ?? []).join(',') || '—'})`);
-    return new DatasetExecutor(this).execute(compiled, selection, context);
+    const result = await new DatasetExecutor(this).execute(compiled, selection, context);
+
+    // ADR-0021 — resolve grouped dimension values to human display labels
+    // (select option label, lookup related-record name). Charts render the
+    // dimension key verbatim, so this is the single place that turns a stored
+    // value / FK id into the text a user expects to read.
+    if (this.labelResolver && selection.dimensions?.length) {
+      const dims = selection.dimensions
+        .map((name) => dataset.dimensions?.find((d) => d.name === name))
+        .filter((d): d is NonNullable<typeof d> => !!d?.field)
+        .map((d) => ({ name: d.name, field: d.field }));
+      if (dims.length) {
+        try {
+          await resolveDimensionLabels(dataset.object, dims, result.rows, this.labelResolver);
+        } catch (e) {
+          this.logger?.warn?.(`[Analytics] dimension label resolution failed for "${dataset.name}": ${String((e as Error)?.message ?? e)}`);
+        }
+      }
+    }
+    return result;
   }
 
   /**
