@@ -1,0 +1,166 @@
+---
+title: Analytics Datasets
+description: The dataset semantic layer (ADR-0021) — define a metric once, bind reports and dashboards to it by name.
+---
+
+# Analytics Datasets
+
+> **Related ADR:** [ADR-0021 — Analytics: one semantic `dataset` layer](https://github.com/objectstack-ai/framework/blob/main/docs/adr/0021-analytics-dataset-semantic-layer.md)
+
+A **dataset** is a named, reusable analytical definition — a base object, the
+relationships to include, and the declared **dimensions** (groupable axes) and
+**measures** (aggregatable values). Reports and dashboards bind to a dataset *by
+reference* and select dimensions/measures *by name* — they never re-declare
+`object` / `field` / `aggregate` inline.
+
+This is the industry-convergent shape (Looker LookML, Power BI dataset+model,
+dbt metrics, Salesforce CRM-Analytics): **a governed semantic layer below; thin
+presentations above.**
+
+## Why a semantic layer
+
+Without one, the same metric is re-defined inline in every surface — a report's
+columns, a dashboard widget's `valueField` + `aggregate`, a list-view chart.
+That produces three defects fatal for an enterprise core system:
+
+1. **No joins** — "revenue by account region" needs `order ⋈ account`. An inline
+   single-object query can't reach it.
+2. **Metric drift** — "revenue" defined three times in three grammars diverges
+   across a report, a dashboard tile, and a list chart. A governance red line.
+3. **No source of truth** — no drill-through, no certification, no reuse.
+
+A dataset fixes all three: `revenue` is defined **once**, joins are derived from
+the object graph, and every surface references the same definition.
+
+## Authoring a dataset
+
+```ts
+// src/datasets/sales.dataset.ts
+import { defineDataset } from '@objectstack/spec/ui';
+
+export const SalesDataset = defineDataset({
+  name: 'sales',
+  label: 'Sales',
+  object: 'opportunity',
+
+  // Relationships to include BY NAME (lookup / master_detail field names).
+  // Joins are COMPILED from these — you never write an ON clause.
+  include: ['account'],
+
+  // Definition-level scope (the dataset's intrinsic filter).
+  filter: { is_deleted: { $ne: true } },
+
+  // Groupable axes — a base field, or a `relationship.field` path.
+  dimensions: [
+    { name: 'stage', field: 'stage', type: 'string' },
+    { name: 'region', field: 'account.region', type: 'string' },
+    { name: 'close_date', field: 'close_date', type: 'date', dateGranularity: 'month' },
+  ],
+
+  // Aggregatable values — defined ONCE here; referenced everywhere by name.
+  measures: [
+    { name: 'opp_count', aggregate: 'count' },
+    { name: 'revenue', aggregate: 'sum', field: 'amount', format: '$0,0', certified: true },
+    { name: 'won_amount', aggregate: 'sum', field: 'amount', filter: { stage: 'closed_won' } },
+    // Derived measure — references OTHER measures by name only (no raw fields/SQL).
+    { name: 'win_rate', derived: { op: 'ratio', of: ['won_amount', 'revenue'] }, format: '0.0%' },
+  ],
+});
+```
+
+Register it in your stack alongside `objects` / `dashboards`:
+
+```ts
+export default defineStack({
+  // ...
+  datasets: Object.values(datasets),
+});
+```
+
+### Key rules
+
+- **No raw SQL, no hand-authored joins.** The author declares *which*
+  relationships to include; the compiler derives the join from the object graph.
+- **`certified: true`** marks a human-blessed metric — the review checkpoint.
+  Reviewing AI output collapses to "did it use certified measures correctly."
+- **Derived measures** are first-class but *closed*: they reference other
+  measures by name only (`ratio` / `sum` / `difference` / `product`).
+- **RLS / tenant scoping is enforced by the runtime**, per joined object — never
+  declared in the dataset. There is one place to reason about access.
+
+## Binding a dashboard widget
+
+A widget selects dimensions/measures by name. Its presentation-scope `filter`
+flows into the query as the runtime filter:
+
+```ts
+{
+  id: 'revenue_by_stage',
+  type: 'bar',
+  title: 'Pipeline by Stage',
+  dataset: 'sales',
+  dimensions: ['stage'],      // X / group / split
+  values: ['revenue'],        // Y — the measure name, not amount+sum
+  filter: { stage: { $nin: ['closed_lost'] } }, // presentation scope (runtimeFilter)
+}
+```
+
+A `metric` (KPI) widget omits `dimensions` and shows the single measure value.
+
+## Binding a report
+
+```ts
+export const SalesByStageReport = {
+  name: 'sales_by_stage',
+  label: 'Sales by Stage',
+  dataset: 'sales',
+  rows: ['stage'],            // dimension names down
+  values: ['revenue'],        // measure names
+  runtimeFilter: { close_date: { $gte: '{current_quarter_start}' } },
+};
+```
+
+`rows` are the pivot's down-axis dimensions; `values` are measure names. A matrix
+report adds across-axis dimensions; `runtimeFilter` is the render-time scope
+(`{date-macro}` placeholders are resolved by the renderer before querying).
+
+## Cross-object joins
+
+Because the dataset's `include` compiles to the analytics runtime's join path,
+any report or widget can be multi-object **safely** — the headline enterprise
+capability the inline single-object query could never reach:
+
+```ts
+{ dataset: 'sales', dimensions: ['region'], values: ['revenue'] }
+// → revenue by account.region, joined + RLS-enforced per object.
+```
+
+## How it runs
+
+A dataset compiles to the **Cube analytics runtime** (`IAnalyticsService`). The
+REST surface is:
+
+```
+POST {basePath}/analytics/dataset/query
+{ datasetName: 'sales',
+  selection: { dimensions: ['stage'], measures: ['revenue'], runtimeFilter: {...} } }
+```
+
+The same governed path backs the Studio dataset preview, dashboard widgets, and
+dataset-bound reports — so the numbers match everywhere.
+
+## Migrating from inline queries
+
+ADR-0021's terminal state is **one** author-facing shape. The migration runs in
+two steps so it can be verified safely:
+
+1. **Dual-form (additive).** A report/widget keeps its legacy inline query AND
+   gains a `dataset` binding. A read-only reconciliation harness asserts both
+   forms return identical numbers (the financial-correctness gate).
+2. **Single-form (terminal).** Once every surface reconciles and `grep` shows no
+   inline residue, the inline query fields and `ListChartConfigSchema` are
+   removed and the union collapses to the single dataset shape.
+
+Author new analytics directly in dataset form; reach for a **named** dataset when
+a metric is shared or must be certified, and an inline anonymous dataset for a
+one-off single-object KPI.

@@ -357,7 +357,12 @@ data-bound widget.
 For shared metrics, prefer the ADR-0021 dataset shape over per-widget inline
 queries. A widget binds to `dataset` and selects named `dimensions` and
 `values`; the dataset owns the base object, allowed joins, intrinsic filter,
-dimensions, and certified measures.
+dimensions, and certified measures. Reports bind the same way (`dataset` +
+`rows` + `values` + `runtimeFilter`). Full guide: **Guides → Analytics Datasets**
+(`content/docs/guides/analytics-datasets.mdx`).
+
+A widget's presentation-scope `filter` flows into the query as the runtime
+filter; keep `filter` on the widget when binding a dataset.
 
 ```typescript
 {
