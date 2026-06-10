@@ -7,6 +7,7 @@ import type { IAnalyticsService } from '@objectstack/spec/contracts';
 import { AnalyticsService } from './analytics-service.js';
 import type { AnalyticsServiceConfig } from './analytics-service.js';
 import type { DriverCapabilities } from './strategies/types.js';
+import { pickDisplayField, type DimensionLabelDeps } from './dimension-labels.js';
 
 /**
  * Minimal IDataEngine surface required for the auto-bridge.
@@ -22,8 +23,14 @@ interface DataEngineLike {
     aggregations?: Array<{ function: string; field: string; alias: string }>;
   }): Promise<unknown[]>;
   execute?(command: unknown, options?: Record<string, unknown>): Promise<unknown>;
-  /** Return the registered object schema (for relationship → target resolution). */
-  getObject?(name: string): { fields?: Record<string, { type?: string; reference?: string }> } | undefined;
+  /** Return the registered object schema (relationship → target + display-label resolution). */
+  getObject?(name: string): {
+    fields?: Record<string, {
+      type?: string;
+      reference?: string;
+      options?: Array<{ value: unknown; label?: string }>;
+    }>;
+  } | undefined;
 }
 
 /**
@@ -279,6 +286,40 @@ export class AnalyticsServicePlugin implements Plugin {
       return engine ? undefined : relationshipName;
     };
 
+    // ADR-0021 — dimension display-label resolution. `queryDataset` groups by a
+    // dimension's raw stored value; for `select` fields the user-facing text is
+    // the option label, and for `lookup`/`master_detail` fields it's the related
+    // record's display name. Wire the two low-level capabilities the resolver
+    // needs from the 'data' engine (resolved lazily so plugin-init order is free):
+    //   - field metadata (select options + lookup target), via getObject
+    //   - id→name pairs, via the executeAggregate bridge (group by id + name)
+    const dataEngine = (): DataEngineLike | undefined => {
+      try {
+        const svc = ctx.getService<DataEngineLike>('data');
+        return svc && typeof svc.getObject === 'function' ? svc : undefined;
+      } catch { return undefined; }
+    };
+    const labelResolver: DimensionLabelDeps = {
+      getObjectFields: (objectName) => dataEngine()?.getObject?.(objectName)?.fields,
+      fetchRecordLabels: async (targetObject, ids) => {
+        const map = new Map<unknown, string>();
+        const displayField = pickDisplayField(dataEngine()?.getObject?.(targetObject)?.fields);
+        if (!displayField || !executeAggregate || ids.length === 0) return map;
+        // Group by (id, displayField) — one row per record — reusing the aggregate
+        // bridge rather than adding a record-fetch capability. A count keeps engines
+        // that require ≥1 aggregation happy; the count itself is unused.
+        const rows = await executeAggregate(targetObject, {
+          groupBy: ['id', displayField],
+          aggregations: [{ field: 'id', method: 'count', alias: '_c' }],
+          filter: { id: { $in: ids } },
+        });
+        for (const r of rows) {
+          if (r.id != null && r[displayField] != null) map.set(r.id, String(r[displayField]));
+        }
+        return map;
+      },
+    };
+
     const config: AnalyticsServiceConfig = {
       cubes: this.options.cubes,
       logger: ctx.logger,
@@ -289,6 +330,7 @@ export class AnalyticsServicePlugin implements Plugin {
       getReadScope,
       getAllowedRelationships: this.options.getAllowedRelationships,
       relationshipResolver,
+      labelResolver,
     };
 
     if (autoBridgedReadScope) {
