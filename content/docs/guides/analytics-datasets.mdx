@@ -149,6 +149,22 @@ POST {basePath}/analytics/dataset/query
 The same governed path backs the Studio dataset preview, dashboard widgets, and
 dataset-bound reports — so the numbers match everywhere.
 
+### Display values are resolved server-side
+
+The query result is presentation-ready — authors do not format dimension or
+measure values by hand:
+
+- **Dimensions** — a `select` dimension returns its option **label** (not the
+  stored value), a `lookup` / `master_detail` dimension returns the related
+  record's **display name** (not the FK id), and a `date` dimension with a
+  `dateGranularity` returns a human bucket label (`month` → `2026-04`,
+  `quarter` → `2026-Q2`, `year` → `2026`). Unresolved values pass through
+  unchanged, never blank.
+- **Measures** — each measure column carries its `label` and `format` on the
+  result `fields`, so a KPI or chart legend reads "Total Spent / $616,000"
+  rather than "spent_sum / 616000". The renderer applies the `format` at display
+  time (it can't be baked into the numeric row value charts plot).
+
 ## Migrating from inline queries
 
 ADR-0021's terminal state is **one** author-facing shape. The migration runs in
