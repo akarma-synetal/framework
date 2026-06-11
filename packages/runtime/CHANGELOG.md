@@ -1,5 +1,28 @@
 # @objectstack/runtime
 
+## 9.2.0
+
+### Patch Changes
+
+- Updated dependencies [2f57b75]
+- Updated dependencies [2f57b75]
+  - @objectstack/spec@9.2.0
+  - @objectstack/core@9.2.0
+  - @objectstack/formula@9.2.0
+  - @objectstack/metadata@9.2.0
+  - @objectstack/objectql@9.2.0
+  - @objectstack/observability@9.2.0
+  - @objectstack/driver-memory@9.2.0
+  - @objectstack/driver-sql@9.2.0
+  - @objectstack/driver-sqlite-wasm@9.2.0
+  - @objectstack/plugin-auth@9.2.0
+  - @objectstack/plugin-org-scoping@9.2.0
+  - @objectstack/plugin-security@9.2.0
+  - @objectstack/rest@9.2.0
+  - @objectstack/service-cluster@9.2.0
+  - @objectstack/service-i18n@9.2.0
+  - @objectstack/types@9.2.0
+
 ## 9.1.0
 
 ### Patch Changes
