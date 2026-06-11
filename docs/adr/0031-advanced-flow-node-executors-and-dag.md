@@ -199,7 +199,7 @@ with best-effort folding of foreign BPMN gateways. BPMN 2.0 **XML**
 - Durable pause *inside* a `parallel` branch or `loop` iteration — the structured
   constructs run their regions synchronously here. Generalizing the engine's
   single-program-counter to a token/scope tree (the runtime dual of these
-  regions) is [ADR-0037](./0037-token-scope-tree-execution.md).
+  regions) is [ADR-0039](./0039-token-scope-tree-execution.md).
 
 ## Already shipped this line of work
 
