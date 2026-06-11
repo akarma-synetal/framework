@@ -79,8 +79,8 @@ jobs:
           fi
           CHANGESET_COUNT=$(find .changeset -name '*.md' ! -name 'README.md' | wc -l)
           if [ "$CHANGESET_COUNT" -eq 0 ]; then
-            echo "::warning::No changeset found. Please add a changeset if this PR includes user-facing changes."
-            echo "Run 'pnpm changeset' to create one, or add the 'skip-changeset' label if not needed."
+            echo "::error::No changeset found. Add one with 'pnpm changeset' if this PR includes user-facing changes, or apply the 'skip-changeset' label if it doesn't."
+            exit 1
           else
             echo "Found $CHANGESET_COUNT changeset(s)"
           fi
