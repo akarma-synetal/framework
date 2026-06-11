@@ -1,4 +1,4 @@
-# ADR-0037: Concurrent durable pause — multi-instance nodes now, token/scope-tree later
+# ADR-0039: Concurrent durable pause — multi-instance nodes now, token/scope-tree later
 
 **Status**: Proposed (2026-06-11) — revised after a code + industry self-review
 **Deciders**: ObjectStack Protocol Architects

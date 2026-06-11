@@ -833,7 +833,7 @@ export const ResilientSyncFlow = defineFlow({
 });
 
 /**
- * Invoice Dual Sign-off — the worked **parallel-approval** example (ADR-0037
+ * Invoice Dual Sign-off — the worked **parallel-approval** example (ADR-0039
  * Track A: aggregating approval node, no engine-core change).
  *
  * "Finance AND legal must both sign off before an invoice is sent" is expressed
@@ -853,7 +853,7 @@ export const ResilientSyncFlow = defineFlow({
 export const InvoiceDualSignoffFlow = defineFlow({
   name: 'showcase_invoice_signoff',
   label: 'Invoice Dual Sign-off (parallel approval)',
-  description: 'On send, requires finance AND legal to both approve via one aggregating approval node — demonstrates parallel approvals without a token tree (ADR-0037 Track A).',
+  description: 'On send, requires finance AND legal to both approve via one aggregating approval node — demonstrates parallel approvals without a token tree (ADR-0039 Track A).',
   type: 'autolaunched',
   nodes: [
     {
@@ -957,7 +957,7 @@ export const OneTaskSignoffSubflow = defineFlow({
 });
 
 /**
- * Release Sign-off — the worked **batch-approval** example (ADR-0037 Track A2:
+ * Release Sign-off — the worked **batch-approval** example (ADR-0039 Track A2:
  * the sequential `map` / multi-instance node).
  *
  * "Every task in the release must be signed off, one at a time" is a **single
@@ -975,7 +975,7 @@ export const OneTaskSignoffSubflow = defineFlow({
 export const ReleaseSignoffFlow = defineFlow({
   name: 'showcase_release_signoff',
   label: 'Release Sign-off (batch approval / map)',
-  description: 'Signs off every task in a release one at a time via a map node — demonstrates batch approval (ADR-0037 Track A2).',
+  description: 'Signs off every task in a release one at a time via a map node — demonstrates batch approval (ADR-0039 Track A2).',
   type: 'autolaunched',
   variables: [
     { name: 'items', type: 'list', isInput: true },
