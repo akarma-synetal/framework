@@ -376,6 +376,37 @@ describe('ApprovalService (node era)', () => {
     expect(rows[0].record_title).toBe('Snapshot Title');
   });
 
+  it('enrichment resolves lookup foreign keys in the payload to record titles', async () => {
+    (engine as any).getSchema = (name: string) =>
+      name === 'opportunity'
+        ? { label: 'Opportunity', fields: { name: {}, account: { type: 'lookup', reference: 'account' } } }
+        : name === 'account' ? { label: 'Account', fields: { name: {} } } : undefined;
+    engine._tables['opportunity'] = [{ id: 'opp1', name: 'Acme Renewal', account: 'acc1' }];
+    engine._tables['account'] = [{ id: 'acc1', name: 'Acme Corp' }];
+    await svc.openNodeRequest(openInput(['u9'], { record: { id: 'opp1', name: 'Acme Renewal', account: 'acc1' } }), CTX);
+    const rows = await svc.listRequests({ status: 'pending' }, SYS);
+    expect(rows[0].object_label).toBe('Opportunity');
+    expect(rows[0].payload_display).toEqual({ account: 'Acme Corp' });
+  });
+
+  it('enrichment maps user-id approvers to display names', async () => {
+    engine._tables['sys_user'] = [{ id: 'u9', name: 'Grace Hopper', email: 'grace@example.com' }];
+    await svc.openNodeRequest(openInput(['u9']), CTX);
+    const rows = await svc.listRequests({ status: 'pending' }, SYS);
+    expect(rows[0].pending_approver_names).toEqual({ u9: 'Grace Hopper' });
+  });
+
+  it('listActions resolves actor display names', async () => {
+    engine._tables['sys_user'] = [
+      { id: 'u1', name: 'Ada Lovelace', email: 'ada@example.com' },
+      { id: 'u9', name: 'Grace Hopper', email: 'grace@example.com' },
+    ];
+    const req = await svc.openNodeRequest(openInput(['u9']), CTX);
+    await svc.decideNode(req.id, { decision: 'approve', actorId: 'u9' }, SYS);
+    const actions = await svc.listActions(req.id, SYS);
+    expect(actions.map(a => (a as any).actor_name)).toEqual(['Ada Lovelace', 'Grace Hopper']);
+  });
+
   it('enrichment resolves an email submitter via sys_user.email', async () => {
     engine._tables['sys_user'] = [{ id: 'u7', name: 'Grace Hopper', email: 'grace@example.com' }];
     await svc.openNodeRequest(openInput(['u9'], { submitterId: 'grace@example.com' }), CTX);
