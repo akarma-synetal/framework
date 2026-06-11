@@ -113,6 +113,7 @@ Each node performs a specific action in the flow.
 | `screen` | Display a user form/screen (durable pause) |
 | `wait` | Pause for a timer or named signal (durable pause; timers auto-resume) |
 | `subflow` | Invoke another flow — a pause inside the child suspends both runs as a linked chain |
+| `map` | Sequential multi-instance — run a per-item subflow for each element, one at a time (each may pause); batch approval (ADR-0039) |
 | `connector_action` | Execute an external connector action |
 
 ### Node Structure
