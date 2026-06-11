@@ -57,6 +57,19 @@ export interface ApprovalRequestRow {
   record_title?: string;
   /** Display name of the submitter (`sys_user.name`), when resolvable. */
   submitter_name?: string;
+  /** Schema label of the target object (e.g. "Project" for `showcase_project`). */
+  object_label?: string;
+  /**
+   * Display names for user-id entries in `pending_approvers`
+   * (id → `sys_user.name`). Emails and `role:<r>` entries are not mapped —
+   * they are already human-readable.
+   */
+  pending_approver_names?: Record<string, string>;
+  /**
+   * Display values for lookup fields in `payload` (field key → referenced
+   * record's display name), so inbox summaries never show foreign-key ids.
+   */
+  payload_display?: Record<string, string>;
 }
 
 /** Audit row. */
@@ -69,6 +82,8 @@ export interface ApprovalActionRow {
   actor_id?: string;
   comment?: string;
   created_at?: string;
+  /** Display name of the actor (`sys_user.name`), when resolvable. */
+  actor_name?: string;
 }
 
 /** Input for a decision on an approval request. */

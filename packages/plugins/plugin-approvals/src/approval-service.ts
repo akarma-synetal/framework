@@ -593,15 +593,66 @@ export class ApprovalService implements IApprovalService {
   }
 
   /**
-   * Attach inbox display fields (`record_title`, `submitter_name`) to rows.
-   * Batched: one query per distinct target object plus one `sys_user` lookup.
-   * Best-effort — a deleted record falls back to the payload snapshot, and a
-   * lookup failure leaves the field unset rather than failing the list.
+   * Batch-resolve `sys_user` display names for identifiers that may be user
+   * ids or emails. Best-effort — failures leave entries unresolved.
+   */
+  private async resolveUserNames(identifiers: Array<string | null | undefined>): Promise<Map<string, string>> {
+    const names = new Map<string, string>();
+    const targets = Array.from(new Set(identifiers.filter(Boolean))) as string[];
+    if (!targets.length) return names;
+    try {
+      const users = await this.engine.find('sys_user', {
+        where: { id: { $in: targets } }, fields: ['id', 'name', 'email'],
+        limit: targets.length, context: SYSTEM_CTX,
+      });
+      for (const u of (users ?? []) as any[]) {
+        if (u?.id && (u.name || u.email)) names.set(String(u.id), String(u.name ?? u.email));
+      }
+    } catch { /* best-effort */ }
+    const unresolvedEmails = targets.filter(t => !names.has(t) && t.includes('@'));
+    if (unresolvedEmails.length) {
+      try {
+        const users = await this.engine.find('sys_user', {
+          where: { email: { $in: unresolvedEmails } }, fields: ['email', 'name'],
+          limit: unresolvedEmails.length, context: SYSTEM_CTX,
+        });
+        for (const u of (users ?? []) as any[]) {
+          if (u?.email && u.name) names.set(String(u.email), String(u.name));
+        }
+      } catch { /* best-effort */ }
+    }
+    return names;
+  }
+
+  /** Lookup-typed fields (key + referenced object) of an object's schema. */
+  private resolveLookupFields(object: string): Array<{ key: string; reference: string }> {
+    try {
+      const schema: any = (this.engine as any).getSchema?.(object);
+      const fields = schema?.fields ?? {};
+      const out: Array<{ key: string; reference: string }> = [];
+      for (const [key, f] of Object.entries<any>(fields)) {
+        if ((f?.type === 'lookup' || f?.type === 'master_detail') && f?.reference) {
+          out.push({ key, reference: String(f.reference) });
+        }
+      }
+      return out;
+    } catch { return []; }
+  }
+
+  /**
+   * Attach inbox display fields to rows so clients never render a raw
+   * identifier: `record_title`, `submitter_name`, `object_label`,
+   * `pending_approver_names` (user-id approvers), and `payload_display`
+   * (lookup foreign keys in the snapshot → referenced record titles).
+   * Batched: one query per distinct object (target + referenced) plus one
+   * `sys_user` lookup. Best-effort — a deleted record falls back to the
+   * payload snapshot, and any failure leaves the field unset rather than
+   * failing the list.
    */
   private async enrichRows(rows: ApprovalRequestRow[]): Promise<void> {
     if (!rows.length) return;
 
-    // Record titles, batched per object.
+    // Record titles + object labels, batched per object.
     const byObject = new Map<string, Set<string>>();
     for (const r of rows) {
       if (!r.object_name || !r.record_id) continue;
@@ -610,7 +661,12 @@ export class ApprovalService implements IApprovalService {
       set.add(r.record_id);
     }
     const titles = new Map<string, string>();
+    const objectLabels = new Map<string, string>();
     for (const [object, idSet] of byObject) {
+      try {
+        const schema: any = (this.engine as any).getSchema?.(object);
+        if (schema?.label) objectLabels.set(object, String(schema.label));
+      } catch { /* label optional */ }
       const ids = Array.from(idSet);
       const displayField = this.resolveDisplayField(object);
       try {
@@ -619,44 +675,83 @@ export class ApprovalService implements IApprovalService {
         });
         for (const rec of (recs ?? []) as any[]) {
           const title = ApprovalService.pickTitle(rec, displayField);
-          if (rec?.id && title) titles.set(`${object} ${rec.id}`, title);
+          if (rec?.id && title) titles.set(`${object} ${rec.id}`, title);
         }
       } catch { /* object may be unregistered — payload fallback below */ }
     }
 
-    // Submitter display names — submitter_id may be a user id or an email.
-    const submitters = Array.from(new Set(rows.map(r => r.submitter_id).filter(Boolean))) as string[];
-    const names = new Map<string, string>();
-    if (submitters.length) {
-      try {
-        const users = await this.engine.find('sys_user', {
-          where: { id: { $in: submitters } }, fields: ['id', 'name', 'email'],
-          limit: submitters.length, context: SYSTEM_CTX,
-        });
-        for (const u of (users ?? []) as any[]) {
-          if (u?.id && (u.name || u.email)) names.set(String(u.id), String(u.name ?? u.email));
-        }
-      } catch { /* best-effort */ }
-      const unresolvedEmails = submitters.filter(s => !names.has(s) && s.includes('@'));
-      if (unresolvedEmails.length) {
-        try {
-          const users = await this.engine.find('sys_user', {
-            where: { email: { $in: unresolvedEmails } }, fields: ['email', 'name'],
-            limit: unresolvedEmails.length, context: SYSTEM_CTX,
-          });
-          for (const u of (users ?? []) as any[]) {
-            if (u?.email && u.name) names.set(String(u.email), String(u.name));
-          }
-        } catch { /* best-effort */ }
+    // Lookup foreign keys inside payload snapshots → referenced record titles.
+    const lookupFieldsByObject = new Map<string, Array<{ key: string; reference: string }>>();
+    for (const object of byObject.keys()) {
+      const lookups = this.resolveLookupFields(object);
+      if (lookups.length) lookupFieldsByObject.set(object, lookups);
+    }
+    const refIds = new Map<string, Set<string>>();
+    for (const r of rows) {
+      const lookups = lookupFieldsByObject.get(r.object_name);
+      const payload: any = r.payload;
+      if (!lookups || !payload || typeof payload !== 'object') continue;
+      for (const { key, reference } of lookups) {
+        const v = payload[key];
+        if (v == null || typeof v === 'object' || !String(v).trim()) continue;
+        let set = refIds.get(reference);
+        if (!set) { set = new Set(); refIds.set(reference, set); }
+        set.add(String(v));
       }
     }
+    const refTitles = new Map<string, string>();
+    for (const [object, idSet] of refIds) {
+      const ids = Array.from(idSet);
+      const displayField = this.resolveDisplayField(object);
+      try {
+        const recs = await this.engine.find(object, {
+          where: { id: { $in: ids } }, limit: ids.length, context: SYSTEM_CTX,
+        });
+        for (const rec of (recs ?? []) as any[]) {
+          const title = ApprovalService.pickTitle(rec, displayField);
+          if (rec?.id && title) refTitles.set(`${object} ${rec.id}`, title);
+        }
+      } catch { /* referenced object unreadable — leave unresolved */ }
+    }
+
+    // Display names for submitters AND user-id approvers in one lookup.
+    // `role:<r>` (and other `type:value` literals) are already readable.
+    const userIdentifiers: Array<string | null | undefined> = [];
+    for (const r of rows) {
+      userIdentifiers.push(r.submitter_id);
+      for (const a of r.pending_approvers ?? []) {
+        if (a && !a.includes(':')) userIdentifiers.push(a);
+      }
+    }
+    const names = await this.resolveUserNames(userIdentifiers);
 
     for (const r of rows as any[]) {
-      const title = titles.get(`${r.object_name} ${r.record_id}`)
+      const title = titles.get(`${r.object_name} ${r.record_id}`)
         ?? ApprovalService.pickTitle(r.payload, undefined);
       if (title) r.record_title = title;
       const name = r.submitter_id ? names.get(String(r.submitter_id)) : undefined;
       if (name) r.submitter_name = name;
+      const label = objectLabels.get(r.object_name);
+      if (label) r.object_label = label;
+
+      const approverNames: Record<string, string> = {};
+      for (const a of r.pending_approvers ?? []) {
+        const n = names.get(String(a));
+        if (n) approverNames[a] = n;
+      }
+      if (Object.keys(approverNames).length) r.pending_approver_names = approverNames;
+
+      const lookups = lookupFieldsByObject.get(r.object_name);
+      if (lookups && r.payload && typeof r.payload === 'object') {
+        const display: Record<string, string> = {};
+        for (const { key, reference } of lookups) {
+          const v = (r.payload as any)[key];
+          if (v == null) continue;
+          const t = refTitles.get(`${reference} ${String(v)}`);
+          if (t) display[key] = t;
+        }
+        if (Object.keys(display).length) r.payload_display = display;
+      }
     }
   }
 
@@ -741,6 +836,16 @@ export class ApprovalService implements IApprovalService {
       orderBy: [{ field: 'created_at', direction: 'asc' }],
       context: SYSTEM_CTX,
     });
-    return Array.isArray(rows) ? rows.map(rowFromAction) : [];
+    const actions = Array.isArray(rows) ? rows.map(rowFromAction) : [];
+    // Timeline display: resolve actor ids to names so the audit trail never
+    // shows a raw identifier. Role/team literals are already readable.
+    const names = await this.resolveUserNames(
+      actions.map(a => a.actor_id).filter(id => id && !id.includes(':')),
+    );
+    for (const a of actions as any[]) {
+      const n = a.actor_id ? names.get(String(a.actor_id)) : undefined;
+      if (n) a.actor_name = n;
+    }
+    return actions;
   }
 }
