@@ -1,5 +1,15 @@
 # @objectstack/plugin-email
 
+## 9.2.0
+
+### Patch Changes
+
+- Updated dependencies [2f57b75]
+- Updated dependencies [2f57b75]
+  - @objectstack/spec@9.2.0
+  - @objectstack/core@9.2.0
+  - @objectstack/platform-objects@9.2.0
+
 ## 9.1.0
 
 ### Patch Changes

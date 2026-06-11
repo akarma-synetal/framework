@@ -1,5 +1,12 @@
 # @objectstack/spec
 
+## 9.2.0
+
+### Minor Changes
+
+- 2f57b75: Approvals display contract v2 — no raw identifiers reach a business reviewer. The inbox enrichment pass now resolves the three remaining id leaks: `payload_display` resolves lookup/master_detail foreign keys in the snapshot to the referenced record's display title (batched one query per object), `pending_approver_names` resolves user-id approvers via `sys_user` (id or email; `role:<r>` literals stay as-is), `object_label` rides the target object's schema label on the row, and `listActions` rows carry `actor_name` so the audit timeline never shows an id.
+- 2f57b75: ADR-0040: unify the platform assistant. The default `data_chat` agent becomes the single platform assistant carrying both the data and authoring registers — the end user never picks an agent. It gains the `metadata_authoring` and `solution_design` skills (registered by the cloud AI Studio plugin; data-only deployments degrade gracefully as the skill registry ignores unresolved names), an intent preamble that classifies build/change vs data intent first and applies that register's discipline without mixing registers or narrating failures, an 'Assistant' persona, temperature 0.2, a guardrail blocklist union minus `alter_schema`/`drop_table` (the build register is draft-gated schema work per ADR-0033), a 60s execution budget, and react ×10 planning with replan.
+
 ## 9.1.0
 
 ### Minor Changes
