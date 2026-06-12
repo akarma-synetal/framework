@@ -24,10 +24,11 @@ describe('ApprovalsServicePlugin schema + nav contribution (ADR-0029 K2.b)', () 
     expect(registered).toHaveLength(1);
     const manifest = registered[0];
 
-    // Owns both approval objects (moved out of platform-objects).
+    // Owns the approval objects (moved out of platform-objects).
     expect(manifest.objects.map((o: any) => o.name).sort()).toEqual([
       'sys_approval_action',
       'sys_approval_request',
+      'sys_approval_token',
     ]);
 
     // Contributes its menu into the Setup app's approvals slot.

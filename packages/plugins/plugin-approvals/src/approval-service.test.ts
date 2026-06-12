@@ -447,7 +447,9 @@ describe('ApprovalService (node era)', () => {
     const req = await svc.openNodeRequest(openInput(['u9', 'u2']), CTX);
     const out = await svc.remind(req.id, { actorId: 'u1' }, CTX); // u1 = submitter (CTX.userId)
     expect(out.notified).toBe(2);
-    expect(emitted[0]).toMatchObject({ topic: 'approval.reminder', audience: ['u9', 'u2'] });
+    // ADR-0043: per-approver fan-out so each reminder carries personal links.
+    const reminders = emitted.filter(e => e.topic === 'approval.reminder');
+    expect(reminders.map(r => r.audience)).toEqual([['u9'], ['u2']]);
     const actions = await svc.listActions(req.id, SYS);
     expect(actions.at(-1)?.action).toBe('remind');
     // The fake clock steps 1s per call — well inside the 4h cool-down.
@@ -480,6 +482,76 @@ describe('ApprovalService (node era)', () => {
       .rejects.toThrow(/FORBIDDEN/);
     const actions = await svc.listActions(req.id, SYS);
     expect(actions.filter(a => a.action === 'comment')).toHaveLength(2);
+  });
+
+  // ── actionable links (ADR-0043) ─────────────────────────────────
+
+  it('issueActionTokens: stores hashes only and binds approver + action', async () => {
+    const req = await svc.openNodeRequest(openInput(['u9']), CTX);
+    const tokens = await svc.issueActionTokens(req.id, 'u9');
+    expect(tokens.approve).not.toBe(tokens.reject);
+    const rows = engine._tables['sys_approval_token'];
+    expect(rows).toHaveLength(2);
+    expect(rows.every(r => r.token_hash.length === 64)).toBe(true); // sha256 hex, never the raw token
+    expect(rows.every(r => !JSON.stringify(r).includes(tokens.approve))).toBe(true);
+    await expect(svc.issueActionTokens(req.id, 'stranger')).rejects.toThrow(/FORBIDDEN/);
+  });
+
+  it('redeem: approves as the bound approver and burns the token (single-use)', async () => {
+    const resumed: any[] = [];
+    svc.attachAutomation({ async resume(runId, signal) { resumed.push({ runId, signal }); } });
+    const req = await svc.openNodeRequest(openInput(['u9']), CTX);
+    const { approve } = await svc.issueActionTokens(req.id, 'u9');
+    const out = await svc.redeemActionToken(approve);
+    expect(out).toMatchObject({ ok: true, action: 'approve', approverId: 'u9' });
+    expect((out as any).request.status).toBe('approved');
+    expect(resumed[0]?.signal?.branchLabel).toBe('approve');
+    const acts = await svc.listActions(req.id, SYS);
+    expect(acts.at(-1)).toMatchObject({ action: 'approve', actor_id: 'u9', comment: 'Via action link' });
+    // replay
+    expect(await svc.redeemActionToken(approve)).toMatchObject({ ok: false, reason: 'consumed' });
+  });
+
+  it('peek: validates without consuming (GET never mutates)', async () => {
+    const req = await svc.openNodeRequest(openInput(['u9']), CTX);
+    const { reject } = await svc.issueActionTokens(req.id, 'u9');
+    expect(await svc.peekActionToken(reject)).toMatchObject({ ok: true, action: 'reject' });
+    expect(await svc.peekActionToken(reject)).toMatchObject({ ok: true }); // still live
+    const fresh = await svc.getRequest(req.id, SYS);
+    expect(fresh?.status).toBe('pending');
+  });
+
+  it('redeem: dead tokens — invalid, expired, decided request, reassigned slot', async () => {
+    const req = await svc.openNodeRequest(openInput(['u9']), CTX);
+    expect(await svc.redeemActionToken('garbage')).toMatchObject({ ok: false, reason: 'invalid' });
+
+    const short = await svc.issueActionTokens(req.id, 'u9', { ttlMs: 1 });
+    // fake clock advances 1s per call — far beyond a 1ms TTL
+    expect(await svc.redeemActionToken(short.approve)).toMatchObject({ ok: false, reason: 'expired' });
+
+    const live = await svc.issueActionTokens(req.id, 'u9');
+    await svc.reassign(req.id, { actorId: 'u9', to: 'u7' }, CTX);
+    expect(await svc.redeemActionToken(live.approve)).toMatchObject({ ok: false, reason: 'not_approver' });
+
+    const forU7 = await svc.issueActionTokens(req.id, 'u7');
+    await svc.decideNode(req.id, { decision: 'approve', actorId: 'u7' }, SYS);
+    expect(await svc.redeemActionToken(forU7.reject)).toMatchObject({ ok: false, reason: 'not_pending' });
+  });
+
+  it('remind: each concrete approver gets their own action links', async () => {
+    const emitted: any[] = [];
+    svc.attachMessaging({ async emit(input) { emitted.push(input); } });
+    const req = await svc.openNodeRequest(openInput(['u9', 'ada@example.com']), CTX);
+    await svc.remind(req.id, { actorId: 'u1' }, CTX);
+    const reminders = emitted.filter(e => e.topic === 'approval.reminder');
+    expect(reminders).toHaveLength(2);
+    for (const r of reminders) {
+      expect(r.audience).toHaveLength(1);
+      expect(r.payload.actions).toHaveLength(2);
+      expect(r.payload.actions[0].url).toContain('/api/v1/approvals/act?token=');
+    }
+    const urls = reminders.flatMap(r => r.payload.actions.map((a: any) => a.url));
+    expect(new Set(urls).size).toBe(4); // every link is personal + per-action
   });
 
   // ── pagination + search pushdown (#1745) ────────────────────────
