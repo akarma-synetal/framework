@@ -1,5 +1,6 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
+import { createHash, randomBytes } from 'node:crypto';
 import {
   APPROVAL_BRANCH_LABELS,
   type ApprovalNodeConfig,
@@ -77,6 +78,14 @@ export const ESCALATION_JOB_NAME = 'approvals-sla-escalation';
 export const ESCALATION_SCAN_INTERVAL_MS = 5 * 60 * 1000;
 /** Reserved actor id for machine decisions made by the SLA scanner. */
 export const SLA_ACTOR_ID = 'system:sla';
+
+/** Default lifetime of an actionable-link token (ADR-0043). */
+export const ACTION_TOKEN_TTL_MS = 72 * 60 * 60 * 1000;
+
+/** Outcome of redeeming (or peeking) an actionable-link token. */
+export type ActionTokenOutcome =
+  | { ok: true; action: 'approve' | 'reject'; request: ApprovalRequestRow; approverId: string }
+  | { ok: false; reason: 'invalid' | 'expired' | 'consumed' | 'not_pending' | 'not_approver'; request?: ApprovalRequestRow };
 
 const SYSTEM_CTX = { isSystem: true, roles: [], permissions: [] } as const;
 
@@ -182,6 +191,12 @@ export interface ApprovalServiceOptions {
   automation?: ApprovalResumeSurface;
   /** Optional messaging service for thread notifications. */
   messaging?: ApprovalMessagingSurface;
+  /**
+   * Absolute origin prefixed onto actionable links (ADR-0043), e.g.
+   * `https://app.example.com`. Defaults to relative URLs, which work inside
+   * the Console and IM webviews; outbound email needs the absolute form.
+   */
+  publicBaseUrl?: string;
 }
 
 export class ApprovalService implements IApprovalService {
@@ -190,6 +205,7 @@ export class ApprovalService implements IApprovalService {
   private readonly logger?: ApprovalServiceOptions['logger'];
   private automation?: ApprovalResumeSurface;
   private messaging?: ApprovalMessagingSurface;
+  private publicBaseUrl: string;
 
   constructor(opts: ApprovalServiceOptions) {
     this.engine = opts.engine;
@@ -197,6 +213,7 @@ export class ApprovalService implements IApprovalService {
     this.logger = opts.logger;
     this.automation = opts.automation;
     this.messaging = opts.messaging;
+    this.publicBaseUrl = (opts.publicBaseUrl ?? '').replace(/\/$/, '');
   }
 
   /** Attach (or replace) the automation surface used to resume flow runs. */
@@ -735,21 +752,151 @@ export class ApprovalService implements IApprovalService {
       actor_id: input.actorId, comment: input.comment ?? null, created_at: nowIso,
     }, { context: SYSTEM_CTX });
 
-    const notified = await this.notify({
-      topic: 'approval.reminder',
-      audience: pending,
-      actorId: input.actorId,
-      source: { object: 'sys_approval_request', id: requestId },
-      dedupKey: `approval-remind-${requestId}-${nowIso}`,
-      payload: {
-        title: 'Approval reminder',
-        message: `A decision on ${raw.object_name}/${raw.record_id} is still waiting on you.`,
-        actionUrl: '/system/approvals',
-      },
-    });
+    // Per-approver fan-out: concrete identities (user ids / emails) each get
+    // their OWN one-tap approve/reject links (ADR-0043); `role:*`-style
+    // literals can't carry a personal token and fall back to a plain nudge.
+    let notified = 0;
+    const concrete = pending.filter(a => a && !a.includes(':'));
+    const literals = pending.filter(a => a && a.includes(':'));
+    for (const approver of concrete) {
+      try {
+        const tokens = await this.issueActionTokens(requestId, approver);
+        notified += await this.notify({
+          topic: 'approval.reminder',
+          audience: [approver],
+          actorId: input.actorId,
+          source: { object: 'sys_approval_request', id: requestId },
+          dedupKey: `approval-remind-${requestId}-${nowIso}-${approver}`,
+          payload: {
+            title: 'Approval reminder',
+            message: `A decision on ${raw.object_name}/${raw.record_id} is still waiting on you.`,
+            actionUrl: '/system/approvals',
+            actions: [
+              { label: 'Approve', url: this.actionLinkUrl(tokens.approve) },
+              { label: 'Reject', url: this.actionLinkUrl(tokens.reject) },
+            ],
+          },
+        });
+      } catch (err: any) {
+        this.logger?.warn?.('[approvals] reminder with action links failed', {
+          request: requestId, approver, error: err?.message ?? String(err),
+        });
+      }
+    }
+    if (literals.length) {
+      notified += await this.notify({
+        topic: 'approval.reminder',
+        audience: literals,
+        actorId: input.actorId,
+        source: { object: 'sys_approval_request', id: requestId },
+        dedupKey: `approval-remind-${requestId}-${nowIso}`,
+        payload: {
+          title: 'Approval reminder',
+          message: `A decision on ${raw.object_name}/${raw.record_id} is still waiting on you.`,
+          actionUrl: '/system/approvals',
+        },
+      });
+    }
 
     const fresh = await this.getRequest(requestId, context);
     return { request: fresh!, notified };
+  }
+
+  // ── Actionable links (ADR-0043) ──────────────────────────────
+
+  /** Build the session-less confirm-page URL for a raw token. */
+  actionLinkUrl(rawToken: string): string {
+    return `${this.publicBaseUrl}/api/v1/approvals/act?token=${encodeURIComponent(rawToken)}`;
+  }
+
+  /**
+   * Issue one-tap approve/reject tokens for one approver on one pending
+   * request. Raw tokens are returned ONCE; only SHA-256 hashes are stored
+   * (`sys_approval_token`), so a DB leak yields no usable links.
+   */
+  async issueActionTokens(
+    requestId: string,
+    approverId: string,
+    opts?: { ttlMs?: number },
+  ): Promise<{ approve: string; reject: string }> {
+    if (!approverId?.trim()) throw new Error('VALIDATION_FAILED: approverId is required');
+    const raw = await this.loadPendingRow(requestId);
+    const pending = csvSplit(raw.pending_approvers);
+    if (!pending.includes(approverId)) {
+      throw new Error(`FORBIDDEN: '${approverId}' is not a pending approver on this request`);
+    }
+    const now = this.clock.now();
+    const expires = new Date(now.getTime() + (opts?.ttlMs ?? ACTION_TOKEN_TTL_MS)).toISOString();
+    const out = { approve: '', reject: '' };
+    for (const action of ['approve', 'reject'] as const) {
+      const rawToken = randomBytes(32).toString('base64url');
+      await this.engine.insert('sys_approval_token', {
+        id: uid('atok'),
+        organization_id: raw.organization_id ?? null,
+        token_hash: createHash('sha256').update(rawToken).digest('hex'),
+        request_id: requestId,
+        action,
+        approver_id: approverId,
+        expires_at: expires,
+        consumed_at: null,
+        created_at: now.toISOString(),
+      }, { context: SYSTEM_CTX });
+      out[action] = rawToken;
+    }
+    return out;
+  }
+
+  /** Shared validation chain for peek/redeem. Returns the token row when live. */
+  private async resolveActionToken(rawToken: string): Promise<
+    { ok: true; token: any; request: ApprovalRequestRow } | Extract<ActionTokenOutcome, { ok: false }>
+  > {
+    const trimmed = rawToken?.trim();
+    if (!trimmed) return { ok: false, reason: 'invalid' };
+    const hash = createHash('sha256').update(trimmed).digest('hex');
+    const rows = await this.engine.find('sys_approval_token', {
+      where: { token_hash: hash }, limit: 1, context: SYSTEM_CTX,
+    });
+    const token: any = Array.isArray(rows) ? rows[0] : null;
+    if (!token) return { ok: false, reason: 'invalid' };
+    if (token.consumed_at) return { ok: false, reason: 'consumed' };
+    if (Date.parse(token.expires_at) < this.clock.now().getTime()) {
+      return { ok: false, reason: 'expired' };
+    }
+    const request = await this.getRequest(token.request_id, SYSTEM_CTX as unknown as SharingExecutionContext);
+    if (!request || request.status !== 'pending') {
+      return { ok: false, reason: 'not_pending', request: request ?? undefined };
+    }
+    if (!(request.pending_approvers ?? []).includes(token.approver_id)) {
+      // Reassigned away / slot consumed by a unanimous round — the link died
+      // with the slot (ADR-0043 invalidation row).
+      return { ok: false, reason: 'not_approver', request };
+    }
+    return { ok: true, token, request };
+  }
+
+  /** GET confirm page: validate WITHOUT consuming — never mutates. */
+  async peekActionToken(rawToken: string): Promise<ActionTokenOutcome> {
+    const res = await this.resolveActionToken(rawToken);
+    if (!res.ok) return res;
+    return { ok: true, action: res.token.action, request: res.request, approverId: res.token.approver_id };
+  }
+
+  /**
+   * POST redemption: consume the token FIRST (a failed decide still burns
+   * it — replay-safe), then decide as the bound approver.
+   */
+  async redeemActionToken(rawToken: string): Promise<ActionTokenOutcome> {
+    const res = await this.resolveActionToken(rawToken);
+    if (!res.ok) return res;
+    await this.engine.update('sys_approval_token', {
+      id: res.token.id, consumed_at: this.clock.now().toISOString(),
+    }, { context: SYSTEM_CTX });
+    const out = await this.decide(res.token.request_id, {
+      decision: res.token.action,
+      actorId: res.token.approver_id,
+      comment: 'Via action link',
+    }, SYSTEM_CTX as unknown as SharingExecutionContext);
+    return { ok: true, action: res.token.action, request: out.request, approverId: res.token.approver_id };
   }
 
   /**

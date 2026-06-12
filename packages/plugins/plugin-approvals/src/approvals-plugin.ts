@@ -3,6 +3,8 @@
 import type { Plugin, PluginContext } from '@objectstack/core';
 import { SysApprovalRequest } from './sys-approval-request.object.js';
 import { SysApprovalAction } from './sys-approval-action.object.js';
+import { SysApprovalToken } from './sys-approval-token.object.js';
+import { renderConfirmPage, renderResultPage } from './action-link-pages.js';
 import {
   ApprovalService,
   ESCALATION_JOB_NAME,
@@ -21,6 +23,11 @@ export interface ApprovalsPluginOptions {
    * `job` service is installed; without one, SLA stays display-only.
    */
   escalationScanIntervalMs?: number;
+  /**
+   * Absolute origin for actionable links in outbound notifications
+   * (ADR-0043), e.g. `https://app.example.com`. Relative by default.
+   */
+  publicBaseUrl?: string;
   /**
    * Disable the record-lock hook. Schema + service stay intact; only the
    * engine-level lock wiring is suppressed. Useful when a caller wants the
@@ -62,7 +69,7 @@ export class ApprovalsServicePlugin implements Plugin {
       scope: 'system',
       defaultDatasource: 'cloud',
       namespace: 'sys',
-      objects: [SysApprovalRequest, SysApprovalAction],
+      objects: [SysApprovalRequest, SysApprovalAction, SysApprovalToken],
       // ADR-0029 D7 — contribute the Approvals entries into the Setup app's
       // `group_approvals` slot. This plugin owns these objects (K2.b), so it
       // ships their menu too; when the plugin isn't installed the slot is empty.
@@ -110,6 +117,7 @@ export class ApprovalsServicePlugin implements Plugin {
     this.service = new ApprovalService({
       engine: engine as ApprovalEngine,
       logger: ctx.logger,
+      publicBaseUrl: this.options.publicBaseUrl,
     });
 
     // Record lock: block edits to a record while it has a pending request.
@@ -156,10 +164,47 @@ export class ApprovalsServicePlugin implements Plugin {
         ctx.logger.info('ApprovalsServicePlugin: SLA escalation scan scheduled', { intervalMs });
       } catch { /* job service not installed */ }
     };
+    // Actionable-link pages (ADR-0043): session-less confirm + redemption,
+    // mounted straight on the host Hono app. GET only renders; the decision
+    // happens exclusively on the POST (mail-gateway prefetch safe).
+    const mountActionPages = async () => {
+      try {
+        const http = ctx.getService<any>('http-server');
+        const rawApp = http && typeof http.getRawApp === 'function' ? http.getRawApp() : null;
+        if (!rawApp || !this.service) return;
+        const svc = this.service;
+        const ACT_PATH = '/api/v1/approvals/act';
+        const html = (c: any, body: string, status = 200) =>
+          c.body(body, status, { 'Content-Type': 'text/html; charset=utf-8' });
+        rawApp.get(ACT_PATH, async (c: any) => {
+          const token = String(c.req.query('token') ?? '');
+          const peek = await svc.peekActionToken(token);
+          if (!peek.ok) return html(c, renderResultPage(peek.reason, peek.request), 200);
+          return html(c, renderConfirmPage({
+            request: peek.request, action: peek.action, approverId: peek.approverId,
+            token, actPath: ACT_PATH,
+          }));
+        });
+        rawApp.post(ACT_PATH, async (c: any) => {
+          let token = '';
+          try {
+            const body = await c.req.parseBody();
+            token = String(body?.token ?? '');
+          } catch { /* fall through to invalid */ }
+          const out = await svc.redeemActionToken(token);
+          if (!out.ok) return html(c, renderResultPage(out.reason, out.request), 200);
+          return html(c, renderResultPage(out.action === 'approve' ? 'approved' : 'rejected', out.request));
+        });
+        ctx.logger.info(`ApprovalsServicePlugin: actionable-link pages mounted at ${ACT_PATH}`);
+      } catch { /* http server not installed */ }
+    };
+
     if (typeof (ctx as any).hook === 'function') {
       (ctx as any).hook('kernel:ready', wireEscalationClock);
+      (ctx as any).hook('kernel:ready', mountActionPages);
     } else {
       await wireEscalationClock();
+      await mountActionPages();
     }
 
     // ADR-0019: contribute the `approval` node to the flow engine when one is

@@ -1,0 +1,94 @@
+// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+
+import { ObjectSchema, Field } from '@objectstack/spec/data';
+
+/**
+ * sys_approval_token — single-use actionable-link tokens (ADR-0043).
+ *
+ * One row per issued approve/reject link. Only the SHA-256 **hash** of the
+ * raw token is stored — a database leak yields no usable links. A token is
+ * dead once any of these holds: `consumed_at` set, `expires_at` passed, the
+ * request left `pending`, or the bound approver no longer holds a slot
+ * (the last two are re-checked at redemption, not materialized here).
+ *
+ * @namespace sys
+ */
+export const SysApprovalToken = ObjectSchema.create({
+  name: 'sys_approval_token',
+  label: 'Approval Action Token',
+  pluralLabel: 'Approval Action Tokens',
+  icon: 'key',
+  isSystem: true,
+  managedBy: 'system',
+  description: 'Single-use tokens behind actionable approval links',
+  displayNameField: 'id',
+
+  fields: {
+    id: Field.text({ label: 'Token ID', required: true, readonly: true, group: 'System' }),
+
+    organization_id: Field.lookup('sys_organization', {
+      label: 'Organization',
+      required: false,
+      group: 'System',
+    }),
+
+    token_hash: Field.text({
+      label: 'Token Hash',
+      required: true,
+      maxLength: 100,
+      readonly: true,
+      description: 'SHA-256 hex of the raw token — the raw value is never stored',
+      group: 'Token',
+    }),
+
+    request_id: Field.text({
+      label: 'Request',
+      required: true,
+      maxLength: 100,
+      readonly: true,
+      group: 'Token',
+    }),
+
+    action: Field.select(['approve', 'reject'], {
+      label: 'Action',
+      required: true,
+      readonly: true,
+      group: 'Token',
+    }),
+
+    approver_id: Field.text({
+      label: 'Approver',
+      required: true,
+      maxLength: 200,
+      readonly: true,
+      description: 'Identity the token is bound to; the decision is audited as this approver',
+      group: 'Token',
+    }),
+
+    expires_at: Field.datetime({
+      label: 'Expires At',
+      required: true,
+      readonly: true,
+      group: 'Lifecycle',
+    }),
+
+    consumed_at: Field.datetime({
+      label: 'Consumed At',
+      required: false,
+      group: 'Lifecycle',
+    }),
+
+    created_at: Field.datetime({
+      label: 'Created At',
+      required: true,
+      defaultValue: 'NOW()',
+      readonly: true,
+      group: 'System',
+    }),
+  },
+
+  indexes: [
+    { fields: ['token_hash'] },
+    { fields: ['request_id'] },
+  ],
+});
