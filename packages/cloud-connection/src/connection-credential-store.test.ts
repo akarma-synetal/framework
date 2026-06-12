@@ -232,7 +232,34 @@ describe('CloudConnectionPlugin credential behavior', () => {
         expect(res.payload.data).toEqual({ environmentId: null, revoked: true, cleared: true });
         expect((fetchSpy.mock.calls[0]![1] as any).body).toBe('{}');
         expect((fetchSpy.mock.calls[0]![1] as any).headers.Authorization).toBe('Bearer oscc_stored');
-        expect(store.read()).toBeNull();
+        // Credential gone; identity residual kept for the re-bind claim.
+        expect(store.read()?.runtimeToken).toBe('');
+        expect(store.read()?.runtimeId).toBe('rt-1');
+    });
+
+    it('unbind keeps an identity residual: token cleared, runtimeId survives for the re-bind claim', async () => {
+        const credPath = join(dir, 'cc.json');
+        const store = new ConnectionCredentialStore(credPath);
+        store.write({ runtimeToken: 'oscc_stored', runtimeId: 'rt-keep' });
+        const rawApp = makeRawApp();
+        const { ctx, fire } = makeCtx(rawApp, { auth: sessionAuth('admin'), manifest: { register: vi.fn() } });
+        vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ success: true }), { status: 200 })));
+        await new CloudConnectionPlugin({
+            singleEnvironment: true, controlPlaneUrl: 'http://cloud.test', controlPlaneApiKey: '', credentialPath: credPath,
+        }).start(ctx as any);
+        await fire();
+
+        const res = await rawApp.routes.get('POST /api/v1/cloud-connection/unbind')!(makeC('http://localhost:3000/x'));
+        expect(res.payload.data.revoked).toBe(true);
+        // Residual: identity kept, credential gone.
+        const residual = store.read();
+        expect(residual?.runtimeId).toBe('rt-keep');
+        expect(residual?.runtimeToken).toBe('');
+
+        // Status reads the residual as UNBOUND (no credential) but surfaces the id.
+        const status = await rawApp.routes.get('GET /api/v1/cloud-connection/status')!(makeC('http://localhost:3000/x'));
+        expect(status.payload.data.bound).toBe(false);
+        expect(status.payload.data.runtimeId).toBe('rt-keep');
     });
 
     it('org-packages without an environment id forwards bearer-only (org from the connection)', async () => {
