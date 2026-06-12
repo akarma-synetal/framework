@@ -26,7 +26,10 @@ export type CompareTo = DatasetCompareTo;
  *   - applies measure-scoped filters via supplementary grouped queries,
  *   - evaluates derived measures (ratio/sum/difference/product) row-by-row (Q1),
  *   - shifts the query for `compareTo` (previousPeriod / previousYear) and
- *     attaches `<measure>__compare` columns.
+ *     attaches `<measure>__compare` columns,
+ *   - computes server-side totals (`selection.totals.groupings`, #1753) by
+ *     re-running the selection per dimension subset, so matrix subtotals and
+ *     the grand total use each measure's true aggregate.
  *
  * RLS/tenant scoping is NOT handled here — it is enforced inside the strategy
  * via the StrategyContext read-scope hook (D-C). This layer is pure query
@@ -133,6 +136,47 @@ export class DatasetExecutor {
    *   applied per request (ADR-0021 D-C).
    */
   async execute(
+    compiled: CompiledDataset,
+    selection: DatasetSelection,
+    context?: ExecutionContext,
+  ): Promise<AnalyticsResult> {
+    const result = await this.executeSelection(compiled, selection, context);
+
+    // Server-side totals (#1753) — re-run the selection grouped by each
+    // requested dimension subset, so a subtotal/grand total is the measure's
+    // TRUE aggregate over the underlying rows (an avg total is the average of
+    // all rows, not of bucket averages). Re-running the full pipeline keeps
+    // measure-scoped filters, derived measures, and compareTo consistent with
+    // the primary grid. order/limit/offset are dropped: totals cover the whole
+    // selection, and an order key may reference a dimension the grouping drops.
+    const groupings = selection.totals?.groupings;
+    if (groupings?.length) {
+      const selected = new Set(selection.dimensions ?? []);
+      const totals: NonNullable<AnalyticsResult['totals']> = [];
+      for (const grouping of groupings) {
+        const unknown = grouping.filter((d) => !selected.has(d));
+        if (unknown.length) {
+          throw new Error(
+            `[dataset-executor] totals grouping [${grouping.join(', ')}] is not a subset of the selected dimensions — unknown: ${unknown.join(', ')}.`,
+          );
+        }
+        const sub = await this.executeSelection(compiled, {
+          ...selection,
+          dimensions: grouping,
+          totals: undefined,
+          order: undefined,
+          limit: undefined,
+          offset: undefined,
+        }, context);
+        totals.push({ dimensions: grouping, rows: sub.rows });
+      }
+      result.totals = totals;
+    }
+
+    return result;
+  }
+
+  private async executeSelection(
     compiled: CompiledDataset,
     selection: DatasetSelection,
     context?: ExecutionContext,

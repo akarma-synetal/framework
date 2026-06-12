@@ -221,6 +221,21 @@ describe('AnalyticsService.queryDataset — label resolution (integration)', () 
     ]);
   });
 
+  it('resolves labels on server-side totals rows (#1753)', async () => {
+    const res = await service().queryDataset(dataset, {
+      dimensions: ['status', 'account'],
+      measures: ['task_count'],
+      totals: { groupings: [['account']] },
+    });
+    expect(res.totals).toEqual([{
+      dimensions: ['account'],
+      rows: [
+        { account: 'Acme Corp', task_count: 4 },
+        { account: 'Globex', task_count: 2 },
+      ],
+    }]);
+  });
+
   it('enriches measure fields with their display label + format', async () => {
     const labelledDataset = DatasetSchema.parse({
       name: 'sales_metrics',
