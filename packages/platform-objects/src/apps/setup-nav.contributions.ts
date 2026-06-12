@@ -38,13 +38,9 @@ export const SETUP_NAV_CONTRIBUTIONS: NavigationContribution[] = [
       { id: 'nav_system_overview', type: 'dashboard', label: 'System Overview', dashboardName: 'system_overview', icon: 'activity' },
     ],
   },
-  {
-    app: 'setup',
-    group: 'group_apps',
-    priority: BASE_PRIORITY,
-    items: [
-    ],
-  },
+  // No group_apps contribution left here — both marketplace entries moved
+  // out (see header note); the group_apps shell anchor in setup.app.ts is
+  // filled entirely by capability plugins now.
   {
     app: 'setup',
     group: 'group_people_org',
