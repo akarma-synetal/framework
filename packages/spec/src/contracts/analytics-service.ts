@@ -75,6 +75,19 @@ export interface AnalyticsResult {
     }>;
     /** Generated SQL (if available) */
     sql?: string;
+    /**
+     * Marginal aggregates — one entry per `DatasetSelection.totals` grouping,
+     * in request order. Each entry's rows carry the grouping's dimension
+     * columns plus the same measure columns as `rows`, computed with the
+     * measure's true aggregate over the underlying data (never re-derived
+     * from bucketed values). The grand-total grouping (`[]`) yields a single
+     * dimensionless row.
+     */
+    totals?: Array<{
+        /** The dimension subset this marginal was grouped by ([] = grand total). */
+        dimensions: string[];
+        rows: Record<string, unknown>[];
+    }>;
 }
 
 /**
@@ -121,6 +134,19 @@ export interface DatasetSelection {
     offset?: number;
     /** Compare-to directive — runs a shifted query and attaches `<measure>__compare`. */
     compareTo?: DatasetCompareTo;
+    /**
+     * Server-side totals (matrix subtotals + grand total). Each grouping is a
+     * subset of `dimensions` to additionally aggregate by; the selection is
+     * re-run grouped only by those dimensions, so every total is the measure's
+     * TRUE aggregate over the underlying rows — an `avg` total is the average
+     * over all rows, not an average of bucket averages (the ADR-0021
+     * governance line that forbids client-side re-aggregation). `[]` requests
+     * the grand total. A matrix report asks for
+     * `{ groupings: [rowDims, columnDims, []] }`. Results arrive on
+     * `AnalyticsResult.totals` in request order. `order`/`limit`/`offset` do
+     * not apply to totals queries — totals always cover the full selection.
+     */
+    totals?: { groupings: string[][] };
     timezone?: string;
 }
 

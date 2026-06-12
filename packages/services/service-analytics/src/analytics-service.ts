@@ -404,6 +404,14 @@ export class AnalyticsService implements IAnalyticsService {
       if (dims.length) {
         try {
           await resolveDimensionLabels(dataset.object, dims, result.rows, this.labelResolver);
+          // Totals rows (#1753) carry dimension values too (a row subtotal is
+          // keyed by its row bucket) — resolve each grouping's own subset.
+          for (const total of result.totals ?? []) {
+            const subset = dims.filter((d) => total.dimensions.includes(d.name));
+            if (subset.length) {
+              await resolveDimensionLabels(dataset.object, subset, total.rows, this.labelResolver);
+            }
+          }
         } catch (e) {
           this.logger?.warn?.(`[Analytics] dimension label resolution failed for "${dataset.name}": ${String((e as Error)?.message ?? e)}`);
         }
