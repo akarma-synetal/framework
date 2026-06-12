@@ -1111,6 +1111,62 @@ export const ReleaseSignoffFlow = defineFlow({
   ],
 });
 
+
+/**
+ * Inbound Webhook → Task — the worked `trigger-api` example (ADR-0041 Tier 1).
+ *
+ * A `type: 'api'` flow waits for an external POST instead of a record change
+ * or a schedule. The start node's config arms the hook:
+ *
+ *   POST /api/v1/automation/hooks/showcase_inbound_task_webhook/intake
+ *   x-objectstack-signature: sha256=<hmac-sha256 of the raw body, key below>
+ *   { "title": "...", "assignee": "...", "project": "<showcase_project id>" }
+ *
+ * The trigger validates the HMAC (constant-time), enqueues, and ACKs 202; a
+ * queue consumer runs the flow with the JSON payload as the trigger record —
+ * so `{record.title}` here reads straight from the webhook body, exactly like
+ * a record-change flow reads its record.
+ */
+export const InboundTaskWebhookFlow = defineFlow({
+  name: 'showcase_inbound_task_webhook',
+  label: 'Inbound Task Webhook',
+  description: 'Creates a task from an external system via the HMAC-verified inbound hook.',
+  type: 'api',
+  nodes: [
+    {
+      id: 'start',
+      type: 'start',
+      label: 'On Webhook',
+      config: {
+        triggerType: 'api',
+        hookId: 'intake',
+        // Demo secret — real deployments inject this from configuration.
+        secret: 'showcase-webhook-secret',
+      },
+    },
+    {
+      id: 'create_task',
+      type: 'create_record',
+      label: 'Create Task',
+      config: {
+        objectName: 'showcase_task',
+        fields: {
+          title: '{record.title}',
+          assignee: '{record.assignee}',
+          project: '{record.project}',
+          status: 'todo',
+        },
+        outputVariable: 'taskId',
+      },
+    },
+    { id: 'end', type: 'end', label: 'End' },
+  ],
+  edges: [
+    { id: 'e1', source: 'start', target: 'create_task' },
+    { id: 'e2', source: 'create_task', target: 'end' },
+  ],
+});
+
 export const allFlows = [
   TaskCompletedFlow,
   ReassignWizardFlow,
@@ -1131,4 +1187,5 @@ export const allFlows = [
   FanOutNotifyFlow,
   ResilientSyncFlow,
   ProjectEscalationFlow,
+  InboundTaskWebhookFlow,
 ];

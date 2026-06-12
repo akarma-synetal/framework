@@ -1431,6 +1431,13 @@ export default class Serve extends Command {
               export: 'ScheduleTriggerPlugin',
               nameMatch: ['trigger-schedule', 'ScheduleTriggerPlugin'],
             },
+            {
+              // Inbound webhook/HTTP trigger (ADR-0041 Tier 1) — arms
+              // `type: 'api'` flows with HMAC-verified, queue-backed hooks.
+              pkg: '@objectstack/trigger-api',
+              export: 'ApiTriggerPlugin',
+              nameMatch: ['trigger-api', 'ApiTriggerPlugin'],
+            },
           ],
         },
         realtime: {

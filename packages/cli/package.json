@@ -66,6 +66,7 @@
     "@objectstack/plugin-security": "workspace:*",
     "@objectstack/plugin-sharing": "workspace:*",
     "@objectstack/trigger-record-change": "workspace:*",
+    "@objectstack/trigger-api": "workspace:*",
     "@objectstack/trigger-schedule": "workspace:*",
     "@objectstack/plugin-webhooks": "workspace:*",
     "@objectstack/rest": "workspace:*",
