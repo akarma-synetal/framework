@@ -44,6 +44,7 @@
       "@objectstack/plugin-sharing",
       "@objectstack/plugin-webhooks",
       "@objectstack/trigger-record-change",
+      "@objectstack/trigger-api",
       "@objectstack/trigger-schedule",
       "@objectstack/connector-mcp",
       "@objectstack/connector-rest",

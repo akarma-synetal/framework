@@ -543,7 +543,7 @@ export class AutomationEngine implements IAutomationService {
 
     /**
      * Derive a flow's trigger binding from its `start` node, or `undefined` if
-     * the flow has no auto-trigger (manual / screen / api). The convention —
+     * the flow has no auto-trigger (manual / screen). The convention —
      * established by the showcase flows — is that the start node carries the
      * trigger details in its `config`: `{ objectName, triggerType, condition }`
      * for record-change, or a `schedule` descriptor for time-based flows.
@@ -574,6 +574,17 @@ export class AutomationEngine implements IAutomationService {
             return {
                 triggerType: 'schedule',
                 binding: { flowName, schedule: config.schedule, condition: (config.condition as FlowTriggerBinding['condition']) ?? undefined, config },
+            };
+        }
+
+        // Inbound HTTP (ADR-0041 Tier 1): an `api` flow waits for an external
+        // POST. The concrete trigger (`@objectstack/trigger-api`) mounts the
+        // endpoint and enqueues; the binding's `config` carries the hook
+        // details (`hookId`, `secret`) from the start node.
+        if (flow.type === 'api' || triggerType === 'api') {
+            return {
+                triggerType: 'api',
+                binding: { flowName, condition: (config.condition as FlowTriggerBinding['condition']) ?? undefined, config },
             };
         }
 
