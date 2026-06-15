@@ -67,7 +67,18 @@ export const hookForm = defineForm({
           { label: 'Abort', value: 'abort' },
           { label: 'Log', value: 'log' },
         ] },
+        { field: 'timeout', type: 'number', colSpan: 1, helpText: 'Abort the hook after N milliseconds' },
         { field: 'condition', type: 'code', language: 'javascript', colSpan: 2, helpText: 'Optional formula — skip the hook when this evaluates to false' },
+        {
+          field: 'retryPolicy',
+          type: 'composite',
+          colSpan: 2,
+          helpText: 'Retry on failure — most useful for async hooks',
+          fields: [
+            { field: 'maxRetries', type: 'number', helpText: 'Maximum retry attempts' },
+            { field: 'backoffMs', type: 'number', helpText: 'Delay between retries (ms)' },
+          ],
+        },
       ],
     },
   ],
