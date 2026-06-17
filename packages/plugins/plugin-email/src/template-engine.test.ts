@@ -37,6 +37,49 @@ describe('template-engine', () => {
     it('escapes all standard HTML entities', () => {
       expect(renderTemplate('{{s}}', { s: `&<>"'` })).toBe('&amp;&lt;&gt;&quot;&#39;');
     });
+
+    // ADR-0053 Phase 2: formatter holes reuse the shared formula whitelist.
+    describe('formatter holes', () => {
+      it('applies currency / number formatters', () => {
+        expect(renderTemplate('{{ amt | currency }}', { amt: 1234.5 })).toBe('$1,234.50');
+        expect(renderTemplate('{{ n | number:2 }}', { n: 1000 })).toBe('1,000.00');
+      });
+
+      it('renders datetime in the supplied reference timezone', () => {
+        // 2026-06-02T01:30Z → 2026-06-01 in America/New_York.
+        const data = { ts: '2026-06-02T01:30:00Z' };
+        const ny = renderTemplate('{{ ts | datetime }}', data, { timeZone: 'America/New_York' });
+        expect(ny).toContain('6/1/26');
+        const utc = renderTemplate('{{ ts | datetime }}', data, { timeZone: 'UTC' });
+        expect(utc).toContain('6/2/26');
+      });
+
+      it('still HTML-escapes formatted output unless triple-braced', () => {
+        // A formatter can yield characters needing escaping; default escapes.
+        expect(renderTemplate('{{ s | upper }}', { s: 'a&b' })).toBe('A&amp;B');
+        expect(renderTemplate('{{{ s | upper }}}', { s: 'a&b' })).toBe('A&B');
+      });
+
+      it('falls back to the raw value for an unknown formatter (no throw)', () => {
+        expect(renderTemplate('{{ x | bogus }}', { x: 'hi' })).toBe('hi');
+      });
+
+      it('renders a missing formatted value as empty (never "undefined")', () => {
+        expect(renderTemplate('{{ missing | datetime }}', {})).toBe('');
+      });
+
+      // Regression: the placeholder matcher must stay linear. CodeQL flagged a
+      // polynomial-ReDoS on inputs like `{{{{.` + many tabs; the brace-free
+      // `[^{}]*` capture removes the backtracking. Pathological input resolves
+      // fast and is left verbatim (not a valid path[+formatter] hole).
+      it('handles pathological brace/whitespace input without backtracking', () => {
+        const evil = '{{{{.' + '\t'.repeat(50_000);
+        const start = Date.now();
+        const out = renderTemplate(evil + '}}', {});
+        expect(Date.now() - start).toBeLessThan(1000);
+        expect(typeof out).toBe('string');
+      });
+    });
   });
 
   describe('requireVars', () => {
