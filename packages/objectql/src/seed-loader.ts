@@ -208,14 +208,23 @@ export class SeedLoaderService implements ISeedLoaderService {
     const seedNow = new Date();
 
     // Identity/context bound to seed CEL expressions. `os.user` / `os.org`
-    // resolve from here, so `owner_id: cel\`os.user.id\`` works. When no
-    // identity is supplied, `os.user` / `os.org` are simply unbound and any
-    // record that references them fails loudly below (rather than silently
-    // writing a raw Expression envelope into the column).
+    // resolve from here, so `owner_id: cel\`os.user.id\`` works.
+    //
+    // When no real user identity is supplied (the normal case — seeds run
+    // before the first human sign-up), `os.user` is bound to a NULL identity
+    // (`{ id: null }`) rather than left undefined. This makes `os.user.id`
+    // resolve to `null` instead of crashing the expression, so a seed's
+    // `owner_id: cel\`os.user.id\`` simply lands NULL — semantically "owned by
+    // whoever becomes the first admin", which the first-admin handoff
+    // (`claimSeedOwnership`) then fills in. The platform therefore never has to
+    // mint a placeholder `usr_system` row just to satisfy this expression.
     const seedIdentity = config.identity;
     const baseEvalCtx = {
       now: seedNow,
-      user: seedIdentity?.user,
+      // `id: null` is a legitimate seed-time state (the owning admin does not
+      // exist yet) that the formula EvalContext's `user.id: string` type does
+      // not yet model — cast the fallback so `os.user.id` evaluates to null.
+      user: seedIdentity?.user ?? ({ id: null } as unknown as NonNullable<typeof seedIdentity>['user']),
       // Fall back to the per-tenant organizationId so `os.org.id` resolves
       // during per-org replay even without an explicit identity.org.
       org: seedIdentity?.org ?? (config.organizationId ? { id: config.organizationId } : undefined),
@@ -245,8 +254,9 @@ export class SeedLoaderService implements ISeedLoaderService {
           recordIndex: i,
           message:
             `Cannot resolve dynamic seed values for ${objectName} record #${i}: ${seedResult.error.message}. ` +
-            'Records using cel`os.user.id` / cel`os.org.id` require a seed identity — ' +
-            'ensure a system/admin user exists before seeding (see SeedLoaderConfig.identity).',
+            '`os.user.id` resolves to null at seed time (the owning admin does not exist yet) and ' +
+            'owner-style fields are assigned by the first-admin handoff — so a required, non-owner ' +
+            'field must not depend on it. Provide a literal value or make the field optional.',
         };
         errors.push(error);
         allErrors.push(error);

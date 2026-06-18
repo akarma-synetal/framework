@@ -5,7 +5,6 @@ import { readEnvWithDeprecation } from '@objectstack/types';
 import { SeedLoaderService } from './seed-loader.js';
 import { loadDisabledPackageIds } from './package-state-store.js';
 import type { IMetadataService, II18nService } from '@objectstack/spec/contracts';
-import { SystemUserId } from '@objectstack/spec/system';
 import { QuickJSScriptRunner } from './sandbox/quickjs-runner.js';
 import { hookBodyRunnerFactory, actionBodyRunnerFactory } from './sandbox/body-runner.js';
 
@@ -472,20 +471,14 @@ export class AppPlugin implements Plugin {
                      object: d.object,
                  }));
 
-             // Resolve the seed identity (os.user) ONLY when a seed actually
-             // references it. The modern ownership model leaves `owner_id`
-             // unset in seeds and lets the first-admin handoff
-             // (`claimSeedOwnership`) re-own NULL rows to the promoted admin —
-             // so most bundles never touch `os.user`, and the non-loginable
-             // `usr_system` placeholder need not exist at all. We provision it
-             // lazily (backward-compatible) only for the rare seed that embeds
-             // `cel`os.user.id`` (detected via the serialized CEL `source`).
-             // `os.org` is unaffected — the loader derives it from
-             // `organizationId`, not from this identity.
-             const seedsReferenceOsUser = JSON.stringify(normalizedDatasets).includes('os.user');
-             const seedIdentity = seedsReferenceOsUser
-                 ? await this.ensureSeedIdentity(ql, ctx.logger)
-                 : undefined;
+             // No seed identity is provisioned. The platform never mints a
+             // placeholder `usr_system`: seeds leave `owner_id` unset (or use
+             // `cel`os.user.id``, which the loader resolves to NULL since the
+             // owning admin does not exist yet), and the first-admin handoff
+             // (`claimSeedOwnership`) re-owns those NULL rows to the promoted
+             // admin. `os.org` is still derived from `organizationId` inside the
+             // loader, independent of this.
+             const seedIdentity = undefined;
 
              // Stash datasets on a kernel service so SecurityPlugin's
              // sys_organization insert hook can replay them per-tenant
@@ -665,78 +658,6 @@ export class AppPlugin implements Plugin {
     stop = async (ctx: PluginContext) => {
         const sys = this.bundle.manifest || this.bundle;
         this.emitCatalogEvent(ctx, 'app:unregistered', sys);
-    }
-
-    /**
-     * Lazily provision the identity bound to `os.user` for seed CEL values.
-     *
-     * Called ONLY when a seed dataset actually embeds `cel`os.user.id`` (see the
-     * caller's `seedsReferenceOsUser` guard). The modern ownership model does
-     * not need this: seeds leave `owner_id` NULL and the first-admin bootstrap
-     * (`claimSeedOwnership` in plugin-security) re-owns those rows to the
-     * promoted human admin — so a typical bundle never references `os.user`, and
-     * the `usr_system` placeholder is never created.
-     *
-     * It survives only as a backward-compatible fallback for the rare seed that
-     * still embeds `cel`os.user.id``: such a seed runs before the first human
-     * sign-up, so we upsert a single non-loginable **system user**
-     * (`usr_system`) and bind it as `os.user` so the expression resolves instead
-     * of dropping the record.
-     *
-     * Why a dedicated system user rather than the login admin:
-     *  - `sys_user` is better-auth-managed and schema-locked (ADR-0010); the
-     *    password lives in `sys_account`, so a *loginable* admin can only be
-     *    minted through better-auth (the CLI does this via HTTP sign-up after
-     *    boot). A raw insert here would bypass those invariants.
-     *  - `usr_system` is an owner identity only (no credential row), analogous
-     *    to Salesforce's "Automated Process" user. The human admin is created
-     *    independently and need not be the seed owner.
-     *
-     * Idempotent: matches by the stable id, inserts once, reuses thereafter.
-     * Failures are non-fatal (logged) — records that actually need `os.user`
-     * then fail loudly in the loader with an actionable message.
-     */
-    private async ensureSeedIdentity(
-        ql: any,
-        logger: PluginContext['logger'],
-    ): Promise<{ user: { id: string; role: string; email: string } }> {
-        // Deterministic, non-loginable service identity that owns seeded data.
-        const SYSTEM_USER_ID = SystemUserId.SYSTEM;
-        const SYSTEM_USER_EMAIL = 'system@objectstack.local';
-        const identity = { user: { id: SYSTEM_USER_ID, role: 'system', email: SYSTEM_USER_EMAIL } };
-        const opts = { context: { isSystem: true } } as any;
-
-        try {
-            const existing = await (ql as any).find(
-                'sys_user',
-                { where: { id: SYSTEM_USER_ID }, limit: 1 },
-                opts,
-            );
-            if (Array.isArray(existing) && existing.length > 0) {
-                return identity;
-            }
-            await (ql as any).insert(
-                'sys_user',
-                {
-                    id: SYSTEM_USER_ID,
-                    name: 'System',
-                    email: SYSTEM_USER_EMAIL,
-                    email_verified: true,
-                    role: 'system',
-                },
-                opts,
-            );
-            logger.info(
-                `[Seeder] Provisioned deterministic system user (${SYSTEM_USER_ID}) as seed owner — binds os.user for identity-derived seed values`,
-            );
-        } catch (err: any) {
-            // Non-fatal: identity-dependent records will fail loudly in the
-            // loader; identity-free records still seed normally.
-            logger.warn('[Seeder] Failed to ensure system seed user; os.user-dependent seeds may be dropped', {
-                error: err?.message ?? String(err),
-            });
-        }
-        return identity;
     }
 
     /**
