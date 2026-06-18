@@ -472,12 +472,20 @@ export class AppPlugin implements Plugin {
                      object: d.object,
                  }));
 
-             // Resolve the seed identity (os.user / os.org) BEFORE any seed
-             // runs. Deterministically ensures a non-loginable system user
-             // exists so identity-derived seed values (e.g.
-             // `owner_id: cel`os.user.id``) resolve at boot — before the
-             // first human sign-up. See ensureSeedIdentity().
-             const seedIdentity = await this.ensureSeedIdentity(ql, ctx.logger);
+             // Resolve the seed identity (os.user) ONLY when a seed actually
+             // references it. The modern ownership model leaves `owner_id`
+             // unset in seeds and lets the first-admin handoff
+             // (`claimSeedOwnership`) re-own NULL rows to the promoted admin —
+             // so most bundles never touch `os.user`, and the non-loginable
+             // `usr_system` placeholder need not exist at all. We provision it
+             // lazily (backward-compatible) only for the rare seed that embeds
+             // `cel`os.user.id`` (detected via the serialized CEL `source`).
+             // `os.org` is unaffected — the loader derives it from
+             // `organizationId`, not from this identity.
+             const seedsReferenceOsUser = JSON.stringify(normalizedDatasets).includes('os.user');
+             const seedIdentity = seedsReferenceOsUser
+                 ? await this.ensureSeedIdentity(ql, ctx.logger)
+                 : undefined;
 
              // Stash datasets on a kernel service so SecurityPlugin's
              // sys_organization insert hook can replay them per-tenant
