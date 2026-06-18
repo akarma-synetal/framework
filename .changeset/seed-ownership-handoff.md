@@ -29,12 +29,14 @@ author-written objects silently shipped with no working ownership at all.
   not the author — performs the handoff, so there is nothing to remember or
   mistype.
 
-- **`usr_system` is now provisioned lazily (runtime)** — only when a seed
-  dataset actually embeds `cel`os.user.id``. Because the default model leaves
-  `owner_id` NULL and relies on the handoff above, a typical bundle never
-  references `os.user`, so the non-loginable `usr_system` placeholder is never
-  created. It survives purely as a backward-compatible fallback; `os.org` is
-  unaffected (derived from `organizationId` in the loader).
+- **`usr_system` is never minted (runtime + objectql).** The seed loader binds
+  `os.user` to a NULL identity, so `cel`os.user.id`` resolves to NULL at seed
+  time (the owning admin does not exist yet) and the row seeds NULL-owned — then
+  the handoff above fills it. The runtime's `ensureSeedIdentity` (the only code
+  that inserted a `usr_system` row) is removed. `SystemUserId.SYSTEM` survives
+  only as a reserved id so legacy DBs' exclusion guards / ownership handoff still
+  recognize a pre-existing row. `os.org` is unaffected (derived from
+  `organizationId`).
 
 Also hardens `bootstrapPlatformAdmin` against a latent dts typecheck error
 (defensive read of the untyped `description` on seed permission sets).
