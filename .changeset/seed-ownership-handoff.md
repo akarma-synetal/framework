@@ -1,6 +1,7 @@
 ---
 "@objectstack/objectql": minor
 "@objectstack/plugin-security": minor
+"@objectstack/runtime": minor
 ---
 
 feat(ownership): auto-provision a canonical `owner_id` and hand seeded records to the first admin
@@ -27,6 +28,13 @@ author-written objects silently shipped with no working ownership at all.
   `sys_*`. Authors write plain seed records (no `owner_id`) and the platform —
   not the author — performs the handoff, so there is nothing to remember or
   mistype.
+
+- **`usr_system` is now provisioned lazily (runtime)** — only when a seed
+  dataset actually embeds `cel`os.user.id``. Because the default model leaves
+  `owner_id` NULL and relies on the handoff above, a typical bundle never
+  references `os.user`, so the non-loginable `usr_system` placeholder is never
+  created. It survives purely as a backward-compatible fallback; `os.org` is
+  unaffected (derived from `organizationId` in the loader).
 
 Also hardens `bootstrapPlatformAdmin` against a latent dts typecheck error
 (defensive read of the untyped `description` on seed permission sets).
