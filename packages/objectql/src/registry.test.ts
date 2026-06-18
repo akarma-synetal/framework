@@ -573,6 +573,49 @@ describe('applySystemFields', () => {
         expect(out.fields.updated_at).toMatchObject({ system: true });
     });
 
+    // ── owner_id — canonical, reassignable record owner ──────────────────
+    it('injects owner_id by default on a business object (reassignable, not readonly)', () => {
+        const out = applySystemFields(baseLead, { multiTenant: false });
+        expect(out.fields.owner_id).toMatchObject({
+            type: 'lookup', reference: 'sys_user', system: true, readonly: false,
+        });
+        // Unlike the audit *_by lookups, owner is editable (ownership transfers).
+        expect(out.fields.owner_id.readonly).toBe(false);
+    });
+
+    it('does NOT inject owner_id for managedBy tables', () => {
+        const platform: any = { name: 'sys_audit_log', managedBy: 'platform', fields: { msg: { type: 'text' } } };
+        const out = applySystemFields(platform, { multiTenant: false });
+        expect(out.fields.owner_id).toBeUndefined();
+    });
+
+    it('does NOT inject owner_id for sys_* objects', () => {
+        const sysish: any = { name: 'sys_widget', fields: { msg: { type: 'text' } } };
+        const out = applySystemFields(sysish, { multiTenant: false });
+        expect(out.fields.owner_id).toBeUndefined();
+        // audit/tenant fields are still injected for non-managed sys_ objects
+        expect(out.fields.created_at).toBeDefined();
+    });
+
+    it('respects ownership: "org" / "none" opt-out (audit + tenant still injected)', () => {
+        for (const ownership of ['org', 'none'] as const) {
+            const opted: any = { ...baseLead, ownership };
+            const out = applySystemFields(opted, { multiTenant: false });
+            expect(out.fields.owner_id).toBeUndefined();
+            expect(out.fields.created_at).toBeDefined();
+        }
+    });
+
+    it('does NOT overwrite an author-declared owner_id', () => {
+        const declared: any = {
+            name: 'lead',
+            fields: { owner_id: { type: 'lookup', reference: 'sys_user', label: 'Custom Owner', readonly: true } },
+        };
+        const out = applySystemFields(declared, { multiTenant: false });
+        expect(out.fields.owner_id.label).toBe('Custom Owner');
+        expect(out.fields.owner_id.readonly).toBe(true);
+    });
+
     it('SchemaRegistry({ multiTenant: true }) auto-injects on registerObject', () => {
         const reg = new SchemaRegistry({ multiTenant: true });
         reg.registerObject({ name: 'lead', fields: { first_name: { type: 'text' } } } as any, 'crm', 'crm', 'own');

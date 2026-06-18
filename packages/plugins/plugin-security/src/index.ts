@@ -23,3 +23,5 @@ export {
   reconcileOrgAdminGrant,
   backfillOrgAdminGrants,
 } from './auto-org-admin-grant.js';
+export { bootstrapPlatformAdmin } from './bootstrap-platform-admin.js';
+export { claimSeedOwnership } from './claim-seed-ownership.js';

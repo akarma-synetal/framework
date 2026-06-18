@@ -80,13 +80,20 @@ export type SystemObjectName = typeof SystemObjectName[keyof typeof SystemObject
  */
 export const SystemUserId = {
   /**
-   * Deterministic, non-loginable service identity that owns seeded data.
+   * Reserved well-known id for the legacy non-loginable system service account.
    *
-   * Provisioned before seed loading so identity-derived seed values
-   * (`owner_id: cel`os.user.id``) resolve even on a fresh boot — before the
-   * first human sign-up. Has no `sys_account` credential, so it cannot sign
-   * in; analogous to Salesforce's "Automated Process" user. The human login
-   * admin is minted separately through better-auth.
+   * NO LONGER AUTO-PROVISIONED. Ownership now works without it: seeds leave
+   * `owner_id` NULL (and `cel`os.user.id`` resolves to NULL at seed time, since
+   * the owning admin does not exist yet), and the first-admin bootstrap
+   * (`claimSeedOwnership`) re-owns those NULL rows to the promoted human admin.
+   * The runtime never mints a `usr_system` row.
+   *
+   * This constant survives only for backward compatibility: DBs created by an
+   * older runtime may still contain a `usr_system` row, so the first-admin
+   * exclusion guards (it must never be mistaken for a human admin) and the
+   * ownership handoff (which also claims any `owner_id = usr_system` rows) keep
+   * referencing it. On a fresh boot no such row exists and those references are
+   * harmless no-ops.
    */
   SYSTEM: 'usr_system',
 } as const;

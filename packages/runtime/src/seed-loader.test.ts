@@ -1102,7 +1102,7 @@ describe('SeedLoaderService', () => {
       );
     });
 
-    it('fails loudly (no raw envelope written) when os.user is unbound', async () => {
+    it('resolves os.user.id to NULL (not a drop) when no identity is supplied', async () => {
       const metadata = createMockMetadata({
         note: { name: 'note', fields: { name: { type: 'text' }, author: { type: 'text' } } },
       });
@@ -1119,16 +1119,20 @@ describe('SeedLoaderService', () => {
             records: [{ name: 'N1', author: cel('os.user.id') }],
           },
         ],
-        // No identity → os.user unbound → record must be dropped, not written.
+        // No identity → the loader binds os.user to a NULL identity, so
+        // `os.user.id` resolves to null and the record seeds with author=null.
+        // The platform never mints a `usr_system` placeholder; owner-style
+        // fields are filled later by the first-admin handoff.
         config: baseConfig(),
       });
 
-      expect(result.success).toBe(false);
-      expect(result.summary.totalErrored).toBe(1);
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].message).toContain('os.user');
-      // Critically: the unresolved Expression envelope is NEVER persisted.
-      expect(engine.insert).not.toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      expect(result.summary.totalErrored).toBe(0);
+      expect(engine.insert).toHaveBeenCalledWith(
+        'note',
+        expect.objectContaining({ name: 'N1', author: null }),
+        expect.anything(),
+      );
     });
 
     it('falls back os.org.id to organizationId during per-tenant replay', async () => {

@@ -186,6 +186,22 @@ export interface SchemaRegistryOptions {
  *     timestamps; the `*_by` lookups are filled by the runtime when an
  *     authenticated session is present (NULL otherwise — e.g. seeded
  *     rows).
+ *   - `owner_id` — canonical, *reassignable* record owner (lookup to
+ *     `sys_user`). Auto-provisioned by DEFAULT on user-authored business
+ *     objects so ownership is correct-by-default for AI/human authors who
+ *     would otherwise forget to declare it (or reinvent a custom `owner`
+ *     lookup the platform can't see). Once present, the existing machinery
+ *     engages automatically: SecurityPlugin auto-stamps it to the acting
+ *     user on insert (step 3.5), owner-scoped RLS / "My" views / owner
+ *     reports key off it, and the first-admin bootstrap hands seeded rows
+ *     (owner_id NULL) to the promoted admin. Unlike `created_by` it is
+ *     editable (`readonly: false`) — ownership transfers; provenance does
+ *     not. Excluded for `managedBy` / `sys_*` tables and any object that
+ *     opts out via `ownership: 'org' | 'none'` (Dataverse-style: a
+ *     catalog/junction table that has no per-record owner). Forgetting the
+ *     opt-out is harmless (a spare nullable column), whereas forgetting to
+ *     ADD ownership — the failure mode we are eliminating — silently breaks
+ *     every owner-keyed feature.
  */
 export function applySystemFields(
   schema: ServiceObject,
@@ -231,6 +247,22 @@ export function applySystemFields(
   // by organization, so the index would be dead weight.
   const wantTenant = sf?.tenant !== false && !tenancyDisabled;
   const wantAudit = sf?.audit !== false;
+
+  // Ownership is auto-provisioned by DEFAULT on user-authored business
+  // objects (correct-by-default for AI authors). It is withheld only where a
+  // per-record owner is meaningless: any platform-managed table (`managedBy`
+  // is set — config/append-only/system/platform; `better-auth` already
+  // returned above), the `sys_*` namespace, or an explicit opt-out via
+  // `ownership: 'org' | 'none'` on the schema (Dataverse-style — catalog /
+  // junction tables). Note this is the SAFE default direction: forgetting the
+  // opt-out leaves a harmless spare column, whereas the old opt-IN model let
+  // authors silently ship objects with no working ownership at all.
+  const ownership = (schema as any).ownership as 'user' | 'org' | 'none' | undefined;
+  const wantOwner =
+    ownership !== 'org' &&
+    ownership !== 'none' &&
+    !(schema as any).managedBy &&
+    !schema.name.startsWith('sys_');
 
   const additions: Record<string, any> = {};
 
@@ -292,6 +324,25 @@ export function applySystemFields(
         description: 'User who last modified the record (populated when an authenticated session is present).',
       };
     }
+  }
+
+  // Canonical reassignable owner. `system: true` marks it platform-provided
+  // (so tooling/migrations recognise it), but — unlike the audit `*_by`
+  // lookups — it is NOT `readonly`: ownership is transferable, so it stays
+  // editable in forms and assignable via the API. SecurityPlugin auto-stamps
+  // it to the acting user on insert when left NULL.
+  if (wantOwner && !schema.fields?.owner_id) {
+    additions.owner_id = {
+      type: 'lookup',
+      reference: 'sys_user',
+      label: 'Owner',
+      required: false,
+      readonly: false,
+      system: true,
+      description:
+        'Record owner (auto-stamped to the creating user on insert; reassignable). ' +
+        'Drives owner-scoped views, reports and notifications.',
+    };
   }
 
   if (Object.keys(additions).length === 0) return schema;
