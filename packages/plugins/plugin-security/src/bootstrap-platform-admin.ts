@@ -21,6 +21,7 @@
 
 import type { PermissionSet } from '@objectstack/spec/security';
 import { SystemUserId } from '@objectstack/spec/system';
+import { claimSeedOwnership } from './claim-seed-ownership.js';
 
 interface BootstrapOptions {
   /** Logger from PluginContext. */
@@ -67,6 +68,8 @@ export async function bootstrapPlatformAdmin(
   seeded: number;
   adminPromoted: boolean;
   reason?: string;
+  /** Count of seeded rows re-owned to the freshly-promoted admin. */
+  ownershipClaimed?: number;
 }> {
   const logger = options.logger;
   if (!ql || typeof ql.find !== 'function' || typeof ql.insert !== 'function') {
@@ -87,7 +90,10 @@ export async function bootstrapPlatformAdmin(
       id,
       name: ps.name,
       label: ps.label ?? ps.name,
-      description: ps.description ?? null,
+      // `description` is not part of the typed PermissionSet shape (name/label
+      // only); read it defensively so a runtime-provided description still
+      // persists without tripping the dts typecheck.
+      description: (ps as any).description ?? null,
       object_permissions: JSON.stringify(ps.objects ?? {}),
       field_permissions: JSON.stringify(ps.fields ?? {}),
       // Persist the remaining permset facets so the runtime resolver
@@ -163,5 +169,16 @@ export async function bootstrapPlatformAdmin(
   }
   logger?.info?.(`[security] first user promoted to platform admin: ${target.email ?? target.id}`);
 
-  return { seeded: seededCount, adminPromoted: true };
+  // Hand seeded business records (owner_id NULL / usr_system) to the freshly
+  // promoted admin so owner-keyed UX works out of the box. Best-effort and
+  // idempotent — failures here must not undo the promotion above.
+  let ownershipClaimed = 0;
+  try {
+    const claims = await claimSeedOwnership(ql, target.id, { logger });
+    ownershipClaimed = claims.reduce((s, c) => s + c.count, 0);
+  } catch (e) {
+    logger?.warn?.('[security] seed ownership handoff failed', { error: (e as Error).message });
+  }
+
+  return { seeded: seededCount, adminPromoted: true, ownershipClaimed };
 }
