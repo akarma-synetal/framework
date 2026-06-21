@@ -2,6 +2,7 @@
 
 import type {
   ISharingService,
+  IHierarchyScopeResolver,
   RecordShare,
   GrantShareInput,
   SharingExecutionContext,
@@ -71,6 +72,11 @@ export interface SharingServiceOptions {
   engine: SharingEngine;
   /** Object names that bypass sharing — typically platform internals. */
   bypassObjects?: string[];
+  /**
+   * [ADR-0057] Late-bound lookup for the enterprise hierarchy-scope resolver
+   * (`hierarchy-scope-resolver` service). Returns null in the open edition.
+   */
+  hierarchyResolver?: () => IHierarchyScopeResolver | null | undefined;
 }
 
 /**
@@ -84,9 +90,11 @@ export interface SharingServiceOptions {
 export class SharingService implements ISharingService {
   private readonly engine: SharingEngine;
   private readonly bypassObjects: Set<string>;
+  private readonly hierarchyResolver?: () => IHierarchyScopeResolver | null | undefined;
 
   constructor(options: SharingServiceOptions) {
     this.engine = options.engine;
+    this.hierarchyResolver = options.hierarchyResolver;
     this.bypassObjects = new Set([
       'sys_record_share',
       'sys_user',
@@ -121,8 +129,18 @@ export class SharingService implements ISharingService {
       return { id: '__deny_all__' };
     }
 
+    // [ADR-0057 D1] Access DEPTH widens the owner-match for this grant:
+    // own → [me], unit → my BU members, unit_and_below → my BU subtree, org →
+    // no owner filter. Sharing grants are still OR-ed in on top (additive).
+    const readScope = (context as any).__readScope as ('own' | 'own_and_reports' | 'unit' | 'unit_and_below' | 'org' | undefined);
+    if (readScope === 'org') return null;
+    const ownerIds = await this.resolveOwnerScopeIds(context, readScope);
+    const ownerMatch: Record<string, unknown> = ownerIds.length === 1
+      ? { [OWNER_FIELD]: ownerIds[0] }
+      : { [OWNER_FIELD]: { $in: ownerIds } };
+
     const grants = await this.engine.find('sys_record_share', {
-      filter: {
+      where: {
         object_name: object,
         recipient_type: 'user',
         recipient_id: context.userId,
@@ -137,12 +155,12 @@ export class SharingService implements ISharingService {
       : [];
 
     if (grantedIds.length === 0) {
-      return { [OWNER_FIELD]: context.userId };
+      return ownerMatch;
     }
 
     return {
       $or: [
-        { [OWNER_FIELD]: context.userId },
+        ownerMatch,
         { id: { $in: grantedIds } },
       ],
     };
@@ -167,19 +185,24 @@ export class SharingService implements ISharingService {
     if (!hasOwnerField(schema)) return true;
     if (!context.userId) return false;
 
-    // 1) Ownership — fast path.
+    // 1) Ownership (write DEPTH widens the owner-set) — fast path.
     const own = await this.engine.find(object, {
-      filter: { id: recordId },
+      where: { id: recordId },
       fields: ['id', OWNER_FIELD],
       limit: 1,
       context: SYSTEM_CTX,
     });
     const owner = Array.isArray(own) && own[0] ? (own[0] as any)[OWNER_FIELD] : undefined;
-    if (owner && String(owner) === String(context.userId)) return true;
+    if (owner != null) {
+      const writeScope = (context as any).__writeScope as ('own' | 'own_and_reports' | 'unit' | 'unit_and_below' | 'org' | undefined);
+      if (writeScope === 'org') return true;
+      const owners = await this.resolveOwnerScopeIds(context, writeScope);
+      if (owners.includes(String(owner))) return true;
+    }
 
     // 2) Explicit edit / full share.
     const editGrants = await this.engine.find('sys_record_share', {
-      filter: {
+      where: {
         object_name: object,
         record_id: recordId,
         recipient_type: 'user',
@@ -212,7 +235,7 @@ export class SharingService implements ISharingService {
     // Upsert: if a row with same (object, record, recipient) exists,
     // update its access level / reason; otherwise insert a new one.
     const existing = await this.engine.find('sys_record_share', {
-      filter: {
+      where: {
         object_name: input.object,
         record_id: input.recordId,
         recipient_type: recipientType,
@@ -271,7 +294,7 @@ export class SharingService implements ISharingService {
     _context: SharingExecutionContext,
   ): Promise<RecordShare[]> {
     const rows = await this.engine.find('sys_record_share', {
-      filter: { object_name: object, record_id: recordId },
+      where: { object_name: object, record_id: recordId },
       orderBy: [{ field: 'created_at', order: 'desc' }],
       limit: 500,
       context: SYSTEM_CTX,
@@ -280,6 +303,38 @@ export class SharingService implements ISharingService {
   }
 
   // ── helpers ──────────────────────────────────────────────────────
+
+  /**
+   * [ADR-0057] Resolve the owner-id set for a DEPTH scope. `own`/unset/`org`
+   * resolve locally to the caller. HIERARCHY scopes (`unit` / `unit_and_below`
+   * / `own_and_reports`) are an ENTERPRISE capability resolved by a pluggable
+   * {@link IHierarchyScopeResolver} (`hierarchy-scope-resolver` service, shipped
+   * only by `@objectstack/security-enterprise`). The open edition has none, so
+   * this fails CLOSED to owner-only — a hierarchy scope NEVER widens without the
+   * enterprise resolver (the spec gate also refuses to compile such a grant).
+   */
+  private async resolveOwnerScopeIds(
+    context: SharingExecutionContext,
+    scope: 'own' | 'own_and_reports' | 'unit' | 'unit_and_below' | 'org' | undefined,
+  ): Promise<string[]> {
+    const me = String((context as any).userId);
+    if (!scope || scope === 'own' || scope === 'org') return [me];
+    const resolver = this.hierarchyResolver?.();
+    if (!resolver) return [me];
+    try {
+      const ids = await resolver.resolveOwnerIds(
+        {
+          userId: me,
+          organizationId: (context as any).organizationId ?? null,
+          tenantId: (context as any).tenantId ?? null,
+        },
+        scope,
+      );
+      return Array.isArray(ids) && ids.length > 0 ? ids : [me];
+    } catch {
+      return [me];
+    }
+  }
 
   private shouldBypass(object: string, context: SharingExecutionContext): boolean {
     if (context?.isSystem) return true;

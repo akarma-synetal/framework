@@ -128,12 +128,12 @@ export interface ISharingService {
  *
  * - `user`       — a specific user id (no expansion)
  * - `team`       — a flat collaboration team (`sys_team` + `sys_team_member`)
- * - `department` — an org-skeleton node (`sys_department` + descendants via
- *                  `parent_department_id` + members from `sys_department_member`)
+ * - `department` — an org-skeleton node (`sys_business_unit` + descendants via
+ *                  `parent_business_unit_id` + members from `sys_business_unit_member`)
  * - `role`       — tenant role on `sys_member.role`
  * - `queue`      — opaque queue identifier (resolution left to caller / app)
  */
-export type SharingRuleRecipientType = 'user' | 'team' | 'department' | 'role' | 'role_and_subordinates' | 'queue';
+export type SharingRuleRecipientType = 'user' | 'team' | 'business_unit' | 'role' | 'role_and_subordinates' | 'queue';
 
 /**
  * Stored shape of a sharing rule. Maps 1-to-1 to `sys_sharing_rule`
@@ -219,7 +219,7 @@ export interface ISharingRuleService {
  * Flat collaboration team graph (better-auth's `sys_team` semantics).
  *
  * Teams in this model are *not* hierarchical — they are ad-hoc groupings.
- * For the enterprise org-chart hierarchy, see {@link IDepartmentGraphService}.
+ * For the enterprise org-chart hierarchy, see {@link IBusinessUnitGraphService}.
  */
 export interface ITeamGraphService {
   /** Return all user ids that are members of `teamId`. */
@@ -231,21 +231,50 @@ export interface ITeamGraphService {
 }
 
 /**
- * Hierarchical department graph (`sys_department` org skeleton).
+ * Hierarchical department graph (`sys_business_unit` org skeleton).
  *
- * Walks `parent_department_id` to expand a department into the union of
+ * Walks `parent_business_unit_id` to expand a department into the union of
  * its members and all descendant members. Drives:
- *   - `recipient_type='department'` sharing rules
- *   - `dept:` approver prefix in the approval engine
+ *   - `recipient_type='business_unit'` sharing rules
+ *   - `bu:` approver prefix in the approval engine
  *   - report rollups, manager chains, and similar org-aware logic
  */
-export interface IDepartmentGraphService {
-  /** Return all descendant department ids (BFS, includes the seed). */
-  descendants(departmentId: string): Promise<string[]>;
-  /** Return all user ids in `departmentId` or any descendant department. */
-  expandUsers(departmentId: string): Promise<string[]>;
+export interface IBusinessUnitGraphService {
+  /** Return all descendant business unit ids (BFS, includes the seed). */
+  descendants(businessUnitId: string): Promise<string[]>;
+  /** Return all user ids in `businessUnitId` or any descendant business unit. */
+  expandUsers(businessUnitId: string): Promise<string[]>;
   /** Return the department head (manager_user_id) — best-effort, null when none. */
-  headOf(departmentId: string): Promise<string | null>;
+  headOf(businessUnitId: string): Promise<string | null>;
   /** Return the manager id for a user — proxy to {@link ITeamGraphService.managerOf}. */
   managerOf(userId: string, organizationId?: string): Promise<string | null>;
+}
+
+
+/**
+ * [ADR-0057] HIERARCHY access scopes (the Dataverse-style "see records by where
+ * you sit in the org"). `own`/`org` are resolved by the open sharing layer
+ * itself; these three require a pluggable resolver.
+ */
+export type HierarchyScope = 'unit' | 'unit_and_below' | 'own_and_reports';
+
+export interface HierarchyScopeContext {
+  userId: string;
+  organizationId?: string | null;
+  tenantId?: string | null;
+}
+
+/**
+ * Pluggable resolver for {@link HierarchyScope}s. The OPEN edition ships no
+ * implementation; the ENTERPRISE package `@objectstack/security-enterprise`
+ * registers one under the `hierarchy-scope-resolver` kernel service. When
+ * absent, the sharing layer fails CLOSED to owner-only (a hierarchy scope never
+ * widens without the resolver).
+ */
+export interface IHierarchyScopeResolver {
+  /**
+   * Owner ids whose records the caller may see under `scope` (must include the
+   * caller). Empty/throw → caller falls back to owner-only.
+   */
+  resolveOwnerIds(context: HierarchyScopeContext, scope: HierarchyScope): Promise<string[]>;
 }
