@@ -689,6 +689,85 @@ describe('SecurityPlugin', () => {
     await orig.call(harness, opCtx);
     // No throw — find is not a write operation.
   });
+
+
+  // ---------------------------------------------------------------------------
+  // ADR-0058 D4 — RLS `check` clause (write post-image validation)
+  //
+  // `using` gates which EXISTING rows a write may target (pre-image, step 2.7);
+  // `check` validates the NEW / CHANGED row (post-image) on insert/update — the
+  // PostgreSQL WITH CHECK analog — compiled by the canonical compiler and matched
+  // in-memory. Fail closed (D5). Scoped to policies that explicitly declare check.
+  // ---------------------------------------------------------------------------
+  describe('RLS check enforcement (ADR-0058 D4)', () => {
+    const checkPolicySet: PermissionSet = {
+      name: 'member_default',
+      label: 'Member',
+      isProfile: true,
+      objects: { '*': { allowRead: true, allowCreate: true, allowEdit: true, allowDelete: true } },
+      rowLevelSecurity: [
+        { name: 'emea_insert_check', object: '*', operation: 'insert', check: "region == 'EMEA'" },
+        { name: 'emea_update_check', object: '*', operation: 'update', check: "region == 'EMEA'" },
+      ],
+    } as any;
+
+    const started = async (findOneImpl?: (q: any) => any) => {
+      const plugin = new SecurityPlugin({ fallbackPermissionSet: 'member_default' });
+      const harness = makeMiddlewareCtx({
+        permissionSets: [checkPolicySet],
+        objectFields: ['id', 'region', 'owner_id', 'name'],
+        findOneImpl,
+      });
+      await plugin.init(harness.ctx);
+      await plugin.start(harness.ctx);
+      return harness;
+    };
+    const ctx = () => ({ userId: 'u1', tenantId: 'org-1', roles: [], permissions: ['member_default'] });
+
+    it('INSERT whose post-image satisfies the check succeeds', async () => {
+      const h = await started();
+      const opCtx: any = { object: 'task', operation: 'insert', data: { name: 'A', region: 'EMEA' }, context: ctx() };
+      await expect(h.run(opCtx)).resolves.toBeDefined();
+    });
+
+    it('INSERT whose post-image VIOLATES the check is denied (fail closed)', async () => {
+      const h = await started();
+      const opCtx: any = { object: 'task', operation: 'insert', data: { name: 'A', region: 'APAC' }, context: ctx() };
+      await expect(h.run(opCtx)).rejects.toMatchObject({ name: 'PermissionDeniedError' });
+    });
+
+    it('INSERT missing the checked field is denied (fail closed)', async () => {
+      const h = await started();
+      const opCtx: any = { object: 'task', operation: 'insert', data: { name: 'A' }, context: ctx() };
+      await expect(h.run(opCtx)).rejects.toMatchObject({ name: 'PermissionDeniedError' });
+    });
+
+    it('UPDATE whose post-image (pre-image ∪ change) satisfies the check succeeds', async () => {
+      // Pre-image is APAC; the update moves it to EMEA → post-image is valid.
+      const h = await started(() => ({ id: 'r1', region: 'APAC', name: 'X' }));
+      const opCtx: any = { object: 'task', operation: 'update', data: { id: 'r1', region: 'EMEA' }, context: ctx() };
+      await expect(h.run(opCtx)).resolves.toBeDefined();
+    });
+
+    it('UPDATE that changes a valid row to violate the check is denied', async () => {
+      // Pre-image is EMEA (valid); the update moves it to APAC → post-image invalid.
+      const h = await started(() => ({ id: 'r1', region: 'EMEA', name: 'X' }));
+      const opCtx: any = { object: 'task', operation: 'update', data: { id: 'r1', region: 'APAC' }, context: ctx() };
+      await expect(h.run(opCtx)).rejects.toMatchObject({ name: 'PermissionDeniedError' });
+    });
+
+    it('UPDATE leaving the checked field unchanged uses the pre-image value (valid stays valid)', async () => {
+      const h = await started(() => ({ id: 'r1', region: 'EMEA', name: 'X' }));
+      const opCtx: any = { object: 'task', operation: 'update', data: { id: 'r1', name: 'renamed' }, context: ctx() };
+      await expect(h.run(opCtx)).resolves.toBeDefined();
+    });
+
+    it('DELETE is unaffected by check (no new row to validate)', async () => {
+      const h = await started(() => ({ id: 'r1', region: 'APAC' }));
+      const opCtx: any = { object: 'task', operation: 'delete', data: { id: 'r1' }, context: ctx() };
+      await expect(h.run(opCtx)).resolves.toBeDefined();
+    });
+  });
 });
 // ---------------------------------------------------------------------------
 describe('PermissionEvaluator', () => {
@@ -1199,17 +1278,28 @@ describe('RLSCompiler', () => {
 // ---------------------------------------------------------------------------
 describe('RLSCompiler D4 — uncompilable predicates are surfaced', () => {
   it('isSupportedRlsExpression accepts the compilable shapes', () => {
+    // Legacy SQL-ish subset (bridged `=`/`IN`).
     expect(isSupportedRlsExpression('owner_id = current_user.id')).toBe(true);
     expect(isSupportedRlsExpression('owner = current_user.email')).toBe(true);
     expect(isSupportedRlsExpression("status = 'published'")).toBe(true);
     expect(isSupportedRlsExpression('id IN (current_user.org_user_ids)')).toBe(true);
     expect(isSupportedRlsExpression('1 = 1')).toBe(true);
+    // ADR-0058: the canonical compiler lowers a broader pushdown subset, so the
+    // shape gate now (correctly) reports these as enforceable — `==`/`!=`,
+    // comparisons, and CEL compound predicates all compile to a FilterCondition.
+    expect(isSupportedRlsExpression('owner == current_user.id')).toBe(true);   // `==`
+    expect(isSupportedRlsExpression('amount > 100')).toBe(true);               // comparison
+    expect(isSupportedRlsExpression('region != null')).toBe(true);             // null check
+    expect(isSupportedRlsExpression('a == 1 && b == 2')).toBe(true);           // CEL compound
   });
 
-  it('isSupportedRlsExpression rejects shapes the runtime would drop', () => {
-    expect(isSupportedRlsExpression('owner == current_user.name')).toBe(false); // `==`
-    expect(isSupportedRlsExpression('a = current_user.id AND b = 1')).toBe(false); // AND
-    expect(isSupportedRlsExpression('amount > 100')).toBe(false); // range
+  it('isSupportedRlsExpression rejects genuinely non-pushdownable shapes', () => {
+    // These cannot lower to a FilterCondition for ANY input, so the gate must
+    // reject them (ADR-0055 / ADR-0056 D4) — they fail closed at runtime.
+    expect(isSupportedRlsExpression('a = current_user.id AND b = 1')).toBe(false); // SQL AND ≠ CEL && (unparseable)
+    expect(isSupportedRlsExpression('amount + 1 > 2')).toBe(false);                // arithmetic
+    expect(isSupportedRlsExpression('id IN (SELECT id FROM users)')).toBe(false);  // subquery
+    expect(isSupportedRlsExpression('record.a.b == 1')).toBe(false);              // cross-object traversal
     expect(isSupportedRlsExpression('')).toBe(false);
   });
 
@@ -1217,7 +1307,9 @@ describe('RLSCompiler D4 — uncompilable predicates are surfaced', () => {
     const warned: string[] = [];
     const compiler = new RLSCompiler();
     compiler.setLogger({ warn: (message: string) => warned.push(message) });
-    const policy: any = { name: 'bad', object: 'thing', operation: 'select', using: 'owner == current_user.name' };
+    // ADR-0058: a genuinely non-pushdownable shape (arithmetic) — no input can
+    // lower it, so it must WARN (vs a valid shape whose var is merely absent).
+    const policy: any = { name: 'bad', object: 'thing', operation: 'select', using: 'amount + 1 > 2' };
     const filter = compiler.compileFilter([policy], { userId: 'u1' } as any);
     expect(filter).toEqual(RLS_DENY_FILTER); // only policy dropped → fail-closed
     expect(warned.length).toBe(1);
