@@ -1973,3 +1973,210 @@ describe('HttpDispatcher — ADR-0066 D4 action requiredPermissions gate', () =>
     expect(executeAction).not.toHaveBeenCalled();
   });
 });
+
+describe('HttpDispatcher — MCP action bridge (list_actions / run_action)', () => {
+  // A `todo_task` object with declarative actions, mirroring examples/app-todo:
+  //  - complete_task: script bound to the `completeTask` handler (row-context)
+  //  - issue_license: script gated behind a capability (ADR-0066 D4)
+  //  - defer_task: modal (UI-only, no headless dispatch)
+  const completeAction = {
+    name: 'complete_task',
+    label: 'Mark Complete',
+    objectName: 'todo_task',
+    type: 'script',
+    target: 'completeTask', // handler key differs from the declarative name
+    locations: ['record_header', 'list_item'],
+    ai: { exposed: true, description: 'Mark a todo task as complete.' },
+  };
+  const gatedAction = {
+    name: 'issue_license',
+    label: 'Issue',
+    objectName: 'todo_task',
+    type: 'script',
+    target: 'issueLicense',
+    requiredPermissions: ['manage_platform_settings'],
+  };
+  const modalAction = {
+    name: 'defer_task',
+    label: 'Defer',
+    objectName: 'todo_task',
+    type: 'modal',
+    target: 'defer_modal',
+  };
+  const todoObject = {
+    name: 'todo_task',
+    label: 'Task',
+    fields: { subject: { type: 'text', label: 'Subject' }, status: { type: 'select', label: 'Status' } },
+    actions: [completeAction, gatedAction, modalAction],
+  };
+  // A system object carrying an action — must be hidden + fail-closed.
+  const sysObject = {
+    name: 'sys_api_key',
+    label: 'API Key',
+    actions: [{ name: 'rotate', type: 'script', target: 'rotate', objectName: 'sys_api_key' }],
+  };
+
+  const makeBridge = (execCtx: any) => {
+    const store: Record<string, any> = { t1: { id: 't1', subject: 'A', status: 'open' } };
+    const executeAction = vi.fn(async (obj: string, key: string, ctx: any) => {
+      if (key === 'completeTask') {
+        const id = ctx?.record?.id ?? ctx?.params?.recordId;
+        if (store[id]) store[id].status = 'completed';
+        return { updated: id };
+      }
+      if (key === 'issueLicense') return { issued: true };
+      throw new Error(`Action '${key}' on object '${obj}' not found`);
+    });
+    const ql: any = {
+      executeAction,
+      registry: { getObject: (n: string) => (n === 'todo_task' ? todoObject : null) },
+      insert: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      find: vi.fn(async (_o: string, opts: any) => {
+        const id = opts?.where?.id;
+        return id && store[id] ? [store[id]] : [];
+      }),
+    };
+    const metadata: any = {
+      listObjects: vi.fn(async () => [todoObject, sysObject]),
+      getObject: vi.fn(async (n: string) =>
+        n === 'todo_task' ? todoObject : n === 'sys_api_key' ? sysObject : undefined,
+      ),
+    };
+    const kernel: any = {
+      context: {
+        getService: (n: string) => (n === 'objectql' ? ql : n === 'metadata' ? metadata : null),
+      },
+    };
+    const dispatcher = new HttpDispatcher(kernel);
+    const ctx: any = { request: {}, environmentId: 'platform', executionContext: execCtx };
+    const bridge = (dispatcher as any).buildMcpBridge(ctx);
+    return { bridge, executeAction, store };
+  };
+
+  it('list_actions returns only invokable, permitted, non-system actions', async () => {
+    const { bridge } = makeBridge({ userId: 'u1', systemPermissions: [] });
+    const names = (await bridge.listActions()).map((a: any) => a.name);
+    expect(names).toContain('complete_task'); // script + permitted
+    expect(names).not.toContain('issue_license'); // gated, caller lacks the capability
+    expect(names).not.toContain('defer_task'); // modal = UI-only, no headless path
+    expect(names).not.toContain('rotate'); // sys_api_key → hidden fail-closed
+  });
+
+  it('list_actions surfaces record-context + summary metadata', async () => {
+    const { bridge } = makeBridge({ userId: 'u1', systemPermissions: [] });
+    const complete = (await bridge.listActions()).find((a: any) => a.name === 'complete_task');
+    expect(complete).toMatchObject({ objectName: 'todo_task', type: 'script', requiresRecord: true });
+    expect(complete.description).toMatch(/complete/i);
+  });
+
+  it('list_actions reveals a gated action once the caller holds the capability', async () => {
+    const { bridge } = makeBridge({ userId: 'u1', systemPermissions: ['manage_platform_settings'] });
+    const names = (await bridge.listActions()).map((a: any) => a.name);
+    expect(names).toContain('issue_license');
+  });
+
+  it('run_action dispatches a script action via executeAction using its target handler key', async () => {
+    const { bridge, executeAction, store } = makeBridge({ userId: 'u1', systemPermissions: [] });
+    const res = await bridge.runAction('complete_task', { recordId: 't1' });
+    expect(res.ok).toBe(true);
+    expect(executeAction).toHaveBeenCalledWith(
+      'todo_task',
+      'completeTask', // the action's target, NOT its declarative name
+      expect.objectContaining({
+        record: expect.objectContaining({ id: 't1' }),
+        params: expect.objectContaining({ recordId: 't1', objectName: 'todo_task' }),
+      }),
+    );
+    expect(store.t1.status).toBe('completed'); // the handler actually ran
+  });
+
+  it('run_action enforces the ADR-0066 D4 capability gate (throws, never dispatches)', async () => {
+    const { bridge, executeAction } = makeBridge({ userId: 'u1', systemPermissions: [] });
+    await expect(bridge.runAction('issue_license', {})).rejects.toThrow(/requires capability/i);
+    expect(executeAction).not.toHaveBeenCalled();
+  });
+
+  it('run_action allows a gated action for a holder of the capability', async () => {
+    const { bridge, executeAction } = makeBridge({ userId: 'u1', systemPermissions: ['manage_platform_settings'] });
+    const res = await bridge.runAction('issue_license', {});
+    expect(res.ok).toBe(true);
+    expect(executeAction).toHaveBeenCalledWith('todo_task', 'issueLicense', expect.anything());
+  });
+
+  it('run_action blocks system-object actions fail-closed (even for a system context)', async () => {
+    const { bridge, executeAction } = makeBridge({ isSystem: true });
+    await expect(bridge.runAction('rotate', { objectName: 'sys_api_key' })).rejects.toThrow(/system object/i);
+    expect(executeAction).not.toHaveBeenCalled();
+  });
+
+  it('run_action rejects an unknown action name', async () => {
+    const { bridge } = makeBridge({ userId: 'u1', systemPermissions: [] });
+    await expect(bridge.runAction('nope', {})).rejects.toThrow(/not found/i);
+  });
+
+  it('run_action refuses a UI-only (modal) action', async () => {
+    const { bridge } = makeBridge({ userId: 'u1', systemPermissions: [] });
+    await expect(bridge.runAction('defer_task', { recordId: 't1' })).rejects.toThrow(/cannot be invoked/i);
+  });
+
+  // ── flow dispatch (type:'flow' → automation flow runner) ──
+  const flowAction = {
+    name: 'escalate_ticket',
+    label: 'Escalate',
+    objectName: 'todo_task',
+    type: 'flow',
+    target: 'escalation_flow',
+    locations: ['record_header'],
+  };
+  const makeFlowBridge = (execCtx: any, automation: any) => {
+    const flowObject = { ...{ name: 'todo_task', label: 'Task', fields: {} }, actions: [flowAction] };
+    const ql: any = {
+      executeAction: vi.fn(),
+      registry: { getObject: () => flowObject },
+      find: vi.fn(async () => []),
+      insert: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    };
+    const metadata: any = {
+      listObjects: vi.fn(async () => [flowObject]),
+      getObject: vi.fn(async () => flowObject),
+    };
+    const kernel: any = {
+      context: {
+        getService: (n: string) =>
+          n === 'objectql' || n === 'data' ? ql : n === 'metadata' ? metadata : n === 'automation' ? automation : null,
+      },
+    };
+    const dispatcher = new HttpDispatcher(kernel);
+    const ctx: any = { request: {}, environmentId: 'platform', executionContext: execCtx };
+    return { bridge: (dispatcher as any).buildMcpBridge(ctx), ql };
+  };
+
+  it('list_actions includes a flow action only when an automation service is present', async () => {
+    const withAuto = makeFlowBridge({ userId: 'u1', systemPermissions: [] }, { execute: vi.fn() });
+    expect((await withAuto.bridge.listActions()).map((a: any) => a.name)).toContain('escalate_ticket');
+    const noAuto = makeFlowBridge({ userId: 'u1', systemPermissions: [] }, null);
+    expect((await noAuto.bridge.listActions()).map((a: any) => a.name)).not.toContain('escalate_ticket');
+  });
+
+  it('run_action dispatches a flow action through the automation flow runner', async () => {
+    const execute = vi.fn(async () => ({ success: true, output: { escalated: true } }));
+    const { bridge, ql } = makeFlowBridge({ userId: 'u1', systemPermissions: [] }, { execute });
+    const res = await bridge.runAction('escalate_ticket', { recordId: 't1', params: { reason: 'sla' } });
+    expect(res.ok).toBe(true);
+    expect(ql.executeAction).not.toHaveBeenCalled(); // flow path, not executeAction
+    expect(execute).toHaveBeenCalledWith(
+      'escalation_flow',
+      expect.objectContaining({ triggerData: expect.objectContaining({ action: 'escalate_ticket', params: { reason: 'sla' } }) }),
+    );
+  });
+
+  it('run_action surfaces a flow failure as an error', async () => {
+    const execute = vi.fn(async () => ({ success: false, error: 'boom' }));
+    const { bridge } = makeFlowBridge({ userId: 'u1', systemPermissions: [] }, { execute });
+    await expect(bridge.runAction('escalate_ticket', {})).rejects.toThrow(/boom/i);
+  });
+});
