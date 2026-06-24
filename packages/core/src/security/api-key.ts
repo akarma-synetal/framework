@@ -84,10 +84,10 @@ export function extractApiKey(headers: any): string | undefined {
   if (x && x.trim()) return x.trim();
   const auth = readHeader(headers, 'authorization');
   if (!auth) return undefined;
-  const apiKeyScheme = auth.match(/^ApiKey\s+(.+)$/i);
+  const apiKeyScheme = auth.match(/^ApiKey\s+(\S.*)$/i);
   if (apiKeyScheme?.[1]?.trim()) return apiKeyScheme[1].trim();
   // Bearer is accepted only for prefixed api-keys (never for session tokens).
-  const bearer = auth.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  const bearer = auth.match(/^Bearer\s+(\S.*)$/i)?.[1]?.trim();
   if (bearer && bearer.startsWith(API_KEY_PREFIX)) return bearer;
   return undefined;
 }
