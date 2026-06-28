@@ -1,7 +1,18 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+//
+// Lean engine entry (ADR-0076). Exposes the data engine surface — engine,
+// registry, hooks, validation, in-memory aggregation, utilities — WITHOUT the
+// kernel plugin (`ObjectQLPlugin`), the kernel factory, or any metadata
+// management (`@objectstack/metadata-protocol`). Embedders that want only the
+// engine (e.g. a thin gateway) import from `@objectstack/objectql/core` so the
+// 268KB metadata protocol is never pulled into their dependency graph.
+//
+// A boundary ratchet (ADR-0076 D2) keeps this entry free of protocol/plugin
+// imports; do not add `./plugin`, `./kernel-factory`, or `@objectstack/metadata-protocol`
+// re-exports here.
 
-// Export Registry
-export { 
+// Registry
+export {
   SchemaRegistry,
   applySystemFields,
   computeFQN,
@@ -12,54 +23,39 @@ export {
 } from './registry.js';
 export type { ObjectContributor, SchemaRegistryOptions } from './registry.js';
 
-// Export Protocol Implementation
-export { ObjectStackProtocolImplementation } from '@objectstack/metadata-protocol';
-
-// ADR-0008 PR-10b: MetadataRepository wrapper over the existing sys_metadata table.
-export { SysMetadataRepository } from '@objectstack/metadata-protocol';
-export type { SysMetadataEngine, SysMetadataRepositoryOptions } from '@objectstack/metadata-protocol';
-
-// Export Engine
+// Engine
 export { ObjectQL, ObjectRepository, ScopedContext } from './engine.js';
 export type { ObjectQLHostContext, HookHandler, HookEntry, OperationContext, EngineMiddleware } from './engine.js';
 
-// Export in-memory aggregation fallback (used by engine.aggregate when the
-// driver lacks native groupBy/aggregations support; also useful for tests).
+// In-memory aggregation fallback
 export { applyInMemoryAggregation, bucketDateValue } from './in-memory-aggregation.js';
 
-// Export Hook Binder & Wrappers (declarative-metadata → engine glue)
+// Hook binder & wrappers (declarative-metadata → engine glue)
 export { bindHooksToEngine } from './hook-binder.js';
 export type { BindHooksOptions, BindHooksResult } from './hook-binder.js';
 export { wrapDeclarativeHook } from './hook-wrappers.js';
 export type { WrapDeclarativeOptions } from './hook-wrappers.js';
 
-// Export Validation
+// Validation
 export { ValidationError, validateRecord } from './validation/record-validator.js';
 export type { FieldValidationError } from './validation/record-validator.js';
 export { evaluateValidationRules, needsPriorRecord, legalNextStates } from './validation/rule-validator.js';
 export type { EvaluateRulesOptions } from './validation/rule-validator.js';
 export {
-    InMemoryHookMetricsRecorder,
-    noopHookMetricsRecorder,
+  InMemoryHookMetricsRecorder,
+  noopHookMetricsRecorder,
 } from './hook-metrics.js';
 export type {
-    HookMetricsRecorder,
-    HookMetricLabel,
-    HookMetricOutcome,
-    HookSkipReason,
+  HookMetricsRecorder,
+  HookMetricLabel,
+  HookMetricOutcome,
+  HookSkipReason,
 } from './hook-metrics.js';
 
-// Export MetadataFacade
+// MetadataFacade
 export { MetadataFacade } from './metadata-facade.js';
 
-// Export Plugin Shim
-export { ObjectQLPlugin } from './plugin.js';
-
-// Export Kernel Factory
-export { createObjectQLKernel } from './kernel-factory.js';
-export type { ObjectQLKernelOptions } from './kernel-factory.js';
-
-// Export secret-field channel helpers (for hosts / privileged consumers)
+// Secret-field channel helpers
 export {
   SECRET_REF_PREFIX,
   SECRET_MASK,
@@ -69,7 +65,7 @@ export {
   collectSecretFields,
 } from './secret-fields.js';
 
-// Export Utilities
+// Utilities
 export {
   toTitleCase,
   convertIntrospectedSchemaToObjects,
@@ -80,12 +76,3 @@ export type {
   IntrospectedTable,
   IntrospectedSchema,
 } from './util.js';
-
-// Seed loader — materializes `seed` metadata into rows (used by publishMetaItem
-// and the runtime dispatcher/app plugins).
-export { SeedLoaderService } from '@objectstack/metadata-protocol';
-
-// ADR-0038 L3 — post-publish runtime probes (one real read per published
-// artifact); findings are BuildIssue-shaped with layer 'runtime'.
-export { runBuildProbes } from '@objectstack/metadata-protocol';
-export type { RuntimeBuildIssue, BuildProbeReport, RunBuildProbesOptions } from '@objectstack/metadata-protocol';
