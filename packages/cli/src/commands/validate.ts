@@ -1,6 +1,9 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { Args, Command, Flags } from '@oclif/core';
+import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import chalk from 'chalk';
 import { ZodError } from 'zod';
 import { ObjectStackDefinitionSchema, normalizeStackInput } from '@objectstack/spec';
@@ -170,7 +173,24 @@ export default class Validate extends Command {
       //     time. Parse it now so malformed source fails loudly (ADR-0078)
       //     instead of being stored and breaking only at render.
       if (!flags.json) printStep('Checking JSX-source pages (ADR-0080)...');
-      const jsxFindings = validateJsxPages(result.data as Record<string, unknown>);
+      // Optional component manifest (ADR-0080): if the project ships a
+      // `sdui.manifest.json` (generated from the registry's public tier), the
+      // gate does full component/prop validation; otherwise parse-level.
+      let sduiManifest: unknown;
+      try {
+        const mp = join(process.cwd(), 'sdui.manifest.json');
+        if (existsSync(mp)) sduiManifest = JSON.parse(readFileSync(mp, 'utf8'));
+        if (!sduiManifest) {
+          // Fall back to the manifest shipped inside @objectstack/console
+          // (built from objectui's public-tier registry; cli already deps it).
+          const cp = createRequire(import.meta.url).resolve('@objectstack/console/dist/sdui.manifest.json');
+          if (existsSync(cp)) sduiManifest = JSON.parse(readFileSync(cp, 'utf8'));
+        }
+      } catch { /* fall back to parse-level */ }
+      const jsxFindings = validateJsxPages(
+        result.data as Record<string, unknown>,
+        sduiManifest ? { manifest: sduiManifest as never } : {},
+      );
       const jsxErrors = jsxFindings.filter((f) => f.severity === 'error');
       const jsxWarnings = jsxFindings.filter((f) => f.severity === 'warning');
 
