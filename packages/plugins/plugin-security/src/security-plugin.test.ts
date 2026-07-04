@@ -292,6 +292,36 @@ describe('SecurityPlugin', () => {
       expect(harness.findOne).toHaveBeenCalledTimes(1);
     });
 
+    it('DENIES a purge of a not-owned row via the pre-image check (#1883 — destructive ops inherit row-level gating)', async () => {
+      // The destructive lifecycle class (transfer/restore/purge) is pre-wired
+      // into OPERATION_TO_PERMISSION, so it clears the object-level RBAC gate.
+      // The record-level pre-image RLS check must therefore ALSO cover it —
+      // otherwise a grant-holder could destroy out-of-scope rows by id. purge
+      // maps onto the `delete` RLS class.
+      const purgerSet: PermissionSet = {
+        name: 'purger', label: 'Purger', isProfile: true,
+        objects: { '*': { allowRead: true, allowPurge: true } },
+        rowLevelSecurity: [
+          { name: 'owner_only_deletes', object: '*', operation: 'delete', using: 'created_by = current_user.id' },
+        ],
+      } as any;
+      const plugin = new SecurityPlugin({ fallbackPermissionSet: 'purger' });
+      const harness = makeMiddlewareCtx({
+        permissionSets: [purgerSet],
+        objectFields: ownerFields,
+        findOneImpl: () => null, // row exists but not owned → filtered out → deny
+      });
+      await plugin.init(harness.ctx);
+      await plugin.start(harness.ctx);
+      const opCtx: any = {
+        object: 'task', operation: 'purge',
+        options: { where: { id: 'r1' } },
+        context: memberCtx,
+      };
+      await expect(harness.run(opCtx)).rejects.toMatchObject({ name: 'PermissionDeniedError' });
+      expect(harness.findOne).toHaveBeenCalledTimes(1);
+    });
+
     it('SKIPS the check when no RLS policy applies (e.g. modifyAllRecords / admin) — no extra read', async () => {
       const adminSet: PermissionSet = {
         name: 'admin_full_access', label: 'Admin', isProfile: true,
@@ -940,17 +970,40 @@ describe('PermissionEvaluator', () => {
     expect(evaluator.checkObjectPermission('unknownOp', 'contact', [])).toBe(true);
   });
 
-  it('should fail CLOSED for unmapped destructive operations (ADR-0049)', () => {
+  it('denies transfer/restore/purge without the matching RBAC bit (#1883)', () => {
     const evaluator = new PermissionEvaluator();
-    // transfer/restore/purge are not in OPERATION_TO_PERMISSION; they must be
-    // denied rather than falling through to default-allow — even for an
-    // otherwise fully-permissioned set.
-    const ps = makePermSet('admin', {
-      contact: { allowRead: true, allowCreate: true, allowEdit: true, allowDelete: true, modifyAllRecords: true },
+    // Full CRUD does NOT imply the destructive lifecycle class: each op is
+    // gated by its own bit (allowTransfer/allowRestore/allowPurge) and must
+    // be denied when the bit is absent — never default-allow (ADR-0049).
+    const ps = makePermSet('member', {
+      contact: { allowRead: true, allowCreate: true, allowEdit: true, allowDelete: true },
     });
     expect(evaluator.checkObjectPermission('transfer', 'contact', [ps])).toBe(false);
     expect(evaluator.checkObjectPermission('restore', 'contact', [ps])).toBe(false);
     expect(evaluator.checkObjectPermission('purge', 'contact', [ps])).toBe(false);
+    // …and an empty permission-set list denies too (fail-closed baseline).
+    expect(evaluator.checkObjectPermission('purge', 'contact', [])).toBe(false);
+  });
+
+  it('allows transfer/restore/purge via their specific RBAC bits (#1883)', () => {
+    const evaluator = new PermissionEvaluator();
+    const transferOnly = makePermSet('t', { contact: { allowTransfer: true } });
+    const restoreOnly = makePermSet('r', { contact: { allowRestore: true } });
+    const purgeOnly = makePermSet('p', { contact: { allowPurge: true } });
+    expect(evaluator.checkObjectPermission('transfer', 'contact', [transferOnly])).toBe(true);
+    expect(evaluator.checkObjectPermission('restore', 'contact', [restoreOnly])).toBe(true);
+    expect(evaluator.checkObjectPermission('purge', 'contact', [purgeOnly])).toBe(true);
+    // A bit on one op never leaks to another.
+    expect(evaluator.checkObjectPermission('purge', 'contact', [transferOnly])).toBe(false);
+    expect(evaluator.checkObjectPermission('transfer', 'contact', [purgeOnly])).toBe(false);
+  });
+
+  it('modifyAllRecords super-user bypass covers transfer/restore/purge (#1883)', () => {
+    const evaluator = new PermissionEvaluator();
+    const admin = makePermSet('admin', { contact: { modifyAllRecords: true } });
+    expect(evaluator.checkObjectPermission('transfer', 'contact', [admin])).toBe(true);
+    expect(evaluator.checkObjectPermission('restore', 'contact', [admin])).toBe(true);
+    expect(evaluator.checkObjectPermission('purge', 'contact', [admin])).toBe(true);
   });
 
   it('should allow via viewAllRecords', () => {
