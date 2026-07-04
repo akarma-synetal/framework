@@ -479,8 +479,23 @@ export const NavigationConfigSchema = lazySchema(() => z.object({
   preventNavigation: z.boolean().default(false).describe('Disable standard navigation entirely'),
   openNewTab: z.boolean().default(false).describe('Force open in new tab (applies to page mode)'),
   
-  /** Dimensions (for modal/drawer) */
-  width: z.union([z.string(), z.number()]).optional().describe('Width of the drawer/modal (e.g. "600px", "50%")'),
+  /**
+   * [#2578] Overlay size for a drawer/modal detail — coarse T-shirt buckets,
+   * aligned with `FormView.modalSize` (`page` mode ignores it). `'auto'`
+   * (default): the renderer derives the size from the object's field count and
+   * clamps it to the client viewport, so AI writes nothing — it cannot know the
+   * client width. Explicit buckets are a coarse, viewport-independent override.
+   */
+  size: z.enum(['auto', 'sm', 'md', 'lg', 'xl', 'full']).default('auto')
+    .describe("[#2578] Overlay size bucket for drawer/modal detail: 'auto' (default — renderer derives from field count + viewport; AI writes nothing) or a coarse override sm/md/lg/xl/full. Prefer this over the pixel `width`; page mode ignores it."),
+
+  /**
+   * @deprecated [#2578 → `size`] A pixel/percent width cannot be authored blind:
+   * the author (often an AI) does not know the client viewport. Kept only as a
+   * renderer fallback for pre-#2578 metadata; new metadata sets `size` (or omits
+   * it for `auto`).
+   */
+  width: z.union([z.string(), z.number()]).optional().describe('[DEPRECATED → size] Pixel/percent width of the drawer/modal (e.g. "600px"). A pixel width cannot be chosen at authoring time without knowing the client viewport — use the `size` bucket.'),
 }));
 
 /**
@@ -697,8 +712,13 @@ export const FormFieldSchema: z.ZodType<any> = lazySchema(() => z.object({
   immutable: z.boolean().optional().describe('Editable on create, locked once the record exists (e.g. machine names).'),
   required: z.boolean().optional().describe('Required override'),
   hidden: z.boolean().optional().describe('Hidden override'),
-  colSpan: z.number().int().min(1).max(4).optional().describe('Column span in grid layout (1-4)'),
-  
+  colSpan: z.number().int().min(1).max(4).optional().describe('[legacy — prefer `span`] Absolute column span (1-4). Fragile when the column count is derived per surface (mobile 1 / modal 2 / page 3-4): a fixed span only lines up at the width the author imagined. The renderer clamps it to the current column count. Prefer `span`.'),
+  /**
+   * [#2578] Relative field width — decoupled from the (often auto-derived)
+   * column count, so it stays correct at 1/2/3/4 columns.
+   */
+  span: z.enum(['auto', 'full']).default('auto').describe("Relative field width. 'auto' (default — omit it): the renderer sizes the field from its widget type × the current column count (wide widgets like textarea/richtext/json/file/subform take the whole row). 'full': whole row at any column count. Prefer this over the absolute `colSpan`."),
+
   /** Custom widget override — only needed when auto-inference is insufficient */
   widget: z.string().optional().describe('Custom widget/component name (overrides type-based inference)'),
 
@@ -823,7 +843,8 @@ export const FormViewSchema = lazySchema(() => z.object({
   splitResizable: z.boolean().optional().describe('Whether the split is resizable (split forms)'),
   /** Drawer (`type: 'drawer'`). */
   drawerSide: z.enum(['top', 'bottom', 'left', 'right']).optional().describe('Drawer side (drawer forms)'),
-  drawerWidth: z.string().optional().describe('Drawer width, e.g. "480px" (drawer forms)'),
+  /** @deprecated [#2578 → `modalSize` / size buckets] A pixel width can't be authored blind (unknown client viewport); the renderer derives width from content + viewport. */
+  drawerWidth: z.string().optional().describe('[DEPRECATED → size buckets] Drawer width, e.g. "480px". A pixel width cannot be chosen without knowing the client viewport — the renderer derives it.'),
   /** Modal (`type: 'modal'`). */
   modalSize: z.enum(['sm', 'default', 'lg', 'xl', 'full']).optional().describe('Modal size (modal forms)'),
 
