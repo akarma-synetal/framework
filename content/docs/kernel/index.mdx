@@ -5,7 +5,7 @@ description: The ObjectKernel runtime — plugin host, event bus, service regist
 
 # Kernel & Services
 
-The kernel is ObjectStack's runtime: it loads your metadata artifact, hosts plugins, wires up services, and enforces the lifecycle that keeps the system stable. This module documents the **ObjectOS layer** in practice — the [System Protocol](/docs/protocol/objectos) is its normative spec. If you write hooks or plugins, this is where the APIs you call and the contracts they implement are documented.
+The kernel is ObjectStack's runtime: it loads your metadata artifact, hosts plugins, wires up services, and enforces the lifecycle that keeps the system stable. This module documents the **ObjectOS layer** in practice — the [System Protocol](/docs/protocol/objectos) is its normative spec. If you write hooks or plugins, this is where the capability surface you call — `ctx.api`, `ctx.getService(...)`, and the `services.*` contract they implement — is documented.
 
 ## How it fits together
 
@@ -23,7 +23,7 @@ The kernel is ObjectStack's runtime: it loads your metadata artifact, hosts plug
 | [`services.storage`](/docs/kernel/runtime-services/storage-service) | stable | File storage |
 | [`services.audit`](/docs/kernel/runtime-services/audit-service) | experimental | Append-only audit sink (query history via `services.data`) |
 
-- **Service contracts** (28 interface files in `packages/spec/src/contracts/` — `IDataEngine`, `IAuthService`, `ICacheService`, `IMetadataService`, `IStorageService`, …) define what any implementation must provide, so services are swappable. Fifteen runtime service packages ship in this repo (cache, cluster, datasource, i18n, job, knowledge, messaging, realtime, …).
+- **Service contracts** (`IDataEngine`, `IAuthService`, `ICacheService`, `IMetadataService`, `IStorageService`, … in `packages/spec/src/contracts/`) define what any implementation must provide, so services are swappable — the repo ships runtime service packages for cache, cluster, datasource, i18n, jobs, knowledge, messaging, realtime, and more.
 - **Cluster semantics** define how the runtime behaves beyond a single node — including the per-partition locking the webhook outbox relies on.
 
 ## What's in this module
