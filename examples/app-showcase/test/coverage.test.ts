@@ -4,11 +4,11 @@ import { describe, it, expect } from 'vitest';
 import { FieldType } from '@objectstack/spec/data';
 import * as ui from '@objectstack/spec/ui';
 
-import * as objects from '../src/objects/index.js';
-import { TaskViews, ProjectViews } from '../src/views/index.js';
-import { ChartGalleryDashboard } from '../src/dashboards/index.js';
-import { allReports } from '../src/reports/index.js';
-import { allActions } from '../src/actions/index.js';
+import * as objects from '../src/data/objects/index.js';
+import { TaskViews, ProjectViews } from '../src/ui/views/index.js';
+import { ChartGalleryDashboard } from '../src/ui/dashboards/index.js';
+import { allReports } from '../src/ui/reports/index.js';
+import { allActions } from '../src/ui/actions/index.js';
 import {
   LIST_VIEW_TYPES,
   FORM_VIEW_TYPES,
@@ -66,7 +66,7 @@ describe('showcase coverage (introspected against the spec)', () => {
     // ADR-0021 single-form: `tabular` (a flat record list) is intentionally NOT
     // demonstrated as a report — a flat list is an object-bound ListView lens
     // (ADR-0017), not an analytics projection, so the former TaskListReport now
-    // lives on showcase_task as a `tabular` ListView (see src/reports/index.ts).
+    // lives on showcase_task as a `tabular` ListView (see src/ui/reports/index.ts).
     const expected = enumValues((ui as Record<string, unknown>).ReportType ?? (ui as Record<string, unknown>).ReportTypeSchema)
       .filter((t) => t !== 'tabular');
     const used = new Set<string>();

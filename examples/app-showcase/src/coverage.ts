@@ -36,7 +36,7 @@ export const FORM_VIEW_TYPES = ['simple', 'tabbed', 'wizard', 'split', 'drawer']
 export const COVERAGE = {
   fieldTypes: {
     source: 'FieldTypeSchema',
-    coveredBy: 'objects/field-zoo.object.ts (+ relationship/date/select fields on the backbone objects)',
+    coveredBy: 'data/objects/field-zoo.object.ts (+ relationship/date/select fields on the backbone objects)',
   },
   relationships: {
     coveredBy: [
@@ -47,30 +47,30 @@ export const COVERAGE = {
   },
   listViewTypes: {
     expected: LIST_VIEW_TYPES,
-    coveredBy: 'views/task.view.ts (all 8) + views/project.view.ts',
+    coveredBy: 'ui/views/task.view.ts (all 8) + ui/views/project.view.ts',
   },
   formViewTypes: {
     expected: FORM_VIEW_TYPES,
-    coveredBy: 'views/task.view.ts formViews (simple/tabbed/wizard/split/drawer)',
+    coveredBy: 'ui/views/task.view.ts formViews (simple/tabbed/wizard/split/drawer)',
   },
   chartTypes: {
     source: 'ChartTypeSchema',
-    coveredBy: 'dashboards/chart-gallery.dashboard.ts (one widget per chart family)',
+    coveredBy: 'ui/dashboards/chart-gallery.dashboard.ts (one widget per chart family)',
   },
   reportTypes: {
     source: 'ReportType',
-    coveredBy: 'reports/index.ts (tabular/summary/matrix/joined)',
+    coveredBy: 'ui/reports/index.ts (tabular/summary/matrix/joined)',
   },
   actionTypesAndLocations: {
     source: 'ActionType + ACTION_LOCATIONS',
-    coveredBy: 'actions/index.ts (script/url/flow/modal/api/form across all locations)',
+    coveredBy: 'ui/actions/index.ts (script/url/flow/modal/api/form across all locations)',
   },
   capabilityChains: {
     security: 'security/index.ts — roles + permission set (CRUD + FLS + RLS) + sharing + policy',
-    automation: 'flows/index.ts (incl. approval nodes) + webhooks/index.ts + jobs/index.ts + emails/index.ts',
+    automation: 'automation/flows/index.ts (incl. approval nodes) + automation/webhooks/index.ts + automation/jobs/index.ts + system/emails/index.ts',
   },
   i18nThemingPortals: {
-    coveredBy: 'translations/index.ts (en + zh-CN), themes/index.ts (light + dark), portals/index.ts',
+    coveredBy: 'system/translations/index.ts (en + zh-CN), ui/themes/index.ts (light + dark), ui/portals/index.ts',
   },
   docs: {
     source: 'ADR-0046 (doc metadata)',

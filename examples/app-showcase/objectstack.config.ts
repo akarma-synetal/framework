@@ -11,33 +11,33 @@ import {
   resolveCloudUrl,
 } from '@objectstack/cloud-connection';
 
-import * as objects from './src/objects/index.js';
-import { ShowcaseExternalDatasource } from './src/datasources/showcase-external.datasource.js';
-import { ExternalCustomer, ExternalOrder } from './src/objects/external/index.js';
-import { setupShowcaseExternalDatasource } from './src/datasources/external-fixture.js';
-import { registerRecalcEndpoint } from './src/server/recalc-endpoint.js';
-import { TaskViews, ProjectViews, InquiryViews, BusinessUnitViews } from './src/views/index.js';
-import { ShowcaseApp } from './src/apps/index.js';
-import { ChartGalleryDashboard, OpsDashboard } from './src/dashboards/index.js';
-import { ShowcaseTaskDataset, ShowcaseProjectDataset } from './src/datasets/index.js';
-import { allReports } from './src/reports/index.js';
-import { allActions } from './src/actions/index.js';
-import { StartHerePage, ComponentGalleryPage, ProjectWorkspacePage, ProjectDetailPage, TaskWorkbenchPage, TaskTriagePage, TaskBoardPage, TaskCalendarPage, TaskGalleryPage, TaskSchedulePage, TaskTimelinePage, TaskMapPage, TaskAllViewsPage, ActiveProjectsPage, TaskDetailPage, ReviewQueuePage, NewProjectWizardPage, MyWorkPage, SettingsPage, StylingGalleryPage, CommandCenterPage, CommandCenterJsxPage, CrmWorkbenchPage, AccountCockpitPage, TaskDeskPage, PageVariablesPage, ContactFormPage, RenewalsPipelinePage } from './src/pages/index.js';
-import { allFlows } from './src/flows/index.js';
-import { allWebhooks } from './src/webhooks/index.js';
-import { allHooks } from './src/hooks/index.js';
-import { allJobs } from './src/jobs/index.js';
-import { allEmails } from './src/emails/index.js';
-import { allBooks } from './src/books/index.js';
+import * as objects from './src/data/objects/index.js';
+import { ShowcaseExternalDatasource } from './src/system/datasources/showcase-external.datasource.js';
+import { ExternalCustomer, ExternalOrder } from './src/data/objects/external/index.js';
+import { setupShowcaseExternalDatasource } from './src/system/datasources/external-fixture.js';
+import { registerRecalcEndpoint } from './src/system/server/recalc-endpoint.js';
+import { TaskViews, ProjectViews, InquiryViews, BusinessUnitViews } from './src/ui/views/index.js';
+import { ShowcaseApp } from './src/ui/apps/index.js';
+import { ChartGalleryDashboard, OpsDashboard } from './src/ui/dashboards/index.js';
+import { ShowcaseTaskDataset, ShowcaseProjectDataset } from './src/ui/datasets/index.js';
+import { allReports } from './src/ui/reports/index.js';
+import { allActions } from './src/ui/actions/index.js';
+import { StartHerePage, ComponentGalleryPage, ProjectWorkspacePage, ProjectDetailPage, TaskWorkbenchPage, TaskTriagePage, TaskBoardPage, TaskCalendarPage, TaskGalleryPage, TaskSchedulePage, TaskTimelinePage, TaskMapPage, TaskAllViewsPage, ActiveProjectsPage, TaskDetailPage, ReviewQueuePage, NewProjectWizardPage, MyWorkPage, SettingsPage, StylingGalleryPage, CommandCenterPage, CommandCenterJsxPage, CrmWorkbenchPage, AccountCockpitPage, TaskDeskPage, PageVariablesPage, ContactFormPage, RenewalsPipelinePage } from './src/ui/pages/index.js';
+import { allFlows } from './src/automation/flows/index.js';
+import { allWebhooks } from './src/automation/webhooks/index.js';
+import { allHooks } from './src/data/hooks/index.js';
+import { allJobs } from './src/automation/jobs/index.js';
+import { allEmails } from './src/system/emails/index.js';
+import { allBooks } from './src/system/books/index.js';
 import {
   allRoles,
   allPermissionSets,
   allSharingRules,
 } from './src/security/index.js';
-import { allThemes } from './src/themes/index.js';
-import { ShowcaseTranslationBundle } from './src/translations/index.js';
-import { allPortals } from './src/portals/index.js';
-import { ShowcaseSeedData } from './src/data/index.js';
+import { allThemes } from './src/ui/themes/index.js';
+import { ShowcaseTranslationBundle } from './src/system/translations/index.js';
+import { allPortals } from './src/ui/portals/index.js';
+import { ShowcaseSeedData } from './src/data/seed/index.js';
 
 // Ambient `process` for the env-var overrides below — the showcase tsconfig
 // doesn't pull in `@types/node`, but the CLI provides the real `process` at
