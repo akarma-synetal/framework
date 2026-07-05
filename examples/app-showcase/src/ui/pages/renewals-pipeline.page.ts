@@ -11,6 +11,13 @@ import { definePage } from '@objectstack/spec/ui';
  * Every block prop is taken straight from the react-tier contract
  * (skills/objectstack-ui/references/react-blocks.md).
  *
+ * The 360 panel deliberately shows BOTH rollup styles side by side:
+ *   • hand-rolled — a `useAdapter()` effect counts related projects/invoices
+ *     into a KPI strip (full control, you own loading/refresh), vs
+ *   • framework blocks — `<ObjectChart>`/`<RecordRelatedList>` do the same
+ *     cross-object reads declaratively (zero data code).
+ * (This comparison absorbed the former Account Cockpit page.)
+ *
  * Styling (ADR-0065): no Tailwind — inline `style={{}}` with `hsl(var(--token))`;
  * data blocks and the drawer bring their own compiled styling. The drawer sets
  * NO pixel width: per #2578 pixel widths are deprecated (the author can't know
@@ -23,10 +30,34 @@ export const RenewalsPipelinePage = definePage({
   kind: 'react',
   source: `
 function Page() {
+  const adapter = useAdapter();
   const [sel, setSel] = React.useState(null);
   const [editing, setEditing] = React.useState(false);
   const [reload, setReload] = React.useState(0);
   const [stage, setStage] = React.useState('active');
+  const [related, setRelated] = React.useState({ projects: 0, invoices: 0, openInvoices: 0 });
+
+  // Hand-rolled rollup: the imperative counterpart of the framework blocks
+  // below. You own the queries, loading, and refresh (reload bumps re-run it).
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!adapter || !sel) { setRelated({ projects: 0, invoices: 0, openInvoices: 0 }); return; }
+      const pr = await adapter.find('showcase_project', { $filter: ['account', '=', sel], top: 500 });
+      const iv = await adapter.find('showcase_invoice', { $filter: ['account', '=', sel], top: 500 });
+      const projects = Array.isArray(pr) ? pr : (pr && pr.records) || [];
+      const invoices = Array.isArray(iv) ? iv : (iv && iv.records) || [];
+      if (alive) setRelated({ projects: projects.length, invoices: invoices.length, openInvoices: invoices.filter((r) => r.status !== 'paid' && r.status !== 'void').length });
+    })();
+    return () => { alive = false; };
+  }, [adapter, sel, reload]);
+
+  const Stat = ({ label, value, accent }) => (
+    <div style={{ background: 'hsl(var(--muted))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', padding: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'hsl(var(--muted-foreground))' }}>{label}</div>
+      <div style={{ marginTop: 4, fontSize: 24, fontWeight: 700, color: accent || 'hsl(var(--foreground))' }}>{value}</div>
+    </div>
+  );
 
   const STAGES = [
     { id: 'active', label: 'Active' },
@@ -76,6 +107,12 @@ function Page() {
             </div>
 
             <RecordHighlights objectName="showcase_account" recordId={sel} fields={['name', 'status']} layout="horizontal" />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              <Stat label="Projects" value={related.projects} />
+              <Stat label="Invoices" value={related.invoices} />
+              <Stat label="Open AR" value={related.openInvoices} accent="hsl(38 92% 50%)" />
+            </div>
 
             <ObjectChart objectName="showcase_invoice" aggregate={{ field: 'total', function: 'sum', groupBy: 'status' }} title="Invoice value by status" showLegend={true} />
 
