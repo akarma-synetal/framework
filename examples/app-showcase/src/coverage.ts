@@ -69,9 +69,14 @@ export const KIND_COVERAGE: Record<MetadataType, KindCoverage> = {
   },
   validation: {
     status: 'demonstrated',
-    files: ['src/data/objects/account.object.ts', 'src/data/objects/task.object.ts'],
+    files: [
+      'src/data/objects/account.object.ts',
+      'src/data/objects/task.object.ts',
+      'src/data/objects/project.object.ts',
+      'src/data/objects/invoice.object.ts',
+    ],
     notes:
-      'Authored inline via object `validations`. Only the runtime-enforced rule types (state_machine/script/cross_field) are demonstrated; the 6 unenforced types are tracked in https://github.com/objectstack-ai/framework/issues/1475 (Prime Directive #10).',
+      'Authored inline via object `validations`. Every declared rule type is now write-path enforced (rule-validator dispatches all of state_machine/script/cross_field/format/json_schema/conditional — ADR-0020 "no silent no-ops", closing the #1475 gap) and each is demonstrated: state_machine (task/project), script+cross_field (project), format/json_schema/conditional (account). Field-level requiredWhen/readonlyWhen are likewise enforced and demonstrated on invoice.',
   },
   hook: { status: 'demonstrated', files: ['src/data/hooks/index.ts'] },
   seed: { status: 'demonstrated', files: ['src/data/seed/index.ts'] },
@@ -241,6 +246,11 @@ export const COVERAGE = {
     source: 'ActionType + ACTION_LOCATIONS',
     coveredBy: 'ui/actions/index.ts (script/url/flow/modal/api/form across all locations)',
   },
+  flowNodeTypes: {
+    source: 'FlowNodeAction',
+    coveredBy:
+      'automation/flows/index.ts — CRUD quartet (create: InboundTaskWebhookFlow, update: ReassignWizardFlow, get+delete: InquiryPurgeFlow), screen/approval/wait/subflow/map/connector_action across the chain; BPMN gateway/boundary forms waived (FLOW_NODE_WAIVERS) in favor of the ADR-0031 structured containers.',
+  },
   capabilityChains: {
     security: 'security/index.ts — roles + permission set (CRUD + FLS + RLS) + sharing + policy',
     automation: 'automation/flows/index.ts (incl. approval nodes) + automation/webhooks/index.ts + automation/jobs/index.ts + system/emails/index.ts',
@@ -253,6 +263,52 @@ export const COVERAGE = {
     coveredBy: 'src/docs/*.md — flat Markdown compiled to `doc` items: frontmatter title + first-heading title, cross-references with anchors, namespace-prefixed names',
   },
 } as const;
+
+/**
+ * Built-in flow node types (FlowNodeAction) the showcase deliberately does
+ * not author, with the reason. The coverage test asserts every OTHER member
+ * of the enum appears in at least one flow, and that each waiver names a
+ * real enum member with a substantive reason — same demonstrated-or-waived
+ * contract as the metadata kinds.
+ */
+export const FLOW_NODE_WAIVERS: Record<string, string> = {
+  parallel_gateway:
+    'BPMN-interop lowering target — the author-facing form is the ADR-0031 structured `parallel` container (FanOutNotifyFlow); bpmn-mapping lowers it to the gateway pair.',
+  join_gateway:
+    'The AND-join half of the pair bpmn-mapping derives from a structured `parallel` container — never hand-authored in examples.',
+  boundary_event:
+    'BPMN-interop form; the author-facing equivalents the showcase demos are the ADR-0031 `try_catch` container (ResilientSyncFlow) and `wait` timers (TaskFollowUpFlow).',
+};
+
+/**
+ * Collect every node `type` used across a set of flow definitions, including
+ * nodes nested inside structured-container regions (ADR-0031: a `parallel` /
+ * `loop` / `try_catch` container carries sub-graphs in its config).
+ */
+export function collectFlowNodeTypes(flows: Array<{ nodes?: Array<Record<string, unknown>> }>): Set<string> {
+  const used = new Set<string>();
+  const visitNodes = (nodes: unknown): void => {
+    if (!Array.isArray(nodes)) return;
+    for (const node of nodes) {
+      if (!node || typeof node !== 'object') continue;
+      const n = node as Record<string, unknown>;
+      if (typeof n.type === 'string') used.add(n.type);
+      if (n.config) visitContainer(n.config);
+    }
+  };
+  // Walk any nested { nodes: [...] } region a container config may carry.
+  const visitContainer = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value)) { for (const v of value) visitContainer(v); return; }
+    const obj = value as Record<string, unknown>;
+    for (const [key, v] of Object.entries(obj)) {
+      if (key === 'nodes') visitNodes(v);
+      else visitContainer(v);
+    }
+  };
+  for (const flow of flows) visitNodes(flow.nodes);
+  return used;
+}
 
 /** Collect every field `type` used across a set of object definitions. */
 export function collectFieldTypes(objects: Array<{ fields?: Record<string, { type?: string }> }>): Set<string> {

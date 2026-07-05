@@ -3,11 +3,13 @@
 import { existsSync } from 'node:fs';
 
 import { describe, it, expect } from 'vitest';
+import { FlowNodeAction } from '@objectstack/spec/automation';
 import { FieldType } from '@objectstack/spec/data';
 import { DEFAULT_METADATA_TYPE_REGISTRY } from '@objectstack/spec/kernel';
 import * as ui from '@objectstack/spec/ui';
 
 import * as objects from '../src/data/objects/index.js';
+import { allFlows } from '../src/automation/flows/index.js';
 import { TaskViews, ProjectViews } from '../src/ui/views/index.js';
 import { ChartGalleryDashboard } from '../src/ui/dashboards/index.js';
 import { allReports } from '../src/ui/reports/index.js';
@@ -15,9 +17,11 @@ import { allActions } from '../src/ui/actions/index.js';
 import {
   KIND_COVERAGE,
   STACK_COLLECTION_COVERAGE,
+  FLOW_NODE_WAIVERS,
   LIST_VIEW_TYPES,
   FORM_VIEW_TYPES,
   collectFieldTypes,
+  collectFlowNodeTypes,
   collectListViewTypes,
   collectFormViewTypes,
 } from '../src/coverage.js';
@@ -120,6 +124,17 @@ describe('showcase coverage (introspected against the spec)', () => {
         }
       });
     }
+  });
+
+  it('covers every built-in flow node type — or waives it with a reason', () => {
+    const all = enumValues(FlowNodeAction);
+    // Every waiver must name a real enum member and carry a substantive reason.
+    for (const [type, reason] of Object.entries(FLOW_NODE_WAIVERS)) {
+      expect(all, `FLOW_NODE_WAIVERS names unknown node type '${type}'`).toContain(type);
+      expect(reason.length, `flow-node waiver '${type}' needs a substantive reason`).toBeGreaterThan(20);
+    }
+    const expected = all.filter((t) => !(t in FLOW_NODE_WAIVERS));
+    expectFullCoverage('FlowNodeAction', expected, collectFlowNodeTypes(allFlows as never));
   });
 
   it('covers every action type and location', () => {

@@ -28,6 +28,12 @@ Trigger the automation yourself: complete a Task (Mark Done) and watch the
 threshold and the `showcase_budget_approval` chain lands in **Workspace →
 Approvals**.
 
+> **Heads-up:** completing one task fires **six** flows on purpose — each
+> teaches a different mechanism for the same trigger (script side-effect,
+> Slack connector, REST connector, subflow reuse, parallel fan-out,
+> try/catch resilience). Watch the Runs panel to see them all land from a
+> single record change; a real app would consolidate these.
+
 ## Jobs, webhooks, connectors
 
 - `src/automation/jobs/` — interval/cron jobs behind the schedule trigger

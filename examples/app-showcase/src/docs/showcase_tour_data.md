@@ -37,6 +37,14 @@ object: showcase_task
 name: task_status_flow
 ```
 
+Projects carry their own lifecycle, including terminal (dead-end) states:
+
+```metadata
+type: state_machine
+object: showcase_project
+name: project_status_flow
+```
+
 ## Hooks & seed data
 
 - `src/data/hooks/` — data-layer lifecycle hooks (before/after CRUD).
