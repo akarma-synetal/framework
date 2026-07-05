@@ -157,6 +157,17 @@ export const KIND_COVERAGE: Record<MetadataType, KindCoverage> = {
  * `KIND_COVERAGE`.
  */
 export const STACK_COLLECTION_COVERAGE: Record<string, KindCoverage> = {
+  analyticsCubes: {
+    status: 'demonstrated',
+    files: ['src/data/analytics/showcase.cube.ts'],
+    notes:
+      'Served by the foundational analytics capability (/api/v1/analytics/*); complements the dataset semantic layer (ADR-0021).',
+  },
+  objectExtensions: {
+    status: 'demonstrated',
+    files: ['src/data/extensions/account.extension.ts'],
+    notes: 'Merged into showcase_account by the ObjectQL engine at registerApp (priority overlay).',
+  },
   mappings: {
     status: 'waived',
     reason:

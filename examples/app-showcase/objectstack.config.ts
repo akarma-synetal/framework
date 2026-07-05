@@ -38,6 +38,8 @@ import { allThemes } from './src/ui/themes/index.js';
 import { ShowcaseTranslationBundle } from './src/system/translations/index.js';
 import { allPortals } from './src/ui/portals/index.js';
 import { ShowcaseSeedData } from './src/data/seed/index.js';
+import { allCubes } from './src/data/analytics/showcase.cube.js';
+import { allObjectExtensions } from './src/data/extensions/account.extension.js';
 
 // Ambient `process` for the env-var overrides below — the showcase tsconfig
 // doesn't pull in `@types/node`, but the CLI provides the real `process` at
@@ -149,6 +151,13 @@ export default defineStack({
 
   // Data
   objects: [...Object.values(objects), ExternalCustomer, ExternalOrder],
+  // Additive overlay merged into showcase_account at registration — the
+  // package-extends-an-object mechanism (see src/data/extensions/).
+  objectExtensions: allObjectExtensions,
+  // Analytics semantic layer served by the foundational analytics capability
+  // (`/api/v1/analytics/*`) — no `requires` token needed; the CLI always
+  // loads it and registers these cubes (see src/data/analytics/).
+  analyticsCubes: allCubes,
 
   // UI
   apps: [ShowcaseApp],
