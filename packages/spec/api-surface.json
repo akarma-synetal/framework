@@ -1699,6 +1699,7 @@
     "VersionConstraint (type)",
     "VersionConstraintSchema (const)",
     "VulnerabilitySeverity (type)",
+    "deriveNamespaceFromPackageId (function)",
     "evaluateLockForDelete (function)",
     "evaluateLockForWrite (function)",
     "extractProtection (function)",
@@ -1710,7 +1711,8 @@
     "listMetadataTypeSchemaTypes (function)",
     "registerMetadataTypeActions (function)",
     "registerMetadataTypeSchema (function)",
-    "resolveLockState (function)"
+    "resolveLockState (function)",
+    "validateObjectNamespacePrefix (function)"
   ],
   "./ai": [
     "AIKnowledgeSchema (const)",
