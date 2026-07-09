@@ -3843,6 +3843,9 @@
     "vercelStaticSiteConnectorExample (const)"
   ],
   "./security": [
+    "AdminScope (type)",
+    "AdminScopeInput (type)",
+    "AdminScopeSchema (const)",
     "CriteriaSharingRule (type)",
     "CriteriaSharingRuleSchema (const)",
     "FieldPermission (type)",
@@ -3881,6 +3884,8 @@
     "TerritoryType (const)",
     "definePermissionSet (function)",
     "defineSharingRule (function)",
+    "describeAnchorForbiddenBits (function)",
+    "describeHighPrivilegeBits (function)",
     "permissionForm (const)"
   ],
   "./studio": [
