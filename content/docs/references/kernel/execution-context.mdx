@@ -54,7 +54,10 @@ const result = ExecutionContext.parse(data);
 | **timezone** | `string` | optional |  |
 | **locale** | `string` | optional |  |
 | **currency** | `string` | optional |  |
-| **roles** | `string[]` | ✅ |  |
+| **positions** | `string[]` | ✅ |  |
+| **principalKind** | `Enum<'human' \| 'agent' \| 'service' \| 'guest' \| 'system'>` | optional |  |
+| **audience** | `Enum<'internal' \| 'external'>` | optional |  |
+| **onBehalfOf** | `Object` | optional |  |
 | **permissions** | `string[]` | ✅ |  |
 | **systemPermissions** | `string[]` | optional |  |
 | **tabPermissions** | `Record<string, Enum<'visible' \| 'hidden' \| 'default_on' \| 'default_off'>>` | optional |  |
@@ -62,6 +65,7 @@ const result = ExecutionContext.parse(data);
 | **rlsMembership** | `Record<string, string[]>` | optional |  |
 | **isSystem** | `boolean` | ✅ |  |
 | **skipTriggers** | `boolean` | optional |  |
+| **oauthScopes** | `string[]` | optional |  |
 | **accessToken** | `string` | optional |  |
 | **transaction** | `any` | optional |  |
 | **traceId** | `string` | optional |  |
