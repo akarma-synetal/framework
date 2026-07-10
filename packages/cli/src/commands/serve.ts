@@ -1259,6 +1259,12 @@ export default class Serve extends Command {
                 // operator override (env wins in buildPluginList()).
                 passwordRejectBreached:
                   String(process.env.OS_AUTH_PASSWORD_REJECT_BREACHED ?? 'false').toLowerCase() === 'true',
+                // #2766/#2780 — phone-number sign-in (phone+password always;
+                // OTP sign-in/reset once the sms capability has a deliverable
+                // provider). Opt-in: without this env the config flag had no
+                // `objectstack serve` switch at all.
+                phoneNumber:
+                  String(process.env.OS_AUTH_PHONE_NUMBER_ENABLED ?? 'false').toLowerCase() === 'true',
               },
               advanced: process.env.OS_COOKIE_DOMAIN
                 ? ({
@@ -1666,9 +1672,9 @@ export default class Serve extends Command {
           // the messaging `sms` channel. Provider config lives in the `sms`
           // settings namespace (OS_SMS_* env keys win at the resolver);
           // unconfigured ⇒ dev LogSmsTransport (no real send).
-          pkg: '@objectstack/plugin-sms',
+          pkg: '@objectstack/service-sms',
           export: 'SmsServicePlugin',
-          nameMatch: ['plugin-sms', 'SmsServicePlugin'],
+          nameMatch: ['service-sms', 'SmsServicePlugin'],
         },
         sharing: {
           pkg: '@objectstack/plugin-sharing',
