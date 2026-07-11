@@ -1489,6 +1489,9 @@ export default class Serve extends Command {
             createDispatcherPlugin({
               scoping: { enableProjectScoping, projectResolution },
               enforceProjectMembership,
+              // Keep the dispatcher's `auth: true` service routes (AI) in
+              // lockstep with the REST `/data` gate above — same `requireAuth`.
+              requireAuth,
               observability,
             }),
           );
