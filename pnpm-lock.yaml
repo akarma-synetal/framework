@@ -787,8 +787,8 @@ importers:
   packages/formula:
     dependencies:
       '@marcbachmann/cel-js':
-        specifier: ^7.6.1
-        version: 7.6.1
+        specifier: ^8.0.0
+        version: 8.0.0
       '@objectstack/spec':
         specifier: workspace:*
         version: link:../spec
@@ -3103,8 +3103,8 @@ packages:
   '@manypkg/get-packages@1.1.3':
     resolution: {integrity: sha512-fo+QhuU3qE/2TQMQmbVMqaQ6EWbMhi4ABWP+O4AM1NqPBuy0OrApV5LO6BrrgnhtAHS2NH6RrVk9OL181tTi8A==}
 
-  '@marcbachmann/cel-js@7.6.1':
-    resolution: {integrity: sha512-YyY8yiDU07ByKb2rJUoNgMAkYeeDvkdrONBREV2MP9siAW7yNft0KfbIoonWTIMY0fGtv8og0EhzKx3Xsi1Nmg==}
+  '@marcbachmann/cel-js@8.0.0':
+    resolution: {integrity: sha512-oaTrAziGr3zDLFiMt/yLU3nZuRMawyWQB5X1a0I7s9eGy3JYzX9l8ZXXHyMd64nzbeVFZTewuUShwsZQdK6UCA==}
     engines: {node: '>=20.19.0'}
     hasBin: true
 
@@ -9916,7 +9916,7 @@ snapshots:
       globby: 11.1.0
       read-yaml-file: 1.1.0
 
-  '@marcbachmann/cel-js@7.6.1': {}
+  '@marcbachmann/cel-js@8.0.0': {}
 
   '@mdx-js/mdx@3.1.1':
     dependencies:
