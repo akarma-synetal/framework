@@ -1797,15 +1797,7 @@ export class SecurityPlugin implements Plugin {
     ) {
       return null;
     }
-    // [ADR-0090 P2] Pass the caller's held positions — a `check` policy that
-    // declares a `positions` applicability domain must fire for holders of
-    // those positions (and only them), exactly like the `using` path.
-    const withCheck = this.collectRLSPolicies(
-      permissionSets,
-      object,
-      operation,
-      (context?.positions ?? []) as string[],
-    ).filter(
+    const withCheck = this.collectRLSPolicies(permissionSets, object, operation).filter(
       (p) => typeof (p as { check?: string }).check === 'string' && (p as { check?: string }).check!.trim() !== '',
     );
     if (withCheck.length === 0) return null;
