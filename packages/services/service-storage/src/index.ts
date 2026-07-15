@@ -14,5 +14,5 @@ export type { StorageRoutesOptions } from './storage-routes.js';
 export { SystemFile, SystemUploadSession } from './objects/index.js';
 export { installAttachmentLifecycleHooks, createSysFileReapGuard } from './attachment-lifecycle.js';
 export type { AttachmentLifecycleEngine, AttachmentLifecycleLogger } from './attachment-lifecycle.js';
-export { installAttachmentAccessHooks } from './attachment-access-hooks.js';
+export { installAttachmentAccessHooks, installAttachmentReadVisibility } from './attachment-access-hooks.js';
 export type { AttachmentSharingLike } from './attachment-access-hooks.js';

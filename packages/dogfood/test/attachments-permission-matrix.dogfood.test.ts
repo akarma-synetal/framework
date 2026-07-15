@@ -246,25 +246,42 @@ describe('attachments permission matrix (#2755)', () => {
     expect(ownDelete.status).toBeLessThan(300);
   });
 
-  // ── (c) known gap: listing does not inherit parent visibility ────────
-  it('(c, KNOWN GAP pin) a member can LIST sys_attachment rows pointing at records they cannot read', async () => {
+  // ── (c) attachment LIST inherits parent visibility (#2970 item 1) ────
+  it('(c) a member CANNOT list/read sys_attachment rows whose parent record they cannot read', async () => {
     const adminFile = await uploadFile(stack, adminTok);
     const created = await attach(adminTok, 'att_secret', secretId, adminFile);
     expect(created.status).toBeLessThan(300);
+    const secretRow = await ql.findOne('sys_attachment', { where: { file_id: adminFile }, context: SYS });
 
     // memberB cannot read the att_secret PARENT…
     const parentRead = await stack.apiAs(memberBTok, 'GET', `/data/att_secret/${secretId}`);
     expect([403, 404]).toContain(parentRead.status);
 
-    // …but CAN see the join row (file name, size, parent id) through the
-    // generic list path. Attachment read visibility does not yet inherit
-    // parent-record visibility — enforce-or-remove follow-up filed with
-    // #2755; flip this pin to a denial assertion when inheritance lands.
+    // …and now the join row is filtered out of the generic list too (the
+    // read-visibility middleware inherits the parent's visibility, and the
+    // list `total` is filtered identically via count()).
     const list = await stack.apiAs(memberBTok, 'GET', '/data/sys_attachment');
     expect(list.status).toBe(200);
-    const rows = ((await list.json()) as any).records ?? [];
-    const leaked = rows.some((r: any) => r.parent_object === 'att_secret' && r.parent_id === secretId);
-    expect(leaked, 'KNOWN GAP: join rows of invisible parents are listable').toBe(true);
+    const body = (await list.json()) as any;
+    const rows = body.records ?? [];
+    expect(
+      rows.some((r: any) => r.id === secretRow.id),
+      'attachment of an invisible parent must not be listable',
+    ).toBe(false);
+    // total must not leak the hidden row's existence either.
+    expect(rows.every((r: any) => r.parent_object !== 'att_secret' || r.parent_id !== secretId)).toBe(true);
+
+    // A by-id read of the hidden attachment is a 404/403, not a leak.
+    const byId = await stack.apiAs(memberBTok, 'GET', `/data/sys_attachment/${secretRow.id}`);
+    expect([403, 404]).toContain(byId.status);
+
+    // Control: memberB CAN still see attachments on a record they can read.
+    const okFile = await uploadFile(stack, memberBTok);
+    const okAttach = await attach(memberBTok, 'att_case', caseAId, okFile);
+    expect(okAttach.status).toBeLessThan(300);
+    const okList = await stack.apiAs(memberBTok, 'GET', '/data/sys_attachment');
+    const okRows = ((await okList.json()) as any).records ?? [];
+    expect(okRows.some((r: any) => r.file_id === okFile)).toBe(true);
   });
 
   // ── (e-read) known gap: anonymous downloads ──────────────────────────

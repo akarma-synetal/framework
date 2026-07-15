@@ -14,7 +14,7 @@ import type { S3StorageAdapterOptions } from './s3-storage-adapter.js';
 import { StorageMetadataStore } from './metadata-store.js';
 import { registerStorageRoutes } from './storage-routes.js';
 import { installAttachmentLifecycleHooks, createSysFileReapGuard } from './attachment-lifecycle.js';
-import { installAttachmentAccessHooks } from './attachment-access-hooks.js';
+import { installAttachmentAccessHooks, installAttachmentReadVisibility } from './attachment-access-hooks.js';
 import { SystemFile, SystemUploadSession } from './objects/index.js';
 // ADR-0052 §3 ownership: `sys_attachment` (a file↔record link) belongs with the
 // storage domain, not the audit/compliance ledger. Definition stays in
@@ -212,6 +212,12 @@ export class StorageServicePlugin implements Plugin {
           },
           ctx.logger,
         );
+        // Parent-derived READ visibility (#2970 item 1) — list/find/count of
+        // sys_attachment only returns rows whose parent record the caller can
+        // read. Middleware (not a hook) so list `total` is filtered too.
+        if (typeof (engine as any).registerMiddleware === 'function') {
+          installAttachmentReadVisibility(engine as any, ctx.logger);
+        }
         try {
           const lifecycle = ctx.getService<any>('lifecycle');
           if (lifecycle && typeof lifecycle.registerReapGuard === 'function') {

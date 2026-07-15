@@ -37,9 +37,25 @@ export interface AttachmentLifecycleEngine {
     handler: (ctx: any) => void | Promise<void>,
     options?: { object?: string; packageId?: string },
   ): void;
+  /** Onion-model data middleware (runs for find/findOne/count/aggregate AND
+   * writes) — the only seam that filters `count()` (→ list `total`)
+   * identically to `find()`. Used for polymorphic parent-visibility on reads.
+   * Optional: only the read-visibility installer needs it. */
+  registerMiddleware?(
+    fn: (ctx: AttachmentReadMiddlewareCtx, next: () => Promise<void>) => Promise<void>,
+    options?: { object?: string },
+  ): void;
   find(object: string, options: Record<string, unknown>): Promise<Array<Record<string, unknown>>>;
   findOne(object: string, options: Record<string, unknown>): Promise<Record<string, unknown> | null>;
   update(object: string, data: Record<string, unknown>, options: Record<string, unknown>): Promise<unknown>;
+}
+
+/** Minimal shape of the engine `OperationContext` the read middleware reads. */
+export interface AttachmentReadMiddlewareCtx {
+  object: string;
+  operation: 'find' | 'findOne' | 'insert' | 'update' | 'delete' | 'count' | 'aggregate';
+  ast?: { object?: string; where?: unknown } & Record<string, unknown>;
+  context?: { userId?: string; tenantId?: string; positions?: string[]; permissions?: string[]; isSystem?: boolean } & Record<string, unknown>;
 }
 
 export interface AttachmentLifecycleLogger {

@@ -197,10 +197,14 @@ describe('StorageServicePlugin: sys_file orphan lifecycle wiring (#2755)', () =>
     const ctx = makeCtx();
 
     const hookEvents: string[] = [];
+    const middlewares: Array<{ object?: string }> = [];
     ctx.registerService('objectql', {
       registerHook: (event: string, _fn: unknown, opts: any) => {
         expect(opts?.object).toBe('sys_attachment');
         hookEvents.push(event);
+      },
+      registerMiddleware: (_fn: unknown, opts: any) => {
+        middlewares.push({ object: opts?.object });
       },
       find: async () => [],
       findOne: async () => null,
@@ -228,6 +232,8 @@ describe('StorageServicePlugin: sys_file orphan lifecycle wiring (#2755)', () =>
     expect(guards).toHaveLength(1);
     expect(guards[0].object).toBe('sys_file');
     expect(typeof guards[0].guard).toBe('function');
+    // Read-visibility middleware registered on sys_attachment (#2970 item 1).
+    expect(middlewares).toEqual([{ object: 'sys_attachment' }]);
   });
 
   it('degrades silently on a bare kernel (no engine, no lifecycle service)', async () => {
