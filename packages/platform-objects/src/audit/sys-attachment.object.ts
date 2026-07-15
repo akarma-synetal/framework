@@ -17,8 +17,11 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
  *  - `parent_id` is the parent record's primary key.
  *  - `(parent_object, parent_id)` is the natural index for the
  *    "files on this record" lookup.
- *  - `share_type` follows the Salesforce convention: V = Viewer,
- *    C = Collaborator, I = Inferred (inherited from parent record).
+ *  - Access is derived from the PARENT record (Salesforce semantics),
+ *    enforced by service-storage's attachment access hooks (#2755).
+ *    Salesforce's `ShareType`/`Visibility` dials were modeled here in v1
+ *    but had no runtime consumer — removed per ADR-0049 enforce-or-remove;
+ *    reintroduce them together with their enforcement if ever needed.
  *
  * @namespace sys
  */
@@ -89,26 +92,6 @@ export const SysAttachment = ObjectSchema.create({
       required: false,
       group: 'File',
     }),
-
-    // ── Sharing ────────────────────────────────────────────────
-    share_type: Field.select(
-      ['viewer', 'collaborator', 'inferred'],
-      {
-        label: 'Share Type',
-        defaultValue: 'viewer',
-        description: 'viewer | collaborator | inferred (inherited from parent record)',
-        group: 'Sharing',
-      },
-    ),
-
-    visibility: Field.select(
-      ['internal', 'all_users', 'shared_users'],
-      {
-        label: 'Visibility',
-        defaultValue: 'internal',
-        group: 'Sharing',
-      },
-    ),
 
     // ── Authoring ──────────────────────────────────────────────
     uploaded_by: Field.lookup('sys_user', {

@@ -106,6 +106,20 @@ export function mapDataError(error: any, object?: string): { status: number; bod
             },
         };
     }
+    // Attachment access gates (#2755): service-storage's engine hooks reject
+    // sys_attachment writes fail-closed when the caller cannot see the parent
+    // record (create) or is neither the uploader nor a parent editor
+    // (delete). Same mapping rationale as the capability gates above.
+    if (error?.code === 'ATTACHMENT_PARENT_ACCESS' || error?.code === 'ATTACHMENT_DELETE_DENIED') {
+        return {
+            status: 403,
+            body: {
+                error: error?.message ?? 'Attachment access denied',
+                code: error.code,
+                ...(error?.object || object ? { object: error?.object ?? object } : {}),
+            },
+        };
+    }
     // Short-circuit: explicit security denial → 403. Match by `code` /
     // `name` to avoid pulling a runtime dependency on plugin-security.
     if (

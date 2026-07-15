@@ -215,7 +215,16 @@ describe('StorageServicePlugin: sys_file orphan lifecycle wiring (#2755)', () =>
     await plugin.start(ctx);
     await ctx._flushReady();
 
-    expect(hookEvents.sort()).toEqual(['afterDelete', 'afterInsert', 'beforeDelete']);
+    // Lifecycle hooks (beforeDelete/afterDelete/afterInsert) + access hooks
+    // (beforeInsert/beforeDelete) — see attachment-lifecycle.ts and
+    // attachment-access-hooks.ts.
+    expect(hookEvents.sort()).toEqual([
+      'afterDelete',
+      'afterInsert',
+      'beforeDelete',
+      'beforeDelete',
+      'beforeInsert',
+    ]);
     expect(guards).toHaveLength(1);
     expect(guards[0].object).toBe('sys_file');
     expect(typeof guards[0].guard).toBe('function');

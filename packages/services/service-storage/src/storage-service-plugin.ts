@@ -14,6 +14,7 @@ import type { S3StorageAdapterOptions } from './s3-storage-adapter.js';
 import { StorageMetadataStore } from './metadata-store.js';
 import { registerStorageRoutes } from './storage-routes.js';
 import { installAttachmentLifecycleHooks, createSysFileReapGuard } from './attachment-lifecycle.js';
+import { installAttachmentAccessHooks } from './attachment-access-hooks.js';
 import { SystemFile, SystemUploadSession } from './objects/index.js';
 // ADR-0052 §3 ownership: `sys_attachment` (a file↔record link) belongs with the
 // storage domain, not the audit/compliance ledger. Definition stays in
@@ -198,6 +199,19 @@ export class StorageServicePlugin implements Plugin {
       // lifecycle sweep. Both degrade silently on bare kernels.
       if (engine && typeof (engine as any).registerHook === 'function') {
         installAttachmentLifecycleHooks(engine as any, ctx.logger);
+        // Parent-derived access on the join rows (#2755, ADR-0049) — the
+        // sharing service resolves lazily so plugin order doesn't matter.
+        installAttachmentAccessHooks(
+          engine as any,
+          () => {
+            try {
+              return ctx.getService<any>('sharing');
+            } catch {
+              return null;
+            }
+          },
+          ctx.logger,
+        );
         try {
           const lifecycle = ctx.getService<any>('lifecycle');
           if (lifecycle && typeof lifecycle.registerReapGuard === 'function') {
@@ -230,6 +244,8 @@ export class StorageServicePlugin implements Plugin {
             basePath: this.options.basePath ?? '/api/v1/storage',
             presignedTtl: this.options.presignedTtl,
             sessionTtl: this.options.sessionTtl,
+            resolveSession: buildAuthSessionResolver(ctx),
+            logger: ctx.logger,
           });
 
           ctx.logger.info(
@@ -348,6 +364,55 @@ function resolveMetrics(
     // Service not registered — silent fall-through.
   }
   return new NoopMetricsRegistry();
+}
+
+/**
+ * Bridge the kernel's `auth` service (better-auth) into the storage routes'
+ * upload gate (#2755). Returns `undefined` when no auth service is present —
+ * the routes then stay open (bare kernels/tests, logged once there).
+ *
+ * Normalization mirrors rest-server's session resolution: the service may be
+ * the AuthManager wrapper (`getApi()`) or the raw better-auth instance
+ * (`.api`), and `getSession` needs a Web `Headers` instance.
+ */
+function buildAuthSessionResolver(
+  ctx: PluginContext,
+): ((req: { headers?: unknown }) => Promise<{ userId?: string } | null>) | undefined {
+  let authService: any;
+  try {
+    authService = ctx.getService<any>('auth');
+  } catch {
+    return undefined;
+  }
+  if (!authService) return undefined;
+
+  return async (req) => {
+    try {
+      let api: any = authService.api;
+      if (!api && typeof authService.getApi === 'function') api = await authService.getApi();
+      if (!api?.getSession) return null;
+
+      const rawHeaders: any = req?.headers;
+      let headers: any;
+      if (rawHeaders && typeof rawHeaders.get === 'function') {
+        headers = rawHeaders;
+      } else if (rawHeaders && typeof rawHeaders === 'object') {
+        headers = new (globalThis as any).Headers();
+        for (const [k, v] of Object.entries(rawHeaders)) {
+          if (Array.isArray(v)) v.forEach((x) => headers.append(k, String(x)));
+          else if (v != null) headers.set(k, String(v));
+        }
+      } else {
+        return null;
+      }
+
+      const session: any = await api.getSession({ headers });
+      const userId = session?.user?.id;
+      return userId ? { userId: String(userId) } : null;
+    } catch {
+      return null;
+    }
+  };
 }
 
 function extractOverrides(payload: unknown): Record<string, unknown> {

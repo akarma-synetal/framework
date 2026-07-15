@@ -1,0 +1,161 @@
+// Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
+
+import { describe, it, expect, vi } from 'vitest';
+import { installAttachmentAccessHooks, type AttachmentSharingLike } from './attachment-access-hooks.js';
+import type { AttachmentLifecycleEngine } from './attachment-lifecycle.js';
+
+const silentLogger = () => ({ info: vi.fn(), warn: vi.fn(), debug: vi.fn() });
+
+/** Capture the two registered hooks so tests can drive them directly. */
+function install(opts: {
+  attachments?: Array<Record<string, unknown>>;
+  sharing?: AttachmentSharingLike | null;
+}) {
+  const hooks = new Map<string, (ctx: any) => Promise<void>>();
+  const engine: AttachmentLifecycleEngine = {
+    registerHook: (event, handler) => {
+      hooks.set(event, handler as any);
+    },
+    find: async (_object, options: any) => {
+      const rows = (opts.attachments ?? []).filter((r) =>
+        Object.entries(options?.where ?? {}).every(([k, v]) => r[k] === v),
+      );
+      return typeof options?.limit === 'number' ? rows.slice(0, options.limit) : rows;
+    },
+    findOne: async (_object, options: any) =>
+      (opts.attachments ?? []).find((r) =>
+        Object.entries(options?.where ?? {}).every(([k, v]) => r[k] === v),
+      ) ?? null,
+    update: async () => ({}),
+  };
+  installAttachmentAccessHooks(engine, () => opts.sharing, silentLogger());
+  return {
+    beforeInsert: hooks.get('beforeInsert')!,
+    beforeDelete: hooks.get('beforeDelete')!,
+  };
+}
+
+/** Caller-scoped api fake: `visibleParents` is the set of records the
+ * caller can read, keyed `object/id`. */
+function apiFor(visibleParents: string[]) {
+  return {
+    object: (name: string) => ({
+      findOne: async ({ where }: any) =>
+        visibleParents.includes(`${name}/${where.id}`) ? { id: where.id } : null,
+    }),
+  };
+}
+
+const insertCtx = (data: any, opts: { userId?: string; isSystem?: boolean; visible?: string[] } = {}) => ({
+  object: 'sys_attachment',
+  event: 'beforeInsert',
+  input: { data, options: { context: { userId: opts.userId, permissions: [] } } },
+  session: opts.isSystem ? { isSystem: true, userId: opts.userId } : opts.userId ? { userId: opts.userId } : undefined,
+  api: apiFor(opts.visible ?? []),
+});
+
+const deleteCtx = (input: any, opts: { userId?: string; isSystem?: boolean; visible?: string[] } = {}) => ({
+  object: 'sys_attachment',
+  event: 'beforeDelete',
+  input: { ...input, options: { ...(input.options ?? {}), context: { userId: opts.userId, permissions: [] } } },
+  session: opts.isSystem ? { isSystem: true, userId: opts.userId } : opts.userId ? { userId: opts.userId } : undefined,
+  api: apiFor(opts.visible ?? []),
+});
+
+describe('attachment access — beforeInsert (parent visibility + provenance)', () => {
+  it('rejects attaching to a parent the caller cannot read (403 ATTACHMENT_PARENT_ACCESS)', async () => {
+    const { beforeInsert } = install({});
+    const ctx = insertCtx(
+      { parent_object: 'att_secret', parent_id: 'r1', file_id: 'f1' },
+      { userId: 'u1', visible: [] },
+    );
+    await expect(beforeInsert(ctx)).rejects.toMatchObject({
+      code: 'ATTACHMENT_PARENT_ACCESS',
+      status: 403,
+      object: 'att_secret',
+    });
+  });
+
+  it('allows attaching to a readable parent', async () => {
+    const { beforeInsert } = install({});
+    const ctx = insertCtx(
+      { parent_object: 'att_case', parent_id: 'r1', file_id: 'f1' },
+      { userId: 'u1', visible: ['att_case/r1'] },
+    );
+    await expect(beforeInsert(ctx)).resolves.toBeUndefined();
+  });
+
+  it('server-stamps uploaded_by from the session, overwriting a spoofed value', async () => {
+    const { beforeInsert } = install({});
+    const data = { parent_object: 'att_case', parent_id: 'r1', file_id: 'f1', uploaded_by: 'someone-else' };
+    await beforeInsert(insertCtx(data, { userId: 'u1', visible: ['att_case/r1'] }));
+    expect(data.uploaded_by).toBe('u1');
+  });
+
+  it('bypasses for system context and context-less calls', async () => {
+    const { beforeInsert } = install({});
+    await expect(
+      beforeInsert(insertCtx({ parent_object: 'x', parent_id: 'r' }, { isSystem: true, userId: 'u1' })),
+    ).resolves.toBeUndefined();
+    await expect(beforeInsert(insertCtx({ parent_object: 'x', parent_id: 'r' }, {}))).resolves.toBeUndefined();
+  });
+});
+
+describe('attachment access — beforeDelete (uploader or parent editor)', () => {
+  const row = { id: 'a1', file_id: 'f1', parent_object: 'att_secret', parent_id: 'r1', uploaded_by: 'uploader' };
+
+  it('the uploader may always delete their attachment', async () => {
+    const canEdit = vi.fn(async () => false);
+    const { beforeDelete } = install({ attachments: [row], sharing: { canEdit } });
+    await expect(beforeDelete(deleteCtx({ id: 'a1' }, { userId: 'uploader' }))).resolves.toBeUndefined();
+    expect(canEdit).not.toHaveBeenCalled();
+  });
+
+  it('a non-uploader without parent edit is rejected (403 ATTACHMENT_DELETE_DENIED)', async () => {
+    const { beforeDelete } = install({ attachments: [row], sharing: { canEdit: async () => false } });
+    await expect(beforeDelete(deleteCtx({ id: 'a1' }, { userId: 'stranger' }))).rejects.toMatchObject({
+      code: 'ATTACHMENT_DELETE_DENIED',
+      status: 403,
+    });
+  });
+
+  it('a parent editor may delete another user\'s attachment', async () => {
+    const canEdit = vi.fn(async (object: string, recordId: string, ctx: any) => {
+      expect(object).toBe('att_secret');
+      expect(recordId).toBe('r1');
+      expect(ctx.userId).toBe('editor');
+      return true;
+    });
+    const { beforeDelete } = install({ attachments: [row], sharing: { canEdit } });
+    await expect(beforeDelete(deleteCtx({ id: 'a1' }, { userId: 'editor' }))).resolves.toBeUndefined();
+  });
+
+  it('multi-delete requires EVERY matched row to pass', async () => {
+    const rows = [
+      { ...row, id: 'a1', uploaded_by: 'me' },
+      { ...row, id: 'a2', uploaded_by: 'someone-else', parent_object: 'att_secret', parent_id: 'r2' },
+    ];
+    const { beforeDelete } = install({ attachments: rows, sharing: { canEdit: async () => false } });
+    await expect(
+      beforeDelete(deleteCtx({ options: { where: { parent_object: 'att_secret' }, multi: true } }, { userId: 'me' })),
+    ).rejects.toMatchObject({ code: 'ATTACHMENT_DELETE_DENIED' });
+  });
+
+  it('degrades to parent READ visibility when the sharing service is absent', async () => {
+    const { beforeDelete } = install({ attachments: [row], sharing: null });
+    // caller can read the parent → allowed
+    await expect(
+      beforeDelete(deleteCtx({ id: 'a1' }, { userId: 'reader', visible: ['att_secret/r1'] })),
+    ).resolves.toBeUndefined();
+    // caller cannot read the parent → denied
+    await expect(
+      beforeDelete(deleteCtx({ id: 'a1' }, { userId: 'reader', visible: [] })),
+    ).rejects.toMatchObject({ code: 'ATTACHMENT_DELETE_DENIED' });
+  });
+
+  it('bypasses for system context; a no-match delete is not blocked', async () => {
+    const { beforeDelete } = install({ attachments: [row], sharing: { canEdit: async () => false } });
+    await expect(beforeDelete(deleteCtx({ id: 'a1' }, { isSystem: true, userId: 'x' }))).resolves.toBeUndefined();
+    await expect(beforeDelete(deleteCtx({ id: 'missing' }, { userId: 'x' }))).resolves.toBeUndefined();
+  });
+});
