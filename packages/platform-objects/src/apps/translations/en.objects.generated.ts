@@ -473,7 +473,11 @@ export const enObjects: NonNullable<TranslationData['objects']> = {
     },
     _views: {
       mine: {
-        label: "My Memberships"
+        label: "My Memberships",
+        emptyState: {
+          title: "No organizations yet",
+          message: "You haven't joined any organizations."
+        }
       }
     },
     _actions: {
@@ -1354,7 +1358,11 @@ export const enObjects: NonNullable<TranslationData['objects']> = {
     },
     _views: {
       recent: {
-        label: "Recent"
+        label: "Recent",
+        emptyState: {
+          title: "No events",
+          message: "No notification events have been emitted."
+        }
       },
       by_topic: {
         label: "By Topic"
@@ -1390,23 +1398,6 @@ export const enObjects: NonNullable<TranslationData['objects']> = {
       },
       size: {
         label: "Size (bytes)"
-      },
-      share_type: {
-        label: "Share Type",
-        help: "viewer | collaborator | inferred (inherited from parent record)",
-        options: {
-          viewer: "viewer",
-          collaborator: "collaborator",
-          inferred: "inferred"
-        }
-      },
-      visibility: {
-        label: "Visibility",
-        options: {
-          internal: "internal",
-          all_users: "all_users",
-          shared_users: "shared_users"
-        }
       },
       uploaded_by: {
         label: "Uploaded By"

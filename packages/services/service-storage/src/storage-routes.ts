@@ -14,6 +14,18 @@ export interface StorageRoutesOptions {
   presignedTtl?: number;
   /** Default chunked upload session TTL in seconds */
   sessionTtl?: number;
+  /**
+   * Session resolver for the UPLOAD entry points (#2755). When wired, the
+   * presigned/complete/chunked upload routes reject anonymous requests with
+   * 401 `AUTH_REQUIRED`, and new sys_file rows are stamped with
+   * `owner_id = session.userId`. When absent (bare kernels, tests), the
+   * routes stay open — back-compat, logged once. Download routes are NOT
+   * gated here (capability URLs embedded in <img src>/<a href>; gating them
+   * is a tracked follow-up needing cookie sessions or signed links).
+   */
+  resolveSession?: (req: IHttpRequest) => Promise<{ userId?: string } | null | undefined>;
+  /** Optional logger for the one-time open-mode notice. */
+  logger?: { info(msg: string): void; warn(msg: string): void };
 }
 
 /**
@@ -44,11 +56,43 @@ export function registerStorageRoutes(
   const presignedTtl = opts.presignedTtl ?? 3600;
   const sessionTtl = opts.sessionTtl ?? 86400;
 
+  // ── Upload auth gate (#2755) ─────────────────────────────────────────
+  // `false` ⇒ the 401 was already sent and the handler must stop.
+  // `null` ⇒ open mode (no resolver wired) — proceed unauthenticated.
+  let warnedOpenUploads = false;
+  const requireUploadSession = async (
+    req: IHttpRequest,
+    res: IHttpResponse,
+  ): Promise<{ userId?: string } | null | false> => {
+    if (!opts.resolveSession) {
+      if (!warnedOpenUploads) {
+        warnedOpenUploads = true;
+        opts.logger?.info(
+          '[storage] no session resolver wired — upload routes accept anonymous requests (bare-kernel mode)',
+        );
+      }
+      return null;
+    }
+    let session: { userId?: string } | null | undefined;
+    try {
+      session = await opts.resolveSession(req);
+    } catch {
+      session = null;
+    }
+    if (!session?.userId) {
+      res.status(401).json({ error: 'Authentication required to upload files', code: 'AUTH_REQUIRED' });
+      return false;
+    }
+    return session;
+  };
+
   // ---------------------------------------------------------------------------
   // POST /storage/upload/presigned
   // ---------------------------------------------------------------------------
   httpServer.post(`${basePath}/upload/presigned`, async (req: IHttpRequest, res: IHttpResponse) => {
     try {
+      const session = await requireUploadSession(req, res);
+      if (session === false) return;
       const { filename, mimeType, size, scope, bucket } = req.body ?? {};
       if (!filename || !mimeType || size == null) {
         res.status(400).json({ error: 'filename, mimeType, and size are required' });
@@ -69,6 +113,7 @@ export function registerStorageRoutes(
         bucket,
         acl: 'private',
         status: 'pending',
+        owner_id: session?.userId,
       });
 
       // If adapter supports presigned upload, use it; otherwise build a local stub URL
@@ -108,6 +153,7 @@ export function registerStorageRoutes(
   // ---------------------------------------------------------------------------
   httpServer.post(`${basePath}/upload/complete`, async (req: IHttpRequest, res: IHttpResponse) => {
     try {
+      if ((await requireUploadSession(req, res)) === false) return;
       const { fileId, eTag } = req.body ?? {};
       if (!fileId) {
         res.status(400).json({ error: 'fileId is required' });
@@ -146,6 +192,8 @@ export function registerStorageRoutes(
   // ---------------------------------------------------------------------------
   httpServer.post(`${basePath}/upload/chunked`, async (req: IHttpRequest, res: IHttpResponse) => {
     try {
+      const session = await requireUploadSession(req, res);
+      if (session === false) return;
       const { filename, mimeType, totalSize, chunkSize: reqChunkSize, scope, bucket, metadata } = req.body ?? {};
       if (!filename || !mimeType || !totalSize) {
         res.status(400).json({ error: 'filename, mimeType, and totalSize are required' });
@@ -170,6 +218,7 @@ export function registerStorageRoutes(
         acl: 'private',
         status: 'pending',
         metadata: metadata ? JSON.stringify(metadata) : undefined,
+        owner_id: session?.userId,
       });
 
       // Initiate chunked upload in backend
@@ -224,6 +273,7 @@ export function registerStorageRoutes(
   // ---------------------------------------------------------------------------
   httpServer.put(`${basePath}/upload/chunked/:uploadId/chunk/:chunkIndex`, async (req: IHttpRequest, res: IHttpResponse) => {
     try {
+      if ((await requireUploadSession(req, res)) === false) return;
       const { uploadId, chunkIndex: chunkIndexStr } = req.params;
       const chunkIndex = parseInt(chunkIndexStr, 10);
       if (!uploadId || isNaN(chunkIndex)) {
@@ -291,6 +341,7 @@ export function registerStorageRoutes(
   // ---------------------------------------------------------------------------
   httpServer.post(`${basePath}/upload/chunked/:uploadId/complete`, async (req: IHttpRequest, res: IHttpResponse) => {
     try {
+      if ((await requireUploadSession(req, res)) === false) return;
       const { uploadId } = req.params;
       const session = await store.getSession(uploadId);
       if (!session) {
@@ -334,6 +385,7 @@ export function registerStorageRoutes(
   // ---------------------------------------------------------------------------
   httpServer.get(`${basePath}/upload/chunked/:uploadId/progress`, async (req: IHttpRequest, res: IHttpResponse) => {
     try {
+      if ((await requireUploadSession(req, res)) === false) return;
       const { uploadId } = req.params;
       const session = await store.getSession(uploadId);
       if (!session) {

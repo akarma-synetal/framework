@@ -2110,6 +2110,36 @@ describe('mapDataError — schema/constraint envelopes', () => {
     expect(r.body.object).toBe('crm_lead');
   });
 
+  // #2755: attachment access gates from service-storage's engine hooks —
+  // same generic-data-path rationale as the capability gates above.
+  it('maps ATTACHMENT_PARENT_ACCESS → 403 with the parent object', () => {
+    const r = mapDataError(
+      Object.assign(new Error('Cannot attach to crm_lead/rec1: the parent record does not exist or you do not have access to it'), {
+        code: 'ATTACHMENT_PARENT_ACCESS',
+        status: 403,
+        object: 'crm_lead',
+      }),
+      'sys_attachment',
+    );
+    expect(r.status).toBe(403);
+    expect(r.body.code).toBe('ATTACHMENT_PARENT_ACCESS');
+    expect(r.body.object).toBe('crm_lead');
+  });
+
+  it('maps ATTACHMENT_DELETE_DENIED → 403', () => {
+    const r = mapDataError(
+      Object.assign(new Error('Cannot delete attachment a1: only the uploader or a user who can edit the parent record (crm_lead/rec1) may delete it'), {
+        code: 'ATTACHMENT_DELETE_DENIED',
+        status: 403,
+        object: 'crm_lead',
+      }),
+      'sys_attachment',
+    );
+    expect(r.status).toBe(403);
+    expect(r.body.code).toBe('ATTACHMENT_DELETE_DENIED');
+    expect(r.body.object).toBe('crm_lead');
+  });
+
   it('maps SQLite "has no column named" → 400 INVALID_FIELD with the field', () => {
     const r = mapDataError(
       sqliteError(

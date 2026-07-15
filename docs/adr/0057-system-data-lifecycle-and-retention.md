@@ -170,6 +170,28 @@ registered ⇒ rows are retained (today's behavior), reported as
 `archive-pending` — a compliance ledger cannot be destroyed by declaring a
 lifecycle.
 
+#### Amendment (#2755): reap guards — domain re-verification + external-resource reclaim
+
+Some reapable rows are pointers to state the Reaper cannot see: `sys_file`
+rows reference storage bytes (disk/S3), and a tombstoned orphan may have
+regained `sys_attachment` references since it was marked. For these, a plugin
+may register a **reap guard** at runtime
+(`lifecycle.registerReapGuard(object, guard)`): the Reaper fetches candidate
+rows in batches, the guard confirms each id — performing external cleanup
+(byte deletion) and sweep-time re-verification first — or vetoes it (kept,
+retried next sweep). Rules:
+
+- A guarded object is **never blind-deleted**: an erroring guard fails safe
+  (rows retained), and an engine without row reads skips the object
+  (`reap-guard-unsupported`) rather than degrading to a blind delete.
+- Guards are runtime wiring, not spec surface — detection and scheduling stay
+  inside the single platform sweep (no bespoke sweepers, per the alternatives
+  below); the guard is a domain callback, not a scheduler.
+- First consumer: `sys_file` (service-storage) — attachment orphans are
+  tombstoned by hooks when their last `sys_attachment` reference is deleted,
+  reaped `30d` later by TTL with byte reclaim, with zero-reference
+  re-verification at sweep time; abandoned `pending` uploads reap after `7d`.
+
 ### 3.4 Reclaim — driver space hygiene
 
 SQLite driver defaults to `auto_vacuum=INCREMENTAL` (shipped P0); the Reaper

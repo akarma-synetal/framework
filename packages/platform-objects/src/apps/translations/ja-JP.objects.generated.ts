@@ -473,7 +473,11 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
     },
     _views: {
       mine: {
-        label: "My Memberships"
+        label: "My Memberships",
+        emptyState: {
+          title: "No organizations yet",
+          message: "You haven't joined any organizations."
+        }
       }
     },
     _actions: {
@@ -1354,7 +1358,11 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
     },
     _views: {
       recent: {
-        label: "Recent"
+        label: "Recent",
+        emptyState: {
+          title: "No events",
+          message: "No notification events have been emitted."
+        }
       },
       by_topic: {
         label: "By Topic"
@@ -1390,23 +1398,6 @@ export const jaJPObjects: NonNullable<TranslationData['objects']> = {
       },
       size: {
         label: "サイズ（バイト）"
-      },
-      share_type: {
-        label: "共有タイプ",
-        help: "viewer | collaborator | inferred（親レコードから継承）",
-        options: {
-          viewer: "閲覧者",
-          collaborator: "共同編集者",
-          inferred: "推定"
-        }
-      },
-      visibility: {
-        label: "公開範囲",
-        options: {
-          internal: "内部",
-          all_users: "すべてのユーザー",
-          shared_users: "共有ユーザー"
-        }
       },
       uploaded_by: {
         label: "アップロード者"

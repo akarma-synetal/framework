@@ -473,7 +473,11 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
     },
     _views: {
       mine: {
-        label: "My Memberships"
+        label: "My Memberships",
+        emptyState: {
+          title: "No organizations yet",
+          message: "You haven't joined any organizations."
+        }
       }
     },
     _actions: {
@@ -1354,7 +1358,11 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
     },
     _views: {
       recent: {
-        label: "Recent"
+        label: "Recent",
+        emptyState: {
+          title: "No events",
+          message: "No notification events have been emitted."
+        }
       },
       by_topic: {
         label: "By Topic"
@@ -1390,23 +1398,6 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
       },
       size: {
         label: "Tamaño (bytes)"
-      },
-      share_type: {
-        label: "Tipo de compartición",
-        help: "visualizador | colaborador | inferido (heredado del registro principal)",
-        options: {
-          viewer: "Visualizador",
-          collaborator: "Colaborador",
-          inferred: "Inferido"
-        }
-      },
-      visibility: {
-        label: "Visibilidad",
-        options: {
-          internal: "Interno",
-          all_users: "Todos los usuarios",
-          shared_users: "Usuarios compartidos"
-        }
       },
       uploaded_by: {
         label: "Subido por"

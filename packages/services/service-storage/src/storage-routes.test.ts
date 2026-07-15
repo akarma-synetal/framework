@@ -284,4 +284,79 @@ describe('Storage REST Routes', () => {
       expect(putRes._status).toBe(403);
     });
   });
+
+  describe('upload auth gate (#2755)', () => {
+    const presignBody = { filename: 'a.txt', mimeType: 'text/plain', size: 3 };
+
+    function registerWithResolver(resolveSession: any) {
+      const server = createMockHttpServer();
+      registerStorageRoutes(server as any, adapter, store, {
+        basePath: '/api/v1/storage',
+        resolveSession,
+      });
+      return server;
+    }
+
+    it('401s anonymous requests on every upload entry point when a resolver is wired', async () => {
+      const server = registerWithResolver(async () => null);
+      const uploadRoutes: Array<[string, string, any]> = [
+        ['POST', '/api/v1/storage/upload/presigned', { body: presignBody }],
+        ['POST', '/api/v1/storage/upload/complete', { body: { fileId: 'x' } }],
+        ['POST', '/api/v1/storage/upload/chunked', { body: { filename: 'a', mimeType: 't', totalSize: 1 } }],
+        ['PUT', '/api/v1/storage/upload/chunked/:uploadId/chunk/:chunkIndex', { params: { uploadId: 'u', chunkIndex: '0' } }],
+        ['POST', '/api/v1/storage/upload/chunked/:uploadId/complete', { params: { uploadId: 'u' } }],
+        ['GET', '/api/v1/storage/upload/chunked/:uploadId/progress', { params: { uploadId: 'u' } }],
+      ];
+      for (const [method, path, reqOpts] of uploadRoutes) {
+        const res = createMockRes();
+        await server._getHandler(method, path)!(createMockReq(reqOpts as any), res);
+        expect(res._status, `${method} ${path}`).toBe(401);
+        expect(res._json?.code, `${method} ${path}`).toBe('AUTH_REQUIRED');
+      }
+    });
+
+    it('stamps owner_id from the resolved session on presigned uploads', async () => {
+      const server = registerWithResolver(async () => ({ userId: 'user-42' }));
+      const res = createMockRes();
+      await server._getHandler('POST', '/api/v1/storage/upload/presigned')!(
+        createMockReq({ body: presignBody }),
+        res,
+      );
+      expect(res._status).toBe(200);
+      const file = await store.getFile(res._json.data.fileId);
+      expect(file?.owner_id).toBe('user-42');
+    });
+
+    it('download routes stay open even with a resolver wired (capability URLs)', async () => {
+      const server = registerWithResolver(async () => null);
+      const res = createMockRes();
+      await server._getHandler('GET', '/api/v1/storage/files/:fileId/url')!(
+        createMockReq({ params: { fileId: 'missing' } }),
+        res,
+      );
+      expect(res._status).toBe(404); // not 401 — anonymous reads reach the handler
+    });
+
+    it('stays open (back-compat) when no resolver is wired', async () => {
+      // The default beforeEach registration has no resolver.
+      const res = createMockRes();
+      await httpServer._getHandler('POST', '/api/v1/storage/upload/presigned')!(
+        createMockReq({ body: presignBody }),
+        res,
+      );
+      expect(res._status).toBe(200);
+      const file = await store.getFile(res._json.data.fileId);
+      expect(file?.owner_id).toBeUndefined();
+    });
+
+    it('a throwing resolver fails closed (401), never open', async () => {
+      const server = registerWithResolver(async () => { throw new Error('auth backend down'); });
+      const res = createMockRes();
+      await server._getHandler('POST', '/api/v1/storage/upload/presigned')!(
+        createMockReq({ body: presignBody }),
+        res,
+      );
+      expect(res._status).toBe(401);
+    });
+  });
 });

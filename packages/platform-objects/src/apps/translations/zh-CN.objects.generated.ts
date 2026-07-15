@@ -473,7 +473,11 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
     },
     _views: {
       mine: {
-        label: "My Memberships"
+        label: "My Memberships",
+        emptyState: {
+          title: "No organizations yet",
+          message: "You haven't joined any organizations."
+        }
       }
     },
     _actions: {
@@ -1354,7 +1358,11 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
     },
     _views: {
       recent: {
-        label: "Recent"
+        label: "Recent",
+        emptyState: {
+          title: "No events",
+          message: "No notification events have been emitted."
+        }
       },
       by_topic: {
         label: "By Topic"
@@ -1390,23 +1398,6 @@ export const zhCNObjects: NonNullable<TranslationData['objects']> = {
       },
       size: {
         label: "大小（字节）"
-      },
-      share_type: {
-        label: "共享类型",
-        help: "viewer | collaborator | inferred（继承自父记录）",
-        options: {
-          viewer: "查看者",
-          collaborator: "协作者",
-          inferred: "推断"
-        }
-      },
-      visibility: {
-        label: "可见性",
-        options: {
-          internal: "内部",
-          all_users: "全部用户",
-          shared_users: "共享用户"
-        }
       },
       uploaded_by: {
         label: "上传人"
