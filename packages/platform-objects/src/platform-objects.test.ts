@@ -160,10 +160,10 @@ describe('@objectstack/platform-objects', () => {
       // predicate, so exactly one is active at any time.
       expect(disable?.target).toBe('/api/v1/auth/admin/oauth2/toggle-disabled');
       expect(disable?.bodyExtra).toEqual({ disabled: true });
-      expect((disable?.visible as any)?.source).toBe('!record.disabled');
+      expect((disable?.visible as any)?.source).toBe('(!record.disabled) && features.oidcProvider != false');
       expect(enable?.target).toBe('/api/v1/auth/admin/oauth2/toggle-disabled');
       expect(enable?.bodyExtra).toEqual({ disabled: false });
-      expect((enable?.visible as any)?.source).toBe('record.disabled');
+      expect((enable?.visible as any)?.source).toBe('(record.disabled) && features.oidcProvider != false');
 
       // Generic CRUD must NOT expose mutating methods — all writes are
       // reserved for better-auth wrappers above so OAuth-specific
@@ -276,5 +276,83 @@ describe('@objectstack/platform-objects', () => {
         expect(contrib).toBeUndefined();
       }
     });
+  });
+});
+
+// #2874 P2a — behavior-equivalence lock for the requiresFeature migration.
+// Every hand-written `visible: 'features.*'` gate was replaced by the
+// declarative `requiresFeature` sugar; these rows pin the LOWERED predicate
+// to the exact CEL string that was previously hand-written, so the migration
+// is provably behavior-neutral. (transfer_ownership composes a residual row
+// predicate with the gate — parenthesized but operand/order-identical to the
+// old `record.role != 'owner' && features.organization != false`.)
+describe('feature-gate lowering matrix (#2874)', () => {
+  const ORG = 'features.organization != false';
+  const MULTI_ORG = 'features.multiOrgEnabled != false';
+
+  const rows: Array<[string, { actions?: readonly { name?: string; visible?: unknown; params?: readonly unknown[] }[] }, string, string]> = [
+    ['SysOrganization', SysOrganization, 'create_organization', MULTI_ORG],
+    ['SysOrganization', SysOrganization, 'update_organization', MULTI_ORG],
+    ['SysOrganization', SysOrganization, 'delete_organization', MULTI_ORG],
+    ['SysOrganization', SysOrganization, 'set_active_organization', MULTI_ORG],
+    ['SysOrganization', SysOrganization, 'leave_organization', MULTI_ORG],
+    ['SysOrganization', SysOrganization, 'change_slug', MULTI_ORG],
+    ['SysUser', SysUser, 'invite_user', ORG],
+    ['SysUser', SysUser, 'create_user', 'features.admin == true'],
+    ['SysMember', SysMember, 'add_member', ORG],
+    ['SysMember', SysMember, 'update_member_role', ORG],
+    ['SysMember', SysMember, 'remove_member', ORG],
+    ['SysMember', SysMember, 'transfer_ownership', `(record.role != 'owner') && ${ORG}`],
+    ['SysInvitation', SysInvitation, 'invite_user', ORG],
+    ['SysInvitation', SysInvitation, 'cancel_invitation', ORG],
+    ['SysInvitation', SysInvitation, 'resend_invitation', ORG],
+    ['SysTeam', SysTeam, 'create_team', ORG],
+    ['SysTeam', SysTeam, 'update_team', ORG],
+    ['SysTeam', SysTeam, 'remove_team', ORG],
+    ['SysTeamMember', SysTeamMember, 'add_team_member', ORG],
+    ['SysTeamMember', SysTeamMember, 'remove_team_member', ORG],
+    // #2874 P2b — audit gates: capability-dependent actions that previously
+    // shipped UNGATED (rendered even with the backing plugin off, then 404'd).
+    ['SysUser', SysUser, 'ban_user', 'features.admin == true'],
+    ['SysUser', SysUser, 'unban_user', 'features.admin == true'],
+    ['SysUser', SysUser, 'unlock_user', 'features.admin == true'],
+    ['SysUser', SysUser, 'set_user_password', 'features.admin == true'],
+    ['SysUser', SysUser, 'set_user_role', 'features.admin == true'],
+    ['SysUser', SysUser, 'impersonate_user', 'features.admin == true'],
+    ['SysUser', SysUser, 'enable_two_factor', '(record.id == ctx.user.id && record.two_factor_enabled != true) && features.twoFactor == true'],
+    ['SysUser', SysUser, 'disable_two_factor', '(record.id == ctx.user.id && record.two_factor_enabled == true) && features.twoFactor == true'],
+    ['SysUser', SysUser, 'generate_backup_codes', '(record.id == ctx.user.id && record.two_factor_enabled == true) && features.twoFactor == true'],
+    ['SysTwoFactor', SysTwoFactor, 'enable_two_factor', 'features.twoFactor == true'],
+    ['SysTwoFactor', SysTwoFactor, 'disable_two_factor', 'features.twoFactor == true'],
+    ['SysTwoFactor', SysTwoFactor, 'regenerate_backup_codes', 'features.twoFactor == true'],
+    ['SysOauthApplication', SysOauthApplication, 'create_oauth_application', 'features.oidcProvider != false'],
+    ['SysOauthApplication', SysOauthApplication, 'delete_oauth_application', 'features.oidcProvider != false'],
+    ['SysOauthApplication', SysOauthApplication, 'disable_oauth_application', '(!record.disabled) && features.oidcProvider != false'],
+    ['SysOauthApplication', SysOauthApplication, 'enable_oauth_application', '(record.disabled) && features.oidcProvider != false'],
+    ['SysOauthApplication', SysOauthApplication, 'rotate_client_secret', 'features.oidcProvider != false'],
+  ];
+
+  it.each(rows)('%s.%s#%s lowers to the previous hand-written predicate', (_export, object, actionName, expected) => {
+    const action = (object.actions ?? []).find((a) => a.name === actionName);
+    expect(action, `${actionName} exists`).toBeDefined();
+    expect((action?.visible as { source?: string })?.source).toBe(expected);
+  });
+
+  it('SysUser.create_user#phoneNumber param lowers to the previous hand-written predicate', () => {
+    const create = (SysUser.actions ?? []).find((a) => a.name === 'create_user');
+    const phone = (create?.params ?? []).find((p) => (p as { name?: string }).name === 'phoneNumber');
+    expect(phone).toBeDefined();
+    expect(((phone as { visible?: { source?: string } }).visible)?.source).toBe('features.phoneNumber == true');
+  });
+
+  it('the requiresFeature sugar never survives into parsed objects', () => {
+    for (const [, object] of systemObjects) {
+      for (const action of object.actions ?? []) {
+        expect(action).not.toHaveProperty('requiresFeature');
+        for (const param of (action as { params?: readonly unknown[] }).params ?? []) {
+          expect(param).not.toHaveProperty('requiresFeature');
+        }
+      }
+    }
   });
 });
