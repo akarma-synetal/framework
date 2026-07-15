@@ -11,6 +11,7 @@ import { SharingRuleService } from './sharing-rule-service.js';
 import { ShareLinkService } from './share-link-service.js';
 import { registerShareLinkRoutes } from './share-link-routes.js';
 import { bindRuleHooks, unbindAllRuleHooks, RULE_REBIND_TRIGGER_PACKAGE } from './rule-hooks.js';
+import { bindRuleProvenanceStamp, unbindRuleProvenanceStamp } from './sharing-rule-provenance.js';
 import { bindPrimaryBuHooks, backfillPrimaryBu } from './primary-bu-projection.js';
 import { bootstrapDeclaredSharingRules } from './bootstrap-declared-sharing-rules.js';
 
@@ -34,6 +35,44 @@ export interface SharingPluginOptions {
    * `/api/v1/share-links`.
    */
   shareLinkBasePath?: string;
+}
+
+/**
+ * [#2926 ③] Boot backfill: rule grants are materialized by the write hooks,
+ * but seed rows are written with `isSystem` (which the hooks deliberately
+ * skip — see rule-hooks.ts), so a fresh deploy's seed data carried no
+ * `sys_record_share` rows until each record was touched at runtime.
+ * Reconcile every active rule once per boot: `evaluateRule` is idempotent
+ * (diff-based grant/update/revoke), so repeated boots are no-ops.
+ * Best-effort per rule — one broken rule must not block startup or its
+ * siblings. Returns the number of rules successfully reconciled.
+ */
+export async function backfillRuleGrants(
+  ruleService: SharingRuleService,
+  rules: Array<{ id?: string; name?: string }>,
+  logger?: { info?: (msg: string, meta?: any) => void; warn?: (msg: string, meta?: any) => void },
+): Promise<number> {
+  const start = Date.now();
+  let reconciled = 0;
+  for (const rule of rules) {
+    try {
+      await ruleService.evaluateRule((rule.id ?? rule.name) as string, { isSystem: true } as any);
+      reconciled += 1;
+    } catch (err: any) {
+      logger?.warn?.('SharingServicePlugin: boot rule backfill failed for rule', {
+        rule: rule.name ?? rule.id,
+        error: err?.message,
+      });
+    }
+  }
+  if (rules.length > 0) {
+    logger?.info?.('SharingServicePlugin: boot rule backfill done', {
+      rules: rules.length,
+      reconciled,
+      ms: Date.now() - start,
+    });
+  }
+  return reconciled;
 }
 
 /**
@@ -262,6 +301,18 @@ export class SharingServicePlugin implements Plugin {
             unbindAllRuleHooks(engine);
             bindRuleHooks(engine, this.ruleService, rules, ctx.logger as any);
             this.bindRuleRebindTriggers(engine, ctx);
+
+            // [#2909 T1] Stamp `customized` on admin edits of seeded rules so
+            // the boot seeder stops overwriting them (seed-not-clobber).
+            unbindRuleProvenanceStamp(engine);
+            bindRuleProvenanceStamp(engine, ctx.logger as any);
+
+            // [#2926 ③] Reconciling existing rows against every rule is
+            // deferred to `kernel:listening` (below): seed data is loaded on
+            // `kernel:ready` (raced against a budget, and the AppPlugin's seed
+            // hook is a *different* kernel:ready handler), so a backfill here
+            // would race the very records it must materialize. `kernel:listening`
+            // fires only after every kernel:ready handler has settled.
           } else {
             ctx.logger.warn('SharingServicePlugin: engine has no hook API — sharing rule auto-evaluation disabled');
           }
@@ -340,6 +391,23 @@ export class SharingServicePlugin implements Plugin {
         }
       } catch (err: any) {
         ctx.logger.warn('SharingServicePlugin: share-link subsystem not started', { error: err?.message });
+      }
+    });
+
+    // [#2926 ③] Materialize sharing grants for rows already present at boot —
+    // notably SeedLoader-inserted seed records, whose write goes through the
+    // isSystem short-circuit in the rule hooks and therefore never produces a
+    // `sys_record_share`. Runs on `kernel:listening` (Phase 4), after every
+    // `kernel:ready` handler — including the AppPlugin seed loader — has
+    // completed, so the reconcile sees the seeded rows. Idempotent: a runtime
+    // write that already materialized a grant is reconciled to the same state.
+    ctx.hook('kernel:listening', async () => {
+      if (!this.ruleService) return;
+      try {
+        const rules = await this.ruleService.listRules({ activeOnly: true }, { isSystem: true } as any);
+        await backfillRuleGrants(this.ruleService, rules, ctx.logger as any);
+      } catch (err: any) {
+        ctx.logger.warn('SharingServicePlugin: boot rule backfill (kernel:listening) failed', { error: err?.message });
       }
     });
   }
