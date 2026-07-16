@@ -199,6 +199,31 @@ describe('attachments permission matrix (#2755)', () => {
     expect(allowed.status).toBeLessThan(300);
   });
 
+  // ── (item 3) edit-on-parent: read is not enough to attach ────────────
+  it('(item 3) a member who can READ but not EDIT the parent cannot attach — yet can still list its attachments', async () => {
+    // att_readonly is public_read: every member reads it, only the owner edits.
+    const ro = await ql.insert('att_readonly', { name: 'ro', owner_id: adminId }, { context: { ...SYS } });
+
+    // memberA can READ the record…
+    const canRead = await stack.apiAs(memberATok, 'GET', `/data/att_readonly/${ro.id}`);
+    expect(canRead.status).toBe(200);
+
+    // …but attaching requires EDIT (Salesforce parity) → 403.
+    const file = await uploadFile(stack, memberATok);
+    const denied = await attach(memberATok, 'att_readonly', ro.id, file);
+    expect(denied.status).toBe(403);
+    expect(((await denied.json()) as any).code).toBe('ATTACHMENT_PARENT_ACCESS');
+
+    // The owner (admin) can attach, and memberA — who can read the parent —
+    // then sees that attachment in the list (read-visibility, item 1).
+    const adminFile = await uploadFile(stack, adminTok);
+    const attached = await attach(adminTok, 'att_readonly', ro.id, adminFile);
+    expect(attached.status).toBeLessThan(300);
+    const list = await stack.apiAs(memberATok, 'GET', '/data/sys_attachment');
+    const rows = ((await list.json()) as any).records ?? [];
+    expect(rows.some((r: any) => r.file_id === adminFile)).toBe(true);
+  });
+
   // ── (a) delete gate ──────────────────────────────────────────────────
   it('(a, DOGFOOD FINDING pin) the everyone baseline carries NO delete bit: an ungranted member cannot delete even their OWN attachment (403 PERMISSION_DENIED)', async () => {
     // ADR-0090 D5 / #2753: `member_default` is the anchor-bound baseline and
@@ -246,34 +271,79 @@ describe('attachments permission matrix (#2755)', () => {
     expect(ownDelete.status).toBeLessThan(300);
   });
 
-  // ── (c) known gap: listing does not inherit parent visibility ────────
-  it('(c, KNOWN GAP pin) a member can LIST sys_attachment rows pointing at records they cannot read', async () => {
+  // ── (c) attachment LIST inherits parent visibility (#2970 item 1) ────
+  it('(c) a member CANNOT list/read sys_attachment rows whose parent record they cannot read', async () => {
     const adminFile = await uploadFile(stack, adminTok);
     const created = await attach(adminTok, 'att_secret', secretId, adminFile);
     expect(created.status).toBeLessThan(300);
+    const secretRow = await ql.findOne('sys_attachment', { where: { file_id: adminFile }, context: SYS });
 
     // memberB cannot read the att_secret PARENT…
     const parentRead = await stack.apiAs(memberBTok, 'GET', `/data/att_secret/${secretId}`);
     expect([403, 404]).toContain(parentRead.status);
 
-    // …but CAN see the join row (file name, size, parent id) through the
-    // generic list path. Attachment read visibility does not yet inherit
-    // parent-record visibility — enforce-or-remove follow-up filed with
-    // #2755; flip this pin to a denial assertion when inheritance lands.
+    // …and now the join row is filtered out of the generic list too (the
+    // read-visibility middleware inherits the parent's visibility, and the
+    // list `total` is filtered identically via count()).
     const list = await stack.apiAs(memberBTok, 'GET', '/data/sys_attachment');
     expect(list.status).toBe(200);
-    const rows = ((await list.json()) as any).records ?? [];
-    const leaked = rows.some((r: any) => r.parent_object === 'att_secret' && r.parent_id === secretId);
-    expect(leaked, 'KNOWN GAP: join rows of invisible parents are listable').toBe(true);
+    const body = (await list.json()) as any;
+    const rows = body.records ?? [];
+    expect(
+      rows.some((r: any) => r.id === secretRow.id),
+      'attachment of an invisible parent must not be listable',
+    ).toBe(false);
+    // total must not leak the hidden row's existence either.
+    expect(rows.every((r: any) => r.parent_object !== 'att_secret' || r.parent_id !== secretId)).toBe(true);
+
+    // A by-id read of the hidden attachment is a 404/403, not a leak.
+    const byId = await stack.apiAs(memberBTok, 'GET', `/data/sys_attachment/${secretRow.id}`);
+    expect([403, 404]).toContain(byId.status);
+
+    // Control: memberB CAN still see attachments on a record they can read.
+    const okFile = await uploadFile(stack, memberBTok);
+    const okAttach = await attach(memberBTok, 'att_case', caseAId, okFile);
+    expect(okAttach.status).toBeLessThan(300);
+    const okList = await stack.apiAs(memberBTok, 'GET', '/data/sys_attachment');
+    const okRows = ((await okList.json()) as any).records ?? [];
+    expect(okRows.some((r: any) => r.file_id === okFile)).toBe(true);
   });
 
-  // ── (e-read) known gap: anonymous downloads ──────────────────────────
-  it('(e-read, KNOWN GAP pin) anonymous download of a committed file id succeeds (capability URL)', async () => {
-    const fileId = await uploadFile(stack, memberATok);
-    const res = await stack.api(`/storage/files/${fileId}/url`);
-    // Anyone holding a fileId can mint a download URL without a session.
-    // Authenticated downloads / signed-link gating is a filed follow-up.
-    expect(res.status).toBe(200);
+  // ── (e-read) attachment downloads inherit parent visibility (#2970 item 2) ──
+  it('(e-read) attachments download requires auth AND read access to a parent record', async () => {
+    // A file attached to the admin-owned, private att_secret record.
+    const adminFile = await uploadFile(stack, adminTok);
+    const linked = await attach(adminTok, 'att_secret', secretId, adminFile);
+    expect(linked.status).toBeLessThan(300);
+
+    // Anonymous → 401 (was a 200 capability URL before #2970).
+    const anon = await stack.api(`/storage/files/${adminFile}/url`);
+    expect(anon.status).toBe(401);
+    expect(((await anon.json()) as any).code).toBe('AUTH_REQUIRED');
+
+    // memberB is authenticated but cannot read att_secret and is not the
+    // owner → 403.
+    const denied = await stack.apiAs(memberBTok, 'GET', `/storage/files/${adminFile}/url`);
+    expect(denied.status).toBe(403);
+    expect(((await denied.json()) as any).code).toBe('ATTACHMENT_DOWNLOAD_DENIED');
+
+    // The owner (admin) → 200 with a signed URL.
+    const owner = await stack.apiAs(adminTok, 'GET', `/storage/files/${adminFile}/url`);
+    expect(owner.status).toBe(200);
+    expect(((await owner.json()) as any).url).toBeTruthy();
+
+    // Parent-inherited read: a file on the PUBLIC att_case record is
+    // downloadable by any member who can read that record — even a
+    // non-uploader (memberB downloads memberA's attachment).
+    const caseFile = await uploadFile(stack, memberATok);
+    const caseLink = await attach(memberATok, 'att_case', caseAId, caseFile);
+    expect(caseLink.status).toBeLessThan(300);
+    const inherited = await stack.apiAs(memberBTok, 'GET', `/storage/files/${caseFile}/url`);
+    expect(inherited.status).toBe(200);
+
+    // The stable 302 endpoint is gated the same way (anon → 401).
+    const anon302 = await stack.api(`/storage/files/${adminFile}`);
+    expect(anon302.status).toBe(401);
   });
 
   // ── Part 1: sys_file orphan lifecycle, end to end ─────────────────────
@@ -404,6 +474,31 @@ describe('attachments permission matrix (#2755)', () => {
       const report = await lifecycle.sweep();
       expect(report.errors, JSON.stringify(report.errors)).toEqual([]);
       expect(await ql.findOne('sys_file', { where: { id: data.fileId }, context: SYS })).toBeNull();
+    });
+
+    it('(item 4) abandoned sys_upload_session rows are reaped past their expiry window', async () => {
+      // Initiate a chunked upload (creates a sys_upload_session) but never
+      // complete it.
+      const init = await stack.api('/storage/upload/chunked', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${memberATok}` },
+        body: JSON.stringify({ filename: 'big.bin', mimeType: 'application/octet-stream', totalSize: 10_485_760 }),
+      });
+      expect(init.status).toBe(200);
+      const { uploadId } = ((await init.json()) as any).data;
+      const session = await ql.findOne('sys_upload_session', { where: { id: uploadId }, context: SYS });
+      expect(session?.id, 'session row created').toBeTruthy();
+
+      // Backdate expires_at past the 1d TTL grace.
+      await ql.update(
+        'sys_upload_session',
+        { id: uploadId, expires_at: new Date(Date.now() - 2 * DAY_MS) },
+        { context: { ...SYS } },
+      );
+
+      const report = await lifecycle.sweep();
+      expect(report.errors, JSON.stringify(report.errors)).toEqual([]);
+      expect(await ql.findOne('sys_upload_session', { where: { id: uploadId }, context: SYS })).toBeNull();
     });
   });
 });
