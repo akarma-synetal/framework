@@ -1,5 +1,25 @@
 # @objectstack/plugin-dev
 
+## 15.1.1
+
+### Patch Changes
+
+- Updated dependencies [9dbb883]
+- Updated dependencies [01ba3b3]
+  - @objectstack/plugin-auth@15.1.1
+  - @objectstack/runtime@15.1.1
+  - @objectstack/spec@15.1.1
+  - @objectstack/core@15.1.1
+  - @objectstack/types@15.1.1
+  - @objectstack/objectql@15.1.1
+  - @objectstack/setup@15.1.1
+  - @objectstack/rest@15.1.1
+  - @objectstack/driver-memory@15.1.1
+  - @objectstack/plugin-hono-server@15.1.1
+  - @objectstack/plugin-security@15.1.1
+  - @objectstack/service-i18n@15.1.1
+  - @objectstack/account@15.1.1
+
 ## 15.1.0
 
 ### Patch Changes

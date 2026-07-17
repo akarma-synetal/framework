@@ -1,5 +1,12 @@
 # @objectstack/service-sms
 
+## 15.1.1
+
+### Patch Changes
+
+- @objectstack/spec@15.1.1
+- @objectstack/core@15.1.1
+
 ## 15.1.0
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @objectstack/plugin-reports
 
+## 15.1.1
+
+### Patch Changes
+
+- @objectstack/spec@15.1.1
+- @objectstack/core@15.1.1
+- @objectstack/platform-objects@15.1.1
+
 ## 15.1.0
 
 ### Patch Changes
