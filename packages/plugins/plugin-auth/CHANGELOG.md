@@ -1,5 +1,29 @@
 # Changelog
 
+## 15.1.1
+
+### Patch Changes
+
+- 9dbb883: Contain the blast radius of a failing optional better-auth plugin: core email/password + session auth now stays up when an optional feature plugin throws during initialization.
+
+  Previously, one throwing optional plugin (the 15.1.0 incident: `@better-auth/oauth-provider` threw `Cannot set properties of undefined (setting 'modelName')` from a 1.6/1.7 version mix) failed the whole lazily-built better-auth instance, turning EVERY auth endpoint — sign-up, sign-in, get-session — into a 500.
+
+  `AuthManager.buildPluginList` now classifies plugins in two tiers. Optional feature plugins (organization, admin, phoneNumber, magicLink, genericOAuth, jwt+oauthProvider as one atomic unit, sso, scim, deviceAuthorization) are constructed through an isolation wrapper: on failure the feature is skipped with a loud actionable `console.error`, recorded in `getDegradedAuthFeatures()`, and its endpoints 404 while core auth keeps working. Security-bearing plugins (bearer, twoFactor, haveIBeenPwned, customSession with its ADR-0069 authGate) still fail hard — better a hard 500 than silently weakened auth (e.g. 2FA-enrolled accounts signing in on password alone).
+
+  The OIDC discovery mount (`/.well-known/{oauth-authorization-server,openid-configuration}`) checks the degraded set and skips advertising an IdP whose endpoints did not come up, with a clear error log instead of sending external clients into 404s.
+
+- 01ba3b3: Fix fresh-project auth returning 500 on every endpoint (sign-up / sign-in / get-session) with `Cannot set properties of undefined (setting 'modelName')`.
+
+  The published manifest declared `better-auth`, `@better-auth/core`, `@better-auth/oauth-provider`, and `@better-auth/sso` as `^1.6.23`, while only `@better-auth/scim` was pinned to `1.7.0-rc.1` (GHSA-j8v8-g9cx-5qf4 is fixed only in the 1.7.0 pre-release line). The framework workspace forces the whole better-auth family to `1.7.0-rc.1` via pnpm overrides, but overrides do not ship with published packages — a downstream `npx create-objectstack` install resolved the `^1.6.23` ranges to 1.6.23 (still the npm `latest`), and the resulting 1.7/1.6 mix crashes during better-auth initialization, so every fresh 15.1.0 project shipped with broken auth.
+
+  All four packages are now pinned to the exact `1.7.0-rc.1` — the only combination the workspace actually builds and tests against. The pins will be relaxed to `^1.7.0` once a stable better-auth 1.7.0 ships. A new CI gate (`scripts/check-override-consistency.mjs`) fails whenever a pnpm-workspace override target is not reachable from a publishable package's declared range, so tested-vs-published drift like this cannot recur silently.
+
+  - @objectstack/spec@15.1.1
+  - @objectstack/core@15.1.1
+  - @objectstack/types@15.1.1
+  - @objectstack/platform-objects@15.1.1
+  - @objectstack/rest@15.1.1
+
 ## 15.1.0
 
 ### Patch Changes

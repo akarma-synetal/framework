@@ -1,5 +1,14 @@
 # @objectstack/plugin-hono-server
 
+## 15.1.1
+
+### Patch Changes
+
+- @objectstack/spec@15.1.1
+- @objectstack/core@15.1.1
+- @objectstack/types@15.1.1
+- @objectstack/observability@15.1.1
+
 ## 15.1.0
 
 ### Minor Changes

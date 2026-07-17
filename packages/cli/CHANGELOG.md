@@ -1,5 +1,59 @@
 # @objectstack/cli
 
+## 15.1.1
+
+### Patch Changes
+
+- Updated dependencies [9dbb883]
+- Updated dependencies [01ba3b3]
+  - @objectstack/plugin-auth@15.1.1
+  - @objectstack/runtime@15.1.1
+  - @objectstack/verify@15.1.1
+  - @objectstack/client@15.1.1
+  - @objectstack/cloud-connection@15.1.1
+  - @objectstack/spec@15.1.1
+  - @objectstack/console@15.1.1
+  - @objectstack/core@15.1.1
+  - @objectstack/types@15.1.1
+  - @objectstack/metadata@15.1.1
+  - @objectstack/objectql@15.1.1
+  - @objectstack/observability@15.1.1
+  - @objectstack/formula@15.1.1
+  - @objectstack/lint@15.1.1
+  - @objectstack/platform-objects@15.1.1
+  - @objectstack/setup@15.1.1
+  - @objectstack/rest@15.1.1
+  - @objectstack/driver-memory@15.1.1
+  - @objectstack/driver-sql@15.1.1
+  - @objectstack/driver-mongodb@15.1.1
+  - @objectstack/driver-sqlite-wasm@15.1.1
+  - @objectstack/plugin-approvals@15.1.1
+  - @objectstack/plugin-audit@15.1.1
+  - @objectstack/plugin-email@15.1.1
+  - @objectstack/plugin-hono-server@15.1.1
+  - @objectstack/mcp@15.1.1
+  - @objectstack/plugin-pinyin-search@15.1.1
+  - @objectstack/plugin-reports@15.1.1
+  - @objectstack/plugin-security@15.1.1
+  - @objectstack/plugin-sharing@15.1.1
+  - @objectstack/service-sms@15.1.1
+  - @objectstack/plugin-webhooks@15.1.1
+  - @objectstack/trigger-record-change@15.1.1
+  - @objectstack/trigger-api@15.1.1
+  - @objectstack/trigger-schedule@15.1.1
+  - @objectstack/service-analytics@15.1.1
+  - @objectstack/service-automation@15.1.1
+  - @objectstack/service-cache@15.1.1
+  - @objectstack/service-datasource@15.1.1
+  - @objectstack/service-job@15.1.1
+  - @objectstack/service-messaging@15.1.1
+  - @objectstack/service-package@15.1.1
+  - @objectstack/service-queue@15.1.1
+  - @objectstack/service-realtime@15.1.1
+  - @objectstack/service-settings@15.1.1
+  - @objectstack/service-storage@15.1.1
+  - @objectstack/account@15.1.1
+
 ## 15.1.0
 
 ### Minor Changes

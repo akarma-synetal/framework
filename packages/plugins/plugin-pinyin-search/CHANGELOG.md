@@ -1,5 +1,13 @@
 # @objectstack/plugin-pinyin-search
 
+## 15.1.1
+
+### Patch Changes
+
+- @objectstack/core@15.1.1
+- @objectstack/types@15.1.1
+- @objectstack/objectql@15.1.1
+
 ## 15.1.0
 
 ### Minor Changes
