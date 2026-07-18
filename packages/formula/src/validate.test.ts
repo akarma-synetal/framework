@@ -153,6 +153,119 @@ describe('validateExpression (ADR-0032)', () => {
     });
   });
 
+  // #1928 tier 4 — a text/boolean field used with an arithmetic or ordering
+  // operator against a number faults at runtime (silent null). With per-field
+  // types the validator surfaces this as a NON-blocking warning, and — the
+  // design law — never flags a case the runtime tolerates (number/date fields,
+  // equality, string concat, null-guards).
+  describe('type-soundness warnings (#1928 tier 4)', () => {
+    const schema = {
+      objectName: 'crm_opportunity',
+      fields: ['name', 'amount', 'is_active', 'due', 'priority', 'title'] as const,
+      fieldTypes: {
+        name: 'text', title: 'textarea', amount: 'currency',
+        is_active: 'boolean', due: 'date', priority: 'select',
+      },
+      scope: 'record',
+    } as const;
+
+    it('warns (does not error) on a text field used in arithmetic against a number', () => {
+      const r = validateExpression('value', 'record.name * 2', schema);
+      expect(r.ok).toBe(true);
+      expect(r.errors).toHaveLength(0);
+      expect(r.warnings).toHaveLength(1);
+      expect(r.warnings[0].message).toMatch(/type mismatch/i);
+      expect(r.warnings[0].message).toMatch(/record\.name/);
+      expect(r.warnings[0].message).toMatch(/evaluates to null/);
+    });
+
+    it('warns on a text field ordered against a number', () => {
+      const r = validateExpression('predicate', 'record.title >= 5', schema);
+      expect(r.ok).toBe(true);
+      expect(r.warnings).toHaveLength(1);
+      expect(r.warnings[0].message).toMatch(/record\.title/);
+    });
+
+    it('warns on a boolean field used in arithmetic (always faults at runtime)', () => {
+      const r = validateExpression('value', 'record.is_active + 1', schema);
+      expect(r.ok).toBe(true);
+      expect(r.warnings).toHaveLength(1);
+      expect(r.warnings[0].message).toMatch(/boolean/i);
+      expect(r.warnings[0].message).toMatch(/record\.is_active/);
+    });
+
+    it('does NOT warn on number/currency arithmetic with an int literal (#1930 runtime fix)', () => {
+      // currency → dyn, so `amount / 100`, `amount * 2 - 50` never fault.
+      expect(validateExpression('value', 'record.amount / 100', schema).warnings).toHaveLength(0);
+      expect(validateExpression('value', 'record.amount * 2 - 50', schema).warnings).toHaveLength(0);
+    });
+
+    it('does NOT warn on a date field compared to today()/daysFromNow()', () => {
+      expect(validateExpression('predicate', 'record.due <= daysFromNow(30)', schema).warnings).toHaveLength(0);
+      expect(validateExpression('predicate', 'record.due == today()', schema).warnings).toHaveLength(0);
+    });
+
+    it('does NOT warn on a select field ordered against a number (option values may be numeric codes)', () => {
+      // select → dyn, so `priority >= 3` (a numeric-coded picklist) is not flagged.
+      expect(validateExpression('predicate', 'record.priority >= 3', schema).warnings).toHaveLength(0);
+    });
+
+    it('does NOT warn on heterogeneous equality (runtime-safe, returns false)', () => {
+      expect(validateExpression('predicate', 'record.name == 5', schema).warnings).toHaveLength(0);
+      expect(validateExpression('predicate', 'record.name != 5', schema).warnings).toHaveLength(0);
+    });
+
+    it('does NOT warn on string concatenation or a null-guard', () => {
+      expect(validateExpression('value', 'record.name + record.title', schema).warnings).toHaveLength(0);
+      expect(validateExpression('predicate', 'record.amount != null && record.amount > 0', schema).warnings).toHaveLength(0);
+    });
+
+    it('does not run without field types', () => {
+      // No fieldTypes → nothing to check.
+      expect(validateExpression('value', 'record.name * 2', { objectName: 'crm_opportunity', fields: schema.fields, scope: 'record' }).warnings).toHaveLength(0);
+    });
+  });
+
+  // #1928 tier 4 (flattened) — the same soundness check for bare-field flow /
+  // automation conditions. Fields are bound bare (`status - 1`); flow variables
+  // stay `dyn` and are never flagged.
+  describe('type-soundness warnings — flattened flow conditions (#1928 tier 4)', () => {
+    const schema = {
+      objectName: 'crm_opportunity',
+      fields: ['stage', 'amount', 'is_active', 'title'] as const,
+      fieldTypes: { stage: 'select', amount: 'currency', is_active: 'boolean', title: 'text' },
+      scope: 'flattened',
+    } as const;
+
+    it('warns on a bare text field used in arithmetic against a number', () => {
+      const r = validateExpression('predicate', 'title - 1 > 0', schema);
+      expect(r.ok).toBe(true);
+      expect(r.warnings).toHaveLength(1);
+      expect(r.warnings[0].message).toMatch(/type mismatch/i);
+      // Bare form — not `record.title`.
+      expect(r.warnings[0].message).toMatch(/`title`/);
+      expect(r.warnings[0].message).not.toMatch(/record\.title/);
+    });
+
+    it('warns on a bare boolean field used in arithmetic', () => {
+      const r = validateExpression('predicate', 'is_active + 1 > 0', schema);
+      expect(r.ok).toBe(true);
+      expect(r.warnings).toHaveLength(1);
+      expect(r.warnings[0].message).toMatch(/boolean/i);
+    });
+
+    it('does NOT flag a flow variable (unlisted → dyn) or number/date fields', () => {
+      // `expiring_count` is not a schema field → dyn → no fault.
+      expect(validateExpression('predicate', 'expiring_count * 2 > 10', schema).warnings).toHaveLength(0);
+      expect(validateExpression('predicate', 'amount / 100 > 5', schema).warnings).toHaveLength(0);
+    });
+
+    it('does NOT flag a correct bare condition, equality, or a select comparison', () => {
+      expect(validateExpression('predicate', 'stage == "closed_won" && amount > 1000', schema).warnings).toHaveLength(0);
+      expect(validateExpression('predicate', 'title == "VIP"', schema).warnings).toHaveLength(0);
+    });
+  });
+
   describe('introspection', () => {
     it('reports the dialect + scope for a field role', () => {
       expect(expectedDialect('predicate')).toBe('cel');

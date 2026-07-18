@@ -234,6 +234,84 @@ describe('validateStackExpressions (ADR-0032 build-time)', () => {
     });
   });
 
+  // #1928 tier 4 — a text/boolean field used with an arithmetic/ordering
+  // operator against a number is a silent-null bug; the lint surfaces it as a
+  // non-blocking warning, threading each object's field types into the checker.
+  describe('type-soundness warnings (#1928 tier 4)', () => {
+    it('warns on a formula that does arithmetic on a text field', () => {
+      const issues = validateStackExpressions({
+        objects: [{
+          name: 'crm_lead',
+          fields: {
+            company: { type: 'text' },
+            score: { type: 'formula', formula: 'record.company * 2' },
+          },
+        }],
+      });
+      const w = issues.filter(i => i.severity === 'warning');
+      expect(w).toHaveLength(1);
+      expect(w[0].where).toMatch(/formula/);
+      expect(w[0].message).toMatch(/type mismatch/i);
+      expect(w[0].message).toMatch(/record\.company/);
+    });
+
+    it('does not flag number arithmetic or date comparison (runtime-sound)', () => {
+      const issues = validateStackExpressions({
+        objects: [{
+          name: 'crm_opportunity',
+          fields: {
+            amount: { type: 'currency' },
+            probability: { type: 'percent' },
+            close_date: { type: 'date' },
+            expected: { type: 'formula', formula: 'record.amount * record.probability / 100' },
+          },
+          validations: [{ name: 'future', expression: 'record.close_date >= today()' }],
+        }],
+      });
+      expect(issues).toHaveLength(0);
+    });
+
+    it('warns on a validation predicate ordering a text field against a number', () => {
+      const issues = validateStackExpressions({
+        objects: [{
+          name: 'crm_lead',
+          fields: { title: { type: 'text' } },
+          validations: [{ name: 'r', expression: 'record.title > 5' }],
+        }],
+      });
+      const w = issues.filter(i => i.severity === 'warning');
+      expect(w).toHaveLength(1);
+      expect(w[0].message).toMatch(/record\.title/);
+    });
+
+    it('warns on a flattened flow condition doing arithmetic on a bare text field', () => {
+      const issues = validateStackExpressions({
+        objects: [{ name: 'crm_opportunity', fields: { title: { type: 'text' }, amount: { type: 'currency' } } }],
+        flows: [{
+          name: 'opp_flow',
+          nodes: [{ id: 'start', type: 'start', config: { objectName: 'crm_opportunity', condition: 'title * 2 > 10' } }],
+          edges: [],
+        }],
+      });
+      const w = issues.filter(i => i.severity === 'warning');
+      expect(w).toHaveLength(1);
+      expect(w[0].message).toMatch(/type mismatch/i);
+      expect(w[0].message).toMatch(/`title`/);
+    });
+
+    it('does not flag a numeric flow condition or a flow variable', () => {
+      const issues = validateStackExpressions({
+        objects: [{ name: 'crm_opportunity', fields: { amount: { type: 'currency' } } }],
+        flows: [{
+          name: 'opp_flow',
+          nodes: [{ id: 'start', type: 'start', config: { objectName: 'crm_opportunity' } }],
+          edges: [{ id: 'e1', source: 'start', target: 'end', condition: 'amount / 100 > 5 && expiring_count * 2 > 3' }],
+        }],
+      });
+      expect(issues).toHaveLength(0);
+    });
+  });
+
   describe('action visible/disabled predicates (record-scoped) — #2183 class', () => {
     it('flags a bare-field `visible` on a stack action (the trap that hid Mark Done)', () => {
       const issues = validateStackExpressions({
