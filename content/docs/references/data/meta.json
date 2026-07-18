@@ -17,12 +17,10 @@
     "hook",
     "hook-body",
     "mapping",
-    "notification",
     "object",
     "query",
     "seed",
     "seed-loader",
-    "subscription",
     "validation"
   ]
 }
