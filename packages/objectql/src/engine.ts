@@ -12,7 +12,8 @@ import {
 } from '@objectstack/spec/data';
 import { parseAutonumberFormat, renderAutonumber, missingFieldValues } from '@objectstack/spec/data';
 import { ExecutionContext, ExecutionContextSchema } from '@objectstack/spec/kernel';
-import { IDataDriver, IDataEngine, Logger, createLogger } from '@objectstack/core';
+import { IDataDriver, IDataEngine, Logger, createLogger, withTransientRetry, type RetryOptions } from '@objectstack/core';
+import { SummaryRecomputeError, type SummaryRecomputeFailure } from './summary-errors.js';
 import { CoreServiceName, StorageNameMapping } from '@objectstack/spec/system';
 import { IRealtimeService, RealtimeEventPayload } from '@objectstack/spec/contracts';
 import type { ICryptoProvider, CryptoHandle } from '@objectstack/spec/contracts';
@@ -1742,6 +1743,13 @@ export class ObjectQL implements IDataEngine {
    *  parent objects that aggregate it. Invalidated when packages register. */
   private summaryIndex: Map<string, SummaryDescriptor[]> | null = null;
 
+  /**
+   * Retry options for roll-up summary recompute (framework#3147). Public so a
+   * test can inject a no-op sleep for deterministic backoff; production uses
+   * the transient-retry defaults.
+   */
+  summaryRetryOptions: RetryOptions = {};
+
   /** Invalidate the cached roll-up summary index (call when metadata changes). */
   private invalidateSummaryIndex(): void {
     this.summaryIndex = null;
@@ -1802,37 +1810,48 @@ export class ObjectQL implements IDataEngine {
     records: any,
     previous: any,
     execCtx?: ExecutionContext,
-  ): Promise<void> {
+  ): Promise<SummaryRecomputeFailure[]> {
     const descriptors = this.getSummaryDescriptors(childObject);
-    if (descriptors.length === 0) return;
+    if (descriptors.length === 0) return [];
     const recs = Array.isArray(records) ? records : records ? [records] : [];
     const prevs = Array.isArray(previous) ? previous : previous ? [previous] : [];
+    const failures: SummaryRecomputeFailure[] = [];
     for (const desc of descriptors) {
       const ids = new Set<string>();
       for (const r of recs) { const v = r?.[desc.fkField]; if (v != null && v !== '') ids.add(String(v)); }
       for (const p of prevs) { const v = p?.[desc.fkField]; if (v != null && v !== '') ids.add(String(v)); }
       for (const parentId of ids) {
         try {
-          const rows = await this.aggregate(childObject, {
-            where: { [desc.fkField]: parentId },
-            aggregations: [{
-              function: desc.fn,
-              ...(desc.fn === 'count' ? {} : { field: desc.sourceField }),
-              alias: 'value',
-            }],
-            context: execCtx,
-          } as any);
-          let value = rows?.[0]?.value;
-          if (value == null) value = (desc.fn === 'count' || desc.fn === 'sum') ? 0 : null;
-          await this.update(desc.parentObject, { id: parentId, [desc.summaryField]: value }, { context: execCtx } as any);
+          // Retry a transient failure (a turso `fetch failed` on the parent
+          // aggregate/update) with backoff — a network blip here used to leave
+          // the parent summary silently stale (framework#3147).
+          await withTransientRetry(async () => {
+            const rows = await this.aggregate(childObject, {
+              where: { [desc.fkField]: parentId },
+              aggregations: [{
+                function: desc.fn,
+                ...(desc.fn === 'count' ? {} : { field: desc.sourceField }),
+                alias: 'value',
+              }],
+              context: execCtx,
+            } as any);
+            let value = rows?.[0]?.value;
+            if (value == null) value = (desc.fn === 'count' || desc.fn === 'sum') ? 0 : null;
+            await this.update(desc.parentObject, { id: parentId, [desc.summaryField]: value }, { context: execCtx } as any);
+          }, this.summaryRetryOptions);
         } catch (err) {
+          // Retries exhausted (or a non-transient failure). Record it so the
+          // caller can surface it — one parent's failure must not abort the
+          // remaining parents' recompute.
           this.logger.warn('Roll-up summary recompute failed', {
             childObject, parentObject: desc.parentObject, parentId, field: desc.summaryField,
             error: (err as any)?.message,
           });
+          failures.push({ childObject, parentObject: desc.parentObject, parentId, field: desc.summaryField, error: err });
         }
       }
     }
+    return failures;
   }
 
   /**
@@ -2181,6 +2200,20 @@ export class ObjectQL implements IDataEngine {
     return opCtx.result;
   }
 
+  /**
+   * Insert one record or an array of records.
+   *
+   * At-least-once hook semantics (framework#3152): when this call is driven by
+   * `bulkWrite` (seed / import), a transient batch retry or a per-row
+   * degradation re-runs the whole insert, so a `beforeInsert` hook may fire
+   * MORE THAN ONCE for the same input row (a first attempt that failed in
+   * validation, then the degraded retry). Side-effecting `beforeInsert` hooks
+   * (notifications, external calls, counters) must therefore be idempotent.
+   * `afterInsert` hooks fire only on a successful write, so they are not
+   * re-run by a validation failure. Autonumbers are assigned only after
+   * validation passes, so a doomed attempt no longer consumes a sequence value
+   * (no number-range gaps from a rejected batch).
+   */
   async insert(object: string, data: any | any[], options?: DataEngineInsertOptions): Promise<any> {
     object = this.resolveObjectName(object);
     this.logger.debug('Insert operation starting', { object, isBatch: Array.isArray(data) });
@@ -2253,15 +2286,23 @@ export class ObjectQL implements IDataEngine {
         // have overridden fields or replaced `input.data` — take its data as-is.
         const rows = rowHookContexts.map((rowCtx) => rowCtx.input.data as Record<string, unknown>);
         for (const r of rows) {
-          await this.applyAutonumbers(object, r, opCtx.context, driverOwnsAutonumber);
-        }
-        for (const r of rows) {
           await this.encryptSecretFields(object, r, opCtx.context, driverOptions);
         }
         for (const r of rows) {
           normalizeMultiValueFields(schemaForValidation, r);
           validateRecord(schemaForValidation, r, 'insert');
           evaluateValidationRules(schemaForValidation as any, r, 'insert', { logger: this.logger, currentUser: this.buildEvalUser(opCtx.context) });
+        }
+        // Autonumbers are assigned AFTER validation (framework#3152): in the
+        // batch path a bulkWrite retry / per-row degradation re-runs the whole
+        // engine.insert, and a batch that dies in validation would otherwise
+        // have already consumed a sequence value for every good row on the
+        // failed attempt, leaving gaps. Required-validation exempts autonumber
+        // fields either way (they are engine-assigned), and a driver that owns
+        // autonumber assigns nothing here — so no validation rule can depend on
+        // the value, making this reorder safe.
+        for (const r of rows) {
+          await this.applyAutonumbers(object, r, opCtx.context, driverOwnsAutonumber);
         }
         if (isBatch) {
           if (driver.bulkCreate) {
@@ -2272,6 +2313,25 @@ export class ObjectQL implements IDataEngine {
           }
         } else {
           result = await driver.create(object, rows[0], driverOptions);
+        }
+
+        // Driver-result contract guard (framework#3151): a batch write must
+        // return one record per input row. A short / non-array return would
+        // otherwise be padded with `undefined` below and fed to afterInsert
+        // hooks (`ctx.result === undefined`) and back to the caller as phantom
+        // records — corrupting seed externalId→id maps and import undo logs.
+        // Refuse it: throw so the caller sees a real failure rather than
+        // silent data loss. (Every driver in this repo already returns
+        // one-per-row in order; this defends against third-party drivers.)
+        if (isBatch && (!Array.isArray(result) || result.length !== rows.length)) {
+          throw Object.assign(
+            new Error(
+              `bulkCreate for '${object}' returned ${
+                Array.isArray(result) ? `${result.length} record(s)` : String(typeof result)
+              } for ${rows.length} input row(s) — refusing to fabricate afterInsert contexts`,
+            ),
+            { code: 'ERR_BULK_RESULT_MISMATCH' },
+          );
         }
 
         // Coerce `boolean` fields (SQLite/libsql return 0/1) to real booleans on
@@ -2287,7 +2347,7 @@ export class ObjectQL implements IDataEngine {
         }
 
         // Roll-up: recompute parent summary fields that aggregate this object.
-        await this.recomputeSummaries(object, result, null, opCtx.context);
+        const summaryFailures = await this.recomputeSummaries(object, result, null, opCtx.context);
 
         // Publish data.record.created event to realtime service
         if (this.realtimeService) {
@@ -2327,7 +2387,13 @@ export class ObjectQL implements IDataEngine {
 
         // Return the (possibly hook-mutated) after-view: the array of per-row
         // results for batch, the single record otherwise.
-        return isBatch ? rowHookContexts.map((rowCtx) => rowCtx.result) : rowHookContexts[0].result;
+        const written = isBatch ? rowHookContexts.map((rowCtx) => rowCtx.result) : rowHookContexts[0].result;
+        // Records ARE written; a summary that could not be recomputed after
+        // retries must not be silent (framework#3147). Thrown after realtime
+        // publish, carrying the written records so a bulk caller (seed/import)
+        // can treat it as a warning rather than re-writing.
+        if (summaryFailures.length > 0) throw new SummaryRecomputeError(summaryFailures, written);
+        return written;
       } catch (e) {
         this.logger.error('Insert operation failed', e as Error, { object });
         throw e;
@@ -2529,7 +2595,7 @@ export class ObjectQL implements IDataEngine {
 
            // Roll-up: recompute parent summaries; pass priorRecord too so a child
            // that moved to a different parent updates BOTH old and new parent.
-           await this.recomputeSummaries(object, result, priorRecord, opCtx.context);
+           const summaryFailures = await this.recomputeSummaries(object, result, priorRecord, opCtx.context);
 
            // Publish data.record.updated event to realtime service
            if (this.realtimeService) {
@@ -2553,6 +2619,9 @@ export class ObjectQL implements IDataEngine {
              }
            }
 
+           // The record IS updated; a summary that could not recompute after
+           // retries must surface, not stay silent (framework#3147).
+           if (summaryFailures.length > 0) throw new SummaryRecomputeError(summaryFailures, hookContext.result);
            return hookContext.result;
        } catch (e) {
           this.logger.error('Update operation failed', e as Error, { object });
@@ -2763,7 +2832,9 @@ export class ObjectQL implements IDataEngine {
           await this.triggerHooks('afterDelete', hookContext);
 
           // Roll-up: recompute the parent summary now that the child is gone.
-          if (summaryPrev) await this.recomputeSummaries(object, null, summaryPrev, opCtx.context);
+          const summaryFailures = summaryPrev
+            ? await this.recomputeSummaries(object, null, summaryPrev, opCtx.context)
+            : [];
 
           // Publish data.record.deleted event to realtime service
           if (this.realtimeService) {
@@ -2785,6 +2856,9 @@ export class ObjectQL implements IDataEngine {
             }
           }
 
+          // The record IS deleted; a summary that could not recompute after
+          // retries must surface, not stay silent (framework#3147).
+          if (summaryFailures.length > 0) throw new SummaryRecomputeError(summaryFailures, hookContext.result);
           return hookContext.result;
       } catch (e) {
           this.logger.error('Delete operation failed', e as Error, { object });

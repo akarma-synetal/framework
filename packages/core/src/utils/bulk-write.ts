@@ -26,6 +26,17 @@
  *    can reassemble output in input order even though rows are processed in
  *    batches (and a batch's flush may be interleaved with other, immediate,
  *    per-row work such as updates).
+ *
+ * Delivery semantics: **at-least-once**. Transient retry and per-row
+ * degradation both RE-RUN a write whose outcome was unknown — e.g. a turso
+ * `fetch failed` that arrived *after* the row was already committed
+ * (framework#3149), or a result-count mismatch that voids the batch
+ * (framework#3151). A caller that needs exactly-once must make its
+ * `writeBatch`/`writeOne` idempotent; both receive an `attempt` counter for
+ * exactly this — see the natural-key recheck the seed loader and import
+ * runner perform on `attempt > 1`. `writeBatch` MUST also resolve exactly one
+ * record per input row, in input order: a short / long / non-array return is
+ * rejected as a failed batch (framework#3151), never silently backfilled.
  */
 
 export interface BulkWriteRowResult<TRecord = any> {
@@ -56,10 +67,18 @@ export interface BulkWriteOptions<TRow, TRecord = any> extends RetryOptions {
    * `batch[i]` positionally (this is how every `bulkCreate` implementation in
    * this repo already behaves: sql's single `INSERT ... VALUES (...), (...)
    * RETURNING *`, memory's `Promise.all`, mongodb's ordered `insertMany`).
+   *
+   * `ctx.attempt` is the 1-based attempt number. `attempt > 1` means a prior
+   * attempt's outcome is UNKNOWN (a transient blip that may have landed after
+   * commit) — an exactly-once caller should recheck by natural key and skip
+   * rows already present before re-writing (framework#3149).
    */
-  writeBatch: (batch: TRow[]) => Promise<TRecord[]>;
-  /** Write a single row — used only to degrade a failed batch. */
-  writeOne: (row: TRow) => Promise<TRecord>;
+  writeBatch: (batch: TRow[], ctx: { attempt: number }) => Promise<TRecord[]>;
+  /**
+   * Write a single row — used only to degrade a failed batch. `ctx.attempt`
+   * carries the same recheck signal as {@link writeBatch}.
+   */
+  writeOne: (row: TRow, ctx: { attempt: number }) => Promise<TRecord>;
 }
 
 const DEFAULT_BATCH_SIZE = 200;
@@ -86,11 +105,33 @@ const TRANSIENT_PATTERNS: RegExp[] = [
 
 const TRANSIENT_CODES = /^(ECONNRESET|ECONNREFUSED|ECONNABORTED|EPIPE|EAI_AGAIN|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|ENOTFOUND)$/i;
 
+/**
+ * Validation / constraint / schema signatures that are DEFINITIVELY logical,
+ * never worth retrying. Checked before {@link TRANSIENT_PATTERNS} so a message
+ * that happens to mention both (e.g. `CHECK constraint failed: network_zone`,
+ * `column network_id is not allowed`) is classified as logical rather than
+ * burning retries on a row that will fail identically every time (framework
+ * #3150).
+ */
+const NON_TRANSIENT_PATTERNS: RegExp[] = [
+  /validation/i,
+  /constraint/i,
+  /\brequired\b/i,
+  /\bunique\b/i,
+  /duplicate/i,
+  /not[\s_-]*null/i,
+  /invalid/i,
+  /not allowed/i,
+  /out of range/i,
+];
+
 export function defaultIsTransientError(err: unknown): boolean {
-  const code = (err as { code?: unknown } | null)?.code;
-  if (typeof code === 'string' && TRANSIENT_CODES.test(code)) return true;
   const message = (err as { message?: unknown } | null)?.message;
   const text = typeof message === 'string' ? message : String(err ?? '');
+  // A definitive logical signature wins even if a transient word also appears.
+  if (NON_TRANSIENT_PATTERNS.some((re) => re.test(text))) return false;
+  const code = (err as { code?: unknown } | null)?.code;
+  if (typeof code === 'string' && TRANSIENT_CODES.test(code)) return true;
   return TRANSIENT_PATTERNS.some((re) => re.test(text));
 }
 
@@ -103,11 +144,11 @@ interface ResolvedRetryOptions {
   sleep: (ms: number) => Promise<void>;
 }
 
-async function withRetry<T>(fn: () => Promise<T>, opts: ResolvedRetryOptions): Promise<T> {
+async function withRetry<T>(fn: (attempt: number) => Promise<T>, opts: ResolvedRetryOptions): Promise<T> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= opts.maxRetries; attempt++) {
     try {
-      return await fn();
+      return await fn(attempt);
     } catch (err) {
       lastError = err;
       if (attempt >= opts.maxRetries || !opts.isTransientError(err)) throw err;
@@ -126,7 +167,7 @@ async function withRetry<T>(fn: () => Promise<T>, opts: ResolvedRetryOptions): P
  * transient-error backoff {@link bulkWrite} applies to batches — so a
  * network blip doesn't drop an update the way it used to drop an insert.
  */
-export async function withTransientRetry<T>(fn: () => Promise<T>, opts: RetryOptions = {}): Promise<T> {
+export async function withTransientRetry<T>(fn: (attempt: number) => Promise<T>, opts: RetryOptions = {}): Promise<T> {
   return withRetry(fn, {
     maxRetries: Math.max(1, opts.maxRetries ?? DEFAULT_MAX_RETRIES),
     backoffBaseMs: opts.backoffBaseMs ?? DEFAULT_BACKOFF_BASE_MS,
@@ -161,7 +202,26 @@ export async function bulkWrite<TRow, TRecord = any>(
   for (let start = 0; start < rows.length; start += batchSize) {
     const batch = rows.slice(start, start + batchSize);
     try {
-      const records = await withRetry(() => opts.writeBatch(batch), retryOpts);
+      const records = await withRetry((attempt) => opts.writeBatch(batch, { attempt }), retryOpts);
+      // Contract guard (framework#3151): `writeBatch` must resolve one record
+      // per input row. A short / long / non-array return breaks the positional
+      // correlation below, so backfilling it would report phantom successes
+      // (`record: undefined`) or drop records. Treat the whole batch as failed
+      // and fall through to per-row degradation (each row re-attempted via
+      // `writeOne`, which under an idempotent caller rechecks before writing).
+      // The message deliberately avoids any transient signature so this never
+      // reads as a retryable blip — and it is thrown *outside* `withRetry`, so
+      // the batch is not retried on it.
+      if (!Array.isArray(records) || records.length !== batch.length) {
+        throw Object.assign(
+          new Error(
+            `bulkWrite: writeBatch returned ${
+              Array.isArray(records) ? `${records.length} record(s)` : String(typeof records)
+            } for a ${batch.length}-row batch — treating batch as failed`,
+          ),
+          { code: 'ERR_BULK_RESULT_MISMATCH' },
+        );
+      }
       for (let i = 0; i < batch.length; i++) {
         results[start + i] = { index: start + i, ok: true, record: records[i] };
       }
@@ -181,7 +241,7 @@ export async function bulkWrite<TRow, TRecord = any>(
       for (let i = 0; i < batch.length; i++) {
         const idx = start + i;
         try {
-          const record = await withRetry(() => opts.writeOne(batch[i]), retryOpts);
+          const record = await withRetry((attempt) => opts.writeOne(batch[i], { attempt }), retryOpts);
           results[idx] = { index: idx, ok: true, record };
         } catch (err) {
           results[idx] = { index: idx, ok: false, error: err };

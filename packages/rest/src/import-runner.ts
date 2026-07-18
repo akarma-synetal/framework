@@ -2,7 +2,7 @@
 
 import { coerceRow, firstMissingRequiredField, type RefResolver, type RefMatch } from './import-coerce.js';
 import type { ExportFieldMeta } from './export-format.js';
-import { bulkWrite, withTransientRetry, type BulkWriteRowResult } from '@objectstack/core';
+import { bulkWrite, withTransientRetry, defaultIsTransientError, type BulkWriteRowResult } from '@objectstack/core';
 
 /**
  * import-runner — the shared row-processing core for bulk import.
@@ -199,20 +199,38 @@ export function runImport(opts: RunImportOptions): Promise<ImportRunSummary> {
       ...(meta.displayField ? [meta.displayField] : []),
       'name', 'title', 'label', 'full_name', 'email', 'username',
     ])];
-    let match: RefMatch = {};
-    for (const f of candidates) {
-      try {
-        const r = await p.findData({
-          ...findArgsBase({ $filter: { [f]: display }, $top: 2 }),
-          object: referenceObject,
-        });
-        const recs = findRows(r);
-        if (recs.length === 0) continue;
-        if (recs.length > 1) { match = { ambiguous: true, matchedField: f }; break; }
-        if (recs[0]?.id != null) { match = { id: String(recs[0].id), matchedField: f }; break; }
-      } catch { /* field absent on target object — try the next candidate */ }
+    const lookup = async (): Promise<RefMatch> => {
+      let match: RefMatch = {};
+      for (const f of candidates) {
+        try {
+          const r = await p.findData({
+            ...findArgsBase({ $filter: { [f]: display }, $top: 2 }),
+            object: referenceObject,
+          });
+          const recs = findRows(r);
+          if (recs.length === 0) continue;
+          if (recs.length > 1) { match = { ambiguous: true, matchedField: f }; break; }
+          if (recs[0]?.id != null) { match = { id: String(recs[0].id), matchedField: f }; break; }
+        } catch { /* field absent on target object — try the next candidate */ }
+      }
+      return match;
+    };
+    let match = await lookup();
+    // A miss may just mean the referenced row is still buffered as a pending
+    // create — the same-file "later row references an earlier CREATE" case that
+    // the batched-create rework regressed. Flush the buffer and retry the
+    // lookup once: the buffered rows are all EARLIER than this one (resolveRef
+    // runs mid row-loop), so the flush is safe and, once drained, a no-op.
+    // Only a reference to THIS object can be satisfied from the buffer, so we
+    // don't flush for a miss on some other object (framework#3148).
+    if (!match.id && !match.ambiguous && referenceObject === objectName && pendingCreates.length > 0) {
+      await flushPendingCreates();
+      match = await lookup();
     }
-    refCache.set(cacheKey, match);
+    // Cache only a definitive verdict. A bare miss ({}) is deliberately NOT
+    // cached: the referenced row may be created by a later flush, and a
+    // negative-cache entry would pin the miss forever (the pre-fix regression).
+    if (match.id != null || match.ambiguous) refCache.set(cacheKey, match);
     return match;
   };
 
@@ -255,8 +273,37 @@ export function runImport(opts: RunImportOptions): Promise<ImportRunSummary> {
   // creates fall back to the original inline per-row `createData` call.
   const canBulkCreate = typeof p.createManyData === 'function';
   const pendingCreates: Array<{ index: number; rowNo: number; data: Record<string, any> }> = [];
+  // bulkWrite is at-least-once: a retry (or a mismatch-driven degradation) may
+  // re-run a create whose prior attempt already committed. When the import has
+  // natural keys (matchFields), recheck before re-creating so a retry can't
+  // duplicate a row (framework#3149). A pure-insert import (no matchFields) has
+  // no natural key to recheck against and stays at-least-once by contract.
+  let lastBatchUncertain = false;
+  // Set when a flush's write succeeded but its post-write roll-up summary
+  // recompute exhausted retries (framework#3147). The rows ARE written; we mark
+  // them created-with-a-warning code rather than failing (or re-writing) them.
+  let flushSummaryStale = false;
+  const isUncertainOutcome = (e: unknown) =>
+    defaultIsTransientError(e) || (e as { code?: unknown } | null)?.code === 'ERR_BULK_RESULT_MISMATCH';
+  // A post-write summary recompute failure (ERR_SUMMARY_RECOMPUTE) means the
+  // records were written; recover the written records from the error rather
+  // than letting the write look failed (which would re-create → duplicate).
+  const recoverSummaryStale = (e: unknown): unknown[] | null => {
+    const err = e as { code?: unknown; written?: unknown } | null;
+    if (err?.code === 'ERR_SUMMARY_RECOMPUTE') {
+      flushSummaryStale = true;
+      return Array.isArray(err.written) ? err.written : (err.written != null ? [err.written] : []);
+    }
+    return null;
+  };
+  const existingByMatch = async (data: Record<string, any>): Promise<Record<string, any> | null> => {
+    if (matchFields.length === 0) return null;
+    const found = await findExisting(data);
+    return found && typeof found === 'object' ? found : null; // ignore 'blank'/'none'/'ambiguous'
+  };
   const flushPendingCreates = async (): Promise<void> => {
     if (pendingCreates.length === 0) return;
+    flushSummaryStale = false;
     const batch = pendingCreates.splice(0, pendingCreates.length);
     const writeResults: BulkWriteRowResult[] = await bulkWrite(
       batch.map(b => b.data),
@@ -266,14 +313,70 @@ export function runImport(opts: RunImportOptions): Promise<ImportRunSummary> {
         // the issue's suggested 100-500 rows/batch must not translate into
         // one oversized multi-row INSERT statement.
         batchSize: Math.min(progressEvery, MAX_CREATE_BATCH_SIZE),
-        writeBatch: (chunk) => p.createManyData!({
-          object: objectName, records: chunk, context: writeCtx,
-          ...(environmentId ? { environmentId } : {}),
-        }).then(r => r.records),
-        writeOne: (row) => p.createData({
-          object: objectName, data: row, context: writeCtx,
-          ...(environmentId ? { environmentId } : {}),
-        }),
+        writeBatch: async (chunk, { attempt }) => {
+          let toCreate = chunk;
+          const existingByIdx = new Map<number, Record<string, any>>();
+          if (attempt > 1 && matchFields.length > 0) {
+            // A prior attempt may have committed before its response was lost:
+            // recheck each row by matchFields and only create the ones missing.
+            toCreate = [];
+            for (let i = 0; i < chunk.length; i++) {
+              const hit = await existingByMatch(chunk[i]);
+              if (hit) existingByIdx.set(i, hit); else toCreate.push(chunk[i]);
+            }
+          }
+          try {
+            let createdRecords: any[];
+            if (toCreate.length === 0) {
+              createdRecords = [];
+            } else {
+              try {
+                createdRecords = (await p.createManyData!({
+                  object: objectName, records: toCreate, context: writeCtx,
+                  ...(environmentId ? { environmentId } : {}),
+                })).records;
+              } catch (e) {
+                // Records written but summary recompute failed: recover them.
+                const recovered = recoverSummaryStale(e);
+                if (!recovered) throw e;
+                createdRecords = recovered;
+              }
+            }
+            // Surface a short/non-array createManyData return as a failed batch
+            // (framework#3151) rather than padding the reassembly with undefined
+            // — this drops into per-row degradation, which rechecks first.
+            if (!Array.isArray(createdRecords) || createdRecords.length !== toCreate.length) {
+              throw Object.assign(
+                new Error(`createManyData returned ${Array.isArray(createdRecords) ? `${createdRecords.length} record(s)` : String(typeof createdRecords)} for ${toCreate.length} row(s)`),
+                { code: 'ERR_BULK_RESULT_MISMATCH' },
+              );
+            }
+            lastBatchUncertain = false;
+            // Reassemble one record per input row: rechecked-existing rows use
+            // the found record, the rest are consumed in order from created.
+            let k = 0;
+            return chunk.map((_row, i) => existingByIdx.has(i) ? existingByIdx.get(i)! : createdRecords[k++]);
+          } catch (e) {
+            lastBatchUncertain = isUncertainOutcome(e);
+            throw e;
+          }
+        },
+        writeOne: async (row, { attempt }) => {
+          if ((attempt > 1 || lastBatchUncertain) && matchFields.length > 0) {
+            const hit = await existingByMatch(row);
+            if (hit) return hit; // already committed by a prior attempt
+          }
+          try {
+            return await p.createData({
+              object: objectName, data: row, context: writeCtx,
+              ...(environmentId ? { environmentId } : {}),
+            });
+          } catch (e) {
+            const recovered = recoverSummaryStale(e);
+            if (recovered) return recovered[0]; // record written; summary stale
+            throw e;
+          }
+        },
       },
     );
     for (const res of writeResults) {
@@ -282,7 +385,8 @@ export function runImport(opts: RunImportOptions): Promise<ImportRunSummary> {
         const id = extractRecordId(res.record);
         okCount++; created++;
         if (collectUndo && id != null) undoLog.created.push(id);
-        results[index] = { row: rowNo, ok: true, action: 'created', id };
+        results[index] = { row: rowNo, ok: true, action: 'created', id,
+          ...(flushSummaryStale ? { code: 'SUMMARY_RECOMPUTE_FAILED' } : {}) };
       } else {
         errCount++;
         results[index] = toFailedResult(rowNo, res.error);
@@ -349,19 +453,34 @@ export function runImport(opts: RunImportOptions): Promise<ImportRunSummary> {
               else { created++; results[i] = { row: rowNo, ok: true, action: 'created' }; }
             } else if (willUpdate) {
               const target = existing as Record<string, any>;
-              const res2 = await withTransientRetry(() => p.updateData({ object: objectName, id: target.id, data, context: writeCtx, ...(environmentId ? { environmentId } : {}) }));
+              let res2: unknown;
+              let updateSummaryStale = false;
+              try {
+                res2 = await withTransientRetry(() => p.updateData({ object: objectName, id: target.id, data, context: writeCtx, ...(environmentId ? { environmentId } : {}) }));
+              } catch (e) {
+                // Record updated but summary recompute failed (framework#3147):
+                // the update landed, so recover rather than fail the row.
+                const recovered = recoverSummaryStale(e);
+                if (!recovered) throw e;
+                res2 = recovered[0]; updateSummaryStale = true;
+              }
               const id = extractRecordId(res2) ?? String(target.id);
               okCount++; updated++;
               if (collectUndo && target.id != null) {
                 undoLog.updated.push({ id: String(target.id), before: captureBefore(target, data) });
               }
-              results[i] = { row: rowNo, ok: true, action: 'updated', id };
+              results[i] = { row: rowNo, ok: true, action: 'updated', id,
+                ...(updateSummaryStale ? { code: 'SUMMARY_RECOMPUTE_FAILED' } : {}) };
             } else if (canBulkCreate) {
               // Buffer — the actual write happens in a batched flush below.
               pendingCreates.push({ index: i, rowNo, data });
             } else {
               // No bulk-create primitive on this protocol: original inline path.
-              const res2 = await p.createData({ object: objectName, data, context: writeCtx, ...(environmentId ? { environmentId } : {}) });
+              // Wrap in transient retry to match the update path above (L352)
+              // and the batched create path (bulkWrite's internal retry) — a
+              // single `fetch failed` blip must not silently drop the row
+              // (framework#3150).
+              const res2 = await withTransientRetry(() => p.createData({ object: objectName, data, context: writeCtx, ...(environmentId ? { environmentId } : {}) }));
               const id = extractRecordId(res2);
               okCount++; created++;
               if (collectUndo && id != null) undoLog.created.push(id);
