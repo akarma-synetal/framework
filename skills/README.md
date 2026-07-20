@@ -29,12 +29,12 @@ apps too).
 
 | Skill | Domain | What it covers |
 |:------|:-------|:---------------|
-| [Platform](./objectstack-platform/SKILL.md) | `platform` | Bootstrap, configure, extend, and operate ObjectStack runtimes. Covers project setup (`defineStack`, drivers, adapters, scaffolding), plugin and service development (PluginContext, DI, kernel hooks like `kernel:ready` and `data:*`), and operations (CLI commands, migrations, deployment, test harnesses via LiteKernel). |
+| [Platform](./objectstack-platform/SKILL.md) | `platform` | Bootstrap, configure, extend, and operate ObjectStack runtimes. Covers project setup (`defineStack`, drivers, adapters, scaffolding), plugin and service development (PluginContext, DI, kernel hooks like `kernel:ready`), and operations (CLI commands, migrations, deployment, test harnesses via LiteKernel). |
 | [Data](./objectstack-data/SKILL.md) | `data` | Design ObjectStack data schemas — objects, fields, field conditional rules, relationships, validations, indexes, lifecycle hooks, permissions, row-level security — and the seeds (`defineSeed()`) that load fixtures and reference data alongside them. |
-| [Query](./objectstack-query/SKILL.md) | `query` | Construct ObjectQL queries — filters, sorting, pagination, aggregation, joins/expansion, window functions, and full-text search. |
+| [Query](./objectstack-query/SKILL.md) | `query` | Construct ObjectQL queries — filters, sorting, pagination, aggregation, relation expansion, and full-text search. |
 | [UI](./objectstack-ui/SKILL.md) | `ui` | Author ObjectStack UI metadata — Views (list/form/kanban/calendar/gantt), Apps (navigation), Pages (structured plus the HTML and React source-authoring tiers, ADR-0080/0081), Dashboards, Reports, Charts, Actions, and package Docs (`src/docs/*.md`). |
-| [Automation](./objectstack-automation/SKILL.md) | `automation` | Design ObjectStack automation — Flows (visual logic), Workflows (declarative rules), Triggers, Approvals, scheduled jobs, and webhooks. |
-| [AI](./objectstack-ai/SKILL.md) | `ai` | Design ObjectStack AI agents, tools, skills, conversations, model registry entries, and MCP integrations. |
+| [Automation](./objectstack-automation/SKILL.md) | `automation` | Design ObjectStack automation — Flows (visual logic), Triggers, Approvals, state machines, scheduled jobs, and webhooks. |
+| [AI](./objectstack-ai/SKILL.md) | `ai` | Design ObjectStack AI skills, tools, knowledge sources, conversations, model registry entries, and MCP integrations. |
 | [API](./objectstack-api/SKILL.md) | `api` | Design the server-side API surface that an ObjectStack runtime exposes — REST/GraphQL endpoints, auth providers, realtime channels, error envelopes, batch/versioning contracts. |
 | [i18n](./objectstack-i18n/SKILL.md) | `i18n` | Author ObjectStack translation bundles — object/field labels, view text, app navigation strings, automation messages — and configure locale fallback, coverage reporting, and the per-locale source layout. |
 | [Formula](./objectstack-formula/SKILL.md) | `expression` | Author CEL expressions used across ObjectStack — formula fields, field conditional rules (`visibleWhen`, `readonlyWhen`, `requiredWhen`), validation / sharing / visibility predicates, flow conditions, and dynamic seed values. |
