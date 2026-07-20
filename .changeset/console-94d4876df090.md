@@ -1,5 +1,5 @@
 ---
-"@objectstack/console": major
+"@objectstack/console": minor
 ---
 
 Console (objectui) refreshed to `94d4876df090`. Frontend changes in this range:
