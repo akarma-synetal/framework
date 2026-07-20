@@ -23,12 +23,13 @@ revision window, and a **declared back-edge** closing the loop:
 ```typescript
 {
   name: 'budget_approval',
+  label: 'Budget Approval',        // `label` is REQUIRED on the flow and every node
   type: 'autolaunched',
   nodes: [
-    { id: 'start', type: 'start',
+    { id: 'start', type: 'start', label: 'On Budget Increase',
       config: { objectName: 'project', triggerType: 'record-after-update',
                 condition: 'budget > 100000 && budget != previous.budget' } },
-    { id: 'manager_review', type: 'approval',
+    { id: 'manager_review', type: 'approval', label: 'Manager Review',
       config: { approvers: [{ type: 'position', value: 'manager' }], lockRecord: true,
                 maxRevisions: 2 } },                         // send-back budget
     { id: 'wait_revision', type: 'wait', label: 'Awaiting Revision',
@@ -47,12 +48,14 @@ revision window, and a **declared back-edge** closing the loop:
 }
 ```
 
-Mirrors `examples/app-showcase` -> `showcase_budget_approval`.
+Mirrors the canonical `showcase_budget_approval` flow in the showcase app in
+the framework repo.
 
 ## Common Mistakes
 
 | Mistake | Why it is wrong | Caught by |
 |---|---|---|
+| Missing `label` on the flow or on a node | `label` is required by `FlowSchema` — `FlowSchema.parse` / `registerFlow` rejects the definition before any graph validation runs | `registerFlow` (schema parse) |
 | Resubmit edge **without** `type: 'back'` | `registerFlow` validates the graph-minus-back-edges as a DAG, so it rejects the cycle as un-declared | `registerFlow`; lint `flow-approval-revise-unmarked-backedge` |
 | `revise` edge to a wait node that **never loops back** | A valid DAG (registerFlow accepts it), but the submitter has nowhere to resubmit — the branch dead-ends | lint `flow-approval-revise-dead-end` |
 | `maxRevisions: 0` together with a `revise` edge | Send-back is disabled, so every revise auto-rejects and the branch never runs | lint `flow-approval-revise-disabled` |

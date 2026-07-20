@@ -1,18 +1,18 @@
 ---
 name: objectstack-automation
 description: >
-  Design ObjectStack automation — Flows (visual logic), Workflows
-  (declarative rules), Triggers, Approvals, scheduled jobs, and webhooks.
-  Use when the user is adding `*.flow.ts` / `*.workflow.ts`, wiring an
+  Design ObjectStack automation — Flows (visual logic), Triggers,
+  Approvals, state machines, scheduled jobs, and webhooks.
+  Use when the user is adding `*.flow.ts`, wiring an
   event-driven rule, or modelling an approval chain. Do not use for data
   lifecycle hooks at the object layer (see objectstack-data) or for kernel
   / plugin events (see objectstack-platform). CEL expressions in flow
-  conditions / workflow predicates: load objectstack-formula alongside.
+  conditions / edge guards: load objectstack-formula alongside.
 license: Apache-2.0
-compatibility: Requires @objectstack/spec Zod schemas (v4+)
+compatibility: Requires @objectstack/spec 16.x (Zod v4 schemas)
 metadata:
   author: objectstack-ai
-  version: "1.1"
+  version: "1.2"
   domain: automation
   tags: flow, workflow, trigger, approval, state-machine, scheduled, webhook
 ---
@@ -20,8 +20,8 @@ metadata:
 # Automation Design — ObjectStack Automation Protocol
 
 Expert instructions for designing business automation using the ObjectStack
-specification. This skill covers Flows (visual logic orchestration), Workflows
-(state machines & approvals), Triggers (event-driven automation), and ETL
+specification. This skill covers Flows (visual logic orchestration), state
+machines & approvals, Triggers (event-driven automation), and ETL
 pipelines.
 
 ---
@@ -55,13 +55,14 @@ parallel. Flows are the primary automation building block in ObjectStack.
 |:-----|:------------|
 | `autolaunched` | Runs without user interaction — triggered by events, APIs, or other flows |
 | `screen` | Interactive — presents UI screens to the user (wizards, forms) |
-| `schedule` | Runs on a cron schedule (daily cleanup, weekly reports) — or a **per-record date sweep** via `config.timeRelative`, see *Time-relative triggers* |
+| `schedule` | Runs on a cron/interval cadence declared on the **start node's `config.schedule`** (daily cleanup, weekly reports) — or a **per-record date sweep** via `config.timeRelative`, see *Time-relative triggers* |
 | `record_change` | Fires automatically on record create/update/delete (bind via the `start` node's `triggerType`) |
 | `api` | Invoked explicitly via the API / `engine.execute()`, **or** bound as an inbound **webhook**: `POST /api/v1/automation/hooks/:flowName/:hookId` (see *Inbound webhook triggers* below) |
 
 ### Flow Node Types
 
-Flows are built from **19 node types**:
+Flows are built from **20 built-in node types** (the `FlowNodeAction` seed set —
+plugins register more via `registerNodeExecutor`, e.g. `approval` below):
 
 #### Control Flow
 
@@ -69,11 +70,12 @@ Flows are built from **19 node types**:
 |:-----|:--------|
 | `start` | Entry point — every flow has exactly one |
 | `end` | Exit point — can have multiple (early exit, error exit) |
-| `decision` | Conditional branching (if/else/switch) |
-| `loop` | Iterate over a collection |
+| `decision` | Conditional branching — routed by **edge `condition` predicates**, not node config (see the approval example below) |
+| `loop` | Iterate a bounded body region over a collection |
+| `map` | Sequential multi-instance — invoke a subflow once per item of a collection; each iteration may pause (batch approvals) |
 | `parallel_gateway` | Fork execution into parallel branches |
 | `join_gateway` | Synchronise parallel branches back together |
-| `wait` | Pause execution until a condition or time elapses |
+| `wait` | Pause execution until a timer elapses or a named signal arrives |
 | `boundary_event` | Attach to another node — fires on timeout or error |
 | `subflow` | Invoke another flow (reusable composition) |
 
@@ -85,15 +87,16 @@ Flows are built from **19 node types**:
 | `create_record` | Insert a new record |
 | `update_record` | Modify existing records |
 | `delete_record` | Remove records |
-| `query_record` | Fetch records with filters |
+| `get_record` | Fetch records with filters — there is **no `query_record`** node (that name has no executor and throws) |
 
 #### External Integration
 
 | Node | Purpose |
 |:-----|:--------|
-| `http_request` | Call an external HTTP API |
+| `http` | Call an external HTTP API — canonical since protocol 11.0; `http_request` survives only as a deprecation-window alias |
+| `notify` | Send a notification through the messaging service (inbox channel by default) |
 | `connector_action` | Invoke a pre-built integration connector |
-| `script` | Execute custom JavaScript/TypeScript logic |
+| `script` | Dispatch to a **registered** callable — `config.actionType` (`email`/`slack`) or a registered `config.function`. Inline `config.script` JS is **not** executed (see pitfall 9) |
 | `screen` | Display a UI form to the user (screen flows only) |
 
 #### Human Decision
@@ -104,63 +107,82 @@ Flows are built from **19 node types**:
 
 ### Flow Variables
 
-Every flow defines input/output variables:
+Every flow defines input/output variables. `variables` is an **array** of
+`{ name, type, isInput, isOutput }` entries — not a name-keyed map, and there
+is no `label` property on a variable:
 
 ```typescript
-variables: {
-  case_id: {
+variables: [
+  {
+    name: 'case_id',
     type: 'text',
-    label: 'Case ID',
     isInput: true,    // passed in when flow is invoked
     isOutput: false,
   },
-  approval_result: {
+  {
+    name: 'approval_result',
     type: 'boolean',
-    label: 'Approved?',
     isInput: false,
     isOutput: true,   // returned when flow completes
   },
-}
+],
 ```
 
 ### Flow Example — Auto-Escalate Overdue Cases
 
 > **Nodes connect via `edges`, not a `next` property.** The engine traverses
 > `flow.edges` (`{ source, target }`); a bare `next:` on a node is ignored.
-> `update_record` selects rows with **`filter`** and writes with **`fields`**
+> `update_record` selects rows with **`filter`** — an ObjectQL `where` **map**
+> of `field → value` / `field → { $operator: value }`, NOT the UI view-filter
+> `[{ field, operator, value }]` triples — and writes with **`fields`**
 > (a single call updates *every* matching row — no per-row loop needed).
+> `label` is **required** on the flow and on every node.
 
 ```typescript
 {
   name: 'escalate_overdue_cases',
+  label: 'Escalate Overdue Cases',
   type: 'schedule',
-  schedule: cron`0 9 * * *`,    // daily at 09:00
+  runAs: 'system',   // a scheduled run has no trigger user — elevate explicitly
   nodes: [
-    { id: 'start', type: 'start' },
+    {
+      id: 'start',
+      type: 'start',
+      label: 'Daily at 09:00',
+      // The cadence lives HERE, on the start node's config — FlowSchema has NO
+      // top-level `schedule` key (one there is silently stripped and the flow
+      // never binds). A bare cron string also works: schedule: '0 9 * * *'.
+      // Do NOT use the cron`…` tagged template — its envelope is not a
+      // recognized schedule shape.
+      config: { schedule: { type: 'cron', expression: '0 9 * * *' } },
+    },
     {
       id: 'escalate_overdue',
       type: 'update_record',
+      label: 'Escalate Overdue Cases',
       config: {
-        object: 'support_case',
-        // which rows to update — `filter`, not `recordId`
-        filter: [
-          { field: 'status', operator: 'in', value: ['new', 'open'] },
-          { field: 'due_date', operator: 'less_than', value: cel`today()` },
-        ],
+        objectName: 'support_case',
+        // which rows to update — `filter` is a `where` map, not filter triples
+        filter: {
+          status: { $in: ['new', 'open'] },
+          due_date: { $lt: '{TODAY()}' },   // template token → today's date at run time
+        },
         // what to write — `fields`, not `values`
         fields: { status: 'escalated' },
       },
     },
     {
       id: 'notify_manager',
-      type: 'http_request',
+      type: 'http',
+      label: 'Notify Manager',
       config: {
         url: 'https://hooks.slack.com/services/...',
         method: 'POST',
         body: { text: 'Escalated overdue support cases.' },
+        timeoutMs: 10000,   // unset = NO timeout at all — always set one
       },
     },
-    { id: 'end', type: 'end' },
+    { id: 'end', type: 'end', label: 'End' },
   ],
   edges: [
     { id: 'e1', source: 'start',            target: 'escalate_overdue' },
@@ -196,6 +218,7 @@ dead-end.
   label: 'Case Lifecycle',
   field: 'status',                 // the field that holds the state
   message: 'Invalid status transition.',
+  initialStates: ['new'],          // states a record may be CREATED in (#3165)
   transitions: {
     new:       ['open'],
     open:      ['escalated', 'resolved'],
@@ -209,11 +232,15 @@ dead-end.
 Notes:
 - **One rule per field.** Parallel lifecycles (e.g. `status` + `payment_status`)
   are N separate `state_machine` rules, one per field.
+- **`initialStates`** (optional, #3165) gates INSERT: a record created with its
+  state field outside this list is rejected. `transitions` only governs
+  updates, so without it a record can be born mid-flow (e.g. created already
+  `resolved`). Omit to keep the legacy no-check-on-insert behavior.
 - **Conditional transitions / side effects are NOT part of the machine.** A
   guard is expressed as a sibling `script` / `conditional` validation rule;
   "do something when the state changes" is a **record-triggered Flow**
-  (ADR-0019) — see the migrated `high-value-deal` / `stale-opportunity` flows in
-  `examples/app-crm`.
+  (ADR-0019) — a `record_change` flow whose start-node condition gates on the
+  transition, e.g. `previous.status != 'escalated' && record.status == 'escalated'`.
 - **Introspection:** `GET /metadata/objects/:name/state/:field?from=:state`
   returns the legal next states so UIs/agents can read the transition table
   instead of hard-coding it (`next: null` when no FSM governs the field).
@@ -249,6 +276,7 @@ is one diagram a reviewer (or AI) can read end-to-end.
     {
       id: 'start',
       type: 'start',
+      label: 'On Opportunity Update',
       config: {
         objectName: 'opportunity',
         triggerType: 'record-after-update',
@@ -261,12 +289,16 @@ is one diagram a reviewer (or AI) can read end-to-end.
       label: 'Sales Manager Review',
       config: {
         approvers: [{ type: 'position', value: 'sales_manager' }],
-        behavior: 'first_response',            // or 'unanimous'
+        behavior: 'first_response',            // or 'unanimous' / 'quorum' / 'per_group'
         lockRecord: true,                      // lock the record while pending
         approvalStatusField: 'approval_status', // mirror pending|approved|rejected|recalled onto the row
       },
     },
-    { id: 'needs_director', type: 'decision', config: { condition: cel`record.amount > 500000` } },
+    // Decision routing lives on the OUT-EDGES, not in node config: the engine
+    // evaluates each out-edge's `condition` and follows every match — and an
+    // out-edge with NO condition ALWAYS runs (all such edges execute in
+    // PARALLEL). Guard every branch with a condition — see e4/e5 below.
+    { id: 'needs_director', type: 'decision', label: 'Needs Director?' },
     {
       id: 'director_signoff',
       type: 'approval',
@@ -277,10 +309,10 @@ is one diagram a reviewer (or AI) can read end-to-end.
         approvalStatusField: 'approval_status',
       },
     },
-    { id: 'mark_won', type: 'update_record',
+    { id: 'mark_won', type: 'update_record', label: 'Mark Won',
       config: { objectName: 'opportunity', filter: { id: '{record.id}' }, fields: { stage: 'closed_won' } } },
-    { id: 'approved', type: 'end' },
-    { id: 'rejected', type: 'end' },
+    { id: 'approved', type: 'end', label: 'Approved' },
+    { id: 'rejected', type: 'end', label: 'Rejected' },
   ],
   edges: [
     { id: 'e1', source: 'start',          target: 'manager_review',
@@ -288,8 +320,12 @@ is one diagram a reviewer (or AI) can read end-to-end.
       condition: cel`record.amount > 100000` },
     { id: 'e2', source: 'manager_review',  target: 'needs_director',   label: 'approve' },
     { id: 'e3', source: 'manager_review',  target: 'rejected',         label: 'reject'  },
-    { id: 'e4', source: 'needs_director',  target: 'director_signoff', label: 'true'    },
-    { id: 'e5', source: 'needs_director',  target: 'mark_won',         label: 'false'   },
+    // Decision branches: mutually-exclusive edge `condition` predicates.
+    // Without them BOTH branches would execute (unguarded edges run in parallel).
+    { id: 'e4', source: 'needs_director',  target: 'director_signoff', label: 'true',
+      condition: cel`record.amount > 500000` },
+    { id: 'e5', source: 'needs_director',  target: 'mark_won',         label: 'false',
+      condition: cel`record.amount <= 500000` },
     { id: 'e6', source: 'director_signoff', target: 'mark_won',        label: 'approve' },
     { id: 'e7', source: 'director_signoff', target: 'rejected',        label: 'reject'  },
     { id: 'e8', source: 'mark_won',         target: 'approved' },
@@ -329,9 +365,12 @@ Three pieces author it:
 
 ```typescript
 {
-  id: 'manager_review', type: 'approval',
+  id: 'manager_review', type: 'approval', label: 'Manager Review',
   config: { approvers: [{ type: 'position', value: 'manager' }], lockRecord: true, maxRevisions: 2 },
 },
+// The signal keys may also live in the spec-canonical node-level
+// `waitEventConfig` block (FlowNodeSchema); the wait executor reads
+// `waitEventConfig` first and falls back to these loose `config` keys.
 { id: 'wait_revision', type: 'wait', label: 'Awaiting Revision',
   config: { eventType: 'signal', signalName: 'budget_revision' } },
 // …among the approval's edges…
@@ -344,8 +383,8 @@ Three pieces author it:
 > submitter nowhere to resubmit), and a resubmit edge left **without**
 > `type: 'back'` (an unmarked cycle `registerFlow` rejects). Resubmit is an
 > explicit verb (`POST /api/v1/approvals/requests/:id/resubmit`), never a
-> record-save. See `examples/app-showcase` → `showcase_budget_approval` for the
-> canonical shape.
+> record-save. See the `showcase_budget_approval` flow in the showcase app in
+> the framework repo for the canonical shape.
 
 ### Re-homing the old process model
 
@@ -388,8 +427,9 @@ branch — you never resume the flow by hand.
 
 | Field | Purpose |
 |:------|:--------|
-| `approvers` | Who may act (≥ 1 — see Approver Types above) |
-| `behavior` | `first_response` (first approver decides) or `unanimous` (all must approve). Default `first_response` |
+| `approvers` | Who may act (≥ 1 — see Approver Types above). Each approver may carry an optional **`group`** label (e.g. `{ type: 'position', value: 'auditor', group: 'finance' }`) — with `behavior: 'per_group'`, approvers sharing a label form one group; unlabelled approvers each form their own |
+| `behavior` | `first_response` (first approver decides), `unanimous` (all must approve), `quorum` (`minApprovals` of N — M-of-N collective sign-off), or `per_group` (EACH approver `group` must reach `minApprovals` — one-from-each-group sign-off, 会签). In every mode a single rejection finalizes the node as `rejected`. Default `first_response` |
+| `minApprovals` | Approvals required — total for `quorum`, per group for `per_group`. Default `1`; clamped at runtime to the resolvable approver count so a misconfiguration can never deadlock |
 | `lockRecord` | Lock the triggering record from edits while pending. Default `true` |
 | `approvalStatusField` | Business-object field to mirror `pending`/`approved`/`rejected`/`recalled` onto (should be readonly) |
 | `escalation` | Optional per-node SLA — `{ enabled, timeoutHours, action: reassign\|auto_approve\|auto_reject\|notify, escalateTo?, notifySubmitter }`. `escalateTo` is a **position machine name** (expanded to its holders via `sys_user_position`, ADR-0090 D3) or a specific user id — never a membership tier. `reassign` without `escalateTo` degrades to notify (linted) |
@@ -402,7 +442,7 @@ These are wired on the **graph**, not in node config:
 - **Conditional step** — put a `decision` node before the Approval node, or a
   `condition` on the edge entering it (the old per-step `entryCriteria`).
 - **On approve / on reject** — wire downstream nodes (`update_record`,
-  `http_request`, an email node, …) to the `approve` / `reject` out-edge.
+  `http`, a `notify` node, …) to the `approve` / `reject` out-edge.
 - **Roll back on reject** — route the `reject` edge as a **back-edge** to an
   earlier node so the submitter can revise (the old `back_to_previous`).
 - **Send back for revision (ADR-0044)** — distinct from a plain reject: an
@@ -487,11 +527,13 @@ read at runtime, not Zod-validated):
 ```typescript
 {
   name: 'notify_on_escalation',
+  label: 'Notify on Escalation',
   type: 'record_change',
   nodes: [
     {
       id: 'start',
       type: 'start',
+      label: 'On Case Escalated',
       config: {
         objectName: 'support_case',
         triggerType: 'record-after-update',
@@ -525,30 +567,36 @@ day, a threshold is never missed.
 ```typescript
 {
   name: 'renewal_alert',
+  label: 'Renewal Alert',
   type: 'schedule',
   runAs: 'system',              // a sweep has no trigger user — elevate explicitly
-  nodes: [{
-    id: 'start', type: 'start',
-    config: {
-      timeRelative: {
-        object: 'contracts',
-        dateField: 'end_date',
-        offsetDays: [60, 30, 7],   // fire exactly at T-60 / T-30 / T-7
-        // — or — withinDays: 30    // "expiring within 30 days" (negative = overdue lookback)
-        filter: { status: 'active' },  // optional, ANDed with the date window
-        // maxRecords: 1000            // optional per-sweep cap (default 1000)
+  nodes: [
+    {
+      id: 'start', type: 'start', label: 'Daily Sweep',
+      config: {
+        timeRelative: {
+          object: 'contracts',
+          dateField: 'end_date',
+          offsetDays: [60, 30, 7],   // fire exactly at T-60 / T-30 / T-7
+          // — or — withinDays: 30    // "expiring within 30 days" (negative = overdue lookback)
+          filter: { status: 'active' },  // optional, ANDed with the date window
+          // maxRecords: 1000            // optional per-sweep cap (default 1000)
+        },
+        // Optional sweep cadence; omit for daily 08:00 UTC. Plain shape only:
+        // schedule: { type: 'cron', expression: '0 8 * * *' }
       },
-      // schedule: cron`0 8 * * *`     // optional sweep cadence; omit for daily 08:00 UTC
     },
-  }, /* …downstream nodes, connected via `edges` */],
+    // …downstream nodes (notify, update_record, …)
+  ],
+  edges: [ /* start → downstream */ ],
 }
 ```
 
 Exactly one of `offsetDays` (discrete T-minus days) or `withinDays` (a range;
 negative = overdue) is required. Ships in `@objectstack/trigger-schedule` —
 needs `requires: ['automation', 'triggers']` **plus `'job'`** (the sweep cadence
-runs on the job service). See the
-[Time Relative Trigger reference](/docs/references/automation/time-relative-trigger).
+runs on the job service). Full descriptor schema:
+`node_modules/@objectstack/spec/src/automation/time-relative-trigger.zod.ts`.
 
 ---
 
@@ -562,10 +610,10 @@ runs on the job service). See the
    scenarios.
 3. **Use variables for all dynamic values.** Never hard-code record IDs or
    API keys in node config.
-4. **Prefer `query_record` over multiple `http_request` calls** when the data
+4. **Prefer `get_record` over multiple `http` calls** when the data
    lives in ObjectStack.
-5. **Set `timeoutMs` on HTTP nodes.** Default is generous; tighten it for
-   critical paths.
+5. **Always set `timeoutMs` on `http` nodes.** Unset means **no timeout at
+   all** — a hung endpoint stalls the run indefinitely.
 
 ### State Machine Design (ADR-0020)
 
@@ -637,11 +685,14 @@ them right the first time:
    **window** (`$gte`/`$lt`), never an equality:
    ```ts
    filter: { status: 'active', $or: [
-     { end_date: { $gte: cel`daysFromNow(7)`,  $lt: cel`daysFromNow(8)`  } },
-     { end_date: { $gte: cel`daysFromNow(30)`, $lt: cel`daysFromNow(31)` } },
-     { end_date: { $gte: cel`daysFromNow(60)`, $lt: cel`daysFromNow(61)` } },
+     { end_date: { $gte: '{TODAY() + 7}',  $lt: '{TODAY() + 8}'  } },
+     { end_date: { $gte: '{TODAY() + 30}', $lt: '{TODAY() + 31}' } },
+     { end_date: { $gte: '{TODAY() + 60}', $lt: '{TODAY() + 61}' } },
    ] }
    ```
+   (Use `{TODAY() + N}` template tokens in CRUD-node filter values — a
+   `cel\`…\`` envelope is not evaluated there and would be compared as a
+   literal object.)
    Abutting windows tile the timeline so each record matches exactly one tier —
    fires once, idempotent, no guard field. For "days remaining" in the message,
    `daysBetween(today(), record.end_date)`.
@@ -705,11 +756,13 @@ metadata first; reserve custom code for edge-case integrations.
 
 ## Verify your work
 
-Flow/workflow predicates fail **silently at runtime** when malformed: a bare
-field ref in a `start`/`decision` condition or an edge guard (`status == 'open'`
-instead of `record.status == 'open'`) resolves to `null`/`false`, so the flow
-"fires" but does nothing — and nothing errors at edit time. Catch it at author
-time before reporting a flow done:
+Flow predicates fail **silently at runtime** when malformed: a typo'd field
+name, an unknown function, or a `{…}`-wrapped reference in a condition
+evaluates to `null`/`false`, so the flow "fires" but does nothing — and nothing
+errors at edit time. (Bare field refs like `status == 'open'` DO resolve in
+start/decision/edge conditions — the engine flattens the trigger record's
+fields into scope — but `record.status == 'open'` remains the canonical style.)
+Catch it at author time before reporting a flow done:
 
 ```bash
 os validate     # CEL/predicate validation (record.<field> existence) + schema
@@ -717,7 +770,7 @@ os validate     # CEL/predicate validation (record.<field> existence) + schema
 ```
 
 This runs the ADR-0032 expression gate over every flow condition, edge guard,
-workflow predicate, validation rule and sharing rule, exiting non-zero with a
+validation rule and sharing rule, exiting non-zero with a
 located, corrective message. Remember conditions are **bare CEL**
 (`record.status == 'x'`); only string node fields use `{…}` templates — see
 objectstack-formula. In a scaffolded project this is `npm run validate`.
