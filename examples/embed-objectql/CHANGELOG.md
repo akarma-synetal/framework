@@ -1,5 +1,16 @@
 # @objectstack/example-embed-objectql
 
+## 0.0.30-rc.1
+
+### Patch Changes
+
+- Updated dependencies [8efa395]
+- Updated dependencies [bfa3c3f]
+- Updated dependencies [06ff734]
+  - @objectstack/spec@16.0.0-rc.1
+  - @objectstack/objectql@16.0.0-rc.1
+  - @objectstack/driver-memory@16.0.0-rc.1
+
 ## 0.0.30-rc.0
 
 ### Patch Changes

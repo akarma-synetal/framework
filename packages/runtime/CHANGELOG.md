@@ -1,5 +1,31 @@
 # @objectstack/runtime
 
+## 16.0.0-rc.1
+
+### Patch Changes
+
+- Updated dependencies [8efa395]
+- Updated dependencies [bfa3c3f]
+- Updated dependencies [9d897b3]
+- Updated dependencies [06ff734]
+  - @objectstack/spec@16.0.0-rc.1
+  - @objectstack/rest@16.0.0-rc.1
+  - @objectstack/plugin-security@16.0.0-rc.1
+  - @objectstack/core@16.0.0-rc.1
+  - @objectstack/formula@16.0.0-rc.1
+  - @objectstack/metadata@16.0.0-rc.1
+  - @objectstack/metadata-core@16.0.0-rc.1
+  - @objectstack/objectql@16.0.0-rc.1
+  - @objectstack/observability@16.0.0-rc.1
+  - @objectstack/driver-memory@16.0.0-rc.1
+  - @objectstack/driver-sql@16.0.0-rc.1
+  - @objectstack/driver-sqlite-wasm@16.0.0-rc.1
+  - @objectstack/plugin-auth@16.0.0-rc.1
+  - @objectstack/service-cluster@16.0.0-rc.1
+  - @objectstack/service-datasource@16.0.0-rc.1
+  - @objectstack/service-i18n@16.0.0-rc.1
+  - @objectstack/types@16.0.0-rc.1
+
 ## 16.0.0-rc.0
 
 ### Major Changes

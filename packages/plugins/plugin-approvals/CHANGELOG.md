@@ -1,5 +1,57 @@
 # @objectstack/plugin-approvals
 
+## 16.0.0-rc.1
+
+### Minor Changes
+
+- e412fb6: feat(approvals): declare file attachments on approve/reject decisions
+
+  The declared `approval_approve` / `approval_reject` actions on
+  `sys_approval_request` gain an optional multi-file `attachments` param
+  (`type: 'file'`, `multiple`). The console renders `type:'file'` action params
+  through the shared upload widget (objectui ADR-0059) and POSTs the resolved
+  `attachments: string[]`, so a reviewer can attach supporting files to a
+  decision through the generic declared-action dialog — letting the approvals
+  inbox retire its hand-wired attachment composer (objectui#2698).
+
+  Purely additive metadata: the decision route already forwards
+  `body.attachments` to `ApprovalService.decide`, and the
+  `sys_approval_action.attachments` column (file, multiple) already persists them
+  (#3266/#3274). No service or route change.
+
+- 8efa395: feat(approvals): server-computed `viewer` capability for precise decision-action gating
+
+  `getRequest` / `listRequests` now attach a per-viewer block —
+  `viewer: { can_act, is_submitter }` — computed from the caller's context
+  (`ApprovalRequestRow.viewer`):
+
+  - `can_act` — the caller is a _current pending approver_ (their user id is in the
+    request's resolved `pending_approvers` while it is still `pending`). This is
+    the same check the decision methods authorize with, so it already reflects
+    position/team/manager resolution — strictly more accurate than a client-side
+    identity guess.
+  - `is_submitter` — the caller submitted the request.
+
+  The declared decision actions on `sys_approval_request` now gate on it: approver
+  actions (approve/reject/reassign/send-back/request-info) use
+  `record.viewer.can_act`; submitter levers (remind/recall/resubmit) use
+  `record.viewer.is_submitter`. Previously approver actions only trimmed the
+  non-pending case, so a submitter viewing their own pending request saw buttons
+  they couldn't use (the backend 403'd); a position-addressed approver could be
+  wrongly hidden by the old client heuristic. Where `viewer` is absent (a row
+  surfaced outside a service read with a user context), the predicate fails closed.
+
+### Patch Changes
+
+- Updated dependencies [8efa395]
+- Updated dependencies [bfa3c3f]
+- Updated dependencies [06ff734]
+  - @objectstack/spec@16.0.0-rc.1
+  - @objectstack/core@16.0.0-rc.1
+  - @objectstack/formula@16.0.0-rc.1
+  - @objectstack/metadata-core@16.0.0-rc.1
+  - @objectstack/platform-objects@16.0.0-rc.1
+
 ## 16.0.0-rc.0
 
 ### Minor Changes

@@ -1,5 +1,86 @@
 # @objectstack/cli
 
+## 16.0.0-rc.1
+
+### Minor Changes
+
+- 06ff734: feat(spec)!: remove deprecated `aiStudio`/`aiSeat` capability aliases (#3308)
+
+  **BREAKING** (shipped as minor per the launch-window convention). The one-cycle
+  deprecation window from #3265 is over: the legacy camelCase `requires` spellings
+  `aiStudio`/`aiSeat` are no longer canonicalized to `ai-studio`/`ai-seat` — they
+  are now plain unknown tokens, rejected by `defineStack` like any other typo.
+
+  - Removed exports `DEPRECATED_PLATFORM_CAPABILITY_ALIASES` and
+    `canonicalizePlatformCapability` from `@objectstack/spec`; `isKnownPlatformCapability`
+    no longer canonicalizes.
+  - `defineStack` no longer rewrites aliases (the `canonicalizeStackRequires` pass
+    is gone); the serve resolver no longer canonicalizes raw-artifact `requires`.
+
+  Migration: use the canonical kebab-case tokens `ai-studio` / `ai-seat`. All
+  first-party configs were migrated in #862/#863; only stacks still carrying the
+  legacy spelling are affected. Cloud's `objectos-runtime` (pinned to an older
+  framework) follows on its next `.framework-sha` bump.
+
+### Patch Changes
+
+- Updated dependencies [e412fb6]
+- Updated dependencies [8efa395]
+- Updated dependencies [a276969]
+- Updated dependencies [bfa3c3f]
+- Updated dependencies [bfa3c3f]
+- Updated dependencies [b320158]
+- Updated dependencies [9d897b3]
+- Updated dependencies [f8c1b69]
+- Updated dependencies [06ff734]
+  - @objectstack/plugin-approvals@16.0.0-rc.1
+  - @objectstack/spec@16.0.0-rc.1
+  - @objectstack/console@16.0.0-rc.1
+  - @objectstack/rest@16.0.0-rc.1
+  - @objectstack/plugin-hono-server@16.0.0-rc.1
+  - @objectstack/client@16.0.0-rc.1
+  - @objectstack/service-automation@16.0.0-rc.1
+  - @objectstack/plugin-security@16.0.0-rc.1
+  - @objectstack/account@16.0.0-rc.1
+  - @objectstack/setup@16.0.0-rc.1
+  - @objectstack/cloud-connection@16.0.0-rc.1
+  - @objectstack/core@16.0.0-rc.1
+  - @objectstack/formula@16.0.0-rc.1
+  - @objectstack/lint@16.0.0-rc.1
+  - @objectstack/mcp@16.0.0-rc.1
+  - @objectstack/metadata@16.0.0-rc.1
+  - @objectstack/objectql@16.0.0-rc.1
+  - @objectstack/observability@16.0.0-rc.1
+  - @objectstack/platform-objects@16.0.0-rc.1
+  - @objectstack/driver-memory@16.0.0-rc.1
+  - @objectstack/driver-mongodb@16.0.0-rc.1
+  - @objectstack/driver-sql@16.0.0-rc.1
+  - @objectstack/driver-sqlite-wasm@16.0.0-rc.1
+  - @objectstack/plugin-audit@16.0.0-rc.1
+  - @objectstack/plugin-auth@16.0.0-rc.1
+  - @objectstack/plugin-email@16.0.0-rc.1
+  - @objectstack/plugin-reports@16.0.0-rc.1
+  - @objectstack/plugin-sharing@16.0.0-rc.1
+  - @objectstack/plugin-webhooks@16.0.0-rc.1
+  - @objectstack/runtime@16.0.0-rc.1
+  - @objectstack/service-analytics@16.0.0-rc.1
+  - @objectstack/service-cache@16.0.0-rc.1
+  - @objectstack/service-datasource@16.0.0-rc.1
+  - @objectstack/service-job@16.0.0-rc.1
+  - @objectstack/service-messaging@16.0.0-rc.1
+  - @objectstack/service-package@16.0.0-rc.1
+  - @objectstack/service-queue@16.0.0-rc.1
+  - @objectstack/service-realtime@16.0.0-rc.1
+  - @objectstack/service-settings@16.0.0-rc.1
+  - @objectstack/service-sms@16.0.0-rc.1
+  - @objectstack/service-storage@16.0.0-rc.1
+  - @objectstack/trigger-api@16.0.0-rc.1
+  - @objectstack/trigger-record-change@16.0.0-rc.1
+  - @objectstack/trigger-schedule@16.0.0-rc.1
+  - @objectstack/types@16.0.0-rc.1
+  - @objectstack/verify@16.0.0-rc.1
+  - @objectstack/plugin-pinyin-search@16.0.0-rc.1
+
 ## 16.0.0-rc.0
 
 ### Minor Changes
