@@ -314,6 +314,11 @@ const expenseReports = defineSeed(ExpenseReport, {
     { name: 'EXP-2001', employee: 'Ada Lovelace', status: 'submitted', submitted_on: cel`daysAgo(5)` },
     { name: 'EXP-2002', employee: 'Linus Torvalds', status: 'approved', submitted_on: cel`daysAgo(12)` },
     { name: 'EXP-2003', employee: 'Grace Hopper', status: 'draft' },
+    // High-value (> $5000) submitted report — the trigger record for the
+    // High-Value Committee Quorum (2-of-3) flow, launched on boot by
+    // src/security/seed-approval-demo.ts so a real pending request lands in the
+    // inbox out of the box.
+    { name: 'EXP-DEMO', employee: 'Grace Hopper', status: 'submitted', submitted_on: cel`daysAgo(1)` },
   ],
 });
 
@@ -333,6 +338,11 @@ const expenseLines = defineSeed(ExpenseLine, {
     // EXP-2003 (draft) → total 225.75 · approved 0 · reimbursable 0 · rejected 0 · over$500 0
     { merchant: 'Hilton Garden Inn', expense_report: 'EXP-2003', category: 'lodging', amount: 210, billable: false, status: 'submitted', incurred_on: cel`daysAgo(3)` },
     { merchant: 'Starbucks', expense_report: 'EXP-2003', category: 'meals', amount: 15.75, billable: false, status: 'submitted', incurred_on: cel`daysAgo(2)` },
+    // EXP-DEMO → total 8900 (≥ $5000, trips the committee-quorum threshold)
+    { merchant: 'Dreamforce Conference', expense_report: 'EXP-DEMO', category: 'other', amount: 3200, billable: true, status: 'submitted', incurred_on: cel`daysAgo(4)` },
+    { merchant: 'Lufthansa', expense_report: 'EXP-DEMO', category: 'travel', amount: 2400, billable: true, status: 'submitted', incurred_on: cel`daysAgo(4)` },
+    { merchant: 'Grand Hyatt', expense_report: 'EXP-DEMO', category: 'lodging', amount: 1800, billable: true, status: 'submitted', incurred_on: cel`daysAgo(3)` },
+    { merchant: 'Apple Store', expense_report: 'EXP-DEMO', category: 'software', amount: 1500, billable: true, status: 'submitted', incurred_on: cel`daysAgo(3)` },
   ],
 });
 

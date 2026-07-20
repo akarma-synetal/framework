@@ -77,6 +77,30 @@ export const ClientPortalUserPosition = definePosition({
   description: 'External client admitted to the Client Portal.',
 });
 
+/**
+ * Approval-routing positions (会签 / quorum demos). The `approval` flow nodes
+ * in src/automation/flows route to `{ type: 'position', value: 'finance' | 'legal' }`
+ * (Invoice Dual Sign-off → finance AND legal; High-Value Committee Quorum →
+ * manager + finance + legal, 2-of-3). Without these declared — and without a
+ * holder assigned (see src/security/seed-approval-demo.ts) — those requests
+ * resolve to an empty approver slate and wait forever, so the marquee v16
+ * approval features could not be demonstrated out of the box.
+ *
+ * They carry no permission-set binding: they exist purely to route approvals,
+ * so a holder gets no extra data access from holding one.
+ */
+export const FinancePosition = definePosition({
+  name: 'finance',
+  label: 'Finance',
+  description: 'Finance sign-off authority on invoices and high-value expenses (approval routing only).',
+});
+
+export const LegalPosition = definePosition({
+  name: 'legal',
+  label: 'Legal',
+  description: 'Legal sign-off authority on invoices and high-value expenses (approval routing only).',
+});
+
 export const allPositions = [
   ContributorPosition,
   ManagerPosition,
@@ -85,4 +109,6 @@ export const allPositions = [
   OpsPosition,
   FieldOpsDelegatePosition,
   ClientPortalUserPosition,
+  FinancePosition,
+  LegalPosition,
 ];

@@ -19,6 +19,7 @@ import { ExternalCustomer, ExternalOrder } from './src/data/objects/external/ind
 import { setupShowcaseExternalDatasource } from './src/system/datasources/external-fixture.js';
 import { registerRecalcEndpoint } from './src/system/server/recalc-endpoint.js';
 import { registerShowcasePositionBindings } from './src/security/bind-position-sets.js';
+import { registerShowcaseApprovalDemo } from './src/security/seed-approval-demo.js';
 import { TaskViews, ProjectViews, InquiryViews, BusinessUnitViews } from './src/ui/views/index.js';
 import { ShowcaseApp } from './src/ui/apps/index.js';
 import { ChartGalleryDashboard, OpsDashboard, RevenuePulseDashboard } from './src/ui/dashboards/index.js';
@@ -248,4 +249,9 @@ export const onEnable = async (ctx: unknown): Promise<void> => {
   // [#2926 ②] Ensure the persona position↔permission-set bindings exist after
   // the security bootstraps (cannot be a seed — see bind-position-sets.ts).
   registerShowcasePositionBindings(ctx as Parameters<typeof registerShowcasePositionBindings>[0]);
+  // Make the v16 approval features (会签 / quorum) demonstrable on a fresh boot:
+  // assign the dev admin the approver positions and launch the signoff flows so
+  // real pending requests land in the inbox (cannot be a seed — see
+  // seed-approval-demo.ts).
+  registerShowcaseApprovalDemo(ctx as Parameters<typeof registerShowcaseApprovalDemo>[0]);
 };
