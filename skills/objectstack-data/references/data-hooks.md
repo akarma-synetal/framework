@@ -70,9 +70,9 @@ ObjectStack provides **8 lifecycle events** organized by operation type:
 |:-------|:----------------|:---------------|
 | **Purpose** | Validation, enrichment, transformation | Side effects, notifications, logging |
 | **Can modify** | `ctx.input` (mutable) | `ctx.result` (mutable) |
-| **Can abort** | Yes (throw error → rollback) | No (operation already committed) |
-| **Transaction** | Within transaction | After transaction (unless async: false) |
-| **Error handling** | Aborts operation by default | Logged by default (configurable) |
+| **Can abort** | Yes (throw error → rollback) | A sync after-hook's throw still rolls back the transaction (see error handling) |
+| **Transaction** | Within transaction | **Within the transaction** (unless `async: true` — then in the background, after commit) |
+| **Error handling** | Aborts by default (`onError: 'abort'`) | **Also aborts by default** — `onError` defaults to `'abort'` unconditionally; set `onError: 'log'` on side-effect hooks |
 
 ---
 
@@ -81,6 +81,7 @@ ObjectStack provides **8 lifecycle events** organized by operation type:
 Every hook must conform to the `HookSchema`:
 
 ```typescript
+import { P } from '@objectstack/spec';
 import { Hook, HookContext } from '@objectstack/spec/data';
 
 const myHook: Hook = {
@@ -104,8 +105,8 @@ const myHook: Hook = {
   // Optional: Run in background (after* events only)
   async: false,
 
-  // Optional: Conditional execution
-  condition: "status = 'active' AND amount > 1000",
+  // Optional: Conditional execution (CEL predicate over `record`)
+  condition: P`record.status == 'active' && record.amount > 1000`,
 
   // Optional: Human-readable description
   description: 'Validates account data before save',
@@ -210,26 +211,32 @@ async: true
 
 #### `condition` — Declarative Filtering
 
-Skip handler execution if condition is false:
+Skip handler execution if the condition is false. Author it as a **CEL
+predicate** over `record` (use `P\`...\`` from `@objectstack/spec`; SQL-style
+`=` / `AND` / `IN (...)` is not CEL):
 
 ```typescript
 // Only run for high-value accounts
-condition: "annual_revenue > 1000000"
+condition: P`record.annual_revenue > 1000000`
 
 // Only run for specific statuses
-condition: "status IN ('pending', 'in_review')"
+condition: P`record.status in ['pending', 'in_review']`
 
 // Complex conditions
-condition: "type = 'enterprise' AND region = 'APAC' AND is_active = true"
+condition: P`record.type == 'enterprise' && record.region == 'APAC' && record.is_active == true`
 ```
 
 #### `onError` — Error Handling
 
+The default is `'abort'` **unconditionally** — for `after*` hooks too, a sync
+after-hook that throws rolls back the transaction. Set `onError: 'log'`
+explicitly on `after*` side-effect hooks:
+
 ```typescript
-// Abort operation on error (default for before* hooks)
+// Abort operation on error — the default for ALL hooks (before* AND after*)
 onError: 'abort'
 
-// Log error and continue (default for after* hooks)
+// Log error and continue — set this on after* side-effect hooks
 onError: 'log'
 ```
 
@@ -347,7 +354,7 @@ set of legal tokens (`HookBodyCapability`) is exactly six:
 
 | Token | Unlocks |
 |:--|:--|
-| `api.read` | `ctx.api.object(n).find` / `findOne` / `count` / `aggregate` |
+| `api.read` | `ctx.api.object(n).find` / `findOne` / `count` |
 | `api.write` | `ctx.api.object(n).insert` / `update` / `delete` / `upsert` |
 | `api.transaction` | `ctx.api.transaction(async () => { … })` — runs the callback's `ctx.api` ops in **one driver transaction** (commit on return, rollback on throw). Pair it with `api.write`. |
 | `crypto.uuid` | `ctx.crypto.randomUUID()` |
@@ -871,12 +878,13 @@ const cascadeAccountUpdate: Hook = {
   object: 'account',
   events: ['afterUpdate'],
   handler: async (ctx) => {
-    // If account industry changed, update all contacts
+    // If account industry changed, update all contacts.
+    // There is NO `updateMany` — bulk updates use update(data, { where, multi: true }).
     if (ctx.input.industry && ctx.previous?.industry !== ctx.input.industry) {
-      await ctx.api?.object('contact').updateMany({
-        filter: { account_id: ctx.input.id },
-        data: { account_industry: ctx.input.industry },
-      });
+      await ctx.api?.object('contact').update(
+        { account_industry: ctx.input.industry },
+        { where: { account_id: ctx.input.id }, multi: true },
+      );
     }
   },
 };
@@ -889,8 +897,8 @@ const highValueAccountAlert: Hook = {
   name: 'high_value_alert',
   object: 'account',
   events: ['afterInsert'],
-  // Only run for high-value accounts
-  condition: "annual_revenue > 10000000",
+  // Only run for high-value accounts (CEL)
+  condition: P`record.annual_revenue > 10000000`,
   async: true,
   handler: async (ctx) => {
     console.log(`🚨 High-value account created: ${ctx.result.name}`);
@@ -1309,8 +1317,7 @@ const conditionalHook: Hook = {
 
 ## References
 
-- [`@objectstack/spec/src/data/hook.zod.ts`](../../../node_modules/@objectstack/spec/src/data/hook.zod.ts) — Hook schema definition, HookContext interface
-- [Examples: app-todo](../../examples/app-todo/src/objects/task.hook.ts) — Simple task hook
+- `node_modules/@objectstack/spec/src/data/hook.zod.ts` — Hook schema definition, HookContext interface
 - [Project hooks pattern](../SKILL.md#lifecycle-hooks) — Hook integration in the data skill
 
 ---

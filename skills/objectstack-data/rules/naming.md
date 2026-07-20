@@ -8,7 +8,7 @@ ObjectStack enforces strict naming conventions to ensure consistency and machine
 |:--------|:-----------|:--------|:--------|
 | Object `name` | `snake_case` | `/^[a-z_][a-z0-9_]*$/` | `project_task` |
 | Field keys | `snake_case` | `/^[a-z_][a-z0-9_]*$/` | `first_name`, `due_date` |
-| Schema property keys (TS config) | `camelCase` | Standard JS | `maxLength`, `referenceFilters` |
+| Schema property keys (TS config) | `camelCase` | Standard JS | `maxLength`, `lookupFilters` |
 | Option `value` | lowercase machine ID | lowercase | `in_progress` |
 | Option `label` | Any case | — | `"In Progress"` |
 
@@ -56,9 +56,10 @@ fields: {
 
 ```typescript
 {
-  type: 'text',
-  max_length: 255,        // ❌ snake_case not allowed for TS config
-  reference_filters: {},  // ❌ snake_case not allowed for TS config
+  type: 'lookup',
+  reference: 'account',
+  lookup_filters: [],  // ❌ snake_case not allowed for TS config
+  max_length: 255,     // ❌ snake_case not allowed for TS config
 }
 ```
 
@@ -66,9 +67,10 @@ fields: {
 
 ```typescript
 {
-  type: 'text',
-  maxLength: 255,        // ✅ camelCase for TS config
-  referenceFilters: {},  // ✅ camelCase for TS config
+  type: 'lookup',
+  reference: 'account',
+  lookupFilters: [{ field: 'status', operator: 'eq', value: 'active' }],  // ✅ camelCase
+  maxLength: 255,                                                          // ✅ camelCase
 }
 ```
 

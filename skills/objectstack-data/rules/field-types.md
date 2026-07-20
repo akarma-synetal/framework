@@ -1,26 +1,33 @@
 # Field Types Reference
 
-Quick reference for choosing the right field type from 48 available options.
+Quick reference for choosing the right field type from 49 available options.
+
+> **Config columns list only real `FieldSchema` keys.** Per-type display knobs
+> beyond these do **not** exist — an unknown field key is silently stripped at
+> parse (dead metadata), so don't invent config like `theme`, `rows`, or
+> `fileAttachmentConfig`. Source of truth:
+> `node_modules/@objectstack/spec/src/data/field.zod.ts`.
 
 ## Text & Content
 
 | Type | When to Use | Config |
 |:-----|:------------|:-------|
 | `text` | Single-line strings (names, codes, titles) | `maxLength`, `minLength`, `defaultValue` |
-| `textarea` | Multi-line plain text (notes, descriptions) | `maxLength`, `rows` |
+| `textarea` | Multi-line plain text (notes, descriptions) | `maxLength`, `minLength` |
 | `email` | Email addresses — built-in format validation | `required`, `unique` |
 | `url` | Web URLs — built-in format validation | `required` |
-| `phone` | Phone numbers | `format` (custom regex) |
-| `password` | Masked / hashed input | `minLength`, `hashAlgorithm` |
+| `phone` | Phone numbers | `format` |
+| `password` | ⚠️ Masked-on-read input. On a generic object the value is stored **PLAINTEXT at rest** (never hashed — one-way hashing applies only inside the auth subsystem's own identity tables). Prefer `secret` for credentials; a generic `password` field triggers a build warning | `minLength`, `maxLength` |
+| `secret` | Reversible **encrypted-at-rest** credential (DB password, API key, token) — encrypted on write via `ICryptoProvider`, masked on read, fail-closed (ADR-0100). **The recommended type for credentials** | — |
 | `markdown` | Markdown-formatted content | `maxLength` |
-| `html` | Raw HTML content | `maxLength`, `sanitize` |
+| `html` | Raw HTML content | `maxLength` |
 | `richtext` | WYSIWYG rich text editor | `maxLength` |
 
 ## Numbers
 
 | Type | When to Use | Config |
 |:-----|:------------|:-------|
-| `number` | Generic numeric value | `min`, `max`, `precision`, `step` |
+| `number` | Generic numeric value | `min`, `max`, `precision`, `scale` |
 | `currency` | Monetary amounts | `currencyConfig` (precision, currencyMode, defaultCurrency) |
 | `percent` | Percentage values (0-100) | `min`, `max`, `precision` |
 
@@ -28,8 +35,8 @@ Quick reference for choosing the right field type from 48 available options.
 
 | Type | When to Use | Config |
 |:-----|:------------|:-------|
-| `date` | Date only (no time component) | `defaultValue`, `min`, `max` |
-| `datetime` | Full date + time | `defaultValue`, `timezone` |
+| `date` | Date only (no time component) | `defaultValue` |
+| `datetime` | Full date + time | `defaultValue` |
 | `time` | Time only (no date component) | `defaultValue`, `format` |
 
 ## Logic
@@ -61,48 +68,63 @@ options: [
 
 | Type | When to Use | Key Config |
 |:-----|:------------|:-----------|
-| `lookup` | Reference another object (independent) | `reference`, `referenceFilters`, `multiple` |
+| `lookup` | Reference another object (independent) | `reference`, `lookupFilters`, `multiple` |
 | `master_detail` | Parent–child with lifecycle control | `reference`, `deleteBehavior` (cascade/restrict/set_null) |
 | `tree` | Hierarchical self-reference | `reference` |
+| `user` | Person picker — a lookup specialized to `sys_user` (assignee, watchers). Stored identically to `lookup` | `multiple` (collaborators), `defaultValue: 'current_user'` |
 
-Set `multiple: true` on lookup for many-to-many via junction.
+> **`multiple: true` lookup ≠ junction object.** A multi-value lookup is stored
+> and read as an **array of ids** on the record — it is NOT a junction table.
+> Reach for a **junction object** (two lookups) only when the relationship
+> itself carries attributes (role, added_at, …). (#1872)
 
 ## Media
 
 | Type | When to Use | Config |
 |:-----|:------------|:-------|
-| `image` | Image files (PNG, JPG, GIF, WebP) | `fileAttachmentConfig` (maxSize, allowedTypes, storage) |
-| `file` | Generic file attachments | `fileAttachmentConfig`, `allowedExtensions` |
-| `avatar` | User/profile picture | `fileAttachmentConfig`, `cropAspectRatio` |
-| `video` | Video files | `fileAttachmentConfig`, `maxDuration` |
-| `audio` | Audio files | `fileAttachmentConfig`, `maxDuration` |
+| `image` | Image files (PNG, JPG, GIF, WebP) | `multiple` |
+| `file` | Generic file attachments | `multiple` |
+| `avatar` | User/profile picture | — |
+| `video` | Video files | — |
+| `audio` | Audio files | — |
 
-All use `fileAttachmentConfig` for size limits, allowed types, virus scanning, and storage provider.
+There is no per-field attachment config (size limits, allowed types, storage) —
+storage concerns live outside the field schema.
+
+## Embedded (JSON sub-objects)
+
+Stored as JSON on the parent row — no separate table / FK:
+
+| Type | When to Use |
+|:-----|:------------|
+| `composite` | Single embedded sub-object with declared sub-fields |
+| `repeater` | Repeating embedded sub-object **array** |
+| `record` | Name-keyed **map** of embedded sub-objects (insertion order = display order; ADR-0007) |
 
 ## Calculated
 
 | Type | When to Use | Config |
 |:-----|:------------|:-------|
-| `formula` | Computed from an expression referencing other fields | `expression`, `resultType` |
-| `summary` | Roll-up aggregation from child records | `summaryType` (count/sum/min/max/avg), `summaryField`, `reference` |
-| `autonumber` | Auto-incrementing display format ({0000} counter + optional date / {field} tokens, resets per scope) | `format` (e.g., `"CASE-{0000}"`, `"AD{YYYYMMDD}{0000}"`) |
+| `formula` | Computed from an expression referencing other fields | `expression` (CEL, `record.` prefixes), `returnType` (`'number' \| 'text' \| 'boolean' \| 'date'`) |
+| `summary` | Roll-up aggregation from child records | `summaryOperations` ({ object, field, function, relationshipField?, filter? }) |
+| `autonumber` | Auto-incrementing display format ({0000} counter + optional date / {field} tokens, resets per scope) | `format` (shorthand) / `autonumberFormat` (canonical) — e.g., `"CASE-{0000}"`, `"AD{YYYYMMDD}{0000}"` |
 
 ## Enhanced Types
 
 | Type | When to Use | Config |
 |:-----|:------------|:-------|
-| `location` | Geographic coordinates (lat/lng) | `defaultZoom`, `enableSearch` |
-| `address` | Structured address (street, city, country) | `countryFilter`, `autocomplete` |
-| `code` | Syntax-highlighted code editor | `language`, `theme` |
-| `json` | JSON data | `schema` (JSON Schema for validation) |
-| `color` | Color picker | `format` (hex/rgb/hsl), `alpha` |
-| `rating` | Star/heart rating | `max` (default 5), `icon` |
+| `location` | Geographic coordinates (lat/lng) | — |
+| `address` | Structured address (street, city, country) | — |
+| `code` | Syntax-highlighted code editor | `language` |
+| `json` | JSON data (untyped escape hatch) | — (validate with a `json_schema` validation rule on the object) |
+| `color` | Color picker | — |
+| `rating` | Star/heart rating | `max` (default 5) |
 | `slider` | Numeric slider | `min`, `max`, `step` |
-| `signature` | Digital signature pad | `signatureConfig` |
-| `qrcode` | QR code generator | `qrConfig` |
-| `progress` | Progress bar | `min`, `max`, `showPercentage` |
-| `tags` | Free-form tag input | `max`, `delimiter`, `caseSensitive` |
-| `vector` | AI/ML embeddings (semantic search, RAG) | `vectorConfig` (dimensions, distanceMetric, indexType) |
+| `signature` | Digital signature pad | — |
+| `qrcode` | QR code / barcode | — |
+| `progress` | Progress bar | `min`, `max` |
+| `tags` | Free-form tag input | — |
+| `vector` | AI/ML embeddings (semantic search, RAG) | `dimensions` (flat sibling, e.g. `1536`) |
 
 ## Field Type Decision Tree
 
@@ -116,6 +138,7 @@ What kind of data?
 │   ├── Email → email
 │   ├── URL → url
 │   ├── Phone → phone
+│   ├── Credential (API key, token, DB password) → secret (encrypted at rest — NOT password)
 │   └── Code → code
 │
 ├── Number?
@@ -141,6 +164,7 @@ What kind of data?
 ├── Reference another object?
 │   ├── Independent → lookup
 │   ├── Owned child → master_detail
+│   ├── A person (assignee, watcher) → user
 │   └── Hierarchy → tree
 │
 ├── File/Media?
@@ -154,6 +178,11 @@ What kind of data?
 │   ├── Formula → formula
 │   ├── Roll-up → summary
 │   └── Auto-number → autonumber
+│
+├── Embedded sub-object (no separate table)?
+│   ├── Single → composite
+│   ├── Array → repeater
+│   └── Name-keyed map → record
 │
 └── Special?
     ├── Location → location
@@ -231,9 +260,11 @@ grouped number (never a hardcoded `$`). The same chain backs analytics measures
   type: 'lookup',
   reference: 'account',
   required: true,
-  referenceFilters: {
-    status: 'active',
-  },
+  // Structured, picker-honoured filter — the former string[] `referenceFilters`
+  // was removed (#2377, ADR-0049): it filtered nothing.
+  lookupFilters: [
+    { field: 'status', operator: 'eq', value: 'active' },
+  ],
 }
 ```
 
@@ -262,10 +293,12 @@ grouped number (never a hardcoded `$`). The same chain backs analytics measures
 ### Formula
 
 ```typescript
+import { F } from '@objectstack/spec';
+
 {
   type: 'formula',
-  expression: 'amount * tax_rate',
-  resultType: 'currency',
+  expression: F`record.amount * record.tax_rate`,  // CEL — `record.` prefixes required
+  returnType: 'number',   // 'number' | 'text' | 'boolean' | 'date' (no 'currency')
 }
 ```
 
@@ -274,9 +307,12 @@ grouped number (never a hardcoded `$`). The same chain backs analytics measures
 ```typescript
 {
   type: 'summary',
-  reference: 'invoice_line_item',
-  summaryType: 'sum',
-  summaryField: 'amount',
+  summaryOperations: {
+    object: 'invoice_line_item',   // child object to aggregate
+    field: 'amount',               // child field (ignored for count)
+    function: 'sum',               // 'count' | 'sum' | 'min' | 'max' | 'avg'
+    // relationshipField / filter — optional (see rules/relationships.md)
+  },
 }
 ```
 
@@ -311,13 +347,12 @@ The `format` is literal text interleaved with `{...}` tokens:
 ```typescript
 {
   type: 'vector',
-  vectorConfig: {
-    dimensions: 1536,  // OpenAI ada-002
-    distanceMetric: 'cosine',
-    indexType: 'hnsw',
-  },
+  dimensions: 1536,  // flat sibling — OpenAI ada-002
 }
 ```
+
+There is **no** `vectorConfig` block — an authored `vectorConfig` is silently
+stripped (dead metadata). `dimensions` is the flat field-level key.
 
 ## Incorrect vs Correct
 
