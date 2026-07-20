@@ -1,9 +1,22 @@
 # ObjectStack Skills
 
 Domain-scoped instructions for AI coding assistants (Claude Code, Copilot, Cursor)
-working in the ObjectStack monorepo. Each skill is self-contained: a `SKILL.md`
-with YAML frontmatter, plus a `references/_index.md` that points into the
-authoritative Zod sources in `node_modules/@objectstack/spec/src/...`.
+working in **any ObjectStack app** — this monorepo *and* third-party projects.
+`npm create objectstack` installs them into new apps automatically; existing
+projects add (or update) the bundle with:
+
+```bash
+npx skills add objectstack-ai/framework/skills --all
+```
+
+The `/skills` subpath matters: it is the published catalog boundary — pointing
+the skills CLI at the repo root would also pick up repo-internal skills (#3101).
+
+Each skill is self-contained: a `SKILL.md` with YAML frontmatter, plus a
+`references/_index.md` that points into the authoritative Zod sources in
+`node_modules/@objectstack/spec/src/...` (the published `@objectstack/spec`
+package ships these `.zod.ts` sources, so the pointers resolve in consumer
+apps too).
 
 > **Always read the spec source for exact field shapes.** Skills give shape and
 > intent; the Zod schemas are the truth.
@@ -37,8 +50,13 @@ authoritative Zod sources in `node_modules/@objectstack/spec/src/...`.
 ```
 skills/<skill-name>/
 ├── SKILL.md              # frontmatter + prose guide
-└── references/
-    └── _index.md         # pointers into @objectstack/spec sources
+├── references/
+│   └── _index.md         # generated pointers into @objectstack/spec sources
+│                         # (pnpm --filter @objectstack/spec gen:skill-refs — do not hand-edit)
+├── rules/                # (optional) detailed per-topic rule files linked from SKILL.md
+├── contracts/            # (optional) generated machine-readable contracts (e.g. react-blocks)
+└── evals/                # skill eval fixtures — used by maintainers to score the skill,
+                          # inert (but harmless) in consumer installs
 ```
 
 `SKILL.md` frontmatter fields:
