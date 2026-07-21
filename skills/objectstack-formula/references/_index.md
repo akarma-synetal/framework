@@ -1,4 +1,4 @@
-# objectstack-query — Schema References
+# objectstack-formula — Schema References
 
 > **Auto-generated** — do not edit. Maintainers regenerate this in the
 > framework repo with `pnpm --filter @objectstack/spec run gen:skill-refs`
@@ -10,8 +10,7 @@ from `node_modules` — there is no local copy in the skill bundle.
 ## Core schemas
 
 - `node_modules/@objectstack/spec/src/data/date-macros.zod.ts` — Date Macro Tokens — the declarative placeholders the UI substitutes
-- `node_modules/@objectstack/spec/src/data/filter.zod.ts` — Unified Query DSL Specification
-- `node_modules/@objectstack/spec/src/data/query.zod.ts` — Sort Node
+- `node_modules/@objectstack/spec/src/shared/expression.zod.ts` — Expression Protocol
 
 ## How to read these
 

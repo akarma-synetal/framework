@@ -27,6 +27,7 @@ The canonical reference includes:
 ### Hook Definition
 
 ```typescript
+import { P } from '@objectstack/spec';
 import { Hook, HookContext } from '@objectstack/spec/data';
 
 const hook: Hook = {
@@ -38,7 +39,7 @@ const hook: Hook = {
   },
   priority: 100,                // Optional: execution order
   async: false,                 // Optional: background execution (after* only)
-  condition: "status = 'active'", // Optional: conditional execution
+  condition: P`record.status == 'active'`, // Optional: conditional execution (CEL)
 };
 ```
 

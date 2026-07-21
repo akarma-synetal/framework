@@ -53,6 +53,7 @@ const SKILL_MAP: Record<string, string[]> = {
   'objectstack-query': [
     'data/query.zod.ts',
     'data/filter.zod.ts',
+    'data/date-macros.zod.ts',
   ],
   'objectstack-ai': [
     'ai/agent.zod.ts',
@@ -62,6 +63,8 @@ const SKILL_MAP: Record<string, string[]> = {
     'ai/conversation.zod.ts',
     'ai/mcp.zod.ts',
     'ai/embedding.zod.ts',
+    'ai/knowledge-source.zod.ts',
+    'ai/knowledge-document.zod.ts',
     'ai/usage.zod.ts',
   ],
   'objectstack-api': [
@@ -78,11 +81,13 @@ const SKILL_MAP: Record<string, string[]> = {
   'objectstack-automation': [
     'automation/flow.zod.ts',
     'automation/trigger-registry.zod.ts',
+    'automation/time-relative-trigger.zod.ts',
     'automation/approval.zod.ts',
     'automation/state-machine.zod.ts',
     'automation/execution.zod.ts',
     'automation/webhook.zod.ts',
     'automation/node-executor.zod.ts',
+    'data/validation.zod.ts',
   ],
   'objectstack-ui': [
     'ui/view.zod.ts',
@@ -95,6 +100,7 @@ const SKILL_MAP: Record<string, string[]> = {
     'ui/component.zod.ts',
     'ui/report.zod.ts',
     'ui/theme.zod.ts',
+    'ui/dataset.zod.ts',
   ],
   'objectstack-platform': [
     // project setup (was objectstack-quickstart)
@@ -114,6 +120,10 @@ const SKILL_MAP: Record<string, string[]> = {
   'objectstack-i18n': [
     'system/translation.zod.ts',
     'ui/i18n.zod.ts',
+  ],
+  'objectstack-formula': [
+    'shared/expression.zod.ts',
+    'data/date-macros.zod.ts',
   ],
 };
 
@@ -174,7 +184,13 @@ function resolveAll(entryFiles: string[]): { files: string[]; missing: string[] 
       if (!visited.has(dep)) queue.push(dep);
     }
   }
-  return { files: [...visited].sort(), missing };
+  // Only `src/**/*.zod.ts` ships in the published package (`files` allowlist in
+  // package.json) — a pointer to any other src file 404s in a consumer's
+  // node_modules (#skills-review: lazy-schema.ts, visibility.ts,
+  // public-auth-features.ts all leaked through transitive imports). Traverse
+  // through non-shipping files (they may import shipping ones) but never list them.
+  const shipped = [...visited].filter((rel) => rel.endsWith('.zod.ts'));
+  return { files: shipped.sort(), missing };
 }
 
 // ── JSDoc description extractor ──────────────────────────────────────────────
@@ -213,8 +229,9 @@ function generateIndex(skillName: string, coreFiles: string[], allFiles: string[
   const lines: string[] = [
     `# ${skillName} — Schema References`,
     '',
-    '> **Auto-generated** by `packages/spec/scripts/build-skill-references.ts`.',
-    `> Do not edit — re-run \`pnpm --filter ${SPEC_PKG} run gen:skill-refs\` to update.`,
+    '> **Auto-generated** — do not edit. Maintainers regenerate this in the',
+    `> framework repo with \`pnpm --filter ${SPEC_PKG} run gen:skill-refs\``,
+    '> (not runnable in an installed app).',
     '',
     `Schemas live in the published \`${SPEC_PKG}\` package. Read them directly`,
     'from `node_modules` — there is no local copy in the skill bundle.',
@@ -246,8 +263,10 @@ function generateIndex(skillName: string, coreFiles: string[], allFiles: string[
     `   \`.describe()\` text, enums, and refinements.`,
     `2. TypeScript types: \`import type { … } from '${SPEC_PKG}'\` (or the`,
     '   matching subpath export).',
-    '3. Runtime values: `import { … } from \'' + SPEC_PKG + '\'` — the package',
-    '   re-exports every schema and helper.',
+    '3. Runtime values: import from the **matching subpath** shown in the',
+    `   schema's directory (\`'${SPEC_PKG}/data'\`, \`'${SPEC_PKG}/ai'\`, …).`,
+    '   The root barrel re-exports the common factories, but not every symbol —',
+    '   when in doubt, use the subpath.',
     '',
   );
 

@@ -1,7 +1,8 @@
 # objectstack-api — Schema References
 
-> **Auto-generated** by `packages/spec/scripts/build-skill-references.ts`.
-> Do not edit — re-run `pnpm --filter @objectstack/spec run gen:skill-refs` to update.
+> **Auto-generated** — do not edit. Maintainers regenerate this in the
+> framework repo with `pnpm --filter @objectstack/spec run gen:skill-refs`
+> (not runnable in an installed app).
 
 Schemas live in the published `@objectstack/spec` package. Read them directly
 from `node_modules` — there is no local copy in the skill bundle.
@@ -28,7 +29,6 @@ from `node_modules` — there is no local copy in the skill bundle.
 - `node_modules/@objectstack/spec/src/shared/expression.zod.ts` — Expression Protocol
 - `node_modules/@objectstack/spec/src/shared/http.zod.ts` — Shared HTTP Schemas
 - `node_modules/@objectstack/spec/src/shared/identifiers.zod.ts` — System Identifier Schema
-- `node_modules/@objectstack/spec/src/shared/lazy-schema.ts` — Wrap a Zod schema constructor so its body is only evaluated on first use.
 
 ## How to read these
 
@@ -37,5 +37,7 @@ from `node_modules` — there is no local copy in the skill bundle.
    `.describe()` text, enums, and refinements.
 2. TypeScript types: `import type { … } from '@objectstack/spec'` (or the
    matching subpath export).
-3. Runtime values: `import { … } from '@objectstack/spec'` — the package
-   re-exports every schema and helper.
+3. Runtime values: import from the **matching subpath** shown in the
+   schema's directory (`'@objectstack/spec/data'`, `'@objectstack/spec/ai'`, …).
+   The root barrel re-exports the common factories, but not every symbol —
+   when in doubt, use the subpath.

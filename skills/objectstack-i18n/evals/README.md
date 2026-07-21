@@ -12,16 +12,15 @@ When implemented, evals will follow this structure:
 
 ```
 evals/
-├── naming/
-│   ├── test-object-names.md
-│   ├── test-field-keys.md
-│   └── test-option-values.md
-├── relationships/
-│   ├── test-lookup-vs-master-detail.md
-│   └── test-junction-patterns.md
-├── validation/
-│   ├── test-script-inversion.md
-│   └── test-state-machine.md
+├── bundle-shape/
+│   ├── test-objects-vs-o-keys.md        # runtime `objects.*` vs secondary `o.*` format
+│   ├── test-snake-case-keys.md          # object/field keys match metadata machine names
+│   └── test-option-machine-values.md    # lowercase option values, not display labels
+├── interpolation/
+│   └── test-double-brace-params.md      # {{userName}}, not {userName}; ICU is experimental
+├── coverage-workflow/
+│   ├── test-extract-command.md          # os i18n extract --locales/--out flags & TS output
+│   └── test-check-command.md            # os i18n check --strict/--threshold CI gate
 └── ...
 ```
 
@@ -42,5 +41,5 @@ Each eval file will contain:
 When adding evals:
 1. Each eval should test a single, specific rule or pattern
 2. Include both positive (correct) and negative (incorrect) examples
-3. Reference the corresponding rule file in `rules/`
+3. Reference the corresponding section of `SKILL.md`
 4. Use realistic scenarios from actual ObjectStack projects

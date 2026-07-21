@@ -1,9 +1,22 @@
 # ObjectStack Skills
 
 Domain-scoped instructions for AI coding assistants (Claude Code, Copilot, Cursor)
-working in the ObjectStack monorepo. Each skill is self-contained: a `SKILL.md`
-with YAML frontmatter, plus a `references/_index.md` that points into the
-authoritative Zod sources in `node_modules/@objectstack/spec/src/...`.
+working in **any ObjectStack app** — this monorepo *and* third-party projects.
+`npm create objectstack` installs them into new apps automatically; existing
+projects add (or update) the bundle with:
+
+```bash
+npx skills add objectstack-ai/framework/skills --all
+```
+
+The `/skills` subpath matters: it is the published catalog boundary — pointing
+the skills CLI at the repo root would also pick up repo-internal skills (#3101).
+
+Each skill is self-contained: a `SKILL.md` with YAML frontmatter, plus a
+`references/_index.md` that points into the authoritative Zod sources in
+`node_modules/@objectstack/spec/src/...` (the published `@objectstack/spec`
+package ships these `.zod.ts` sources, so the pointers resolve in consumer
+apps too).
 
 > **Always read the spec source for exact field shapes.** Skills give shape and
 > intent; the Zod schemas are the truth.
@@ -16,12 +29,12 @@ authoritative Zod sources in `node_modules/@objectstack/spec/src/...`.
 
 | Skill | Domain | What it covers |
 |:------|:-------|:---------------|
-| [Platform](./objectstack-platform/SKILL.md) | `platform` | Bootstrap, configure, extend, and operate ObjectStack runtimes. Covers project setup (`defineStack`, drivers, adapters, scaffolding), plugin and service development (PluginContext, DI, kernel hooks like `kernel:ready` and `data:*`), and operations (CLI commands, migrations, deployment, test harnesses via LiteKernel). |
+| [Platform](./objectstack-platform/SKILL.md) | `platform` | Bootstrap, configure, extend, and operate ObjectStack runtimes. Covers project setup (`defineStack`, drivers, adapters, scaffolding), plugin and service development (PluginContext, DI, kernel hooks like `kernel:ready`), and operations (CLI commands, migrations, deployment, test harnesses via LiteKernel). |
 | [Data](./objectstack-data/SKILL.md) | `data` | Design ObjectStack data schemas — objects, fields, field conditional rules, relationships, validations, indexes, lifecycle hooks, permissions, row-level security — and the seeds (`defineSeed()`) that load fixtures and reference data alongside them. |
-| [Query](./objectstack-query/SKILL.md) | `query` | Construct ObjectQL queries — filters, sorting, pagination, aggregation, joins/expansion, window functions, and full-text search. |
+| [Query](./objectstack-query/SKILL.md) | `query` | Construct ObjectQL queries — filters, sorting, pagination, aggregation, relation expansion, and full-text search. |
 | [UI](./objectstack-ui/SKILL.md) | `ui` | Author ObjectStack UI metadata — Views (list/form/kanban/calendar/gantt), Apps (navigation), Pages (structured plus the HTML and React source-authoring tiers, ADR-0080/0081), Dashboards, Reports, Charts, Actions, and package Docs (`src/docs/*.md`). |
-| [Automation](./objectstack-automation/SKILL.md) | `automation` | Design ObjectStack automation — Flows (visual logic), Workflows (declarative rules), Triggers, Approvals, scheduled jobs, and webhooks. |
-| [AI](./objectstack-ai/SKILL.md) | `ai` | Design ObjectStack AI agents, tools, skills, conversations, model registry entries, and MCP integrations. |
+| [Automation](./objectstack-automation/SKILL.md) | `automation` | Design ObjectStack automation — Flows (visual logic), Triggers, Approvals, state machines, scheduled jobs, and webhooks. |
+| [AI](./objectstack-ai/SKILL.md) | `ai` | Design ObjectStack AI skills, tools, knowledge sources, conversations, model registry entries, and MCP integrations. |
 | [API](./objectstack-api/SKILL.md) | `api` | Design the server-side API surface that an ObjectStack runtime exposes — REST/GraphQL endpoints, auth providers, realtime channels, error envelopes, batch/versioning contracts. |
 | [i18n](./objectstack-i18n/SKILL.md) | `i18n` | Author ObjectStack translation bundles — object/field labels, view text, app navigation strings, automation messages — and configure locale fallback, coverage reporting, and the per-locale source layout. |
 | [Formula](./objectstack-formula/SKILL.md) | `expression` | Author CEL expressions used across ObjectStack — formula fields, field conditional rules (`visibleWhen`, `readonlyWhen`, `requiredWhen`), validation / sharing / visibility predicates, flow conditions, and dynamic seed values. |
@@ -37,8 +50,13 @@ authoritative Zod sources in `node_modules/@objectstack/spec/src/...`.
 ```
 skills/<skill-name>/
 ├── SKILL.md              # frontmatter + prose guide
-└── references/
-    └── _index.md         # pointers into @objectstack/spec sources
+├── references/
+│   └── _index.md         # generated pointers into @objectstack/spec sources
+│                         # (pnpm --filter @objectstack/spec gen:skill-refs — do not hand-edit)
+├── rules/                # (optional) detailed per-topic rule files linked from SKILL.md
+├── contracts/            # (optional) generated machine-readable contracts (e.g. react-blocks)
+└── evals/                # skill eval fixtures — used by maintainers to score the skill,
+                          # inert (but harmless) in consumer installs
 ```
 
 `SKILL.md` frontmatter fields:

@@ -15,10 +15,10 @@ description: >
   formulas / validations / sharing rules / dynamic seed values: load
   objectstack-formula alongside.
 license: Apache-2.0
-compatibility: Requires @objectstack/spec Zod schemas (v4+)
+compatibility: Requires @objectstack/spec 16.x (Zod v4 schemas)
 metadata:
   author: objectstack-ai
-  version: "4.2"
+  version: "4.3"
   domain: data
   tags: object, field, validation, index, relationship, hook, schema, permission, rls, security, seed, fixture
 ---
@@ -45,7 +45,7 @@ relationship modelling, validation rules, index strategy, and lifecycle hooks.
 ## When to Use This Skill
 
 - You are creating a **new business object** (e.g., `account`, `project_task`)
-- You need to **choose the right field type** from the 48 supported types
+- You need to **choose the right field type** from the 49 supported types
 - You are configuring **lookup / master-detail relationships** between objects
 - You need to add **validation rules** (cross-field, state machine, format, etc.)
 - You are optimising **query performance with indexes**
@@ -74,7 +74,7 @@ database table and exposes automatic CRUD APIs.
 |:---------|:--------|:------------|
 | `label` | Auto from `name` | Human-readable singular label |
 | `pluralLabel` | — | Plural form (e.g., "Accounts") |
-| `namespace` | — | **Deprecated** — ignored by the runtime. Embed prefix directly in `name` instead (e.g. `name: 'crm_account'`) |
+| `namespace` | — | **Not a schema key** — `ObjectSchema.create()` rejects unknown keys, so authoring it is a build error. Embed the prefix directly in `name` instead (e.g. `name: 'crm_account'`) |
 | `datasource` | `'default'` | Target datasource ID for virtualized data |
 | `nameField` | derived (e.g. `'name'`/`'title'`) | **Canonical** record-title field — the stored field used as the record's display name. Use a single text/email field, or a formula field (`returnType: 'text'`) for a composite title |
 | `displayNameField` | — | **Deprecated** alias for `nameField` (still honored as a fallback) |
@@ -94,8 +94,8 @@ Toggle system behaviours per object:
 | `apiEnabled` | `true` | Expose via automatic REST / GraphQL APIs |
 | `apiMethods` | all | Whitelist specific operations (`get`, `list`, `create`, …) |
 | `files` | `false` | Attachments & document management |
-| `feeds` | `false` | Social feed, comments, mentions |
-| `activities` | `false` | Tasks & events tracking |
+| `feeds` | `true` | Social feed, comments, mentions — **opt-out**: explicit `false` hides the feed UI and rejects new comments |
+| `activities` | `true` | Activity timeline (`sys_activity` mirror of CRUD) — **opt-out**: explicit `false` stops mirroring and hides the timeline |
 | `trash` | `true` | Soft-delete with restore |
 | `mru` | `true` | Most Recently Used tracking |
 | `clone` | `true` | Record deep cloning |
@@ -204,7 +204,7 @@ export const Invoice = ObjectSchema.create({
 For comprehensive documentation with incorrect/correct examples:
 
 - **[Naming Conventions](./rules/naming.md)** — snake_case rules, option values, config properties
-- **[Field Types](./rules/field-types.md)** — All 48 field types with decision tree and configs
+- **[Field Types](./rules/field-types.md)** — All 49 field types with decision tree and configs
 - **[Relationships](./rules/relationships.md)** — lookup vs master_detail, junction patterns, delete behaviors
 - **[Validation Rules](./rules/validation.md)** — All validation types, script inversion, severity levels
 - **[Index Strategy](./rules/indexing.md)** — btree/gin/gist/fulltext, composite indexes, partial indexes
@@ -303,23 +303,25 @@ see **objectstack-platform**.
 |:--------|:-----------|:--------|
 | Object `name` | `snake_case` | `project_task` |
 | Field keys | `snake_case` | `first_name`, `due_date` |
-| Schema properties | `camelCase` | `maxLength`, `referenceFilters` |
+| Schema properties | `camelCase` | `maxLength`, `lookupFilters` |
 | Option `value` | lowercase | `in_progress` |
 
 See [rules/naming.md](./rules/naming.md) for incorrect/correct examples.
 
 ### Field Type Selection
 
-48 types available. Quick categories:
+49 types available. Quick categories:
 
-- **Text:** `text`, `textarea`, `email`, `url`, `phone`, `markdown`, `html`, `richtext`
+- **Text:** `text`, `textarea`, `email`, `url`, `phone`, `password`, `markdown`, `html`, `richtext` — ⚠️ `password` on a generic object is **plaintext at rest** (masked on read, never hashed); prefer `secret` for credentials
+- **Secret:** `secret` — reversible, **encrypted-at-rest** credential (DB password, API key, token) via the registered `ICryptoProvider`; masked on read, fail-closed (ADR-0100). The recommended type for credentials
 - **Numbers:** `number`, `currency`, `percent`
 - **Date/Time:** `date`, `datetime`, `time`
 - **Logic:** `boolean`, `toggle`
 - **Selection:** `select`, `multiselect`, `radio`, `checkboxes`
-- **Relational:** `lookup`, `master_detail`, `tree`
+- **Relational:** `lookup`, `master_detail`, `tree`, `user` — `user` is a person picker (a lookup specialized to `sys_user`; stored identically to `lookup`)
 - **Media:** `image`, `file`, `avatar`, `video`, `audio`
-- **Calculated:** `formula`, `summary`, `autonumber` — `formula` fields take a CEL expression in `formula` (use `F\`...\`` from `@objectstack/spec`); see **objectstack-formula** skill
+- **Calculated:** `formula`, `summary`, `autonumber` — `formula` fields take a CEL expression in `expression` (use `F\`...\`` from `@objectstack/spec`); see **objectstack-formula** skill
+- **Embedded:** `composite`, `repeater`, `record` — embedded JSON sub-objects stored on the parent row (no separate table / FK)
 - **Enhanced:** `location`, `address`, `code`, `json`, `color`, `rating`, `slider`, `signature`, `qrcode`, `progress`, `tags`, `vector`
 
 See [rules/field-types.md](./rules/field-types.md) for full reference.
@@ -421,9 +423,9 @@ Mirror these CRM-style patterns when designing enterprise metadata objects:
 | Object layout via field groups | `src/objects/*.object.ts` | Use `fieldGroups[]` + per-field `group` for deterministic form structure |
 | Capability gating | `src/objects/*.object.ts` | Use `enable` flags (`trackHistory`, `apiMethods`, `files`, `feeds`, `activities`) per object |
 | Index + validation pairing | `src/objects/*.object.ts` | Keep `indexes[]` aligned to common filters and enforce invariants with `validations[]` |
-| Relationship constraints | `src/objects/*.object.ts` | Use `lookup` + `referenceFilters` for constrained child selection |
-| Lifecycle automation | `src/objects/*.hook.ts` | Use a lifecycle **hook** (`defineHook()`) or a top-level `record_change` flow for field updates triggered by record changes. There is **no** object-level `workflows[]` field — authoring one is a build error (#1535). |
-| State transitions | `src/objects/*.state.ts` | Prefer explicit `stateMachines` for lifecycle-heavy objects |
+| Relationship constraints | `src/objects/*.object.ts` | Use `lookup` + `lookupFilters` (`[{ field, operator, value }]`) for constrained child selection |
+| Lifecycle automation | `src/objects/*.hook.ts` | Use a lifecycle **hook** (a `Hook` object registered via `defineStack({ hooks })`) or a top-level `record_change` flow for field updates triggered by record changes. There is **no** object-level `workflows[]` field — authoring one is a build error (#1535). |
+| State transitions | `src/objects/*.object.ts` | Prefer explicit `state_machine` validation rules (one per state field) — there is **no** separate `stateMachines` map |
 
 For metadata authoring, keep expressions in CEL (`P\`...\``, `F\`...\``,
 `cel\`...\``) and avoid legacy formula-string syntax.
@@ -432,40 +434,56 @@ For metadata authoring, keep expressions in CEL (`P\`...\``, `F\`...\``,
 
 ## Object Extension Model
 
-When extending an object you do not own:
+When extending an object you do not own, author an extension with
+`defineObjectExtension()` and register it on the stack's `objectExtensions`
+array:
 
 ```typescript
-{
-  ownership: 'extend',
-  extend: 'crm.account',      // target object FQN
+import { defineObjectExtension } from '@objectstack/spec';
+
+export const accountExtension = defineObjectExtension({
+  extend: 'account',           // target object name
   fields: { custom_score: { type: 'number' } },
   priority: 300,               // higher = applied later
-}
+});
+
+// objectstack.config.ts
+// defineStack({ objectExtensions: [accountExtension], ... })
 ```
 
 - `priority` controls merge order (default `200`; range `0–999`)
 - Extensions can add fields, validations, and indexes — but cannot remove them
+- Do **not** author `ownership: 'extend'` on an object schema — the object-level
+  `ownership` property is the *record-ownership* enum (`'user' | 'org' | 'none'`),
+  unrelated to extensions
 
 ---
 
 ## Security & Access Control
 
-Per-object access control is part of the schema, not a separate layer.
-Configure these alongside `fields` / `validations` / `hooks`:
+Per-object access control is authored in **permission sets**, not on the object
+schema. There is no object-level `permissions` key (and no `hooks` key either) —
+`ObjectSchema.create()` **rejects** both as unknown keys.
 
 ### Object-level permissions (RBAC)
 
-Bind CRUD operations to roles:
+Grant CRUD access per object with boolean bits on a permission set:
 
 ```typescript
-permissions: {
-  read:   ['authenticated'],
-  create: ['sales', 'admin'],
-  update: ['record_owner', 'sales_manager', 'admin'],
-  delete: ['admin'],
-}
+import { definePermissionSet } from '@objectstack/spec';
+
+export const salesUser = definePermissionSet({
+  name: 'sales_user',
+  objects: {
+    account: { allowRead: true, allowCreate: true, allowEdit: true },
+    contact: { allowRead: true },
+  },
+});
 ```
 
+- Bits: `allowCreate` / `allowRead` / `allowEdit` / `allowDelete`, plus
+  `allowTransfer` (ownership change), `viewAllRecords` / `modifyAllRecords`
+  (super-user, bypass sharing).
 - Source: `node_modules/@objectstack/spec/src/security/permission.zod.ts`
 - Combine with `enable.apiMethods` to also restrict the HTTP surface.
 
@@ -517,17 +535,19 @@ every read for users carrying that set; `check` gates writes. (`@objectstack/plu
 re-reads the target row through the write filter before single-id `update`/`delete`.)
 
 ```typescript
-// in a *.profile.ts / permission-set
+// in a permission set (definePermissionSet)
 rowLevelSecurity: [
   {
     name: 'own_records',
-    operations: ['select', 'update', 'delete'],
-    using: 'owner_id == current_user.id',   // read scope
-    check: 'owner_id == current_user.id',   // write scope
+    object: 'account',                       // REQUIRED per policy
+    operation: 'all',                        // singular: select|insert|update|delete|all
+    using: 'owner_id == current_user.id',    // read scope
+    check: 'owner_id == current_user.id',    // write scope
   },
   {
     name: 'org_isolation',
-    operations: ['all'],
+    object: 'contact',
+    operation: 'select',
     using: 'organization_id == current_user.organization_id',
   },
 ]
@@ -547,67 +567,78 @@ A legacy SQL-style `=` / `IN (...)` predicate still compiles via a **deprecated*
 | `current_user.email` | the caller's email (ADR-0056 #2054) |
 | `current_user.organization_id` | the caller's tenant |
 | `current_user.org_user_ids` | ids of users in the same org (for `IN`) |
-| `current_user.roles` | the caller's roles (for `IN`) |
+| `current_user.positions` | the caller's positions (for `IN`; ADR-0090 D3) |
 
 - Source: `node_modules/@objectstack/spec/src/security/permission.zod.ts` (policy shape),
   `node_modules/@objectstack/spec/src/security/rls.zod.ts` (predicate grammar).
 - Owner-scoping shortcut: the built-in `member_default` set already owner-scopes
   writes via `owner_only_writes` / `owner_only_deletes`, and an object's
-  `sharingModel` (`private` / `public_read` / `controlled_by_parent`, ADR-0056 D1)
+  `sharingModel` (`private` / `public_read` / `public_read_write` / `controlled_by_parent`, ADR-0056 D1)
   is the declarative way to set the org-wide default — prefer those over
   hand-written policies for the common cases.
 
-> **Experimental:** a separate object-level `rls` config with a free-form CEL
-> `predicate` exists in `rls.zod.ts` but is marked experimental (ADR-0056 D8) and
-> is **not** the path the runtime compiles/enforces. Author RLS as
-> `rowLevelSecurity` policies as shown above.
+> **Removed:** a former object-level `rls` config (`RLSConfigSchema`, a free-form
+> CEL `predicate` on the object) was **removed** from the spec (ADR-0056 D8,
+> "design+enforce or remove"). Permission-set `rowLevelSecurity` policies are the
+> only RLS surface — author them as shown above.
 
-### Field-level encryption
+### Sensitive fields — `secret` type + `requiredPermissions`
 
-Encrypt sensitive columns at rest. Decryption is automatic for callers with
-permission; raw bytes are stored otherwise.
+The former `encryptionConfig` and `maskingRule` field keys were **pruned from
+`FieldSchema`** — they had no runtime consumer (dead surface; setting them
+protected nothing). The real channels are:
+
+**Encrypted-at-rest values — `type: 'secret'` (ADR-0100).** For reversible
+machine credentials (DB passwords, API keys, tokens): the engine encrypts the
+value on write via the registered `ICryptoProvider`, stores the ciphertext
+handle in `sys_secret`, persists only an opaque ref on the row, and masks the
+value on read. **Fail-closed:** with no crypto provider registered, writes
+throw rather than persist cleartext.
+
+```typescript
+fields: {
+  api_key: { type: 'secret', label: 'API Key' },
+}
+```
+
+**Per-field access gating — `requiredPermissions` (ADR-0066 D3).** Capabilities
+required to READ/EDIT the field. A field declaring `requiredPermissions` is
+**masked on read and denied on write** unless the caller holds ALL listed
+capabilities — an AND-gate that is strictest-wins over permission-set field
+grants. Enforced by plugin-security's FieldMasker.
 
 ```typescript
 fields: {
   ssn: {
     type: 'text',
-    encryptionConfig: { algorithm: 'aes-256-gcm', keyRef: 'pii_key_v1' },
+    requiredPermissions: ['view_pii'],  // mask on read / deny on write without it
   },
 }
 ```
 
-- Source: `node_modules/@objectstack/spec/src/system/encryption.zod.ts`
-- Key rotation: bump `keyRef` and let the migration re-encrypt.
-
-### PII masking
-
-Show partial values (`****-****-1234`) to roles that can read but should not
-see the full value. Applied after RLS, before serialization.
-
-```typescript
-fields: {
-  credit_card: {
-    type: 'text',
-    maskingRule: {
-      pattern: 'last4',          // built-in: last4 | first2 | email | custom
-      visibleToRoles: ['billing_admin'],
-    },
-  },
-}
-```
-
-- Source: `node_modules/@objectstack/spec/src/system/masking.zod.ts`
+- Source: `node_modules/@objectstack/spec/src/data/field.zod.ts`
+  (`secret` field type, `requiredPermissions`)
 
 ### Multi-tenancy
 
-For SaaS, set `tenancy` on the object schema. Combined with RLS, this
-enforces per-tenant data isolation:
+For SaaS, set `tenancy` on the object schema for row-level tenant isolation
+(the tenant field is injected on write and enforced on read). The block is
+**strict** — exactly two keys:
 
-| Mode | Storage | When to use |
-|:-----|:--------|:------------|
-| `shared` | Single table, `tenant_id` column + RLS | Default — most cost-efficient |
-| `isolated` | Separate database per tenant | Regulatory isolation / large tenants |
-| `hybrid` | Shared schema, tenant-specific sharding | High-volume multi-tenant |
+```typescript
+tenancy: {
+  enabled: true,             // enable row-level tenant isolation
+  tenantField: 'tenant_id',  // default: 'tenant_id'
+}
+```
+
+- The former `shared` / `isolated` / `hybrid` mode key (`tenancy.strategy`) was
+  **retired** (#2763) — an unknown `tenancy` key is now a loud parse error with
+  upgrade guidance, never silently stripped.
+- **Database-per-tenant isolation is not object metadata** — it is an
+  environment/deployment choice (each environment carries its own database URL).
+- Platform/env-global objects declare `tenancy: { enabled: false }` to opt out
+  of org row-scoping (see the visibility-posture recipe below).
 
 ### Platform-global / admin-only objects (visibility posture)
 
@@ -637,7 +668,7 @@ requiredPermissions: ['manage_platform_settings'], // object-level gate → memb
 > row to all authenticated users**. `access.default:'private'` *by itself* opts
 > the admin's `'*'` grant out too, so the **admin sees nothing**. The
 > `tenancy.enabled:false` + `requiredPermissions` pair is the correct combo
-> (admin sees all, non-admins 403). Posture model: [ADR-0066](../../docs/adr/0066-unified-authorization-model.md).
+> (admin sees all, non-admins 403). Posture model: ADR-0066.
 
 ### Cross-skill notes
 
@@ -652,7 +683,7 @@ requiredPermissions: ['manage_platform_settings'], // object-level gate → memb
 ## Metadata Protection (`protection`)
 
 Package authors can lock shipped metadata against Studio edits / overlays / deletes.
-See [ADR-0010](../../docs/adr/0010-metadata-protection-model.md) for the full model.
+See ADR-0010 for the full model.
 
 The `protection` block is **declared on the source schema** (`*.object.ts`,
 `*.app.ts`, `*.view.ts`, …) and stripped at load time — it never appears in
@@ -666,12 +697,15 @@ and the lock banner reads.
 protection?: {
   /** Lock level — controls what Studio can do to this item. */
   lock: 'none' | 'no-overlay' | 'no-delete' | 'full';
-  /** Human-readable reason shown in the Studio lock banner. */
-  reason?: string;
-  /** Optional doc URL — renders as "查看文档 →" link in the banner. */
+  /** REQUIRED — reason shown in the Studio lock banner (1–500 chars). */
+  reason: string;
+  /** Optional doc URL — renders as a "View docs" link in the banner. */
   docsUrl?: string;
 }
 ```
+
+The block is `.strict()`: `reason` is **required** (min 1 / max 500 chars) and
+unknown keys are rejected.
 
 | `lock` | Edit (overlay) | Delete | Typical use |
 |:---|:---:|:---:|:---|
@@ -683,10 +717,10 @@ protection?: {
 ### Example — fully locked platform object
 
 ```ts
-// packages/platform-objects/src/identity/sys-user.object.ts
-import { defineObject } from '@objectstack/spec';
+// src/objects/sys-user.object.ts
+import { ObjectSchema } from '@objectstack/spec/data';
 
-export const SysUserObject = defineObject({
+export const SysUserObject = ObjectSchema.create({
   name: 'sys_user',
   label: 'User',
   protection: {
@@ -694,15 +728,17 @@ export const SysUserObject = defineObject({
     reason: 'Core identity object — see ADR-0010.',
     docsUrl: 'https://docs.objectstack.ai/adr/0010-metadata-protection',
   },
-  fields: [ /* ... */ ],
+  fields: { /* ... */ },
 });
 ```
 
 ### Example — schema-locked but deletable
 
 ```ts
-// packages/platform-objects/src/security/sys-role.object.ts
-export const SysRoleObject = defineObject({
+// src/objects/sys-role.object.ts
+import { ObjectSchema } from '@objectstack/spec/data';
+
+export const SysRoleObject = ObjectSchema.create({
   name: 'sys_role',
   label: 'Role',
   protection: {
@@ -710,7 +746,7 @@ export const SysRoleObject = defineObject({
     reason: 'RBAC schema is platform-defined — see ADR-0010.',
     docsUrl: 'https://docs.objectstack.ai/adr/0010-metadata-protection',
   },
-  fields: [ /* ... */ ],
+  fields: { /* ... */ },
 });
 ```
 
@@ -720,7 +756,7 @@ The same block works on non-object metadata (apps, views, dashboards, flows,
 agents, tools, skills, reports, email-templates):
 
 ```ts
-// packages/plugin-auth/src/apps/setup.app.ts
+// src/apps/setup.app.ts
 import { defineApp } from '@objectstack/spec';
 
 export const SetupApp = defineApp({
@@ -742,7 +778,8 @@ export const SetupApp = defineApp({
   (`GET ?layers=true`) include `lock`, `lockReason`, `lockDocsUrl`, `lockSource`,
   and `packageId` so Studio can render the banner.
 - **Studio**: `ResourceEditPage` renders a banner with the lock reason and the
-  "查看文档 →" link; edit + delete buttons are hidden according to the lock.
+  "View docs" link (from `docsUrl`); edit + delete buttons are hidden according
+  to the lock.
 - **Package vs Artifact source**: `_lockSource: 'package'` when the lock comes
   from a code-shipped schema, `'artifact'` when set by a workspace artifact.
   Artifact locks override package locks (workspace wins).
@@ -763,13 +800,16 @@ export const SetupApp = defineApp({
 
 | Feature | When to Consider |
 |:--------|:-----------------|
-| `tenancy` | Multi-tenant SaaS — choose `shared`, `isolated`, or `hybrid` |
-| `softDelete` | Regulatory requirement for data retention |
-| `versioning` | Audit / compliance — `snapshot`, `delta`, or `event-sourcing` |
-| `partitioning` | Tables > 100M rows — `range`, `hash`, or `list` |
-| `cdc` | Real-time sync to Kafka, webhooks, or data lakes |
-| `encryptionConfig` | GDPR / HIPAA / PCI-DSS field-level encryption |
-| `maskingRule` | PII masking for non-privileged users |
+| `tenancy` | Multi-tenant SaaS — `{ enabled: true, tenantField: 'tenant_id' }` row-level isolation (DB-per-tenant is an environment/deployment choice, not object metadata) |
+| `lifecycle` | Append-only / high-write-rate objects — retention / rotation / archival contract (ADR-0057); see [rules/lifecycle.md](./rules/lifecycle.md) |
+| `enable.trash` | Soft-delete with restore — defaults on; explicit `false` disables the recycle bin |
+| per-field `trackHistory` | Render a field's value changes as human-readable activity-timeline entries (pair with `enable.trackHistory`, ADR-0052 §5b) |
+
+> The former `softDelete` / `versioning` object keys were **removed** from the
+> spec (#2377, ADR-0049 enforce-or-remove) — authoring them is now a build
+> error with upgrade guidance. `partitioning` / `cdc` were never schema keys,
+> and the `encryptionConfig` / `maskingRule` field keys were pruned (see
+> [Sensitive fields](#sensitive-fields--secret-type--requiredpermissions)).
 
 ---
 
