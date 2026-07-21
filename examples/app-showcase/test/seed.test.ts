@@ -25,11 +25,11 @@ describe('showcase stack', () => {
     // leaving 3 dataset-bound analytics reports.
     expect((stack.reports ?? []).length).toBe(3);
     expect((stack.flows ?? []).length).toBeGreaterThan(0);
-    // Seven flat positions (contributor/manager/exec/auditor/ops/
-    // field_ops_delegate/client_portal_user) — the ADR-0090 distribution
-    // layer; `everyone` and `guest` are built-in anchors and never declared
-    // by the app.
-    expect((stack.positions ?? []).length).toBe(7);
+    // Nine flat positions (contributor/manager/exec/auditor/ops/
+    // field_ops_delegate/client_portal_user, plus finance/legal for the v16
+    // approval sign-off flows) — the ADR-0090 distribution layer; `everyone`
+    // and `guest` are built-in anchors and never declared by the app.
+    expect((stack.positions ?? []).length).toBe(9);
     expect((stack.agents ?? []).length).toBe(0); // AI agents are an enterprise (service-ai) feature; the open showcase ships none
   });
 });
