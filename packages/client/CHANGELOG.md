@@ -1,5 +1,152 @@
 # @objectstack/client
 
+## 16.0.0
+
+### Minor Changes
+
+- 9ccd1e9: feat(client): typed `data.batchTransaction()` for the atomic cross-object batch (#1604 / ADR-0034 item 4)
+
+  Adds `client.data.batchTransaction(operations)` (and the environment-scoped
+  `client.project(id).data.batchTransaction`) — a typed SDK surface for
+  `POST {basePath}/batch`, the all-or-nothing cross-object transactional batch
+  that master-detail saves go through. Reuses `CrossObjectBatchOperation` /
+  `CrossObjectBatchRequest` / `CrossObjectBatchResponse` from
+  `@objectstack/spec/api` (also re-exported from the client for convenience);
+  supports `{ $ref: <opIndex> }` intra-batch parent references.
+
+  The method is always atomic and deliberately exposes no `atomic` flag — the
+  endpoint rejects `atomic: false` with `400 BATCH_NOT_ATOMIC`. Non-atomic
+  per-object bulk writes stay on `data.batch()` / `createMany` / `updateMany`,
+  so any best-effort fallback is isolated in the caller's adapter (the ObjectUI
+  `masterDetailTx` adapter), not in the SDK.
+
+- bfa3c3f: **Broadcast a `transactionalBatch` capability bit in discovery so clients negotiate the atomic cross-object batch declaratively, instead of runtime-probing 404/405/501 (#3298).**
+
+  The atomic cross-object batch endpoint (`POST {basePath}/batch`, #1604 / ADR-0034 item 4) and its typed SDK surface (`client.data.batchTransaction`, #3271) already shipped, but discovery never told a client whether a backend actually supports it. Consumers (notably ObjectUI's `ObjectStackAdapter`) had to _probe_: fire a `/batch`, read `404`/`405` (no route) or `501` (no runtime transaction), and only then fall back to non-atomic client-side simulation. That is "find out by calling", not capability negotiation — it cannot be decided at connect time and cannot serve as the "minimum backend supports `/batch`" gate that blocks hard-deleting the non-atomic fallback downstream.
+
+  `WellKnownCapabilitiesSchema` gains a required `transactionalBatch: boolean`, and **every** discovery producer fills it honestly (`declared === enforced`), so it never becomes a declared-but-unpopulated bit:
+
+  - **`@objectstack/metadata-protocol`** (`getDiscovery`) — reports whether the runtime engine can honour a transaction (`typeof engine.transaction === 'function'`). The `/batch` handler runs its ops inside `engine.transaction()`, which degrades to a non-atomic passthrough (or 501) without one.
+  - **`@objectstack/rest`** (`/discovery`) — ANDs the engine signal with whether it actually mounts the route (`api.enableBatch`), so a server with batch disabled reports `false` even on a transaction-capable engine (never advertise an endpoint that would 404).
+  - **`@objectstack/plugin-hono-server`** (standalone discovery) — reports `false`: this minimal surface registers CRUD only and does not mount `/batch` (that ships with `@objectstack/rest`). Under-reporting is the safe direction — a client keeps its correct-but-slower fallback rather than losing atomicity.
+  - **`@objectstack/client`** — already normalizes hierarchical `capabilities` to flat booleans, so `client.capabilities.transactionalBatch` is exposed (and now typed) for declarative consumers.
+
+  The bit follows the existing capability semantics: `true` ⟺ the `/batch` route is mounted **and** the runtime can honour a transaction — the exact condition under which the endpoint returns `200` rather than `404`/`405`/`501`. Additive and behavior-preserving; only the discovery payload gains a field.
+
+- 668dd17: **Breaking (npm type surface): retire the vestigial feed contracts + protocol surface (ADR-0052 §5 follow-up, #1959).**
+
+  The `service-feed` runtime was deleted in #1955; `sys_comment` / `sys_activity`
+  are the canonical record-collaboration/timeline backend. This removes the dead
+  type surface that still pointed at the deleted runtime — every removed method was
+  already unreachable (the feed REST route was never mounted → 404; the protocol
+  implementation was never wired with a feed service, so `requireFeedService()`
+  could only throw). No behavior changes.
+
+  No authorable metadata key is removed (the `feeds:` object capability flag and
+  the `RecordActivity` UI component config are unchanged), so `PROTOCOL_MAJOR`
+  stays 15 and this ships as `minor` rather than a protocol major.
+
+  FROM → TO migration for every removed export:
+
+  - `@objectstack/spec/contracts` — `IFeedService`, `CreateFeedItemInput`,
+    `UpdateFeedItemInput`, `ListFeedOptions`, `FeedListResult` → **removed, no
+    replacement**. Comments/activity are plain records: write `sys_comment` / read
+    `sys_activity` via the data engine or the REST data API.
+  - `@objectstack/spec/api` — `FeedApiContracts`, `FeedApiErrorCode`,
+    `FeedProtocol`, and all feed request/response schemas + types (`GetFeed*`,
+    `CreateFeedItem*`, `UpdateFeedItem*`, `DeleteFeedItem*`, `AddReaction*`,
+    `RemoveReaction*`, `PinFeedItem*`, `UnpinFeedItem*`, `StarFeedItem*`,
+    `UnstarFeedItem*`, `SearchFeed*`, `GetChangelog*`, `ChangelogEntry`,
+    `SubscribeRequest/Response`, `FeedUnsubscribeRequest`, `UnsubscribeResponse`,
+    `FeedPathParams`, `FeedItemPathParams`, `FeedListFilterType`) → **removed**. Use
+    the data API against `sys_comment` / `sys_activity` (`/api/v1/data/sys_comment/…`);
+    reactions and threaded replies are fields on `sys_comment`.
+  - `@objectstack/spec/data` — `FeedItemSchema`/`FeedItem`, `FeedActorSchema`/`FeedActor`,
+    `MentionSchema`/`Mention`, `ReactionSchema`/`Reaction`,
+    `FieldChangeEntrySchema`/`FieldChangeEntry`, `FeedVisibility`,
+    `RecordSubscriptionSchema`/`RecordSubscription`, `SubscriptionEventType`, and the
+    `data`-namespace `NotificationChannel` → **removed**. `FeedItemType` and
+    `FeedFilterMode` are **kept** (live UI activity-timeline config). For notification
+    channels use `NotificationChannelSchema` from `@objectstack/spec/system`.
+  - `@objectstack/client` — `client.feed.*` (`list` / `create` / `update` / `delete` /
+    `addReaction` / `removeReaction` / `pin` / `unpin` / `star` / `unstar` / `search` /
+    `getChangelog` / `subscribe` / `unsubscribe`) and the re-exported feed response
+    types → **removed**. One-line fix: use `client.data.*` on `sys_comment` /
+    `sys_activity`, e.g. `client.data.create('sys_comment', { object, record_id, body })`
+    and `client.data.find('sys_activity', { filters: [['record_id', '=', id]] })`.
+  - `@objectstack/metadata-protocol` — `ObjectStackProtocolImplementation` no longer
+    implements the 14 feed methods; its constructor
+    `(engine, getServicesRegistry?, getFeedService?, environmentId?)` becomes
+    `(engine, getServicesRegistry?, environmentId?)`. One-line fix: delete the third
+    argument.
+
+### Patch Changes
+
+- 8abf133: **Breaking (discovery response shape): retire the residual feed capability surface (#3180, follow-up to #1959 / ADR-0052 §5).**
+
+  The feed backend was retired long ago; #1959 removed the feed contracts + SDK. This
+  removes the last discovery/dispatcher references to it, and fixes a real bug where the
+  `comments` capability was permanently `false`.
+
+  - `@objectstack/spec` — `WellKnownCapabilitiesSchema.feed` and `ApiRoutesSchema.feed`
+    (`routes.feed`) are **removed**, and the `/api/v1/feed` entry is dropped from
+    `DEFAULT_DISPATCHER_ROUTES`. FROM → TO: clients reading `discovery.capabilities.feed`
+    or `discovery.routes.feed` → use `discovery.capabilities.comments`; comments/activity
+    are served by the generic data API on `sys_comment` / `sys_activity`
+    (`/api/v1/data/sys_comment/…`).
+  - `@objectstack/metadata-protocol` — `getDiscovery()` no longer emits the always-`false`
+    `feed` service/capability. **Bug fix:** the `comments` capability previously keyed off
+    the deleted `'feed'` service (so it was permanently `false` after #1955); it now tracks
+    the presence of the `sys_comment` object (provided by the always-on audit slate), so
+    `declared === enforced`.
+  - `@objectstack/client` — the internal `feed: '/api/v1/feed'` route constant is removed
+    (it only existed to satisfy the now-removed `ApiRoutes.feed` type; no client code used it).
+
+- Updated dependencies [f972574]
+- Updated dependencies [6289ec3]
+- Updated dependencies [22013aa]
+- Updated dependencies [3ad3dd5]
+- Updated dependencies [8efa395]
+- Updated dependencies [3a18b60]
+- Updated dependencies [a8aa34c]
+- Updated dependencies [e057f42]
+- Updated dependencies [a3823b2]
+- Updated dependencies [43a3efb]
+- Updated dependencies [524696a]
+- Updated dependencies [bfa3c3f]
+- Updated dependencies [5e3301d]
+- Updated dependencies [dd9f223]
+- Updated dependencies [46e876c]
+- Updated dependencies [5f05de2]
+- Updated dependencies [021ba4c]
+- Updated dependencies [158aa14]
+- Updated dependencies [62a2117]
+- Updated dependencies [d2723e2]
+- Updated dependencies [fefcd54]
+- Updated dependencies [beaf2de]
+- Updated dependencies [369eb6e]
+- Updated dependencies [06ff734]
+- Updated dependencies [b659111]
+- Updated dependencies [5754a23]
+- Updated dependencies [6c270a6]
+- Updated dependencies [290e2f0]
+- Updated dependencies [668dd17]
+- Updated dependencies [8abf133]
+- Updated dependencies [e0859b1]
+- Updated dependencies [04ecd4e]
+- Updated dependencies [4d5a892]
+- Updated dependencies [16cebeb]
+- Updated dependencies [86d30af]
+- Updated dependencies [8923843]
+- Updated dependencies [a2795f6]
+- Updated dependencies [f16b492]
+- Updated dependencies [4b6fde8]
+- Updated dependencies [2018df9]
+- Updated dependencies [fc5a3a2]
+- Updated dependencies [8ff9210]
+  - @objectstack/spec@16.0.0
+  - @objectstack/core@16.0.0
+
 ## 16.0.0-rc.1
 
 ### Minor Changes

@@ -1,5 +1,128 @@
 # @objectstack/console
 
+## 16.0.0
+
+### Minor Changes
+
+- bfa3c3f: Console (objectui) refreshed to `3b2e4d98d904`. Frontend changes in this range:
+
+  - fix(list): route remaining system-field groupings through shared classifier (#2706)
+  - feat(console): user-import wizard defaults to the `auto` password policy (tracks framework#3236) (#2701)
+  - feat(flow-designer): schema-driven keyValue + numberList mapping (#3304) (#2708)
+
+  objectui range: `0318118e02fd...3b2e4d98d904`
+
+- 39b56d0: Console (objectui) refreshed to `94d4876df090`. Frontend changes in this range:
+
+  - feat(dashboard): Studio authors the ADR-0021 dataset shape only (framework#3251) (#2703)
+  - feat(app-shell): render ActionParamDialog params through the shared form field-widget renderer (#2700, ADR-0059) (#2704)
+  - feat(app-shell): distinguish writable system objects from engine-owned in badge + empty-state (ADR-0103 / #3220) (#2705)
+  - fix(list): keep injected owner_id out of leading auto-derived list columns (#2702)
+  - feat(flow-designer): #2670 Phase 3 — nested container node selection + schema-driven editing (#2699)
+  - feat(approvals-inbox): retire hardcoded secondary buttons for server-declared actions (#2697)
+
+  objectui range: `fd45313b4d00...94d4876df090`
+
+- 447465a: Console (objectui) refreshed to `e164196801bd`. Frontend changes in this range:
+
+  - fix(app-shell,plugin-detail): record History tab renders display values, not raw audit payloads (#2691)
+  - fix(plugin-gantt): mirror the row 「→」 slot in the task-list header (#2690)
+  - fix(plugin-detail): #2688 header Record-#id floor + raw audit user id in meta footer (#2689)
+  - feat(plugin-gantt)!: remove the mobile QR share (移动端二维码) context-menu feature (#2687)
+  - feat(plugin-gantt): dependencyTypes switch — hide the type switcher for id-only dependency stores (#2686)
+  - feat(approvals): decision attachments + progress display + deep link + designer sync (#2681)
+  - feat(studio): inline push-down expansion of loop/parallel/try_catch regions on the flow canvas (#2680)
+  - feat(plugin-gantt): ownership-aware reschedule + confirm-first auto-schedule, export fixes, business time zone (#2683)
+  - fix(app-shell): skip resultDialog fields whose path does not resolve (#2674)
+  - feat(studio): visualize loop/parallel/try_catch nested regions on the flow canvas (#2670) (#2675)
+  - feat(plugin-gantt): manual-scheduling summary bars, interaction switches, beforeTaskUpdate veto + tooltip/scrollbar/cursor fixes (#2677)
+  - fix(flow-designer): author the canonical config.schedule the runtime reads (#2671)
+  - feat(report): drill a date-bucket cell into its time range, not a superset (#1752) (#2672)
+  - feat(studio): filter editor for roll-up summary fields (framework#1868) (#2669)
+  - feat(flow-designer): first-class panel for the time-relative trigger (#1874) (#2668)
+  - feat(studio): nest per-iteration / per-region step logs in the flow Runs panel (#2667)
+  - fix(metadata-admin): dashboard label fallback + skill activation editors (#1878) (#2666)
+
+  objectui range: `2e7d7f0f7ee7...e164196801bd`
+
+- a140ff0: Console (objectui) refreshed to `fd45313b4d00`. Frontend changes in this range:
+
+  - feat(app-shell): DeclaredActionsBar — render server-declared object actions on bespoke pages (#2678 P2-4) (#2692)
+  - feat(data): unify master-detail saves behind DataSource.batchTransaction; isolate non-atomic fallback in the adapter (#2679) (#2684)
+
+  objectui range: `e164196801bd...fd45313b4d00`
+
+### Patch Changes
+
+- a276969: Console (objectui) refreshed to `0318118e02fd`. Frontend changes in this range:
+
+  - fix(app-shell): guard ActionParamDialog submit during file upload + map spec `autonumber` (ADR-0059 follow-ups) (#2707)
+
+  objectui range: `94d4876df090...0318118e02fd`
+
+- 47d923c: Console (objectui) refreshed to `2e7d7f0f7ee7`. Frontend changes in this range:
+
+  - feat(evaluator): route CEL-dialect component/action predicates to the canonical engine (#2664)
+  - fix(grid): explain the import wizard's disabled Next and silent downgrade (#2640, #2639) (#2646)
+  - fix(form+detail): single-file children stay inline grids; drop non-spec `attachment` (#2654, #2655) (#2656)
+  - feat(access): localize curated capability labels client-side (#2600 B5 follow-up) (#2657)
+  - feat(access): localize capability picker group headers (#2600 B5, objectui side) (#2653)
+  - fix(access): Studio permission matrix — stop clipping the Bulk column at narrow widths (#2600 B3) (#2652)
+  - feat(access): Studio permission matrix — field-level bulk + filter for wide objects (#2600 B4) (#2651)
+  - feat(access): Studio Explain panel — package-scoped object dropdown instead of free-text api-name (#2600 B2) (#2650)
+  - feat(access): Studio permission matrix — collapse identity + zero-grant capabilities so the matrix hits the first screen (#2600 B1) (#2649)
+  - feat(plugin-list): 列表工具栏增加手动刷新按钮 (#2634) (#2645)
+  - fix(studio): approver Type dropdown drops deprecated `role`, membership-tier picker (#2643)
+  - fix(components): route internal html-page links through the SPA navigation handler (#2642)
+  - feat(discovery): trust only handlerReady/available services (ADR-0076 D12) (#2637)
+  - feat(types)!: adopt @objectstack/spec 15.1.1; drop value-erased spec/ui `…Schema` re-exports (#2589)
+  - feat(console): dev-seeded admin credentials hint on the login page (#2635)
+  - fix(auth): 注册页去掉重复的「or」分隔线(与 #2629 登录页修复对齐) (#2633)
+  - feat(app-shell/react): adapt to framework 15.1 — atomic publish rendering + honest discovery (#2630)
+  - fix(chatbot): plan approval flips the card to a Building… badge immediately (#2632)
+  - fix(app-shell,components): welcome CTA deep-links into the environment create dialog (#2631)
+  - fix(auth): login-page config race + sign-in watchdog — never strand SSO-only users on a password wall (#2629)
+  - feat(types): derive ListViewSchema from @objectstack/spec/ui (#2231) (#2622)
+
+  objectui range: `077e45b4bc55...2e7d7f0f7ee7`
+
+- a791200: Console (objectui) refreshed to `69fa5d163a97`. Frontend changes in this range:
+
+  - fix(app-shell): mark notifications read via the REST surface, not direct receipt writes (#2743)
+
+  objectui range: `af1b0db96e44...69fa5d163a97`
+
+- db34d54: Console (objectui) refreshed to `9a5f016f7d5c`. Frontend changes in this range:
+
+  - feat(flow-designer): nested-array columns in the node property form (#2678 P2-5) (#2761)
+  - fix: redo record-list "Add View" flow — empty-name 405, invisible drafts, canonical naming (#2768)
+  - feat(SchemaForm): field-type-aware operators + values for view filter (#2766)
+  - fix(plugin-charts): draw dashboard chart bars on first paint via isAnimationActive=false (#2756) (#2759)
+  - feat(data-objectstack): gate non-atomic batch fallback on discovery transactionalBatch capability (#2693) (#2755)
+
+  objectui range: `69fa5d163a97...9a5f016f7d5c`
+
+- 1965549: Console (objectui) refreshed to `af1b0db96e44`. Frontend changes in this range:
+
+  - feat(i18n): localize action result dialogs via \_actions.<action>.resultDialog (#2736)
+  - feat(data): thread the host's authenticated fetch into provider:'api' data sources (#2725) (#2732)
+  - feat(managedBy): add explicit `engine-owned` lifecycle bucket (tracks framework ADR-0103 addendum, #3343) (#2739)
+  - feat(fields): CheckboxesField visibleWhen cascading + dependsOn gating (completes option-widget parity) (#2735)
+  - feat(fields): RadioField visibleWhen cascading + dependsOn gating; single-source the option resolver (#2728)
+  - fix(kanban,calendar): surface write failures instead of silently swallowing them (#2716)
+  - fix(plugin-charts): draw dashboard bars on first paint via one settle re-mount (#2727)
+  - feat(dashboard): retire pre-ADR-0021 inline-analytics renderer branches (framework#3320) (#2723)
+  - fix(data-objectstack): type the exportDownload test fetch mock so its type-check passes (#2726)
+  - feat(detail): related lists paginate by default with server-side $top/$skip windows (#2711) (#2722)
+  - fix(approvals-inbox): align participant gating with the server-computed viewer block (#2719)
+  - fix(plugin-view): coerce i18n tab-label helpers to string (TS2322) (#2721)
+  - feat(fields): MultiSelectField per-option visibleWhen cascading + dependsOn gating (#2715) (#2717)
+  - fix(site): make docs build resilient to remote badge fetch failures (#2695) (#2718)
+  - feat(approvals-inbox): retire the approve/reject composer for declared actions with file attachments (#2698) (#2710)
+  - feat(fields): select+multiple → multi-value chip picker; restore fields/core lint gates (#2709)
+
+  objectui range: `3b2e4d98d904...af1b0db96e44`
+
 ## 16.0.0-rc.1
 
 ### Minor Changes
