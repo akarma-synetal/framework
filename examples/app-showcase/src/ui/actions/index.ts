@@ -3,6 +3,7 @@
 import { defineAction } from '@objectstack/spec/ui';
 
 const task = 'showcase_task';
+const invoice = 'showcase_invoice';
 
 /**
  * Action matrix — covers every `ActionType` (script / url / flow / modal /
@@ -138,6 +139,39 @@ export const NewTaskAction = defineAction({
   refreshAfter: true,
 });
 
+/**
+ * script — Submit an invoice for finance + legal sign-off (§1 demo entry point).
+ *
+ * Flipping `status` to `sent` is exactly the transition the `showcase_invoice_signoff`
+ * flow's start gate watches (`status == "sent" && previous.status != "sent"`), so
+ * this button opens a fresh 会签 (finance ∧ legal) approval request from the record
+ * header — the same request the boot-time demo seeds (src/security/seed-approval-demo.ts),
+ * but on demand. The sandboxed body's write fires the record-change trigger like any
+ * user edit. Gated to draft invoices so it disappears once submitted.
+ */
+export const SubmitForSignoffAction = defineAction({
+  name: 'showcase_submit_signoff',
+  label: 'Submit for Sign-off',
+  icon: 'send',
+  objectName: invoice,
+  type: 'script',
+  body: {
+    language: 'js',
+    source:
+      "var id = ctx.recordId || (ctx.record && ctx.record.id) || input.recordId;" +
+      "if (!id) throw new Error('No invoice to submit');" +
+      "await ctx.api.object('showcase_invoice').update({ id: id, status: 'sent' });" +
+      "return { ok: true, id: id };",
+    capabilities: ['api.write'],
+  },
+  successMessage: 'Invoice submitted for finance + legal sign-off.',
+  // Only on invoices not yet sent. `record.`-prefixed single comparison, per the
+  // ActionEngine's fail-closed CEL evaluation (see MarkDoneAction's note).
+  visible: "record.status != 'sent'",
+  locations: ['list_item', 'record_header'],
+  refreshAfter: true,
+});
+
 export const allActions = [
   MarkDoneAction,
   OpenDocsAction,
@@ -146,4 +180,5 @@ export const allActions = [
   RecalcEstimateAction,
   LogTimeAction,
   NewTaskAction,
+  SubmitForSignoffAction,
 ];
