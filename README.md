@@ -19,11 +19,12 @@
 `Fits in an agent's context` · `Typed, validated, governed` · `Self-host anywhere` · Apache-2.0
 
 **Everything in this repo is the open stack** — protocol, microkernel, SDK,
-CLI, and the production runtime, Apache-2.0 with no open-core asterisks. You
-can build, ship, and self-host real apps from here alone. Rather have the
-platform run for you, AI Builder and governance included? That's
-**[ObjectOS](https://github.com/objectstack-ai/objectos)**, the commercial
-runtime environment built on this stack.
+CLI, and the production runtime, Apache-2.0 with no open-core asterisks. The
+workflow here is **build & ask with Claude Code** (or any coding agent): the
+agent writes the metadata in your repo, and operates the running app over
+MCP. Rather **build & ask online** — in the browser, nothing to install?
+That's **[ObjectOS](https://github.com/objectstack-ai/objectos)**, the
+commercial runtime environment built on this stack.
 
 <p align="center">
   <img src="docs/screenshots/architecture.png" width="940" alt="ObjectStack architecture: author typed Zod metadata (objects, flows, views, policies); the microkernel compiles it into a versioned JSON artifact and loads plugins, drivers, and services; it generates a REST API, client SDK, Console and Studio UI, and MCP tools used by developers and AI agents, governed by Auth, RBAC, RLS, FLS, and audit, over PostgreSQL, MySQL, SQLite, or MongoDB">
