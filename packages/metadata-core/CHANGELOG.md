@@ -1,5 +1,85 @@
 # @objectstack/metadata-core
 
+## 16.0.0
+
+### Patch Changes
+
+- 62a2117: **Split the overloaded `managedBy: 'system'` bucket with an explicit `engine-owned` value (ADR-0103 addendum, #3343).** ADR-0103 deferred the enum split ("revisitable later as a rename") because a new `managedBy` value would fall through to the fully-editable `platform` default on deployed Console clients. Both reasons against it are now retired — the server-side write guard / `apiMethods` reconciliation / `/me/permissions` clamp make that fallthrough cosmetic (the write is rejected regardless of what the client renders), and objectui#2712 closed the UI union — so v16 lands it, **additively**.
+
+  - **New enum value `engine-owned`** with the same all-locked default affordance row as `system` (`create/import/edit/delete: false`, `exportCsv: true`). It joins `ENGINE_OWNED_BUCKETS` (the engine write guard) and `GUARDED_WRITE_BUCKETS` (the `/me/permissions` clamp); the guard, `reconcileManagedApiMethods`, and the clamp mechanisms are unchanged — `engine-owned` is an explicit member of the set they already covered by resolved affordance.
+  - **20 objects relabelled `system → engine-owned`** — the ones the engine owns end to end and that declared no write-opening `userActions` (the metadata store, jobs, approval runtime rows, sharing rows, `sys_automation_run`, the messaging delivery/receipt pipeline, `sys_secret`, settings). One-line, behaviour-identical per object.
+  - **8 admin/user-writable objects keep `managedBy: 'system'`** (the RBAC link tables, `sys_user_preference`, `sys_approval_delegation`, the messaging config grids) — `system` now reads as "engine-managed schema, writable via `userActions`".
+
+  Behaviour-, enforcement- and wire-identical: resolved affordances, the guard verdict, the 405 `apiMethods` reconciliation, and the permissions clamp are the same before and after — this is a self-documenting relabel, not a policy change. No data migration (`managedBy` is schema metadata) and no code branches on the `'system'` literal. Retiring the overloaded `system` entirely (moving the 8 writable objects to a dedicated bucket) is a breaking rename deferred to v17.
+
+- 06cb319: fix(identity): close the generic-write apiMethods hole on sys_presence and sys_metadata (#3220)
+
+  Follow-through on #1591/#3213 (better-auth apiMethods reconciliation) for two
+  non-better-auth managed objects that shipped the same contradiction: their
+  `enable.apiMethods` advertised generic `create`/`update`/`delete` while their
+  `managedBy` bucket forbids user-context writes, leaving the generic `/data`
+  route open to a write the bucket does not permit.
+
+  - `sys_presence` (`managedBy: 'append-only'`) advertised `create`/`update`/`delete`
+    (update/delete on an append-only object at that) but is written only over the
+    realtime websocket/in-memory path, never through ObjectQL. Narrowed to
+    `['get', 'list']`.
+  - `sys_metadata` (`managedBy: 'system'`) advertised full CRUD but customization
+    overlays are authored only through the metadata-protocol RPC (engine writes
+    carry a transaction context, not a user session); neither the framework nor
+    the Console (objectui) POSTs `/data/sys_metadata`. Narrowed to `['get', 'list']`.
+
+  Reads stay open. The metadata-protocol / realtime write paths are engine-level
+  and bypass the HTTP exposure gate, so they are unaffected — verified by the
+  metadata-authoring dogfood and the objectql overlay tests.
+
+  A blast-radius audit confirmed the broader `system`/`append-only` buckets are NOT
+  safe to guard wholesale: several `system` objects (`sys_user_position`,
+  `sys_user_permission_set`, `sys_position_permission_set`, `sys_user_preference`,
+  `sys_import_job`) are legitimately user-writable by design (delegated
+  administration, user preferences, imports). Generalizing the engine write guard
+  to those buckets is intentionally NOT done here — see #3220 for the bucket-taxonomy
+  root cause.
+
+- Updated dependencies [f972574]
+- Updated dependencies [6289ec3]
+- Updated dependencies [22013aa]
+- Updated dependencies [3ad3dd5]
+- Updated dependencies [8efa395]
+- Updated dependencies [3a18b60]
+- Updated dependencies [a8aa34c]
+- Updated dependencies [a3823b2]
+- Updated dependencies [43a3efb]
+- Updated dependencies [524696a]
+- Updated dependencies [bfa3c3f]
+- Updated dependencies [5e3301d]
+- Updated dependencies [46e876c]
+- Updated dependencies [158aa14]
+- Updated dependencies [62a2117]
+- Updated dependencies [d2723e2]
+- Updated dependencies [fefcd54]
+- Updated dependencies [beaf2de]
+- Updated dependencies [369eb6e]
+- Updated dependencies [06ff734]
+- Updated dependencies [b659111]
+- Updated dependencies [5754a23]
+- Updated dependencies [6c270a6]
+- Updated dependencies [668dd17]
+- Updated dependencies [8abf133]
+- Updated dependencies [e0859b1]
+- Updated dependencies [04ecd4e]
+- Updated dependencies [4d5a892]
+- Updated dependencies [16cebeb]
+- Updated dependencies [86d30af]
+- Updated dependencies [8923843]
+- Updated dependencies [a2795f6]
+- Updated dependencies [f16b492]
+- Updated dependencies [4b6fde8]
+- Updated dependencies [2018df9]
+- Updated dependencies [fc5a3a2]
+- Updated dependencies [8ff9210]
+  - @objectstack/spec@16.0.0
+
 ## 16.0.0-rc.1
 
 ### Patch Changes
