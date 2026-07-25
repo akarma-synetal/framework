@@ -19,6 +19,7 @@ import { validateCapabilityReferences } from '@objectstack/lint';
 import { validateVisibilityPredicates } from '@objectstack/lint';
 import { validateSecurityPosture } from '@objectstack/lint';
 import { validateFlowTriggerReadiness } from '@objectstack/lint';
+import { validateFlowTemplatePaths } from '@objectstack/lint';
 import { validateReadonlyFlowWrites } from '@objectstack/lint';
 import { preflightRequiredCapabilities, renderCapabilityMessage } from '../utils/capability-preflight.js';
 import {
@@ -428,6 +429,22 @@ export default class Validate extends Command {
         }
       }
 
+      // 3g-bis. Flow template path references (#3426): a `{record.<path>}` token
+      //     in a node template that names an unknown field, or hops through a
+      //     lookup relation the seeded record carries only as a scalar id, both
+      //     render a SILENT empty string at runtime. Advisory: the head object
+      //     may come from another package (skipped there), and the runtime still
+      //     produces output (a blank), so nothing is fully broken.
+      if (!flags.json) printStep('Checking flow template references...');
+      const flowTemplateFindings = validateFlowTemplatePaths(normalized as Record<string, unknown>);
+      const flowTemplateWarnings = flowTemplateFindings.filter((f) => f.severity === 'warning');
+      if (!flags.json) {
+        for (const w of flowTemplateWarnings.slice(0, 50)) {
+          console.log(chalk.yellow(`  ⚠ ${w.where}: ${w.message}`));
+          console.log(chalk.dim(`      ${w.hint}`));
+        }
+      }
+
       // 3e2. [#3425] Readonly flow-write guardrail. A `runAs:user` update_record
       //      that writes a static-`readonly` field is a SILENT no-op — the engine
       //      strips it from the UPDATE payload (#2948) yet the step reports
@@ -545,7 +562,7 @@ export default class Validate extends Command {
           valid: true,
           manifest: config.manifest,
           stats,
-          warnings: [...exprWarnings, ...widgetWarnings, ...actionRefWarnings, ...styleWarnings, ...jsxWarnings, ...capWarnings, ...flowReadinessWarnings, ...securityAdvisories, ...capProviderWarnings],
+          warnings: [...exprWarnings, ...widgetWarnings, ...actionRefWarnings, ...styleWarnings, ...jsxWarnings, ...capWarnings, ...flowReadinessWarnings, ...flowTemplateWarnings, ...securityAdvisories, ...capProviderWarnings],
           conversions: conversionNotices,
           specVersionGap: specGap,
           duration: timer.elapsed(),

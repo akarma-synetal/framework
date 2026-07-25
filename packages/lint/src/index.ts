@@ -40,6 +40,16 @@ export type {
 } from './validate-flow-trigger-readiness.js';
 
 export {
+  validateFlowTemplatePaths,
+  FLOW_TEMPLATE_UNKNOWN_FIELD,
+  FLOW_TEMPLATE_LOOKUP_TRAVERSAL,
+} from './validate-flow-template-paths.js';
+export type {
+  FlowTemplatePathFinding,
+  FlowTemplatePathSeverity,
+} from './validate-flow-template-paths.js';
+
+export {
   validateReadonlyFlowWrites,
   FLOW_UPDATE_READONLY_FIELD,
   FLOW_UPDATE_READONLY_WHEN_FIELD,
