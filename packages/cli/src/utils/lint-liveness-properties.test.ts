@@ -159,29 +159,15 @@ describe('lintLivenessProperties', () => {
     expect(findings).toEqual([]);
   });
 
-  // ── webhook (#3462) ───────────────────────────────────────────────────────
-  // The ENTIRE WebhookSchema authoring surface is disconnected from the
-  // sys_webhook dispatcher (#3461): authoring `webhooks:` never materializes a
-  // dispatchable row. Rather than warn on all 16 dead props, the ledger warns
-  // once per webhook via the required `url` carrier — one no-op heads-up per
-  // artifact. These run against the REAL webhook.json ledger.
+  // ── webhook (#3461 bridge landed → #3490; #3494 prune) ────────────────────
+  // Two things closed the old "entire surface is dead" state: #3494 PRUNED the
+  // aspirational dead props (body/payloadFields/includeSession/retryPolicy/tags/
+  // authentication) from the schema, and the #3489 materializer bridge makes
+  // every REMAINING prop live (object/isActive/url/triggers/method/name/headers/
+  // secret/timeoutMs/label/description). So a webhook has no misleading dead
+  // surface left — authoring one is silent. Runs against the REAL webhook.json.
 
-  it('warns once per authored webhook via the url carrier', () => {
-    const findings = lintLivenessProperties({
-      webhooks: [{ name: 'w1', url: 'https://hooks.example/x' }],
-    });
-    const f = findings.find((x) => x.message.includes('`url`'));
-    expect(f).toBeDefined();
-    expect(f!.where).toBe("webhook 'w1'");
-    expect(f!.hint.toLowerCase()).toContain('sys_webhook');
-  });
-
-  it('emits exactly one warning for a fully-authored (showcase-shaped) webhook', () => {
-    // object/triggers/method/isActive/description are dead too, but only `url`
-    // carries authorWarn — so the whole no-op artifact yields ONE finding, not
-    // one-per-prop. (isActive is default(true), deliberately unmarked.
-    // #3494 pruned the aspirational body/payloadFields/includeSession/
-    // authentication/retryPolicy/tags props outright.)
+  it('does not warn on an authored webhook — all remaining props are live (#3490)', () => {
     const findings = lintLivenessProperties({
       webhooks: [{
         name: 'showcase_task_changed',
@@ -193,14 +179,6 @@ describe('lintLivenessProperties', () => {
         description: 'Sends task lifecycle events to an external system.',
       }],
     });
-    expect(findings.length).toBe(1);
-    expect(findings[0].message).toContain('`url`');
-  });
-
-  it('does NOT warn on isActive (default(true) boolean, deliberately unmarked)', () => {
-    const findings = lintLivenessProperties({
-      webhooks: [{ name: 'w1', url: 'https://hooks.example/x', isActive: true }],
-    });
-    expect(paths(findings).some((m) => m.includes('`isActive`'))).toBe(false);
+    expect(findings).toEqual([]);
   });
 });
