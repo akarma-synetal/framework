@@ -22,6 +22,8 @@
  * {@link DimensionLabelDeps} so this module stays free of any engine dependency.
  */
 
+import type { ExecutionContext } from '@objectstack/spec/kernel';
+
 /** The minimal field shape this resolver needs. */
 export interface FieldMetaLite {
   type?: string;
@@ -48,11 +50,19 @@ export interface DimensionLabelDeps {
    * object is more restricted than the base object whose rows carry the id.
    * `undefined` means "no scope for this object" (global table / unrestricted
    * caller) — the same contract as the read-scope provider.
+   *
+   * `context` is the request's ExecutionContext — the SECOND belt on the same
+   * read (#3602). `scope` is the analytics layer's own predicate; forwarding the
+   * context lets the ENGINE's middleware chain scope this per-record read
+   * itself, so it stays scoped even if a caller ever reaches this hook without
+   * a resolved `scope`. Implementations bridging to an ObjectQL engine MUST
+   * forward it; a bridge with nowhere to put it may ignore it.
    */
   fetchRecordLabels(
     targetObject: string,
     ids: unknown[],
     scope?: Record<string, unknown>,
+    context?: ExecutionContext,
   ): Promise<Map<unknown, string>>;
 }
 
@@ -140,6 +150,10 @@ export function formatDateBucket(value: unknown, granularity?: DateGranularity |
  *   throws, that dimension's labels are SKIPPED (fail-closed — the raw id renders
  *   instead) rather than fetched unscoped. Omit when no read-scope provider is
  *   configured (labels then fetch unscoped, as before — no security in play).
+ * @param context - the request's ExecutionContext, forwarded to
+ *   {@link DimensionLabelDeps.fetchRecordLabels} so the engine's own middleware
+ *   scopes the per-record label read too — the second belt beside `resolveScope`
+ *   (#3602)
  */
 export async function resolveDimensionLabels(
   baseObject: string,
@@ -147,6 +161,7 @@ export async function resolveDimensionLabels(
   rows: Record<string, unknown>[],
   deps: DimensionLabelDeps,
   resolveScope?: LabelScopeResolver,
+  context?: ExecutionContext,
 ): Promise<void> {
   if (!rows.length || !dims.length) return;
   const fields = deps.getObjectFields(baseObject);
@@ -202,7 +217,7 @@ export async function resolveDimensionLabels(
           continue;
         }
       }
-      const labelById = await deps.fetchRecordLabels(meta.reference, ids, scope ?? undefined);
+      const labelById = await deps.fetchRecordLabels(meta.reference, ids, scope ?? undefined, context);
       if (!labelById || labelById.size === 0) continue;
       for (const row of rows) {
         const label = labelById.get(row[dim.name]);

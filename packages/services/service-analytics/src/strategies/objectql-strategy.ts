@@ -4,6 +4,12 @@ import type { AnalyticsQuery, AnalyticsResult } from '@objectstack/spec/contract
 import type { Cube } from '@objectstack/spec/data';
 import type { AnalyticsStrategy, StrategyContext } from './types.js';
 import { normalizeAnalyticsFilters, coerceFilterValueForObjectQL } from './filter-normalizer.js';
+import { compileScopedFilterToSql } from '../read-scope-sql.js';
+
+/** Scalar analytics operators → their SQL spelling (display SQL only). */
+const SCALAR_SQL_OPS: Record<string, string> = {
+  equals: '=', notEquals: '!=', gt: '>', gte: '>=', lt: '<', lte: '<=',
+};
 
 /**
  * ObjectQLStrategy — Priority 2
@@ -84,7 +90,7 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
     // runs BEFORE scope injection and subsumes the #3597 joined-scope concern:
     // a rejected query never loads the joined object, so nothing is left
     // unscoped. Independent of read scope, so it fires with security off too.
-    this.assertNoCrossObjectReferences(cube, query, groupBy, filter);
+    this.assertNoCrossObjectReferences(cube, query);
 
     // ADR-0021 D-C — the base object's read scope (tenant + RLS) MUST be ANDed
     // in before the query leaves the strategy (#3597).
@@ -102,6 +108,12 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
       // on that zone's calendar days. A non-UTC zone makes the engine bucket
       // in-memory (uniform across drivers); UTC/unset keeps the DB fast path.
       timezone: query.timezone,
+      // ADR-0021 D-C (#3602): the second belt. `withReadScope` above is this
+      // layer's own scoping; handing the engine the context makes ITS middleware
+      // inject RLS too, so a future strategy that forgets `withReadScope` still
+      // cannot read across tenants. Without it the operation reaches the engine
+      // principal-less and plugin-security falls open — the #3597 shape.
+      context: ctx.context,
     });
 
     // Remap short field names back to cube-qualified names
@@ -206,32 +218,57 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
     }
 
     const tableName = this.extractObjectName(cube);
-    let sql = `SELECT ${selectParts.join(', ')} FROM "${tableName}"`;
 
-    const SQL_OPERATORS: Record<string, string> = {
-      equals: '=', notEquals: '<>', gt: '>', gte: '>=', lt: '<', lte: '<=',
-      contains: 'LIKE', in: 'IN', notIn: 'NOT IN', set: 'IS NOT NULL', notSet: 'IS NULL',
-    };
+    // ADR-0021 D-C (#3602) — render the READ SCOPE too, not just the caller's
+    // own filters (#3652 added those). Without it this string still reads as an
+    // unscoped table scan while the real aggregate is scoped (#3601), so anyone
+    // debugging a "why is this row missing" gets SQL that cannot reproduce the
+    // result. Nothing leaks — the string is never executed, and scope VALUES
+    // stay in `params`, which `execute()`'s echo discards — but a rendering
+    // that contradicts execution is worse than no rendering.
+    //
+    // The cross-object guard runs here for the same reason: this must not
+    // render SQL for a query `execute()` would reject outright (#3654).
+    //
+    // Faithfulness cuts both ways: `execute()` does NOT apply
+    // `timeDimensions[].dateRange` on this path (only `where` reaches the
+    // engine), so neither does this. Rendering a BETWEEN here would invent a
+    // predicate the ObjectQL path never applies. That gap is real but separate
+    // — filed as #3650, not papered over here.
+    this.assertNoCrossObjectReferences(cube, query);
+
     const whereParts: string[] = [];
     for (const f of normalizeAnalyticsFilters(query)) {
-      const col = this.resolveFieldName(cube, f.member, 'any');
-      const op = SQL_OPERATORS[f.operator] ?? '=';
-      if (f.operator === 'set' || f.operator === 'notSet') {
-        whereParts.push(`${col} ${op}`);
-        continue;
-      }
-      const values = f.values ?? [];
-      if (values.length === 0) continue;
-      if (f.operator === 'in' || f.operator === 'notIn') {
-        const placeholders = values.map((v) => { params.push(v); return `$${params.length}`; });
-        whereParts.push(`${col} ${op} (${placeholders.join(', ')})`);
-      } else {
-        params.push(values[0]);
-        whereParts.push(`${col} ${op} $${params.length}`);
+      const clause = this.buildFilterClauseSql(
+        this.resolveFieldName(cube, f.member, 'any'),
+        f.operator,
+        f.values,
+        params,
+      );
+      if (clause) whereParts.push(clause);
+    }
+    // Read scope last, so it reads as the outermost constraint. Compiled by the
+    // same fail-closed compiler `NativeSQLStrategy` uses — it throws rather than
+    // drop a predicate, which is the correct posture even for a display string:
+    // silently omitting the scope is exactly the misleading output being fixed.
+    const scope = ctx.getReadScope?.(tableName);
+    if (scope != null) {
+      const { sql: scopeSql, params: scopeParams } = compileScopedFilterToSql(scope, tableName);
+      if (scopeSql) {
+        let i = 0;
+        // `compileScopedFilterToSql` emits `?`; renumber into this builder's $N.
+        const rendered = scopeSql.replace(/\?/g, () => {
+          params.push(scopeParams[i++]);
+          return `$${params.length}`;
+        });
+        whereParts.push(`(${rendered})`);
       }
     }
-    if (whereParts.length > 0) sql += ` WHERE ${whereParts.join(' AND ')}`;
 
+    let sql = `SELECT ${selectParts.join(', ')} FROM "${tableName}"`;
+    if (whereParts.length > 0) {
+      sql += ` WHERE ${whereParts.join(' AND ')}`;
+    }
     if (groupByParts.length > 0) {
       sql += ` GROUP BY ${groupByParts.join(', ')}`;
     }
@@ -305,17 +342,11 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
   private assertNoCrossObjectReferences(
     cube: Cube,
     query: AnalyticsQuery,
-    groupBy: Array<string | { field: string; dateGranularity: string }>,
-    filter: Record<string, unknown>,
   ): void {
-    // Field names as they will reach the engine. A dotted name whose first
-    // segment names a DIFFERENT object is a relationship traversal the engine
-    // cannot perform in an aggregate.
-    const referenced = [
-      ...groupBy.map((g) => (typeof g === 'string' ? g : g.field)),
-      ...Object.keys(filter),
-      ...(query.measures ?? []).map((m) => this.resolveMeasureAggregation(cube, m).field),
-    ];
+    // Derived from `(cube, query)` alone rather than from `execute()`'s built
+    // `groupBy`/`filter`, so `generateSql()` runs the IDENTICAL check (#3602):
+    // the rendered string must never describe a query `execute()` would reject.
+    const referenced = this.referencedFieldNames(cube, query);
 
     const baseObject = this.extractObjectName(cube);
     const offending = new Set<string>();
@@ -339,6 +370,71 @@ export class ObjectQLStrategy implements AnalyticsStrategy {
       `it (a raw-SQL/JOIN-capable driver with no date-granularity bucketing), or ` +
       `drop the cross-object dimension/measure from the query.`,
     );
+  }
+
+  /**
+   * Every field name the query puts in front of the engine — group-bys, filter
+   * members and measure sources — resolved exactly as the corresponding clause
+   * resolves it in `execute()`. A dotted name is a relationship traversal whose
+   * first segment is the join alias, which is what the scope guard keys off.
+   *
+   * Derived from `(cube, query)` alone so `execute()` and `generateSql()` run
+   * the guard over the identical field set; duplicates are fine, the caller
+   * dedupes by offending object.
+   */
+  private referencedFieldNames(cube: Cube, query: AnalyticsQuery): string[] {
+    const names: string[] = [];
+    for (const dim of query.dimensions ?? []) {
+      names.push(this.resolveFieldName(cube, dim, 'dimension'));
+    }
+    for (const td of query.timeDimensions ?? []) {
+      names.push(this.resolveFieldName(cube, td.dimension, 'dimension'));
+    }
+    for (const f of normalizeAnalyticsFilters(query)) {
+      names.push(this.resolveFieldName(cube, f.member, 'any'));
+    }
+    for (const m of query.measures ?? []) {
+      names.push(this.resolveMeasureAggregation(cube, m).field);
+    }
+    return names;
+  }
+
+  /**
+   * Render one normalized filter as a display SQL predicate for `generateSql`.
+   *
+   * Mirrors `NativeSQLStrategy.buildFilterClause`'s operator vocabulary so the
+   * two previews read alike, but binds through `coerceFilterValueForObjectQL`:
+   * the comparand shown is the one THIS path actually hands the engine (a real
+   * boolean, not SQL's 1/0). Returns null for an operator/value combination
+   * that carries no predicate, matching `execute()`, which drops it too.
+   */
+  private buildFilterClauseSql(
+    col: string,
+    operator: string,
+    values: string[] | undefined,
+    params: unknown[],
+  ): string | null {
+    if (operator === 'set') return `${col} IS NOT NULL`;
+    if (operator === 'notSet') return `${col} IS NULL`;
+
+    if (!values || values.length === 0) return null;
+
+    if (operator === 'in' || operator === 'notIn') {
+      const placeholders = values
+        .map((v) => { params.push(coerceFilterValueForObjectQL(v)); return `$${params.length}`; })
+        .join(', ');
+      return `${col} ${operator === 'in' ? 'IN' : 'NOT IN'} (${placeholders})`;
+    }
+
+    if (operator === 'contains' || operator === 'notContains') {
+      params.push(`%${values[0]}%`);
+      return `${col} ${operator === 'contains' ? 'LIKE' : 'NOT LIKE'} $${params.length}`;
+    }
+
+    const op = SCALAR_SQL_OPS[operator];
+    if (!op) return null;
+    params.push(coerceFilterValueForObjectQL(values[0]));
+    return `${col} ${op} $${params.length}`;
   }
 
   /**

@@ -113,6 +113,15 @@ export interface AnalyticsServiceConfig {
     groupBy?: string[];
     aggregations?: Array<{ field: string; method: string; alias: string }>;
     filter?: Record<string, unknown>;
+    /** Reference timezone (IANA) for date bucketing — ADR-0053 Phase 2. */
+    timezone?: string;
+    /**
+     * ADR-0021 D-C (#3602) — the request's ExecutionContext. Bridges MUST
+     * forward it to `engine.aggregate` so engine-side RLS applies; see
+     * `StrategyContext.executeAggregate` for why this is a second belt rather
+     * than a replacement for `getReadScope`.
+     */
+    context?: ExecutionContext;
   }) => Promise<Record<string, unknown>[]>;
   /**
    * Fallback IAnalyticsService (e.g. MemoryAnalyticsService).
@@ -329,7 +338,12 @@ export class AnalyticsService implements IAnalyticsService {
     query: AnalyticsQuery,
     context?: ExecutionContext,
   ): Promise<StrategyContext> {
-    if (!this.readScopeProvider) return this.baseCtx;
+    // #3602 — `context` rides along unconditionally. It is the ENGINE-side belt
+    // (forwarded to `engine.aggregate`, where the middleware chain applies its
+    // own RLS), so it must not be gated on the analytics-side belt being wired:
+    // a deployment with no `getReadScope` provider is exactly the one that most
+    // needs the engine to scope for it.
+    if (!this.readScopeProvider) return { ...this.baseCtx, context };
     // Pre-resolve the read scope for every object the strategy will scan (base
     // + all declared joins) BEFORE the synchronous SQL builder runs, since the
     // provider may be async (the production `security.getReadFilter` bridge).
@@ -337,6 +351,7 @@ export class AnalyticsService implements IAnalyticsService {
     const scopes = await this.resolveReadScopes(query, context);
     return {
       ...this.baseCtx,
+      context,
       getReadScope: (objectName: string) => scopes.get(objectName) ?? null,
     };
   }
@@ -631,13 +646,16 @@ export class AnalyticsService implements IAnalyticsService {
           ? (targetObject: string) => provider(targetObject, context)
           : undefined;
         try {
-          await resolveDimensionLabels(dataset.object, dims, result.rows, this.labelResolver, resolveScope);
+          // `context` rides alongside `resolveScope` — the label lookup's SECOND
+          // belt. `resolveScope` is this layer's own predicate; the context lets
+          // the engine's middleware scope the same per-record read itself.
+          await resolveDimensionLabels(dataset.object, dims, result.rows, this.labelResolver, resolveScope, context);
           // Totals rows (#1753) carry dimension values too (a row subtotal is
           // keyed by its row bucket) — resolve each grouping's own subset.
           for (const total of result.totals ?? []) {
             const subset = dims.filter((d) => total.dimensions.includes(d.name));
             if (subset.length) {
-              await resolveDimensionLabels(dataset.object, subset, total.rows, this.labelResolver, resolveScope);
+              await resolveDimensionLabels(dataset.object, subset, total.rows, this.labelResolver, resolveScope, context);
             }
           }
         } catch (e) {
