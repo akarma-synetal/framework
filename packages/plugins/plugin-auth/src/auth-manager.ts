@@ -1858,6 +1858,9 @@ export class AuthManager {
       const { twoFactor } = await import('better-auth/plugins/two-factor');
       plugins.push(twoFactor({
         schema: buildTwoFactorPluginSchema(),
+        // ADR-0069 D2 (#3690) — the operator's lockout policy governs BOTH
+        // stages of sign-in, not just the password one.
+        accountLockout: this.resolveTwoFactorAccountLockout(),
       }));
     }
 
@@ -3897,6 +3900,46 @@ export class AuthManager {
   }
 
   /**
+   * ADR-0069 D2 (#3690) — project the operator's lockout settings onto
+   * better-auth's own `twoFactor({ accountLockout })` contract, so the second
+   * factor obeys the same policy as the password stage above.
+   *
+   * Deliberately reuses `lockoutThreshold` / `lockoutDurationMinutes` rather
+   * than introducing a parallel `two_factor_lockout_*` pair: an admin who
+   * tightens sign-in to 3 attempts reasonably reads that as "the login flow is
+   * tightened", and before this the second factor silently stayed at
+   * better-auth's 10 — the stricter door was the looser one, with nothing in
+   * the UI saying so. Following better-auth's own field shape (rather than
+   * inventing ObjectStack settings on top of it) also means a future upstream
+   * addition here shows up as a new option, not a conflict.
+   *
+   * `undefined` when the threshold is 0/absent — better-auth's defaults (on,
+   * 10 attempts, 15 minutes) then stand. That is NOT mapped to
+   * `enabled: false`: `0` is the password stage's "off", and a deployment may
+   * leave THAT stage unlocked because other controls cover it (per-IP rate
+   * limiting, a captcha, an IdP in front). The second factor is the last door
+   * before a session is issued, so it is not turned off by a setting that
+   * never mentioned it. Both stages remain explicitly configurable; only the
+   * "unset" case differs, and it differs toward locking.
+   *
+   * Note the plugin ALSO caps attempts per challenge at a hardcoded 5
+   * (`beginAttempt(5)` in its totp / backup-code verifiers), which no option
+   * reaches. A threshold above 5 therefore still forces a fresh challenge
+   * every 5 guesses; the account budget is what accumulates across them.
+   */
+  private resolveTwoFactorAccountLockout():
+  { enabled: boolean; maxFailedAttempts: number; durationSeconds: number } | undefined {
+    const threshold = Number(this.config.lockoutThreshold) || 0;
+    if (threshold <= 0) return undefined;
+    const minutes = Number(this.config.lockoutDurationMinutes) || 15;
+    return {
+      enabled: true,
+      maxFailedAttempts: threshold,
+      durationSeconds: minutes * 60,
+    };
+  }
+
+  /**
    * ADR-0069 D7 — stamp `last_login_at` (+ `last_login_ip` when known) on a
    * successful sign-in. Best-effort and always fire-and-forget safe: a login
    * audit write must never turn a valid login into an error, and it runs
@@ -3921,6 +3964,14 @@ export class AuthManager {
    * ADR-0069 D2 — clear a user's lockout state (admin "Unlock" action).
    * Resets `failed_login_count` and `locked_until`. Returns false when no data
    * engine is wired or the user does not exist.
+   *
+   * [#3690] Clears BOTH stages. Sign-in can lock at the password check
+   * (`sys_user`) or at the second factor (`sys_two_factor`), and the two keep
+   * independent counters — so unlocking only the first left a 2FA-locked user
+   * with no admin escape hatch at all, waiting out the duration. That was
+   * survivable while the second factor sat on better-auth's 10-attempt default;
+   * with the threshold now operator-configurable (3 is a reasonable choice),
+   * it is a lock admins will hit routinely.
    */
   public async unlockUser(userId: string): Promise<boolean> {
     const engine = this.getDataEngine();
@@ -3935,6 +3986,25 @@ export class AuthManager {
       { id: userId, failed_login_count: 0, locked_until: null },
       { context: SYSTEM_CTX } as any,
     );
+    // Best-effort and deliberately after the primary write: a user with no
+    // enrolment (or an environment where 2FA was never switched on) must still
+    // get a successful unlock, and the password-stage clear is the part the
+    // admin asked for.
+    try {
+      const enrolments = await engine.find('sys_two_factor', {
+        where: { user_id: String(userId) }, fields: ['id'], context: SYSTEM_CTX,
+      } as any);
+      for (const row of (enrolments ?? []) as Array<{ id?: string }>) {
+        if (!row?.id) continue;
+        await engine.update(
+          'sys_two_factor',
+          { id: row.id, failed_verification_count: 0, locked_until: null },
+          { context: SYSTEM_CTX } as any,
+        );
+      }
+    } catch {
+      // Never turn a successful password-stage unlock into a failure.
+    }
     return true;
   }
 

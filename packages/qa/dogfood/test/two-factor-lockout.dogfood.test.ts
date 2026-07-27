@@ -28,6 +28,19 @@
  * would therefore pass while the lockout path stayed completely unexercised —
  * exactly the blind spot that let the missing columns through. Hence the
  * cookie plumbing below: it is what makes this test test anything.
+ *
+ * ## Why it runs under an explicit operator policy (#3690)
+ *
+ * The budget used to be better-auth's own default (10 failures / 15 minutes),
+ * asserted as a literal here. That made this file blind to #3690: the auth
+ * manager passed no `accountLockout` at all, so the second factor ignored the
+ * operator's `lockout_threshold` entirely — and a test pinned to the default
+ * value could not tell "configured to 10" from "configuration ignored".
+ *
+ * So the stack is patched to a policy that is DIFFERENT from every default
+ * below, and every assertion derives from it. If the wiring is ever dropped,
+ * the counts and the lock duration snap back to better-auth's defaults and
+ * these assertions fail — which is the point.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -37,6 +50,19 @@ import { bootStack, type VerifyStack } from '@objectstack/verify';
 
 const SYS = { context: { isSystem: true } };
 const ADMIN_PASSWORD = 'admin123';
+
+// [#3690] The operator policy this file runs under. Both values are chosen to
+// differ from better-auth's defaults (10 attempts / 15 minutes) so an assertion
+// cannot pass by accident if the settings stop reaching the plugin.
+//
+// 7 is also deliberately ABOVE the plugin's hardcoded per-challenge cap of 5
+// (`beginAttempt(5)`, not reachable by any option), so spending the budget
+// still has to cross a challenge boundary — the account-level counter is the
+// one backed by the columns under test.
+const LOCKOUT_THRESHOLD = 7;
+const LOCKOUT_DURATION_MINUTES = 40;
+/** better-auth's per-two-factor-cookie cap. Hardcoded upstream, not configurable. */
+const MAX_PER_CHALLENGE = 5;
 
 // ── RFC 6238 TOTP ──────────────────────────────────────────────────────────
 // Hand-rolled rather than imported: `@better-auth/utils/otp` is a transitive
@@ -90,6 +116,7 @@ describe('#3624 follow-up: better-auth 2FA lockout counts wrong codes', () => {
   let priorTwoFactor: string | undefined;
   let secret: Buffer;
   let adminEmail: string;
+  let adminUserId: string;
 
   beforeAll(async () => {
     // The two-factor plugin is opt-in (`twoFactor: … ?? false`), resolved once
@@ -100,10 +127,23 @@ describe('#3624 follow-up: better-auth 2FA lockout counts wrong codes', () => {
     stack = await bootStack(showcaseStack, {});
     ql = await stack.kernel.getServiceAsync<any>('objectql');
 
+    // [#3690] Apply the operator policy the same way the settings service does
+    // — `applyConfigPatch` nulls the cached better-auth instance, so the next
+    // request rebuilds with the new `accountLockout`. Going through this seam
+    // (rather than constructing the manager by hand) is what proves a Setup-UI
+    // change actually reaches the second factor.
+    const auth = await stack.kernel.getServiceAsync<any>('auth');
+    auth.applyConfigPatch({
+      lockoutThreshold: LOCKOUT_THRESHOLD,
+      lockoutDurationMinutes: LOCKOUT_DURATION_MINUTES,
+    });
+
     const token = await stack.signIn();
     const me = await (await stack.apiAs(token, 'GET', '/auth/get-session')).json() as any;
     adminEmail = me?.user?.email;
+    adminUserId = String(me?.user?.id ?? '');
     expect(adminEmail, 'could not resolve the seeded admin email').toBeTruthy();
+    expect(adminUserId, 'could not resolve the seeded admin id').toBeTruthy();
 
     // Enrol. `enable` returns the otpauth:// URI carrying the base32 secret;
     // the stored copy is symmetrically encrypted, so this is the only place
@@ -214,16 +254,18 @@ describe('#3624 follow-up: better-auth 2FA lockout counts wrong codes', () => {
     expect(after.lockedUntil ?? null).toBeNull();
   });
 
-  it('locks the account once the budget is spent, and refuses even a correct code', async () => {
+  it('locks the account once the operator-configured budget is spent, and refuses even a correct code', async () => {
     // Two budgets stack here, and the test has to respect both. better-auth
     // allows MAX_PER_CHALLENGE verifications per two-factor cookie
-    // (`beginAttempt(5)`) and MAX_FAILURES consecutive failures per ACCOUNT
-    // (`accountLockout.maxFailedAttempts`, default 10). Only the second one
-    // touches the columns under test, so reaching it takes a fresh challenge
-    // every MAX_PER_CHALLENGE tries. Both are better-auth's defaults — the
-    // auth manager passes no `accountLockout` config.
-    const MAX_PER_CHALLENGE = 5;
-    const MAX_FAILURES = 10;
+    // (hardcoded), and MAX_FAILURES consecutive failures per ACCOUNT
+    // (`accountLockout.maxFailedAttempts`). Only the second one touches the
+    // columns under test, so reaching it takes a fresh challenge every
+    // MAX_PER_CHALLENGE tries.
+    //
+    // MAX_FAILURES is the operator's threshold, not better-auth's default —
+    // #3690. Were the config dropped, the account would still be unlocked at
+    // failure 7 and the assertion below would fail on a null `locked_until`.
+    const MAX_FAILURES = LOCKOUT_THRESHOLD;
 
     expect((await lockoutState()).count, 'precondition: a clean budget').toBe(0);
 
@@ -246,7 +288,15 @@ describe('#3624 follow-up: better-auth 2FA lockout counts wrong codes', () => {
       locked.lockedUntil ?? null,
       `budget spent (${MAX_FAILURES} failures) but locked_until was never stamped`,
     ).not.toBeNull();
-    expect(new Date(String(locked.lockedUntil)).getTime()).toBeGreaterThan(Date.now());
+
+    // The lock lasts the operator's duration, not better-auth's 15 minutes.
+    // `lockoutDurationMinutes` (minutes) is projected onto the plugin's
+    // `durationSeconds` — the units differ on the two sides, so this is where a
+    // ×60 that went missing would show up. The window is wide enough for the
+    // several seconds of guessing above, and far too narrow to admit 15.
+    const lockedForMs = new Date(String(locked.lockedUntil)).getTime() - Date.now();
+    expect(lockedForMs).toBeGreaterThan((LOCKOUT_DURATION_MINUTES - 5) * 60_000);
+    expect(lockedForMs).toBeLessThanOrEqual(LOCKOUT_DURATION_MINUTES * 60_000);
 
     // The lock has to bite BEFORE the code is checked — otherwise it is not a
     // lockout, just a slower guess loop.
@@ -262,9 +312,9 @@ describe('#3624 follow-up: better-auth 2FA lockout counts wrong codes', () => {
     const before = await lockoutState();
     expect(before.lockedUntil ?? null, 'precondition: carries the lock from the previous test').not.toBeNull();
 
-    // Expire the lock rather than waiting out `durationSeconds` (900 by
-    // default). This is the one place the test reaches past the API: there is
-    // no endpoint that ages a lock.
+    // Expire the lock rather than waiting out `durationSeconds`. This is the
+    // one place the test reaches past the API: there is no endpoint that ages
+    // a lock.
     const users = await ql.find('sys_user', { where: { email: adminEmail }, limit: 1 }, SYS);
     const rows = await ql.find('sys_two_factor', { where: { user_id: String(users[0]?.id) }, limit: 1 }, SYS);
     await ql.update(
@@ -286,5 +336,50 @@ describe('#3624 follow-up: better-auth 2FA lockout counts wrong codes', () => {
     const after = await lockoutState();
     expect(after.lockedUntil ?? null, 'the expired lock must be cleared, not merely ignored').toBeNull();
     expect(after.count, 'clearing an expired lock must reset the failure budget too').toBe(0);
+  });
+
+  // [#3690] The admin escape hatch. `Unlock Account` used to clear only
+  // `sys_user`, so a user locked at the SECOND factor had no way out but to
+  // wait out the duration — tolerable while that lock needed 10 failures, much
+  // less so now that an operator can set the threshold to 3.
+  it('the admin unlock action releases a second-factor lock', async () => {
+    // A session that survives the lock. The one minted in beforeAll does not:
+    // completing enrolment rotates the session, so that bearer is stale by now.
+    // Take a fresh one through the full two-factor sign-in BEFORE re-locking —
+    // afterwards there is no way to obtain one, which is exactly why the admin
+    // escape hatch has to exist.
+    const bootstrap = await verifyWithCookie(await beginChallenge(), totp(secret));
+    expect(bootstrap.status, `sign-in for the admin session: ${await bootstrap.clone().text()}`).toBe(200);
+    const adminSession = ((await bootstrap.json()) as { token?: string }).token;
+    expect(adminSession, 'two-factor sign-in returned no session token').toBeTruthy();
+
+    // Re-lock: the previous test cleared everything.
+    let failures = 0;
+    while (failures < LOCKOUT_THRESHOLD) {
+      const cookie = await beginChallenge();
+      for (let i = 0; i < MAX_PER_CHALLENGE && failures < LOCKOUT_THRESHOLD; i++) {
+        await verifyWithCookie(cookie, '000000');
+        failures++;
+      }
+    }
+    const locked = await lockoutState();
+    expect(locked.lockedUntil ?? null, 'precondition: the account is locked again').not.toBeNull();
+    expect(locked.count).toBe(LOCKOUT_THRESHOLD);
+
+    // The lock gates VERIFICATION, not live sessions — so an already-signed-in
+    // admin can still act, which is what makes the escape hatch reachable.
+    const unlocked = await stack.apiAs(adminSession as string, 'POST', '/auth/admin/unlock-user', {
+      userId: adminUserId,
+    });
+    expect(unlocked.status, `unlock-user: ${await unlocked.clone().text()}`).toBe(200);
+
+    const cleared = await lockoutState();
+    expect(cleared.lockedUntil ?? null, 'unlock must clear the second factor, not just the password stage').toBeNull();
+    expect(cleared.count, 'unlock must reset the failure budget too — otherwise the next wrong code re-locks immediately').toBe(0);
+
+    // And the user can actually sign in again, which is the point of unlocking.
+    const cookie = await beginChallenge();
+    const ok = await verifyWithCookie(cookie, totp(secret));
+    expect(ok.status, `still locked out after unlock: ${await ok.clone().text()}`).toBe(200);
   });
 });
