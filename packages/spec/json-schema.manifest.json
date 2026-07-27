@@ -1603,6 +1603,7 @@
     "ui/DashboardHeaderAction",
     "ui/DashboardNavItem",
     "ui/DashboardWidget",
+    "ui/DashboardWidgetOptions",
     "ui/Dataset",
     "ui/DatasetDimension",
     "ui/DatasetMeasure",
