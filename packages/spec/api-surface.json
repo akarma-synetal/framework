@@ -554,6 +554,7 @@
     "isApiPrimitive (function)",
     "isCompatible (function)",
     "isDateMacroToken (function)",
+    "isFileIdToken (function)",
     "isFilterAST (function)",
     "isIncoherentAggregate (function)",
     "isLegacyApiMethod (function)",
