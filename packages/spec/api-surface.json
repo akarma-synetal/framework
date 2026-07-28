@@ -1070,6 +1070,7 @@
     "ResolveOptions (interface)",
     "ResolvedBook (interface)",
     "ResolvedEntry (interface)",
+    "ResolvedFieldLabel (interface)",
     "ResolvedGroup (interface)",
     "ResolvedSettingValue (type)",
     "ResolvedSettingValueSchema (const)",
