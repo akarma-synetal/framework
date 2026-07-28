@@ -35,7 +35,7 @@ import {
   authIdentityObjects,
   authPluginManifestHeader,
 } from './manifest.js';
-import { normalizeAdditionalOrgRoles, withMembershipRoleOptions } from './org-roles.js';
+import { normalizeAdditionalOrgRoles, withMembershipRoleOptions, type OrgRoleInput } from './org-roles.js';
 
 /**
  * Auth Plugin Options
@@ -80,7 +80,7 @@ export interface AuthPluginOptions extends Partial<AuthConfig> {
    * ROLE_NOT_FOUND. Forwarded as-is to AuthManager. See
    * {@link AuthManagerOptions.additionalOrgRoles} for details.
    */
-  additionalOrgRoles?: string[];
+  additionalOrgRoles?: OrgRoleInput[];
 
   /**
    * ADR-0081 D1 — single-org default-organization bootstrap. In single-org

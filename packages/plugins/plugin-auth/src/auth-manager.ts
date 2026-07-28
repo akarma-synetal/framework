@@ -21,7 +21,7 @@ import {
 import { MCP_OAUTH_SCOPES } from '@objectstack/spec/ai';
 import { createObjectQLAdapterFactory, withSystemReadContext } from './objectql-adapter.js';
 import { invitationRoleCapFailure, isPlainMemberInvitation } from './invitation-role-cap.js';
-import { normalizeAdditionalOrgRoles } from './org-roles.js';
+import { normalizeAdditionalOrgRoles, orgRoleNames, type OrgRoleInput } from './org-roles.js';
 import { isPlaceholderEmail } from './placeholder-email.js';
 import { reconcileMembership, type MembershipPolicy } from './reconcile-membership.js';
 import type { TenancyService } from './tenancy-service.js';
@@ -404,12 +404,18 @@ export interface AuthManagerOptions extends Partial<AuthConfig> {
    * Better-Auth's `member` role) so it cannot inadvertently grant org-level
    * admin capabilities.
    *
-   * Typical source: the union of `permission` metadata names that have
-   * declared names, collected from the loaded stack at CLI boot.
+   * Typical source: `collectStackOrgRoles(stack)` — the one walk every host
+   * shares (`objectstack serve`, the verify harness, DevPlugin).
    *
-   * @example ['sales_rep', 'sales_manager', 'service_agent']
+   * Accepts a bare name, or `{ name, label }` to carry the declaring
+   * metadata's own display label into the role picker (#3723) — without it the
+   * picker would title-case the machine name and contradict a position that
+   * already says `销售代表`. The label is presentation only: better-auth sees
+   * just the name, and the stored value is always the name.
+   *
+   * @example ['sales_rep', { name: 'sales_manager', label: '销售经理' }]
    */
-  additionalOrgRoles?: string[];
+  additionalOrgRoles?: OrgRoleInput[];
 
   /**
    * Optional outbound email service used by better-auth callbacks
@@ -1601,7 +1607,9 @@ export class AuthManager {
             ...stmts,
             invitation: ['create'],
           });
-          for (const name of extra) {
+          // Names only — a descriptor's `label` is presentation for the role
+          // picker and means nothing to better-auth.
+          for (const name of orgRoleNames(extra)) {
             if (!name) continue;
             if (built[name]) continue;
             built[name] = defaultAc.newRole(stmts);

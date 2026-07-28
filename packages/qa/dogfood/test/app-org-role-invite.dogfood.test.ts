@@ -125,6 +125,19 @@ describe('#3723: an app-declared org role can actually be invited and held', () 
     expect(memberRoles).toEqual(invitationRoles);
   }, 30_000);
 
+  it('the picker shows the DECLARED label, not a title-cased machine name', async () => {
+    // The showcase position `exec` declares `label: 'Executive'`. Deriving the
+    // option label from the machine name would render "Exec" — a third source
+    // of truth for a string the position metadata already owns. Same one-list
+    // principle as the role set itself, applied to how it is displayed.
+    const schema = await ql.getSchema('sys_member');
+    const options = (schema.fields.role.options ?? []) as { label: string; value: string }[];
+    const exec = options.find((o) => o.value === 'exec');
+    expect(exec, `no 'exec' option among ${options.map((o) => o.value).join(', ')}`).toBeDefined();
+    expect(exec!.label).toBe('Executive');
+    expect(exec!.label).not.toBe('Exec');
+  }, 30_000);
+
   it('inviting with an app-declared role SUCCEEDS — this is the reported failure', async () => {
     // Before the fix: 200 from better-auth's role check, then the sys_invitation
     // insert threw `role must be one of: owner, admin, member`.

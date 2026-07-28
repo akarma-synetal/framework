@@ -29,10 +29,20 @@ const roleOptionsOf = (object: unknown): { label: string; value: string }[] =>
 describe('#3723 normalizeAdditionalOrgRoles — the one normalizer', () => {
   it('keeps valid app role names, in declaration order', () => {
     expect(normalizeAdditionalOrgRoles(['sales_rep', 'sales_manager', 'service_agent'])).toEqual([
-      'sales_rep',
-      'sales_manager',
-      'service_agent',
+      { name: 'sales_rep' },
+      { name: 'sales_manager' },
+      { name: 'service_agent' },
     ]);
+  });
+
+  it('carries a declared label through, and tolerates entries without one', () => {
+    expect(
+      normalizeAdditionalOrgRoles([{ name: 'sales_rep', label: '销售代表' }, 'ops']),
+    ).toEqual([{ name: 'sales_rep', label: '销售代表' }, { name: 'ops' }]);
+  });
+
+  it('drops a blank label rather than storing an empty picker entry', () => {
+    expect(normalizeAdditionalOrgRoles([{ name: 'ops', label: '   ' }])).toEqual([{ name: 'ops' }]);
   });
 
   it('drops the built-ins — an app may not redefine owner/admin/member/delegated_admin', () => {
@@ -40,17 +50,31 @@ describe('#3723 normalizeAdditionalOrgRoles — the one normalizer', () => {
     // `invitation:create` and 403 every org mutation.
     expect(
       normalizeAdditionalOrgRoles(['owner', 'admin', 'member', 'delegated_admin', 'sales_rep']),
-    ).toEqual(['sales_rep']);
+    ).toEqual([{ name: 'sales_rep' }]);
   });
 
   it('de-duplicates and trims', () => {
-    expect(normalizeAdditionalOrgRoles(['  sales_rep ', 'sales_rep', ''])).toEqual(['sales_rep']);
+    expect(normalizeAdditionalOrgRoles(['  sales_rep ', 'sales_rep', ''])).toEqual([
+      { name: 'sales_rep' },
+    ]);
   });
 
-  it('ignores non-strings and a non-array input', () => {
-    expect(normalizeAdditionalOrgRoles([null, 42, {}, 'sales_rep'] as unknown[])).toEqual(['sales_rep']);
+  it('ignores unusable entries and a non-array input', () => {
+    expect(normalizeAdditionalOrgRoles([null, 42, {}, { name: 7 }, 'sales_rep'] as unknown[])).toEqual([
+      { name: 'sales_rep' },
+    ]);
     expect(normalizeAdditionalOrgRoles(undefined)).toEqual([]);
     expect(normalizeAdditionalOrgRoles(null)).toEqual([]);
+  });
+
+  it('a blank label never masks the built-in drop or the name filter', () => {
+    expect(
+      normalizeAdditionalOrgRoles([
+        { name: 'owner', label: 'Boss' },
+        { name: 'bad.name', label: 'Bad' },
+        { name: 'ok_role', label: 'OK' },
+      ]),
+    ).toEqual([{ name: 'ok_role', label: 'OK' }]);
   });
 
   it('REFUSES a name that cannot round-trip through Field.select — loudly', () => {
@@ -64,7 +88,7 @@ describe('#3723 normalizeAdditionalOrgRoles — the one normalizer', () => {
         ['showcase.export_data', 'Sales Rep', '_leading', 'x', 'sales_rep'],
         { warn },
       ),
-    ).toEqual(['sales_rep']);
+    ).toEqual([{ name: 'sales_rep' }]);
     expect(warn).toHaveBeenCalledTimes(4);
     expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toContain('showcase.export_data');
   });
@@ -81,13 +105,13 @@ describe('#3723 membershipRoleOptions — the option list both selects get', () 
   });
 
   it('appends app roles after the built-ins, with humanized labels', () => {
-    const options = membershipRoleOptions(['sales_rep']);
+    const options = membershipRoleOptions([{ name: 'sales_rep' }]);
     expect(values(options)).toEqual(['owner', 'admin', 'delegated_admin', 'member', 'sales_rep']);
     expect(options.at(-1)).toEqual({ label: 'Sales Rep', value: 'sales_rep' });
   });
 
   it('never duplicates a built-in', () => {
-    expect(values(membershipRoleOptions(['member', 'sales_rep']))).toEqual([
+    expect(values(membershipRoleOptions([{ name: 'member' }, { name: 'sales_rep' }]))).toEqual([
       'owner',
       'admin',
       'delegated_admin',
@@ -99,9 +123,18 @@ describe('#3723 membershipRoleOptions — the option list both selects get', () 
   it('humanizes labels without ever changing the stored value', () => {
     expect(membershipRoleLabel('sales_rep')).toBe('Sales Rep');
     expect(membershipRoleLabel('ops')).toBe('Ops');
-    expect(membershipRoleOptions(['field_ops_delegate']).at(-1)).toEqual({
+    expect(membershipRoleOptions([{ name: 'field_ops_delegate' }]).at(-1)).toEqual({
       label: 'Field Ops Delegate',
       value: 'field_ops_delegate',
+    });
+  });
+
+  it('a declared label WINS over the title-cased machine name', () => {
+    // The whole point: a position that says `销售代表` must not be rendered as
+    // "Sales Rep" by a picker deriving its own label from the machine name.
+    expect(membershipRoleOptions([{ name: 'sales_rep', label: '销售代表' }]).at(-1)).toEqual({
+      label: '销售代表',
+      value: 'sales_rep',
     });
   });
 });
@@ -112,14 +145,14 @@ describe('#3723 withMembershipRoleOptions — materializing onto the platform ob
   it('widens BOTH role selects — fixing one leaves the other rejecting the same value', () => {
     // The lesson from #3722: `sys_member.role` alone still left
     // `sys_invitation.role` refusing the invitation at issuance.
-    const [, member, invitation] = withMembershipRoleOptions(objects, ['sales_rep']);
+    const [, member, invitation] = withMembershipRoleOptions(objects, [{ name: 'sales_rep' }]);
     expect(values(roleOptionsOf(member))).toContain('sales_rep');
     expect(values(roleOptionsOf(invitation))).toContain('sales_rep');
     expect(values(roleOptionsOf(member))).toEqual(values(roleOptionsOf(invitation)));
   });
 
   it('leaves unrelated objects untouched, by identity', () => {
-    const [user] = withMembershipRoleOptions(objects, ['sales_rep']);
+    const [user] = withMembershipRoleOptions(objects, [{ name: 'sales_rep' }]);
     expect(user).toBe(SysUser);
   });
 
@@ -127,12 +160,12 @@ describe('#3723 withMembershipRoleOptions — materializing onto the platform ob
     // `authIdentityObjects` is a process-wide singleton also used by the
     // compile-time `objectstack.config.ts`; two kernels booted with different
     // app roles in one test run must not see each other's options.
-    withMembershipRoleOptions(objects, ['sales_rep']);
+    withMembershipRoleOptions(objects, [{ name: 'sales_rep' }]);
     expect(values(roleOptionsOf(SysMember))).toEqual(values(BUILTIN_MEMBERSHIP_ROLE_OPTIONS));
     expect(values(roleOptionsOf(SysInvitation))).toEqual(values(BUILTIN_MEMBERSHIP_ROLE_OPTIONS));
 
-    const a = withMembershipRoleOptions(objects, ['role_a']);
-    const b = withMembershipRoleOptions(objects, ['role_b']);
+    const a = withMembershipRoleOptions(objects, [{ name: 'role_a' }]);
+    const b = withMembershipRoleOptions(objects, [{ name: 'role_b' }]);
     expect(values(roleOptionsOf(a[1]))).toContain('role_a');
     expect(values(roleOptionsOf(a[1]))).not.toContain('role_b');
     expect(values(roleOptionsOf(b[1]))).toContain('role_b');
@@ -158,20 +191,25 @@ describe('#3723 collectStackOrgRoles — one walk for every host', () => {
       positions: [{ name: 'sales_rep' }, { name: 'sales_manager' }],
       permissions: [{ name: 'sales_user' }, { name: 'guest_portal' }],
     });
-    expect(roles).toEqual(['sales_rep', 'sales_manager', 'sales_user', 'guest_portal']);
+    expect(roles.map((r) => r.name)).toEqual([
+      'sales_rep',
+      'sales_manager',
+      'sales_user',
+      'guest_portal',
+    ]);
   });
 
   it('accepts bare strings as well as named entries', () => {
     expect(collectStackOrgRoles({ positions: ['sales_rep', { name: 'ops' }] })).toEqual([
-      'sales_rep',
-      'ops',
+      { name: 'sales_rep' },
+      { name: 'ops' },
     ]);
   });
 
   it('normalizes on the way out — the built-ins never leak into the extras', () => {
     expect(
       collectStackOrgRoles({ positions: [{ name: 'member' }, { name: 'owner' }, { name: 'ops' }] }),
-    ).toEqual(['ops']);
+    ).toEqual([{ name: 'ops' }]);
   });
 
   it('a stack with no role metadata yields nothing (and does not throw)', () => {

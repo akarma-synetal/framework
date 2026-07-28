@@ -43,9 +43,19 @@ New exports:
 
 Hosts that boot `AuthPlugin` from a loaded stack should derive
 `additionalOrgRoles` with `collectStackOrgRoles(stack)` rather than walking the
-stack themselves — `objectstack serve` and the `@objectstack/verify` harness now
-both do (the harness previously passed none, which is why a dogfood proof could
-boot a stack whose declared roles better-auth had never heard of).
+stack themselves — `objectstack serve`, the `@objectstack/verify` harness and
+`DevPlugin` now all do. The harness previously passed none, which is why a
+dogfood proof could boot a stack whose declared roles better-auth had never
+heard of; `DevPlugin` documents itself as equivalent to the full stack and
+silently excluded app roles from that equivalence.
+
+`additionalOrgRoles` accepts `{ name, label }` alongside a bare name, and
+`collectStackOrgRoles` now returns those descriptors. The label is what the
+declaring `position` / `permission` metadata already says, so the role picker
+shows `Executive` for a position declared as such instead of title-casing the
+machine name into `Exec` — a third source of truth for one string. Presentation
+only: better-auth sees just the name, and the stored value is always the name.
+Passing `string[]` keeps working unchanged.
 
 Behaviour change worth noting: a declared role name that is not a valid machine
 name (`/^[a-z][a-z0-9_]*$/`, min 2 chars) is no longer registered at all, with a

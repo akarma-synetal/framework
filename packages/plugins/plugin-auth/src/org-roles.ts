@@ -87,6 +87,28 @@ export interface MembershipRoleOption {
   value: string;
 }
 
+/**
+ * An app-declared organization role: the machine name better-auth registers,
+ * plus the display label its `position` / `permission` metadata already
+ * declared.
+ *
+ * The label rides along because the alternative is a THIRD source of truth for
+ * the same string. A position declares `{ name: 'sales_rep', label: '销售代表' }`;
+ * deriving the picker's label by title-casing the machine name instead would
+ * render "Sales Rep" next to the very metadata that says otherwise. Same
+ * one-list principle as the role set itself, applied to how it is displayed.
+ *
+ * Purely presentational: better-auth only ever sees `name`, and the stored
+ * value is always `name`.
+ */
+export interface OrgRoleDescriptor {
+  name: string;
+  label?: string;
+}
+
+/** What a host may hand to `additionalOrgRoles` — a bare name, or a name + label. */
+export type OrgRoleInput = string | OrgRoleDescriptor;
+
 /** Minimal logger surface — `ctx.logger`, `console`, or nothing at all. */
 export interface OrgRoleLogger {
   warn?(message: string): void;
@@ -94,7 +116,11 @@ export interface OrgRoleLogger {
 
 const BUILTIN_SET: ReadonlySet<string> = new Set<string>(BUILTIN_MEMBERSHIP_ROLES);
 
-/** `sales_rep` → `Sales Rep`. Display only; the value is always the raw name. */
+/**
+ * `sales_rep` → `Sales Rep`. The LAST-RESORT label, used only when the
+ * declaring metadata carried none — a stack that declared a label always wins.
+ * Display only; the value is always the raw name.
+ */
 export function membershipRoleLabel(name: string): string {
   return name
     .split('_')
@@ -103,27 +129,43 @@ export function membershipRoleLabel(name: string): string {
     .join(' ');
 }
 
+/** The machine names of `descriptors` — what better-auth's role map is keyed by. */
+export function orgRoleNames(descriptors: readonly OrgRoleDescriptor[]): string[] {
+  return descriptors.map((d) => d.name);
+}
+
 /**
  * The one normalizer for app-supplied organization roles.
  *
- * Trims, drops non-strings, drops the built-ins (an app cannot redefine
- * `owner`/`admin`/`member`/`delegated_admin` — silently downgrading `owner` to
- * a plain member role would 403 every org mutation), de-duplicates, and
- * refuses names that cannot survive `Field.select`'s value normalization.
+ * Trims, drops entries with no usable name, drops the built-ins (an app cannot
+ * redefine `owner`/`admin`/`member`/`delegated_admin` — silently downgrading
+ * `owner` to a plain member role would 403 every org mutation), de-duplicates,
+ * and refuses names that cannot survive `Field.select`'s value normalization.
  * Order is preserved so the resulting picker is stable across boots.
+ *
+ * Accepts a bare name or a {@link OrgRoleDescriptor}; always returns
+ * descriptors, so every consumer downstream gets the same shape whether or not
+ * the host had a label to offer.
  *
  * @param logger optional sink for the "dropped an unusable role name" warning
  */
 export function normalizeAdditionalOrgRoles(
   input: readonly unknown[] | undefined | null,
   logger?: OrgRoleLogger,
-): string[] {
+): OrgRoleDescriptor[] {
   if (!Array.isArray(input)) return [];
-  const out: string[] = [];
+  const out: OrgRoleDescriptor[] = [];
   const seen = new Set<string>();
   for (const raw of input) {
-    if (typeof raw !== 'string') continue;
-    const name = raw.trim();
+    const entry: OrgRoleDescriptor | null =
+      typeof raw === 'string'
+        ? { name: raw }
+        : raw && typeof raw === 'object' && typeof (raw as OrgRoleDescriptor).name === 'string'
+          ? (raw as OrgRoleDescriptor)
+          : null;
+    if (!entry) continue;
+    const name = entry.name.trim();
+    const label = typeof entry.label === 'string' && entry.label.trim() ? entry.label.trim() : undefined;
     if (!name) continue;
     if (BUILTIN_SET.has(name)) continue;
     if (seen.has(name)) continue;
@@ -140,7 +182,7 @@ export function normalizeAdditionalOrgRoles(
       continue;
     }
     seen.add(name);
-    out.push(name);
+    out.push(label ? { name, label } : { name });
   }
   return out;
 }
@@ -153,12 +195,16 @@ export function normalizeAdditionalOrgRoles(
  * {@link normalizeAdditionalOrgRoles}); normalizing again here is harmless but
  * the point of the single normalizer is that callers share one result.
  */
-export function membershipRoleOptions(additional: readonly string[] = []): MembershipRoleOption[] {
+export function membershipRoleOptions(
+  additional: readonly OrgRoleDescriptor[] = [],
+): MembershipRoleOption[] {
   return [
     ...BUILTIN_MEMBERSHIP_ROLE_OPTIONS.map((o) => ({ ...o })),
     ...additional
-      .filter((name) => !BUILTIN_SET.has(name))
-      .map((name) => ({ label: membershipRoleLabel(name), value: name })),
+      .filter((d) => !BUILTIN_SET.has(d.name))
+      // The declaring metadata's own label wins; title-casing the machine name
+      // is the fallback for a host that had none.
+      .map((d) => ({ label: d.label ?? membershipRoleLabel(d.name), value: d.name })),
   ];
 }
 
@@ -178,9 +224,9 @@ export function membershipRoleOptions(additional: readonly string[] = []): Membe
  */
 export function withMembershipRoleOptions<T>(
   objects: readonly T[],
-  additional: readonly string[] = [],
+  additional: readonly OrgRoleDescriptor[] = [],
 ): T[] {
-  const extras = additional.filter((name) => !BUILTIN_SET.has(name));
+  const extras = additional.filter((d) => !BUILTIN_SET.has(d.name));
   if (extras.length === 0) return [...objects];
 
   const options = membershipRoleOptions(extras);
@@ -218,15 +264,21 @@ export function withMembershipRoleOptions<T>(
  *
  * Real RBAC enforcement stays with SecurityPlugin; better-auth only needs to
  * accept the names as opaque strings.
+ *
+ * Each entry's declared `label` is carried through, so the role picker shows
+ * what the position/permission metadata already says (`销售代表`) rather than a
+ * title-cased machine name (`Sales Rep`) contradicting it.
  */
-export function collectStackOrgRoles(stack: unknown, logger?: OrgRoleLogger): string[] {
-  const names: unknown[] = [];
+export function collectStackOrgRoles(stack: unknown, logger?: OrgRoleLogger): OrgRoleDescriptor[] {
+  const entries: OrgRoleInput[] = [];
   const collect = (arr: unknown) => {
     if (!Array.isArray(arr)) return;
     for (const entry of arr) {
-      if (typeof entry === 'string') names.push(entry);
-      else if (entry && typeof (entry as { name?: unknown }).name === 'string') {
-        names.push((entry as { name: string }).name);
+      if (typeof entry === 'string') {
+        entries.push(entry);
+      } else if (entry && typeof (entry as { name?: unknown }).name === 'string') {
+        const { name, label } = entry as { name: string; label?: unknown };
+        entries.push(typeof label === 'string' ? { name, label } : { name });
       }
     }
   };
@@ -238,5 +290,5 @@ export function collectStackOrgRoles(stack: unknown, logger?: OrgRoleLogger): st
     // Best-effort: a malformed stack must not stop the server from booting.
     return [];
   }
-  return normalizeAdditionalOrgRoles(names, logger);
+  return normalizeAdditionalOrgRoles(entries, logger);
 }
