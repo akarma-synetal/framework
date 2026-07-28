@@ -6,8 +6,9 @@ description: The two platform agents (ask and build), how skills extend them, an
 # AI Agents
 
 Part of the [AI module](/docs/ai). In the **open edition**, agents, tools, and
-skills are **typed metadata**: you author them as source with `defineAgent` /
-`defineSkill` / `defineTool` from the open `@objectstack/spec/ai` package, and an
+skills are **typed metadata**. You author **skills** (`defineSkill`) — agents are
+platform-owned and tool records are optional (see below) — from the open
+`@objectstack/spec/ai` package, and an
 external AI client (Claude, Cursor, a local model — any MCP client) reaches your
 objects, queries, and business **Actions** through `@objectstack/mcp` (BYO-AI),
 all governed by RLS. This page describes that metadata and the `AgentSchema` it
@@ -112,12 +113,74 @@ assistant to *write* your metadata and never run. Same word, two layers.
 `*.agent.ts` is **closed to third parties** — the `agent` metadata type is
 `allowRuntimeCreate:false, allowOrgOverride:false`, reserved for the two platform
 agents and platform-owned subagents (ADR-0063 §2). To give the `ask` agent a new
-capability you author an agent **skill** (`*.skill.ts`) whose `tools` reference
-your Actions / Flows / queries; it then attaches to `ask`. Every skill declares
+capability you author an agent **skill** (`*.skill.ts`). Every skill declares
 `surface: 'ask' | 'build' | 'both'`, and an agent's tool set is the **union of its
 surface-compatible skills' tools** — there is no global fall-through, so a skill
 reaches an agent only when their surfaces match
 ([ADR-0064](https://github.com/objectstack-ai/objectstack/blob/main/docs/adr/0064-tool-scoping-to-agent.md)).
+`os validate` warns if a stack declares an agent (`agent-authoring-withdrawn`).
+
+### A skill needs **no tool records** — name the Action
+
+Per [ADR-0109](https://github.com/objectstack-ai/objectstack/blob/main/docs/adr/0109-ai-tool-authoring-model.md)
+the default path declares **zero** `defineTool` records. The runtime already
+materialises one `action_<name>` tool per AI-exposed Action, so a skill names
+that tool directly. The Action is the same one your UI button runs, so
+permissions, validation and audit are identical whether a human clicks or the
+assistant calls:
+
+```typescript
+import { defineAction } from '@objectstack/spec/ui';
+import { defineSkill } from '@objectstack/spec/ai';
+
+// 1. The Action you already have — opt it in to AI.
+export const ConvertLeadAction = defineAction({
+  name: 'convert_lead',
+  label: 'Convert Lead',
+  objectName: 'crm_lead',
+  type: 'flow',            // headless: script | api | flow
+  target: 'lead_conversion_flow',
+  ai: {
+    exposed: true,          // ADR-0011 — opt-in, default off
+    description: 'Converts a qualified lead into an account, contact and opportunity.',
+  },
+});
+
+// 2. The skill names its materialised tool. No defineTool anywhere.
+export const LeadQualificationSkill = defineSkill({
+  name: 'lead_qualification',
+  label: 'Lead Qualification',
+  surface: 'ask',
+  instructions: `Score the lead with BANT from what you read, then convert it
+when the user agrees. Scoring is your judgement — there is no scoring tool.`,
+  tools: ['get_record', 'query_records', 'action_convert_lead'],
+});
+```
+
+Three things decide whether `action_<name>` exists, and `os validate` checks
+all three (`ai-skill-tool-unresolved`):
+
+| Requirement | Why |
+|---|---|
+| `ai.exposed: true` + `ai.description` (≥40 chars) | ADR-0011 governance gate — AI reach is opt-in, and the description is the LLM's contract |
+| type is `script` / `api` / `flow` | `url` / `modal` / `form` are UI-only: they have no headless path, so they stay human-driven **by design** |
+| a `target` (or a `body`, for `script`) | something has to dispatch |
+
+A `modal` Action is not a gap to fix. When the operation should collect input
+from a person — an escalation reason, a refund amount — leave it modal and have
+the skill's instructions *recommend* the button instead of calling it.
+
+The other tools a skill may name are the **platform** ones the runtime
+registers (`describe_object`, `query_records`, `aggregate_data`,
+`search_knowledge`, `visualize_data`, …). Between those and your Actions, most
+skills need nothing else: "analyse the pipeline", "draft this email" and "score
+this lead" are *reasoning* the model does with data — writing them as tool
+names is the most common authoring mistake, and produces an assistant that
+claims abilities it does not have.
+
+A `defineTool` record is an **optional refinement layer**, not a required step
+— reach for one only when the AI-facing surface must differ from the Action
+itself (a different LLM-facing description, fewer exposed parameters).
 Both `surface:'ask'` and `surface:'build'` skills run only where the in-UI AI
 runtime exists — **ObjectOS**. On the open framework
 there is no in-product agent to attach them to; author capability
@@ -193,12 +256,9 @@ Always be professional and data-driven.`,
     maxTokens: 2000,
   },
 
-  // References to Actions/Flows exposed as tools (see "Actions as Tools").
-  tools: [
-    { type: 'flow', name: 'analyze_lead', description: 'Analyze a lead and provide a qualification score' },
-    { type: 'flow', name: 'suggest_next_action', description: 'Suggest the next best action for an opportunity' },
-    { type: 'action', name: 'generate_email', description: 'Generate a personalized email template' },
-  ],
+  // Capability comes from skills — the only tool-bearing slot (ADR-0064).
+  // Each skill names the platform tools and `action_<name>` tools it needs.
+  skills: ['lead_qualification', 'opportunity_coaching', 'email_drafting'],
 
   // RAG access: sources to recruit knowledge from + vector store indexes.
   knowledge: {
@@ -233,11 +293,10 @@ Always be empathetic and solution-focused.`,
     maxTokens: 1500,
   },
 
-  // `search_knowledge` is provided by the Knowledge Protocol tool, not declared inline.
-  tools: [
-    { type: 'flow', name: 'triage_case', description: 'Analyze a case and assign priority' },
-    { type: 'action', name: 'generate_response', description: 'Generate a customer response' },
-  ],
+  // Skills carry the tools. `case_triage` names the platform data tools it
+  // reads with; `knowledge_search` names `search_knowledge` (Knowledge
+  // Protocol). Neither needs a `defineTool` record.
+  skills: ['case_triage', 'knowledge_search', 'response_drafting'],
 
   knowledge: {
     sources: ['support-kb', 'cases'],
@@ -271,10 +330,10 @@ Use reputable data sources.`,
     maxTokens: 1000,
   },
 
-  tools: [
-    { type: 'flow', name: 'lookup_company', description: 'Look up company information' },
-    { type: 'flow', name: 'enrich_contact', description: 'Enrich contact information' },
-  ],
+  // The enrichment Flows are exposed with `ai.exposed`, so the runtime
+  // materialises `action_lookup_company` / `action_enrich_contact` for the
+  // skill to name.
+  skills: ['contact_enrichment'],
 });
 ```
 
@@ -307,11 +366,10 @@ Use the data tools to query records and aggregate metrics.`,
     maxTokens: 3000,
   },
 
-  // Built-in data tools (query_records / get_record / aggregate_data) are
-  // available to agents automatically once registered — see "Natural Language Queries".
-  tools: [
-    { type: 'flow', name: 'analyze_pipeline', description: 'Analyze sales pipeline health' },
-  ],
+  // Pipeline analysis is reasoning over the platform's own data tools
+  // (query_records / aggregate_data / visualize_data), which the skill
+  // names directly — see "Natural Language Queries".
+  skills: ['revenue_forecasting'],
 
   knowledge: {
     sources: ['opportunities', 'pipeline'],
