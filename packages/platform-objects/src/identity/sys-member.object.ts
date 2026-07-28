@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
+import { BUILTIN_MEMBERSHIP_ROLE_OPTIONS, MEMBERSHIP_ROLE_MEMBER } from '@objectstack/spec/identity';
 
 /**
  * sys_member — System Member Object
@@ -165,27 +166,22 @@ export const SysMember = ObjectSchema.create({
       required: true,
     }),
     
+    // [#3723] The framework's built-in roles ONLY. App-declared organization
+    // roles are appended at boot by plugin-auth's `withMembershipRoleOptions`,
+    // from the SAME normalized array that registers them with better-auth —
+    // adding one by hand here re-creates the two-lists-that-must-agree bug.
+    //
+    // This select is ENFORCED on write: better-auth's own accept-invitation
+    // membership insert is validated like any other row (system context does
+    // not exempt it), so a role better-auth accepts and this list omits is a
+    // role nobody can hold. `delegated_admin` (ADR-0105 D8 / #3697) is in the
+    // built-in list for exactly that reason.
     role: Field.select({
       label: 'Role',
       required: false,
       description: 'Member role within the organization',
-      options: [
-        { label: 'Owner', value: 'owner' },
-        { label: 'Admin', value: 'admin' },
-        // [ADR-0105 D8 / #3697] The delegated issuer grade — may reach
-        // `/organization/invite-member` WITHOUT being an org admin, which is
-        // what finally gives D8's scope-bounded issuance gate a caller. It
-        // carries no ObjectStack authority by itself: placement authority
-        // comes from a separately-granted `adminScope`, and the invitation
-        // role cap holds it to inviting plain members.
-        //
-        // Listed here because this select is ENFORCED on write: better-auth's
-        // own accept-invitation membership insert is validated like any other
-        // row, so a role missing from this list is a role nobody can hold.
-        { label: 'Delegated Admin', value: 'delegated_admin' },
-        { label: 'Member', value: 'member' },
-      ],
-      defaultValue: 'member',
+      options: [...BUILTIN_MEMBERSHIP_ROLE_OPTIONS],
+      defaultValue: MEMBERSHIP_ROLE_MEMBER,
     }),
   },
   

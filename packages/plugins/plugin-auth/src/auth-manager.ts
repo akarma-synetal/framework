@@ -21,6 +21,7 @@ import {
 import { MCP_OAUTH_SCOPES } from '@objectstack/spec/ai';
 import { createObjectQLAdapterFactory, withSystemReadContext } from './objectql-adapter.js';
 import { invitationRoleCapFailure, isPlainMemberInvitation } from './invitation-role-cap.js';
+import { normalizeAdditionalOrgRoles, orgRoleNames, type OrgRoleInput } from './org-roles.js';
 import { isPlaceholderEmail } from './placeholder-email.js';
 import { reconcileMembership, type MembershipPolicy } from './reconcile-membership.js';
 import type { TenancyService } from './tenancy-service.js';
@@ -403,12 +404,18 @@ export interface AuthManagerOptions extends Partial<AuthConfig> {
    * Better-Auth's `member` role) so it cannot inadvertently grant org-level
    * admin capabilities.
    *
-   * Typical source: the union of `permission` metadata names that have
-   * declared names, collected from the loaded stack at CLI boot.
+   * Typical source: `collectStackOrgRoles(stack)` — the one walk every host
+   * shares (`objectstack serve`, the verify harness, DevPlugin).
    *
-   * @example ['sales_rep', 'sales_manager', 'service_agent']
+   * Accepts a bare name, or `{ name, label }` to carry the declaring
+   * metadata's own display label into the role picker (#3723) — without it the
+   * picker would title-case the machine name and contradict a position that
+   * already says `销售代表`. The label is presentation only: better-auth sees
+   * just the name, and the stored value is always the name.
+   *
+   * @example ['sales_rep', { name: 'sales_manager', label: '销售经理' }]
    */
-  additionalOrgRoles?: string[];
+  additionalOrgRoles?: OrgRoleInput[];
 
   /**
    * Optional outbound email service used by better-auth callbacks
@@ -1571,7 +1578,15 @@ export class AuthManager {
       // attribution — so the permission would mean "cancel anyone's pending
       // invitation in the org". Attributed cancel needs its own guard first.
       let customOrgRoles: Record<string, any> | undefined;
-      const extra = this.config.additionalOrgRoles ?? [];
+      // [#3723] The SAME normalized array `AuthPlugin` stamps onto the
+      // `sys_invitation.role` / `sys_member.role` selects. Registering a name
+      // the write path cannot store is the bug this closes, so a name that
+      // cannot round-trip through `Field.select` is refused HERE too — the
+      // invitation then fails at better-auth's door (`ROLE_NOT_FOUND`) rather
+      // than at the insert.
+      // (Idempotent: `AuthPlugin` normalizes before constructing the manager,
+      // so this pass only warns for a caller wiring `AuthManager` directly.)
+      const extra = normalizeAdditionalOrgRoles(this.config.additionalOrgRoles, this.config.logger);
       try {
         const accessMod = await import('better-auth/plugins/organization/access');
         const { defaultAc, memberAc, defaultRoles } = accessMod as any;
@@ -1592,7 +1607,9 @@ export class AuthManager {
             ...stmts,
             invitation: ['create'],
           });
-          for (const name of extra) {
+          // Names only — a descriptor's `label` is presentation for the role
+          // picker and means nothing to better-auth.
+          for (const name of orgRoleNames(extra)) {
             if (!name) continue;
             if (built[name]) continue;
             built[name] = defaultAc.newRole(stmts);

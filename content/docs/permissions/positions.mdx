@@ -16,7 +16,10 @@ of their own** — they only decide *who gets which sets*.
 > security identifiers and labels). The vocabulary is now unambiguous:
 > **permission set** = capability, **position** = distribution,
 > **business unit** = hierarchy. The single exception is better-auth's
-> internal `sys_member.role` (org-membership tier: owner/admin/member).
+> internal `sys_member.role` — the org-membership tier (`owner`, `admin`,
+> `delegated_admin`, `member`, **plus every position name your stack
+> declares**, so a person can be invited straight into a position; see
+> [Authentication](/docs/permissions/authentication#positions-as-membership-tiers)).
 
 ```typescript
 import type { Position } from '@objectstack/spec/identity';

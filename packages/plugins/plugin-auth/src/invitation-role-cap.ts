@@ -43,10 +43,16 @@
  * invitation is refused.
  */
 
-/** better-auth's built-in organization roles. */
-export const MEMBERSHIP_ROLE_OWNER = 'owner';
-export const MEMBERSHIP_ROLE_ADMIN = 'admin';
-export const MEMBERSHIP_ROLE_MEMBER = 'member';
+// better-auth's built-in organization roles — from the one membership-role
+// list (#3723), the same constants the `sys_invitation.role` / `sys_member.role`
+// selects are built from. Re-exported to keep this module's existing surface.
+import {
+  MEMBERSHIP_ROLE_OWNER,
+  MEMBERSHIP_ROLE_ADMIN,
+  MEMBERSHIP_ROLE_MEMBER,
+} from '@objectstack/spec/identity';
+
+export { MEMBERSHIP_ROLE_OWNER, MEMBERSHIP_ROLE_ADMIN, MEMBERSHIP_ROLE_MEMBER };
 
 /** Grade ladder. Anything unrecognized — `member`, `delegated_admin`, an
  *  app-registered role — grades as an ordinary member; only better-auth's two
