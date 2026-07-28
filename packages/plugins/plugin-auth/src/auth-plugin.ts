@@ -82,10 +82,12 @@ export interface AuthPluginOptions extends Partial<AuthConfig> {
   manifestDatasource?: string;
 
   /**
-   * Application-specific organization roles to register with Better-Auth's
-   * organization plugin so invitations to those roles aren't rejected with
-   * ROLE_NOT_FOUND. Forwarded as-is to AuthManager. See
-   * {@link AuthManagerOptions.additionalOrgRoles} for details.
+   * EXTRA organization roles to register with Better-Auth's organization
+   * plugin, beyond the ones AuthPlugin derives itself: stack-declared
+   * `position` / `permission` names arrive automatically via the
+   * kernel:ready self-derivation (#3723 follow-up), so most hosts pass
+   * nothing. Only roles that exist OUTSIDE stack metadata need this; the
+   * two sets are unioned. See {@link AuthManagerOptions.additionalOrgRoles}.
    */
   additionalOrgRoles?: OrgRoleInput[];
 
