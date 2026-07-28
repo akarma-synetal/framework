@@ -942,6 +942,23 @@ describe('AuthManager', () => {
       expect(orgPlugin._opts.roles.delegated_admin.statements.invitation).toEqual(['create']);
     });
 
+    it('#3723: a role name the write path cannot store is not registered either', async () => {
+      // `Field.select` strips the dot, so `showcase.export_data` would be
+      // registered with better-auth verbatim and stored as
+      // `showcaseexport_data` — the two lists agreeing on the name and
+      // disagreeing on the value is the original bug with extra steps.
+      // Refusing it here makes the invitation fail at the door
+      // (`ROLE_NOT_FOUND`) instead of at the `sys_invitation` insert.
+      const orgPlugin = await bootOrgPlugin({
+        additionalOrgRoles: ['showcase.export_data', 'sales_rep'],
+      });
+
+      const roles = orgPlugin._opts.roles;
+      expect(Object.keys(roles)).toContain('sales_rep');
+      expect(Object.keys(roles)).not.toContain('showcase.export_data');
+      expect(Object.keys(roles)).not.toContain('showcaseexport_data');
+    });
+
     it('role cap: a delegate inviting an `admin` is REFUSED (the escalation chain)', async () => {
       // delegate invites admin → sys_member(role='admin') → auto-org-admin-grant
       // → organization_admin → wildcard modifyAllRecords → isTenantAdmin().

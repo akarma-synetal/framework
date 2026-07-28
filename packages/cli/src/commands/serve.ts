@@ -1388,7 +1388,7 @@ export default class Serve extends Command {
       if (!hasAuthPlugin && tierEnabled('auth')) {
         try {
           const authPkg = '@objectstack/plugin-auth';
-          const { AuthPlugin } = await import(/* webpackIgnore: true */ authPkg);
+          const { AuthPlugin, collectStackOrgRoles } = await import(/* webpackIgnore: true */ authPkg);
 
           // In dev, fall back to a stable local secret so users don't have
           // to set OS_AUTH_SECRET just to try the login/register flow.
@@ -1485,40 +1485,20 @@ export default class Serve extends Command {
 
             // Collect application-defined org roles from the stack so
             // Better-Auth's organization plugin accepts invitations to
-            // those names (otherwise it 400s with `ROLE_NOT_FOUND`).
-            // better-auth boundary: its API keeps the word "roles"
-            // (ADR-0090 D3 exception). Sources:
-            //   - top-level `positions[]` (flat distribution groups)
-            //   - `permissions[]` PermissionSet names
-            // Real RBAC enforcement is still owned by SecurityPlugin.
-            const additionalOrgRoles = new Set<string>();
-            try {
-              const stackAny: any = config ?? {};
-              const collect = (arr: any) => {
-                if (!Array.isArray(arr)) return;
-                for (const r of arr) {
-                  const n = typeof r === 'string' ? r : (r && typeof r.name === 'string' ? r.name : null);
-                  if (n && n !== 'owner' && n !== 'admin' && n !== 'member') additionalOrgRoles.add(n);
-                }
-              };
-              collect(stackAny.positions);
-              if (Array.isArray(stackAny.permissions)) {
-                for (const p of stackAny.permissions) {
-                  if (p && typeof p.name === 'string') {
-                    if (p.name !== 'owner' && p.name !== 'admin' && p.name !== 'member') additionalOrgRoles.add(p.name);
-                  }
-                }
-              }
-            } catch {
-              // best-effort
-            }
+            // those names (otherwise it 400s with `ROLE_NOT_FOUND`) AND the
+            // `sys_invitation.role` / `sys_member.role` selects accept them on
+            // write. #3723: the walk lives in plugin-auth so `serve`, the
+            // `@objectstack/verify` harness and any embedder derive the list
+            // identically — a second copy of it here is how the harness came to
+            // boot without app roles while `serve` had them.
+            const additionalOrgRoles = collectStackOrgRoles(config);
 
             await kernel.use(new AuthPlugin({
               secret,
               baseUrl,
               socialProviders: Object.keys(socialProviders).length > 0 ? socialProviders : undefined,
               trustedOrigins: trustedOrigins.length ? trustedOrigins : undefined,
-              ...(additionalOrgRoles.size > 0 ? { additionalOrgRoles: Array.from(additionalOrgRoles) } : {}),
+              ...(additionalOrgRoles.length > 0 ? { additionalOrgRoles } : {}),
               // Enable the admin plugin by default so the Setup app's
               // ban/unban/set-password/impersonate/set-role row actions
               // resolve to real endpoints. The plugin self-gates by role

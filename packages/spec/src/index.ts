@@ -166,10 +166,23 @@ export {
   BUILTIN_IDENTITY_ORG_OWNER,
   BUILTIN_IDENTITY_ORG_ADMIN,
   BUILTIN_IDENTITY_ORG_MEMBER,
-  MEMBERSHIP_ROLE_DELEGATED_ADMIN,
   ADMIN_FULL_ACCESS,
   ORGANIZATION_ADMIN,
   ORGANIZATION_ADMIN_NO_BYPASS,
   ORGANIZATION_ADMIN_GRANTS,
 } from './identity/eval-user.zod';
 export type { EvalUser, EvalUserInput, BuiltinIdentityName } from './identity/eval-user.zod';
+
+// #3723: organization membership roles — the ONE list read by better-auth's
+// role registry AND the `sys_invitation`/`sys_member` role selects.
+export {
+  MEMBERSHIP_ROLE_OWNER,
+  MEMBERSHIP_ROLE_ADMIN,
+  MEMBERSHIP_ROLE_MEMBER,
+  MEMBERSHIP_ROLE_DELEGATED_ADMIN,
+  BUILTIN_MEMBERSHIP_ROLES,
+  BUILTIN_MEMBERSHIP_ROLE_OPTIONS,
+  MEMBERSHIP_ROLE_NAME_PATTERN,
+  MEMBERSHIP_ROLE_NAME_MIN_LENGTH,
+} from './identity/membership-role';
+export type { BuiltinMembershipRole } from './identity/membership-role';

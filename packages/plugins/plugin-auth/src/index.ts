@@ -30,4 +30,9 @@ export * from './auth-schema-config.js';
 // compose the reconciler into their own hooks; embeddings query tenancy mode).
 export * from './reconcile-membership.js';
 export * from './tenancy-service.js';
+// #3723 — organization roles. Exported because every host that boots AuthPlugin
+// from a loaded stack (`objectstack serve`, the @objectstack/verify harness, the
+// cloud per-project kernel) must derive `additionalOrgRoles` the SAME way; a
+// second copy of the walk is how the harness came to boot without app roles.
+export * from './org-roles.js';
 export type { AuthConfig, AuthProviderConfig, AuthPluginConfig } from '@objectstack/spec/system';

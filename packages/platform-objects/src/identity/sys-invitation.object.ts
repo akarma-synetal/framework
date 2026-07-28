@@ -1,6 +1,7 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
 import { ObjectSchema, Field } from '@objectstack/spec/data';
+import { BUILTIN_MEMBERSHIP_ROLE_OPTIONS, MEMBERSHIP_ROLE_MEMBER } from '@objectstack/spec/identity';
 
 /**
  * sys_invitation — System Invitation Object
@@ -196,22 +197,17 @@ export const SysInvitation = ObjectSchema.create({
       description: 'Email address of the invited user',
     }),
     
+    // [#3723] Same list as `sys_member.role`, from the same constant — this is
+    // the value that lands there on acceptance, so the two can never be allowed
+    // to drift. App-declared organization roles are appended at boot by
+    // plugin-auth's `withMembershipRoleOptions`, from the same normalized array
+    // that registers them with better-auth; do not hand-add one here.
     role: Field.select({
       label: 'Role',
       required: false,
       description: 'Role to assign upon acceptance',
-      options: [
-        { label: 'Owner', value: 'owner' },
-        { label: 'Admin', value: 'admin' },
-        // [ADR-0105 D8 / #3697] Kept in step with `sys_member.role` — this is
-        // the value that lands there on acceptance, and inviting is how a
-        // delegate gets provisioned in the first place. Both selects are
-        // enforced on write, so a role missing from either one is a role that
-        // cannot be handed out.
-        { label: 'Delegated Admin', value: 'delegated_admin' },
-        { label: 'Member', value: 'member' },
-      ],
-      defaultValue: 'member',
+      options: [...BUILTIN_MEMBERSHIP_ROLE_OPTIONS],
+      defaultValue: MEMBERSHIP_ROLE_MEMBER,
     }),
     
     status: Field.select(['pending', 'accepted', 'rejected', 'expired', 'canceled'], {

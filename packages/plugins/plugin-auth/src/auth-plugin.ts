@@ -35,6 +35,7 @@ import {
   authIdentityObjects,
   authPluginManifestHeader,
 } from './manifest.js';
+import { normalizeAdditionalOrgRoles, withMembershipRoleOptions } from './org-roles.js';
 
 /**
  * Auth Plugin Options
@@ -200,8 +201,16 @@ export class AuthPlugin implements Plugin {
       ctx.logger.warn('No data engine service found - auth will use in-memory storage');
     }
 
+    // [#3723] Normalize the app-declared organization roles ONCE, here: the
+    // same array feeds better-auth's role registry (via AuthManager) and the
+    // `sys_invitation.role` / `sys_member.role` selects (via the manifest
+    // below). Two derivations from one caller-supplied list is exactly the
+    // drift that made a registered role unstorable.
+    const additionalOrgRoles = normalizeAdditionalOrgRoles(this.options.additionalOrgRoles, ctx.logger);
+
     const authConfig: AuthManagerOptions & AuthPluginOptions = {
       ...this.options,
+      additionalOrgRoles,
       dataEngine,
       logger: ctx.logger,
       // ADR-0093 D2/D3 — the membership reconciler consults the tenancy service
@@ -330,7 +339,14 @@ export class AuthPlugin implements Plugin {
       ...(this.options.manifestDatasource
         ? { defaultDatasource: this.options.manifestDatasource }
         : {}),
-      objects: authIdentityObjects,
+      // [#3723] App-declared organization roles widen the `sys_invitation.role`
+      // / `sys_member.role` selects, from the SAME normalized array that
+      // registers them with better-auth (`AuthManager`'s org-plugin roles map).
+      // Without this the two lists drift and a registered role is one
+      // better-auth accepts and the write path rejects — the registration is
+      // half a feature. Copy-on-write: `authIdentityObjects` is a shared
+      // module-level array, never mutated.
+      objects: withMembershipRoleOptions(authIdentityObjects, additionalOrgRoles),
       // ADR-0048 — Setup/Studio/Account apps (and the Setup nav contributions)
       // moved to their own one-app packages (@objectstack/{setup,studio,account}),
       // each registering under its own package id so /apps/<packageId> resolves

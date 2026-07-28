@@ -21,6 +21,7 @@ import {
 import { MCP_OAUTH_SCOPES } from '@objectstack/spec/ai';
 import { createObjectQLAdapterFactory, withSystemReadContext } from './objectql-adapter.js';
 import { invitationRoleCapFailure, isPlainMemberInvitation } from './invitation-role-cap.js';
+import { normalizeAdditionalOrgRoles } from './org-roles.js';
 import { isPlaceholderEmail } from './placeholder-email.js';
 import { reconcileMembership, type MembershipPolicy } from './reconcile-membership.js';
 import type { TenancyService } from './tenancy-service.js';
@@ -1571,7 +1572,15 @@ export class AuthManager {
       // attribution — so the permission would mean "cancel anyone's pending
       // invitation in the org". Attributed cancel needs its own guard first.
       let customOrgRoles: Record<string, any> | undefined;
-      const extra = this.config.additionalOrgRoles ?? [];
+      // [#3723] The SAME normalized array `AuthPlugin` stamps onto the
+      // `sys_invitation.role` / `sys_member.role` selects. Registering a name
+      // the write path cannot store is the bug this closes, so a name that
+      // cannot round-trip through `Field.select` is refused HERE too — the
+      // invitation then fails at better-auth's door (`ROLE_NOT_FOUND`) rather
+      // than at the insert.
+      // (Idempotent: `AuthPlugin` normalizes before constructing the manager,
+      // so this pass only warns for a caller wiring `AuthManager` directly.)
+      const extra = normalizeAdditionalOrgRoles(this.config.additionalOrgRoles, this.config.logger);
       try {
         const accessMod = await import('better-auth/plugins/organization/access');
         const { defaultAc, memberAc, defaultRoles } = accessMod as any;
