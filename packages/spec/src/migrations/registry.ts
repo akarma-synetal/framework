@@ -347,11 +347,22 @@ const step17: MigrationStep = {
     'its canonical key at parse time and dropped from the parsed output, so no runtime ' +
     'behaviour changes — only the authorable surface shrinks to one spelling per slot. ' +
     'All three are pure key renames with unchanged values and replay losslessly; the ' +
-    'schemas reject the removed spellings with a fix-it error naming the replacement.',
+    'schemas reject the removed spellings with a fix-it error naming the replacement.\n\n' +
+    'It also removes the sharing-rule access level `full` (#3865): declared as ' +
+    '"Full Access (Transfer, Share, Delete)" but never enforced as anything but ' +
+    '`edit` — both gates matched `edit`/`full` alike, so Setup promised admins a ' +
+    'delete grant it never issued (ADR-0078). Unlike the OWD `sharingModel: \'full\'` ' +
+    'alias retired at step 13, this one HAS a lossless target precisely because it ' +
+    'was inert — old and new shapes are behaviourally identical — so it converts ' +
+    'mechanically and leaves no semantic residue. It is the one protocol-17 ' +
+    'conversion that keeps a load-path acceptance window: it had no prior ' +
+    'deprecation, and a removed enum value cannot carry the fix-it error the three ' +
+    'key renames tombstone theirs with.',
   conversionIds: [
     'action-execute-to-target',
     'field-conditionalRequired-to-requiredWhen',
     'agent-knowledge-topics-to-sources',
+    'sharing-rule-access-level-full-to-edit',
   ],
   semantic: [],
 };
