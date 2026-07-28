@@ -18,7 +18,7 @@ import {
   FILE_REFERENCES_MIGRATION_ID,
   isDataMigrationFlagVerified,
 } from '@objectstack/spec/system';
-import { ExecutionContext, ExecutionContextSchema } from '@objectstack/spec/kernel';
+import { ExecutionContext, ExecutionContextInput, ExecutionContextSchema } from '@objectstack/spec/kernel';
 import { IDataDriver, IDataEngine, Logger, createLogger, withTransientRetry, type RetryOptions } from '@objectstack/core';
 import { SummaryRecomputeError, type SummaryRecomputeFailure } from './summary-errors.js';
 import { DriverConnectError, emitDegradedBootBanner, type DriverConnectFailure } from './driver-connect-errors.js';
@@ -142,7 +142,7 @@ function planFormulaProjection(
 function applyFormulaPlan(
   plan: FormulaPlanEntry[],
   records: any[],
-  execCtx?: ExecutionContext,
+  execCtx?: ExecutionContextInput,
   nowSnapshot?: Date,
 ): void {
   if (!plan.length) return;
@@ -194,7 +194,7 @@ export interface OperationContext {
   ast?: QueryAST;
   data?: any;
   options?: any;
-  context?: ExecutionContext;
+  context?: ExecutionContextInput;
   result?: any;
 }
 
@@ -213,14 +213,14 @@ export interface OperationContext {
  * are given, `options.context` wins (it is the explicit channel).
  */
 export interface EngineReadOptions {
-  context?: ExecutionContext;
+  context?: ExecutionContextInput;
 }
 
 /** Merge read-path execution context from the query and the trailing options. */
 function mergeReadContext(
-  fromQuery?: ExecutionContext,
-  fromOptions?: ExecutionContext,
-): ExecutionContext | undefined {
+  fromQuery?: ExecutionContextInput,
+  fromOptions?: ExecutionContextInput,
+): ExecutionContextInput | undefined {
   if (fromOptions == null) return fromQuery;
   if (fromQuery == null) return fromOptions;
   return { ...fromQuery, ...fromOptions };
@@ -234,7 +234,7 @@ function mergeReadContext(
  * for a "historical" import) turns it off. Both are server-set, never
  * client-supplied.
  */
-function shouldSkipStateMachine(ctx?: ExecutionContext): boolean {
+function shouldSkipStateMachine(ctx?: ExecutionContextInput): boolean {
   return ctx?.seedReplay === true || ctx?.skipStateMachine === true;
 }
 
@@ -767,11 +767,21 @@ export class ObjectQL implements IDataEngine {
   }
 
   /**
-   * Build a HookContext.session from ExecutionContext
+   * Build a HookContext.session from ExecutionContext — WHO is calling.
+   *
+   * Returns `undefined` when the context yields nothing session-worthy, which
+   * keeps `!ctx.session` meaning exactly one thing for hooks: "no identity
+   * envelope was supplied" — the bare-kernel / programmatic call that
+   * caller-gating hooks skip for. A context carrying only write PROVENANCE
+   * (`{ flowRunId }`, all an identity-less flow run has — #3712) is such a
+   * case: it says what produced the write, not who is calling, and surfaces
+   * through {@link buildProvenance} instead. Every real transport resolves
+   * `positions` into the context, so an anonymous HTTP request still yields a
+   * session and stays gated.
    */
-  private buildSession(execCtx?: ExecutionContext): HookContext['session'] {
+  private buildSession(execCtx?: ExecutionContextInput): HookContext['session'] {
     if (!execCtx) return undefined;
-    return {
+    const session = {
       userId: execCtx.userId,
       // `organizationId` is the blessed developer-facing name for the caller's
       // active org (matches the `organization_id` column, `current_user`
@@ -785,12 +795,6 @@ export class ObjectQL implements IDataEngine {
       // Propagate system-elevated flag so hooks can distinguish engine
       // self-writes (e.g. approval status mirror) from genuine user writes.
       ...((execCtx as any).isSystem ? { isSystem: true } : {}),
-      // Propagate the owning flow run so a hook can recognize writes made BY a
-      // run it already knows about — the approvals record lock lets the run that
-      // opened a pending approval write its own target record (#3456). Pure
-      // provenance: it grants nothing, and unlike `isSystem` it does not widen
-      // the write's authorization, so a `runAs:'user'` run stays RLS-scoped.
-      ...((execCtx as any).flowRunId ? { flowRunId: String((execCtx as any).flowRunId) } : {}),
       // Propagate the automation-suppression flag so the record-change trigger
       // can skip flow dispatch for seed/bulk writes (ADR: seed loads end-state
       // data, not user events). `skipAutomations` implies `skipTriggers` —
@@ -805,6 +809,26 @@ export class ObjectQL implements IDataEngine {
       // stamping now (#3493). Opt-in, server-set only.
       ...((execCtx as any).preserveAudit ? { preserveAudit: true } : {}),
     } as HookContext['session'];
+    // Nothing to say about the caller → say nothing. An object whose every
+    // property is `undefined` conveys no more than no session at all, and
+    // returning it would turn "no caller" into "an anonymous caller".
+    return Object.values(session as Record<string, unknown>).some((v) => v !== undefined)
+      ? session
+      : undefined;
+  }
+
+  /**
+   * Build the HookContext.provenance envelope — WHAT produced this write.
+   *
+   * Deliberately separate from {@link buildSession}: provenance is server-
+   * stamped, evaluated by no security middleware, and can exist with no
+   * identity beside it. A schedule-triggered flow run resolves no principal
+   * yet still owns its writes, and that is the case the approvals record lock
+   * needs to recognize (#3456 / #3712).
+   */
+  private buildProvenance(execCtx?: ExecutionContextInput): HookContext['provenance'] {
+    const flowRunId = (execCtx as any)?.flowRunId;
+    return flowRunId ? { flowRunId: String(flowRunId) } : undefined;
   }
 
   /**
@@ -814,7 +838,7 @@ export class ObjectQL implements IDataEngine {
    * system / unauthenticated writes, where membership predicates then fail-open.
    */
   private buildEvalUser(
-    execCtx?: ExecutionContext,
+    execCtx?: ExecutionContextInput,
   ): { id: string; positions: string[]; organizationId: string | null } | undefined {
     if (!execCtx || execCtx.userId == null) return undefined;
     return {
@@ -835,7 +859,7 @@ export class ObjectQL implements IDataEngine {
    * hooks that need an org regardless of a resolved user read
    * `ctx.session.organizationId`, which is populated whenever a session is.
    */
-  private buildUser(execCtx?: ExecutionContext): HookContext['user'] {
+  private buildUser(execCtx?: ExecutionContextInput): HookContext['user'] {
     if (!execCtx || execCtx.userId == null) return undefined;
     return {
       id: String(execCtx.userId),
@@ -867,7 +891,7 @@ export class ObjectQL implements IDataEngine {
    * `tenantId` themselves on the resulting object; this helper does not
    * mask the system path.
    */
-  private buildDriverOptions(object: string, execCtx?: ExecutionContext, base?: any): any {
+  private buildDriverOptions(object: string, execCtx?: ExecutionContextInput, base?: any): any {
     // The open transaction may arrive explicitly via the context, or ambiently
     // via txStore when an internal query runs during a transactional write
     // (ADR-0034). Explicit wins; ambient is the safety net.
@@ -928,8 +952,8 @@ export class ObjectQL implements IDataEngine {
    * Falls back to a system-elevated empty context when no execCtx
    * is supplied (e.g. system-triggered hooks).
    */
-  private buildHookApi(execCtx?: ExecutionContext): ScopedContext {
-    const safeCtx: ExecutionContext = execCtx ?? ({ isSystem: true } as any);
+  private buildHookApi(execCtx?: ExecutionContextInput): ScopedContext {
+    const safeCtx: ExecutionContextInput = execCtx ?? ({ isSystem: true } as any);
     return new ScopedContext(safeCtx, this as unknown as IDataEngine);
   }
 
@@ -956,7 +980,7 @@ export class ObjectQL implements IDataEngine {
   private applyFieldDefaults(
     object: string,
     record: Record<string, unknown>,
-    execCtx?: ExecutionContext,
+    execCtx?: ExecutionContextInput,
     nowSnapshot?: Date,
   ): Record<string, unknown> {
     const schema = this.getSchema(object);
@@ -1028,7 +1052,7 @@ export class ObjectQL implements IDataEngine {
   private async applyAutonumbers(
     object: string,
     record: Record<string, unknown>,
-    execCtx?: ExecutionContext,
+    execCtx?: ExecutionContextInput,
     driverOwnsAutonumber?: boolean,
   ): Promise<void> {
     if (driverOwnsAutonumber) return; // driver generates persistently in create()
@@ -1079,7 +1103,7 @@ export class ObjectQL implements IDataEngine {
     object: string,
     field: string,
     prefix: string,
-    execCtx?: ExecutionContext,
+    execCtx?: ExecutionContextInput,
   ): Promise<number> {
     try {
       const rows = await this.find(object, {
@@ -1549,7 +1573,7 @@ export class ObjectQL implements IDataEngine {
   private async encryptSecretFields(
     object: string,
     row: Record<string, unknown>,
-    context: ExecutionContext | undefined,
+    context: ExecutionContextInput | undefined,
     driverOptions: unknown,
   ): Promise<void> {
     if (!row || typeof row !== 'object') return;
@@ -1977,7 +2001,7 @@ export class ObjectQL implements IDataEngine {
           const rows = await this.find(DATA_MIGRATION_FLAG_OBJECT, {
             where: { id: FILE_REFERENCES_MIGRATION_ID },
             limit: 1,
-            context: { isSystem: true } as ExecutionContext,
+            context: { isSystem: true } as ExecutionContextInput,
           });
           const row: any = rows?.[0];
           if (!row || row.id !== FILE_REFERENCES_MIGRATION_ID) return false;
@@ -2128,7 +2152,7 @@ export class ObjectQL implements IDataEngine {
     childObject: string,
     records: any,
     previous: any,
-    execCtx?: ExecutionContext,
+    execCtx?: ExecutionContextInput,
   ): Promise<SummaryRecomputeFailure[]> {
     const descriptors = this.getSummaryDescriptors(childObject);
     if (descriptors.length === 0) return [];
@@ -2194,7 +2218,7 @@ export class ObjectQL implements IDataEngine {
     records: any[],
     expand: Record<string, QueryAST>,
     depth: number = 0,
-    execCtx?: ExecutionContext,
+    execCtx?: ExecutionContextInput,
   ): Promise<any[]> {
     if (!records || records.length === 0) return records;
     if (depth >= ObjectQL.MAX_EXPAND_DEPTH) return records;
@@ -2273,7 +2297,7 @@ export class ObjectQL implements IDataEngine {
             where,
             ...(nestedAST.fields ? { fields: nestedAST.fields as any } : {}),
             ...(nestedAST.orderBy ? { orderBy: nestedAST.orderBy as any } : {}),
-            context: { ...(execCtx ?? {}), __expandRead: true } as ExecutionContext,
+            context: { ...(execCtx ?? {}), __expandRead: true } as ExecutionContextInput,
           },
         ) ?? [];
 
@@ -2345,7 +2369,7 @@ export class ObjectQL implements IDataEngine {
   private async resolveFileReferences(
     objectName: string,
     records: any[],
-    execCtx?: ExecutionContext,
+    execCtx?: ExecutionContextInput,
   ): Promise<any[]> {
     if (!records || records.length === 0) return records;
     // A caller whose subject is the STORED form — the ADR-0104 backfill /
@@ -2394,7 +2418,7 @@ export class ObjectQL implements IDataEngine {
     try {
       fileRows = (await this.find(
         'sys_file',
-        { where: { id: { $in: uniqueIds } }, context: { ...(execCtx ?? {}), __expandRead: true } as ExecutionContext },
+        { where: { id: { $in: uniqueIds } }, context: { ...(execCtx ?? {}), __expandRead: true } as ExecutionContextInput },
       )) ?? [];
     } catch {
       return records; // sys_file unregistered / unreadable — leave ids as-is
@@ -2531,6 +2555,7 @@ export class ObjectQL implements IDataEngine {
           event: 'beforeFind',
           input: { ast: opCtx.ast, options: opCtx.options },
           session: this.buildSession(opCtx.context),
+          provenance: this.buildProvenance(opCtx.context),
           user: this.buildUser(opCtx.context),
           api: this.buildHookApi(opCtx.context),
           transaction: opCtx.context?.transaction,
@@ -2621,6 +2646,7 @@ export class ObjectQL implements IDataEngine {
           event: 'beforeFind',
           input: { ast: opCtx.ast, options: opCtx.options },
           session: this.buildSession(opCtx.context),
+          provenance: this.buildProvenance(opCtx.context),
           user: this.buildUser(opCtx.context),
           api: this.buildHookApi(opCtx.context),
           transaction: opCtx.context?.transaction,
@@ -2720,6 +2746,7 @@ export class ObjectQL implements IDataEngine {
           event: 'beforeInsert',
           input: { data: row, options: opCtx.options },
           session: this.buildSession(opCtx.context),
+          provenance: this.buildProvenance(opCtx.context),
           user: this.buildUser(opCtx.context),
           api: this.buildHookApi(opCtx.context),
           transaction: opCtx.context?.transaction,
@@ -3020,6 +3047,7 @@ export class ObjectQL implements IDataEngine {
           event: 'beforeUpdate',
           input: { id, data: opCtx.data, options: opCtx.options },
           session: this.buildSession(opCtx.context),
+          provenance: this.buildProvenance(opCtx.context),
           user: this.buildUser(opCtx.context),
           api: this.buildHookApi(opCtx.context),
           transaction: opCtx.context?.transaction,
@@ -3218,7 +3246,7 @@ export class ObjectQL implements IDataEngine {
   private async cascadeDeleteRelations(
     object: string,
     id: string | number,
-    context?: ExecutionContext,
+    context?: ExecutionContextInput,
     depth = 0,
   ): Promise<void> {
     if (id == null || depth >= ObjectQL.MAX_CASCADE_DEPTH) return;
@@ -3303,7 +3331,7 @@ export class ObjectQL implements IDataEngine {
             // rides a server-DERIVED context (set here, never from client input
             // — same trust model as `__expandRead`), so it cannot be forged from
             // a request to bypass the guard on an ordinary write.
-            const referentialCtx = { ...(context ?? {}), __referentialFieldClear: true } as ExecutionContext;
+            const referentialCtx = { ...(context ?? {}), __referentialFieldClear: true } as ExecutionContextInput;
             await this.update(childName, { id: depId, [fieldName]: null }, { context: referentialCtx } as any);
           }
         }
@@ -3355,6 +3383,7 @@ export class ObjectQL implements IDataEngine {
           event: 'beforeDelete',
           input: { id, options: opCtx.options },
           session: this.buildSession(opCtx.context),
+          provenance: this.buildProvenance(opCtx.context),
           user: this.buildUser(opCtx.context),
           api: this.buildHookApi(opCtx.context),
           transaction: opCtx.context?.transaction,
@@ -4012,7 +4041,7 @@ export class ObjectQL implements IDataEngine {
 export class ObjectRepository {
   constructor(
     private objectName: string,
-    private context: ExecutionContext,
+    private context: ExecutionContextInput,
     private engine: IDataEngine & { executeAction?: (o: string, a: string, c: any) => Promise<any> }
   ) {}
 
@@ -4109,7 +4138,7 @@ export class ObjectRepository {
  */
 export class ScopedContext {
   constructor(
-    private executionContext: ExecutionContext,
+    private executionContext: ExecutionContextInput,
     private engine: IDataEngine
   ) {}
 
