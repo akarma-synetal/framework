@@ -22,6 +22,7 @@ describe('reference-integrity suite — membership', () => {
       'validateNavAccess',
       'validateTranslationReferences',
       'validateFlowTemplatePaths',
+      'validateAiSurfaceAffinity',
     ]);
   });
 
@@ -107,6 +108,10 @@ describe('reference-integrity suite — every member actually runs', () => {
       // validateTranslationReferences: a field the object does not declare.
       { en: { objects: { crm_lead: { label: 'Lead', fields: { assigned_to: { label: 'Owner' } } } } } },
     ],
+    // validateAiSurfaceAffinity: an 'ask' agent binding a 'build' skill — the
+    // runtime throws on this at chat time (ADR-0064 §3).
+    agents: [{ name: 'helper', surface: 'ask', skills: ['metadata_authoring'] }],
+    skills: [{ name: 'metadata_authoring', surface: 'build', tools: [] }],
     flows: [
       {
         name: 'lead_followup',
@@ -139,6 +144,7 @@ describe('reference-integrity suite — every member actually runs', () => {
     expect(rules).toContain('nav-object-ungranted');
     expect(rules).toContain('translation-target-unknown');
     expect(rules).toContain('flow-template-unknown-field');
+    expect(rules).toContain('ai-skill-surface-mismatch');
   });
 
   it('carries a gating flow-template finding through the suite (#3810)', () => {
@@ -160,9 +166,9 @@ describe('reference-integrity suite — every member actually runs', () => {
       expect(typeof f.message).toBe('string');
       expect(typeof f.hint).toBe('string');
     }
-    // Object references run first, flow template paths last.
+    // Object references run first, AI surface affinity last.
     expect(findings[0].rule).toBe('object-reference-unknown');
-    expect(findings[findings.length - 1].rule).toBe('flow-template-unknown-field');
+    expect(findings[findings.length - 1].rule).toBe('ai-skill-surface-mismatch');
   });
 
   it('returns nothing for an empty stack', () => {

@@ -52,6 +52,7 @@ import { validateChartBindings } from './validate-chart-bindings.js';
 import { validateNavAccess } from './validate-nav-access.js';
 import { validateTranslationReferences } from './validate-translation-references.js';
 import { validateFlowTemplatePaths } from './validate-flow-template-paths.js';
+import { validateAiSurfaceAffinity } from './validate-ai-surface-affinity.js';
 
 export type ReferenceIntegritySeverity = 'error' | 'warning';
 
@@ -94,6 +95,7 @@ export const REFERENCE_INTEGRITY_RULES: readonly ReferenceIntegrityRule[] = [
   { name: 'validateNavAccess', run: validateNavAccess },
   { name: 'validateTranslationReferences', run: validateTranslationReferences },
   { name: 'validateFlowTemplatePaths', run: validateFlowTemplatePaths },
+  { name: 'validateAiSurfaceAffinity', run: validateAiSurfaceAffinity },
 ];
 
 /**
