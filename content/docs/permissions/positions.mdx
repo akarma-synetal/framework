@@ -16,11 +16,10 @@ of their own** — they only decide *who gets which sets*.
 > security identifiers and labels). The vocabulary is now unambiguous:
 > **permission set** = capability, **position** = distribution,
 > **business unit** = hierarchy. The single exception is better-auth's
-> internal `sys_member.role` (org-membership tier: `owner`, `admin`,
-> `delegated_admin`, `member`). A position name you declare here is also
-> registered as a valid `sys_member.role` value, so someone can be invited
-> directly into the position — see [Positions as membership
-> roles](#positions-as-membership-roles).
+> internal `sys_member.role` — the org-membership tier (`owner`, `admin`,
+> `delegated_admin`, `member`, **plus every position name your stack
+> declares**, so a person can be invited straight into a position; see
+> [Authentication](/docs/permissions/authentication#positions-as-membership-tiers)).
 
 ```typescript
 import type { Position } from '@objectstack/spec/identity';
@@ -89,36 +88,6 @@ is no singular `current_user.position` at runtime). Framework-seeded names:
 | `org_member` | Organization member (`sys_member.role = member`) |
 
 Test membership in RLS/CEL with `'org_admin' in current_user.positions`.
-
-## Positions as membership roles
-
-Every position and permission-set name your stack declares is registered as a
-valid organization role, so an invitation can name it directly:
-
-```http
-POST /api/v1/auth/organization/invite-member
-{ "email": "new.hire@example.com", "role": "sales_rep" }
-```
-
-On acceptance the value lands in `sys_member.role`, and the membership
-projection passes an unrecognized value straight through as a position name —
-so the invitee holds `sales_rep` in `current_user.positions` and resolves
-whatever permission sets are bound to it. Both `sys_invitation.role` and
-`sys_member.role` are pickers built from that same registered set, so the
-Setup UI offers your names alongside the built-ins.
-
-Two limits are worth knowing before you use this as a provisioning path:
-
-- **It is not a way to hand out more authority than you have.** An issuer
-  below `admin` grade may invite only as plain `member`, and no invitation may
-  ever confer a role above the issuer's own. A delegated admin grants
-  capability through the invitation's *placement* (business unit + positions),
-  which is authorized against their `adminScope` — not through the membership
-  role, which nothing scopes.
-- **Only spec-compliant names are registered.** A declared name that is not
-  lowercase snake_case (`/^[a-z][a-z0-9_]*$/`, min 2 characters) is skipped
-  with a boot warning, and an invitation naming it is refused with
-  `ROLE_NOT_FOUND`.
 
 ## Audience anchors: `everyone` and `guest` (ADR-0090 D5/D9)
 

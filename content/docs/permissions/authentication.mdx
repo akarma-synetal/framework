@@ -668,6 +668,40 @@ new AuthPlugin({
 })
 ```
 
+#### Positions as membership tiers
+
+`sys_member.role` is better-auth's own column and the one place ObjectStack
+keeps that vocabulary (ADR-0090 D3's single boundary exception). Beyond the
+four built-in tiers — `owner`, `admin`, `delegated_admin`, `member` — every
+[position](/docs/permissions/positions) and
+[permission set](/docs/permissions/permission-sets) your stack declares is
+registered as a valid value, so an invitation can name one directly:
+
+```http
+POST /api/v1/auth/organization/invite-member
+{ "email": "new.hire@example.com", "role": "sales_rep" }
+```
+
+On acceptance the value lands in `sys_member.role`, and the membership
+projection passes an unrecognized value through as a position name — so the
+invitee holds `sales_rep` in `current_user.positions` and resolves whatever
+permission sets are bound to it. Both `sys_invitation` and `sys_member` build
+their pickers from that same registered set, so the Setup UI offers your names
+alongside the built-ins.
+
+Two limits bound this as a provisioning path:
+
+- **It never hands out more authority than the issuer has.** An issuer below
+  `admin` grade may invite as plain `member` only, and no invitation may confer
+  a tier above the issuer's own. A delegated admin grants capability through
+  the invitation's *placement* (business unit + positions), authorized against
+  their `adminScope` — not through the membership tier, which nothing scopes.
+- **Only spec-compliant names are registered.** A declared name that is not
+  lowercase snake_case (`/^[a-z][a-z0-9_]*$/`, minimum 2 characters) is skipped
+  with a boot warning, and an invitation naming it is refused with
+  `ROLE_NOT_FOUND` — better-auth never learns a name the write path could not
+  store.
+
 ### Admin User Management
 
 With `plugins: { admin: true }` (forced on when SCIM is enabled), platform
