@@ -1986,6 +1986,7 @@
     "APPROVAL_NODE_TYPE (const)",
     "APPROVER_EXPRESSION_ROOTS (const)",
     "APPROVER_VALUE_BINDINGS (const)",
+    "APPROVER_VALUE_SOURCES (const)",
     "ActionCategory (type)",
     "ActionCategorySchema (const)",
     "ActionDescriptor (type)",
