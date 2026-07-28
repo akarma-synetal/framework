@@ -25,7 +25,7 @@ import { ObjectQLPlugin } from '@objectstack/objectql';
 import { SqliteWasmDriver } from '@objectstack/driver-sqlite-wasm';
 import { HonoServerPlugin } from '@objectstack/plugin-hono-server';
 import { createRestApiPlugin } from '@objectstack/rest';
-import { AuthPlugin, collectStackOrgRoles } from '@objectstack/plugin-auth';
+import { AuthPlugin } from '@objectstack/plugin-auth';
 import { SecurityPlugin } from '@objectstack/plugin-security';
 import { SharingServicePlugin } from '@objectstack/plugin-sharing';
 import { SettingsServicePlugin, LocalCryptoProvider } from '@objectstack/service-settings';
@@ -182,15 +182,15 @@ export async function bootStack(
   // create, ADR-0062 federation, ADR-0086 two-doors). The bootstrap itself is
   // covered by plugin-auth unit tests + browser E2E.
   //
-  // [#3723] `additionalOrgRoles` IS derived here, from the same
-  // `collectStackOrgRoles` walk `objectstack serve` uses. The harness used to
-  // omit it, so a dogfood proof booted a stack whose declared roles better-auth
-  // had never heard of — the one surface that drives the real HTTP route was
-  // blind to the exact class of bug it exists to catch.
+  // [#3723] App-declared organization roles need no wiring: AuthPlugin derives
+  // them from the registered metadata in its own kernel:ready hook. The
+  // harness passing NOTHING is deliberate and is itself part of the proof —
+  // the dogfood invite gate only stays green if the auto-derivation works,
+  // which is exactly the guarantee per-host wiring could never give (this
+  // harness was one of the three hosts that forgot it).
   await kernel.use(new AuthPlugin({
     secret: opts.authSecret ?? DEFAULT_AUTH_SECRET,
     autoDefaultOrganization: false,
-    additionalOrgRoles: collectStackOrgRoles(config),
   }));
 
   // ADR-0062 — datasource connection service (registers 'datasource-connection'),

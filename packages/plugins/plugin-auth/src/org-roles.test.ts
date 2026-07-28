@@ -14,6 +14,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { BUILTIN_MEMBERSHIP_ROLE_OPTIONS } from '@objectstack/spec/identity';
 import { SysInvitation, SysMember, SysUser } from '@objectstack/platform-objects/identity';
 import {
+  collectRegisteredOrgRoles,
   collectStackOrgRoles,
   membershipRoleLabel,
   membershipRoleOptions,
@@ -223,5 +224,65 @@ describe('#3723 collectStackOrgRoles — one walk for every host', () => {
     const roles = collectStackOrgRoles(stack);
     const [, member] = withMembershipRoleOptions([SysUser, SysMember], roles);
     expect(values(roleOptionsOf(member))).toContain('sales_user');
+  });
+});
+
+describe('#3723/cloud#897 collectRegisteredOrgRoles — the late-bound twin', () => {
+  it('reads position + permission items from the engine registry', async () => {
+    const engine = {
+      _registry: {
+        listItems: (type: string) =>
+          type === 'position'
+            ? [{ content: { name: 'sales_rep', label: '销售代表' } }]
+            : type === 'permission'
+              ? [{ name: 'sales_user' }] // bare item (no content wrapper) — both shapes occur
+              : [],
+      },
+    };
+    expect(await collectRegisteredOrgRoles(engine)).toEqual([
+      { name: 'sales_rep', label: '销售代表' },
+      { name: 'sales_user' },
+    ]);
+  });
+
+  it('falls back to the metadata-service facade when the registry has nothing', async () => {
+    const metadataService = {
+      list: (type: string) =>
+        Promise.resolve(type === 'position' ? [{ name: 'ops', label: 'Operations' }] : []),
+    };
+    expect(await collectRegisteredOrgRoles(undefined, metadataService)).toEqual([
+      { name: 'ops', label: 'Operations' },
+    ]);
+  });
+
+  it('registry wins over the facade per type — no double counting', async () => {
+    const engine = { _registry: { listItems: (t: string) => (t === 'position' ? [{ name: 'ops' }] : []) } };
+    const metadataService = {
+      list: (t: string) => (t === 'position' ? [{ name: 'ops' }, { name: 'ghost' }] : [{ name: 'sales_user' }]),
+    };
+    // position served by the registry (facade ignored for it); permission
+    // empty in the registry → facade serves it.
+    expect(await collectRegisteredOrgRoles(engine, metadataService)).toEqual([
+      { name: 'ops' },
+      { name: 'sales_user' },
+    ]);
+  });
+
+  it('normalizes like every other entry point — built-ins and bad names drop', async () => {
+    const engine = {
+      _registry: {
+        listItems: (t: string) =>
+          t === 'position' ? [{ name: 'owner' }, { name: 'bad.name' }, { name: 'ok_role' }] : [],
+      },
+    };
+    expect(await collectRegisteredOrgRoles(engine)).toEqual([{ name: 'ok_role' }]);
+  });
+
+  it('nothing to read from → empty, never a throw', async () => {
+    expect(await collectRegisteredOrgRoles(undefined, undefined)).toEqual([]);
+    expect(await collectRegisteredOrgRoles({}, {})).toEqual([]);
+    expect(
+      await collectRegisteredOrgRoles({ _registry: { listItems: () => { throw new Error('boom'); } } }),
+    ).toEqual([]);
   });
 });

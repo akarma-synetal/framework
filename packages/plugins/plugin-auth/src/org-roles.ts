@@ -292,3 +292,57 @@ export function collectStackOrgRoles(stack: unknown, logger?: OrgRoleLogger): Or
   }
   return normalizeAdditionalOrgRoles(entries, logger);
 }
+
+/**
+ * Collect the organization roles REGISTERED in the running kernel — the
+ * late-bound twin of {@link collectStackOrgRoles}.
+ *
+ * `collectStackOrgRoles` needs the raw stack object in the host's hand, which
+ * is exactly why it kept being forgotten: five hosts booted `AuthPlugin` from
+ * a stack, and three of them (verify harness, DevPlugin, cloud's
+ * ArtifactKernelFactory) never wired the walk — a capability silently absent,
+ * no error anywhere. Worse, one host (cloud) mounts `AuthPlugin` BEFORE the
+ * app metadata even exists, so no init-time walk could ever cover it.
+ *
+ * This variant instead reads the `position` / `permission` metadata already
+ * registered with the engine, at whatever point it is called — `AuthPlugin`
+ * calls it from its own `kernel:ready` hook, which in every host fires after
+ * ALL plugins (and therefore all app metadata) are in. Hosts pass nothing.
+ *
+ * Dual read, same as `bootstrapDeclaredPositions`: the engine's
+ * SchemaRegistry (`_registry.listItems`) is populated by `manifest.register`
+ * in every boot path; the metadata-service facade is the fallback for boots
+ * where the registry shape differs.
+ */
+export async function collectRegisteredOrgRoles(
+  engine: unknown,
+  metadataService?: { list?: (type: string) => unknown },
+  logger?: OrgRoleLogger,
+): Promise<OrgRoleDescriptor[]> {
+  const entries: OrgRoleInput[] = [];
+  const push = (items: unknown) => {
+    if (!Array.isArray(items)) return;
+    for (const raw of items) {
+      const item = (raw as { content?: unknown })?.content ?? raw;
+      if (item && typeof (item as { name?: unknown }).name === 'string') {
+        const { name, label } = item as { name: string; label?: unknown };
+        entries.push(typeof label === 'string' ? { name, label } : { name });
+      }
+    }
+  };
+  for (const type of ['position', 'permission']) {
+    let items: unknown = undefined;
+    try {
+      const reg = (engine as { _registry?: { listItems?: (t: string) => unknown } })?._registry;
+      if (typeof reg?.listItems === 'function') items = reg.listItems(type);
+    } catch { /* fall through to the facade */ }
+    if (!Array.isArray(items) || items.length === 0) {
+      try {
+        const listed = metadataService?.list?.(type);
+        items = typeof (listed as Promise<unknown>)?.then === 'function' ? await listed : listed;
+      } catch { items = undefined; }
+    }
+    push(items);
+  }
+  return normalizeAdditionalOrgRoles(entries, logger);
+}
