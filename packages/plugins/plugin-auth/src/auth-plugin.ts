@@ -32,10 +32,17 @@ import { runSetInitialPassword } from './set-initial-password.js';
 import { runRegisterSsoProviderFromForm, runRegisterSamlProviderFromForm, runRequestDomainVerification, runVerifyDomain } from './register-sso-provider.js';
 import { runResendVerificationEmail } from './send-verification-email.js';
 import {
+  AUTH_PLUGIN_ID,
   authIdentityObjects,
   authPluginManifestHeader,
 } from './manifest.js';
-import { normalizeAdditionalOrgRoles, withMembershipRoleOptions, type OrgRoleInput } from './org-roles.js';
+import {
+  MEMBERSHIP_ROLE_OBJECTS,
+  collectRegisteredOrgRoles,
+  normalizeAdditionalOrgRoles,
+  withMembershipRoleOptions,
+  type OrgRoleInput,
+} from './org-roles.js';
 
 /**
  * Auth Plugin Options
@@ -75,10 +82,12 @@ export interface AuthPluginOptions extends Partial<AuthConfig> {
   manifestDatasource?: string;
 
   /**
-   * Application-specific organization roles to register with Better-Auth's
-   * organization plugin so invitations to those roles aren't rejected with
-   * ROLE_NOT_FOUND. Forwarded as-is to AuthManager. See
-   * {@link AuthManagerOptions.additionalOrgRoles} for details.
+   * EXTRA organization roles to register with Better-Auth's organization
+   * plugin, beyond the ones AuthPlugin derives itself: stack-declared
+   * `position` / `permission` names arrive automatically via the
+   * kernel:ready self-derivation (#3723 follow-up), so most hosts pass
+   * nothing. Only roles that exist OUTSIDE stack metadata need this; the
+   * two sets are unioned. See {@link AuthManagerOptions.additionalOrgRoles}.
    */
   additionalOrgRoles?: OrgRoleInput[];
 
@@ -396,6 +405,74 @@ export class AuthPlugin implements Plugin {
             ],
           }
         : {}),
+    });
+
+    // [#3723 / cloud#897] Late-bound organization roles — hosts pass nothing.
+    //
+    // Five hosts boot AuthPlugin from a stack; three of them (verify harness,
+    // DevPlugin, cloud's ArtifactKernelFactory) at some point forgot to wire
+    // `additionalOrgRoles`, and the failure is silent: app-declared roles are
+    // simply absent, no error anywhere. Per-host wiring is the defect pattern;
+    // this hook removes the need for it. cloud is also ORDER-hostile: it
+    // mounts AuthPlugin before the app metadata exists, so no init-time walk
+    // could ever cover it — `kernel:ready` is the one point that fires after
+    // all metadata is registered in every host.
+    //
+    // What happens when app roles are found beyond the explicit config:
+    //  - better-auth side: `applyConfigPatch` merges them; the instance is
+    //    built lazily (or reset by the patch), so the org-plugin roles map is
+    //    rebuilt with the full set on next use.
+    //  - select side: `sys_invitation` / `sys_member` are re-registered with
+    //    widened `role` options under the SAME package id — an explicitly
+    //    supported re-registration path (the registry replaces the owner
+    //    contribution and invalidates the merge cache). No DDL: options are
+    //    validator/picker metadata, the column stays TEXT.
+    //
+    // Explicit `additionalOrgRoles` remains as override/extra — the union is
+    // what both consumers see, preserving the one-list invariant.
+    ctx.hook('kernel:ready', async () => {
+      try {
+        // PluginContext has no getServiceAsync — the sync getService is the
+        // API (it throws for unknown names, hence the guard). At kernel:ready
+        // the engine is long registered in every real boot; `undefined` only
+        // in mock/Lite kernels, where the metadata facade below still serves
+        // the better-auth half and the select half has no engine to update.
+        const engine = (() => {
+          try { return ctx.getService?.('objectql') as unknown; } catch { return undefined; }
+        })();
+        const metadataService = (() => {
+          try { return ctx.getService?.('metadata') as { list?: (t: string) => unknown } | undefined; }
+          catch { return undefined; }
+        })();
+        if (!engine && !metadataService) return; // mock/Lite boots — nothing to derive from
+
+        const registered = await collectRegisteredOrgRoles(engine, metadataService, ctx.logger);
+        if (registered.length === 0) return;
+
+        const known = new Set(additionalOrgRoles.map((d) => d.name));
+        const discovered = registered.filter((d) => !known.has(d.name));
+        if (discovered.length === 0) return;
+
+        const merged = [...additionalOrgRoles, ...discovered];
+        this.authManager?.applyConfigPatch({ additionalOrgRoles: merged });
+
+        const ql = engine as { registerObject?: (s: unknown, pkg?: string, ns?: string) => string } | undefined;
+        if (typeof ql?.registerObject === 'function') {
+          const widened = withMembershipRoleOptions(authIdentityObjects, merged)
+            .filter((o) => (MEMBERSHIP_ROLE_OBJECTS as readonly string[]).includes((o as { name?: string })?.name ?? ''));
+          for (const schema of widened) {
+            ql.registerObject(schema, AUTH_PLUGIN_ID, authPluginManifestHeader.namespace);
+          }
+        }
+        ctx.logger.info('[auth] app-declared organization roles derived from registered metadata', {
+          discovered: discovered.map((d) => d.name),
+          total: merged.length,
+        });
+      } catch (e) {
+        // Derivation is additive — a failure leaves the explicit config in
+        // force, which is exactly the pre-hook behavior. Loud, not fatal.
+        ctx.logger.warn('[auth] organization-role derivation failed', { error: (e as Error).message });
+      }
     });
 
     ctx.logger.info('Auth Plugin initialized successfully');

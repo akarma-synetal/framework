@@ -522,21 +522,15 @@ export class DevPlugin implements Plugin {
     let authMounted = false;
     if (enabled('auth')) {
       try {
-        const { AuthPlugin, collectStackOrgRoles } = await import('@objectstack/plugin-auth') as any;
-        // [#3723] The same stack walk `objectstack serve` and the verify
-        // harness use. DevPlugin advertises itself as equivalent to the full
-        // stack, so a stack whose declared positions / permission sets are
-        // invitable under `serve` must be invitable here too — otherwise
-        // "equivalent" quietly excludes app-declared organization roles.
-        // Guarded: an older plugin-auth on disk simply yields none.
-        const additionalOrgRoles: string[] =
-          typeof collectStackOrgRoles === 'function'
-            ? collectStackOrgRoles(this.options.stack, ctx.logger)
-            : [];
+        const { AuthPlugin } = await import('@objectstack/plugin-auth') as any;
+        // [#3723] App-declared organization roles need no wiring: AuthPlugin
+        // derives them from the registered metadata in its own kernel:ready
+        // hook, so DevPlugin's "equivalent to the full stack" claim holds
+        // without this host having to remember a parameter (it was one of the
+        // three hosts that forgot it).
         const authPlugin = new AuthPlugin({
           secret: this.options.authSecret,
           baseUrl: this.options.authBaseUrl,
-          ...(additionalOrgRoles.length > 0 ? { additionalOrgRoles } : {}),
         });
         this.childPlugins.push(authPlugin);
         authMounted = true;

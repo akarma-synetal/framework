@@ -404,8 +404,11 @@ export interface AuthManagerOptions extends Partial<AuthConfig> {
    * Better-Auth's `member` role) so it cannot inadvertently grant org-level
    * admin capabilities.
    *
-   * Typical source: `collectStackOrgRoles(stack)` — the one walk every host
-   * shares (`objectstack serve`, the verify harness, DevPlugin).
+   * Rarely needed since the kernel:ready self-derivation (#3723 follow-up):
+   * AuthPlugin reads the registered `position` / `permission` metadata itself
+   * via `collectRegisteredOrgRoles`, so stack-declared roles arrive with NO
+   * host wiring. Pass this only for roles that exist OUTSIDE stack metadata
+   * (the derived set and this list are unioned).
    *
    * Accepts a bare name, or `{ name, label }` to carry the declaring
    * metadata's own display label into the role picker (#3723) — without it the

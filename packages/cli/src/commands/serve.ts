@@ -1396,7 +1396,7 @@ export default class Serve extends Command {
       if (!hasAuthPlugin && tierEnabled('auth')) {
         try {
           const authPkg = '@objectstack/plugin-auth';
-          const { AuthPlugin, collectStackOrgRoles } = await import(/* webpackIgnore: true */ authPkg);
+          const { AuthPlugin } = await import(/* webpackIgnore: true */ authPkg);
 
           // In dev, fall back to a stable local secret so users don't have
           // to set OS_AUTH_SECRET just to try the login/register flow.
@@ -1491,22 +1491,17 @@ export default class Serve extends Command {
               if (!trustedOrigins.includes(wildcard)) trustedOrigins.push(wildcard);
             }
 
-            // Collect application-defined org roles from the stack so
-            // Better-Auth's organization plugin accepts invitations to
-            // those names (otherwise it 400s with `ROLE_NOT_FOUND`) AND the
-            // `sys_invitation.role` / `sys_member.role` selects accept them on
-            // write. #3723: the walk lives in plugin-auth so `serve`, the
-            // `@objectstack/verify` harness and any embedder derive the list
-            // identically — a second copy of it here is how the harness came to
-            // boot without app roles while `serve` had them.
-            const additionalOrgRoles = collectStackOrgRoles(config);
-
+            // App-declared organization roles (positions / permission sets)
+            // need no wiring here: AuthPlugin derives them from the registered
+            // metadata in its own kernel:ready hook (#3723 / cloud#897) — the
+            // per-host walk was the defect pattern (three of five hosts forgot
+            // it). `additionalOrgRoles` remains available for roles OUTSIDE
+            // the stack metadata, which this host has none of.
             await kernel.use(new AuthPlugin({
               secret,
               baseUrl,
               socialProviders: Object.keys(socialProviders).length > 0 ? socialProviders : undefined,
               trustedOrigins: trustedOrigins.length ? trustedOrigins : undefined,
-              ...(additionalOrgRoles.length > 0 ? { additionalOrgRoles } : {}),
               // Enable the admin plugin by default so the Setup app's
               // ban/unban/set-password/impersonate/set-role row actions
               // resolve to real endpoints. The plugin self-gates by role
