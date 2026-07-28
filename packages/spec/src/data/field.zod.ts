@@ -181,56 +181,6 @@ export const AddressSchema = lazySchema(() => z.object({
 }));
 
 /**
- * Data Quality Rules Schema
- * Defines data quality validation and monitoring for fields
- * 
- * @example Unique SSN field with completeness requirement
- * {
- *   uniqueness: true,
- *   completeness: 0.95,  // 95% of records must have this field
- *   accuracy: {
- *     source: 'government_db',
- *     threshold: 0.98
- *   }
- * }
- */
-export const DataQualityRulesSchema = lazySchema(() => z.object({
-  /** Enforce uniqueness constraint */
-  uniqueness: z.boolean().default(false).describe('Enforce unique values across all records'),
-  
-  /** Completeness ratio (0-1) indicating minimum percentage of non-null values */
-  completeness: z.number().min(0).max(1).default(0).describe('Minimum ratio of non-null values (0-1, default: 0 = no requirement)'),
-  
-  /** Accuracy validation against authoritative source */
-  accuracy: z.object({
-    source: z.string().describe('Reference data source for validation (e.g., "api.verify.com", "master_data")'),
-    threshold: z.number().min(0).max(1).describe('Minimum accuracy threshold (0-1, e.g., 0.95 = 95% match required)'),
-  }).optional().describe('Accuracy validation configuration'),
-}));
-
-/**
- * Computed Field Caching Schema
- * Configuration for caching computed/formula field results
- * 
- * @example Cache product price with 1-hour TTL, invalidate on inventory changes
- * {
- *   enabled: true,
- *   ttl: 3600,
- *   invalidateOn: ['inventory.quantity', 'pricing.discount']
- * }
- */
-export const ComputedFieldCacheSchema = lazySchema(() => z.object({
-  /** Enable caching for this computed field */
-  enabled: z.boolean().describe('Enable caching for computed field results'),
-  
-  /** Time-to-live in seconds */
-  ttl: z.number().min(0).describe('Cache TTL in seconds (0 = no expiration)'),
-  
-  /** Array of field paths that trigger cache invalidation when changed */
-  invalidateOn: z.array(z.string()).describe('Field paths that invalidate cache (e.g., ["inventory.quantity", "pricing.base_price"])'),
-}));
-
-/**
  * Field Schema - Best Practice Enterprise Pattern
  */
 /**
@@ -544,6 +494,23 @@ export const FieldSchema = lazySchema(() => z.object({
   // the real channel is type:'secret'). See
   // docs/audits/2026-06-dead-surface-disposition-plan.md (P0/P2 field prune):
   // encryptionConfig, maskingRule, auditTrail, cached, dataQuality.
+  //
+  // Two of the five value schemas outlived their keys by a release — `dataQuality`'s
+  // (`DataQualityRulesSchema` + the `DataQualityRules` / `DataQualityRulesInput`
+  // types, #3726) and `cached`'s (`ComputedFieldCacheSchema` + `ComputedFieldCache`,
+  // #3733). Each key was gone from this object while its schema stayed on the
+  // published API surface and in the generated reference docs, so an author could
+  // still discover the shape and write it. This object is NOT `.strict()`, so that
+  // write did not fail loudly: it parsed clean and the key was silently stripped —
+  // the same ADR-0104 failure class as the pre-declaration `accept` / `maxSize`
+  // above (accepted in source, dropped in the contract, no feedback). Both schemas
+  // are removed as of #3733; all five keys are now dead in both layers, as the
+  // tombstone above always claimed.
+  //
+  // If field-level data-quality governance or computed-field caching is ever built
+  // for real, re-add the key and its schema TOGETHER, with a consumer — the enforce
+  // side of ADR-0049. Do not restore a schema on its own; that middle state is what
+  // both issues were filed about.
 
   /** Layout & Grouping */
   group: z.string().optional().describe('Field group name for organizing fields in forms and layouts (e.g., "contact_info", "billing", "system")'),
@@ -642,9 +609,6 @@ export type Address = z.infer<typeof AddressSchema>;
 export type CurrencyConfig = z.infer<typeof CurrencyConfigSchema>;
 export type CurrencyConfigInput = z.input<typeof CurrencyConfigSchema>;
 export type CurrencyValue = z.infer<typeof CurrencyValueSchema>;
-export type DataQualityRules = z.infer<typeof DataQualityRulesSchema>;
-export type DataQualityRulesInput = z.input<typeof DataQualityRulesSchema>;
-export type ComputedFieldCache = z.infer<typeof ComputedFieldCacheSchema>;
 
 /**
  * Field Factory Helper
