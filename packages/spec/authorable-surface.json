@@ -2289,6 +2289,7 @@
     "automation/DecisionOutputDef:key",
     "automation/DecisionOutputDef:label",
     "automation/DecisionOutputDef:multiple",
+    "automation/DecisionOutputDef:required",
     "automation/DecisionOutputDef:type",
     "automation/ETLDestination:config",
     "automation/ETLDestination:connector",
