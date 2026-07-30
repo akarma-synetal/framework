@@ -3769,6 +3769,8 @@
     "SendSmsInput (interface)",
     "SendSmsResult (interface)",
     "SendTemplateInput (interface)",
+    "ServiceSlotContract (type)",
+    "ServiceSlotContracts (interface)",
     "ShareAccessLevel (type)",
     "ShareLink (interface)",
     "ShareLinkAudience (type)",
