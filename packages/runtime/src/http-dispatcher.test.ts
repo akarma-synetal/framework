@@ -126,7 +126,7 @@ describe('HttpDispatcher', () => {
             // field-anchored issues; the dispatcher must pass them through (not
             // flatten to a single 400 message) so the Studio can point at fields.
             const err: any = new Error('[invalid_metadata] object/bad failed spec validation: fields.amount.type: Required');
-            err.code = 'invalid_metadata';
+            err.code = 'INVALID_METADATA';
             err.status = 422;
             err.issues = [
                 { path: 'fields.amount.type', message: 'Required', code: 'invalid_type' },
@@ -141,7 +141,7 @@ describe('HttpDispatcher', () => {
             const error = result.response?.body?.error;
             // [#3842] The spec-validation code is the `error.code`; the
             // field-anchored issues stay in `details`, which is what they are.
-            expect(error?.code).toBe('invalid_metadata');
+            expect(error?.code).toBe('INVALID_METADATA');
             expect(error?.details?.issues).toEqual(err.issues);
             expect(error?.details?.issues[0].path).toBe('fields.amount.type');
         });
@@ -337,7 +337,7 @@ describe('HttpDispatcher', () => {
         // flow failed", which is the opposite of what happened.
         it('should answer 403 when the engine refuses the resume as service-gated', async () => {
             mockAutomationService.resume.mockResolvedValue({
-                success: false, code: 'forbidden',
+                success: false, code: 'PERMISSION_DENIED',
                 error: "Run 'run_1' is paused at an 'approval' node, which only its owning service may resume",
             });
             const result = await dispatcher.handleAutomation(
@@ -366,7 +366,7 @@ describe('HttpDispatcher', () => {
         // let `output` reopen the hole `inputs` had just closed.)
         it('should answer 400 when the engine rejects the signal as engine-internal', async () => {
             mockAutomationService.resume.mockResolvedValue({
-                success: false, code: 'invalid_signal',
+                success: false, code: 'INVALID_SIGNAL',
                 error: "Resume signal may not set engine-internal variables (signoffs.$mapItemDone) — " +
                     "names starting with '$' (or containing '.$') are reserved by the flow engine",
             });

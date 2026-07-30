@@ -78,6 +78,7 @@ export const ERROR_CODE_LEDGER = {
     'NO_MATCH',                   // import upsert found no record for the match key
     'OBJECT_API_DISABLED',
     'OBJECT_API_METHOD_NOT_ALLOWED',
+    'OPENAPI_UNAVAILABLE',        // no OpenAPI spec bundled with this runtime
     'PACKAGE_DELETE_FAILED',
     'PACKAGE_DELETE_PARTIAL',        // uninstall left per-item failures behind; see error.details
     'PACKAGE_MANIFEST_INVALID',
@@ -147,7 +148,9 @@ export const ERROR_CODE_LEDGER = {
   '@objectstack/plugin-auth': [
     'ACCOUNT_LOCKED',
     'ASYNC_NOT_SUPPORTED',
+    'AUTH_CONFIG_ERROR',
     'CREATE_FAILED',
+    'DOMAIN_VERIFICATION_DISABLED', // domain verification is off on this deployment
     'DOMAIN_VERIFICATION_FAILED', // pass-through from better-auth
     'EMAIL_SERVICE_REQUIRED',
     'ENV_ACCESS_DENIED',
@@ -155,6 +158,7 @@ export const ERROR_CODE_LEDGER = {
     'INVALID_PHONE',
     'INVITE_EMAIL_FAILED',
     'INVITE_REQUIRES_EMAIL',
+    'INVALID_REQUEST',
     'INVITE_SMS_FAILED',
     'IP_NOT_ALLOWED',
     'LAST_LOCAL_CREDENTIAL',      // refusing to remove the user's only local credential
@@ -164,7 +168,10 @@ export const ERROR_CODE_LEDGER = {
     'PASSWORD_EXPIRED',
     'PASSWORD_POLICY_VIOLATION',
     'PASSWORD_REUSE',
+    'OAUTH_REGISTER_FAILED',       // better-auth rejected the client registration
     'PHONE_NOT_ENABLED',
+    'SAML_REGISTER_FAILED',
+    'SSO_REGISTER_FAILED',
     'SSO_REGISTER_FORBIDDEN',
     'USER_ALREADY_EXISTS',        // pass-through from better-auth
     'VALIDATION_FAILED',
@@ -189,11 +196,25 @@ export const ERROR_CODE_LEDGER = {
     'WRONG_PASSWORD',
   ],
   '@objectstack/metadata-protocol': [
+    'BATCH_ABORTED',              // sibling item in an all-or-nothing publish; it never ran
     'CLONE_DISABLED',
+    'COMMIT_NOT_FOUND',
     'CONCURRENT_UPDATE',
+    'DESTRUCTIVE_CHANGE',         // change would drop data; needs an explicit opt-in
+    'INVALID_METADATA',
+    'INVALID_REQUEST',
+    'ITEM_LOCKED',                // _lock refuses the write/delete (ADR-0010 §3.3)
+    'METADATA_CONFLICT',
     'NAMESPACE_PREFIX',           // name violates the package namespace-prefix rule
+    'NO_DRAFT',
+    'NOT_CREATABLE',
+    'NOT_OVERRIDABLE',
+    'OVERLAY_PERSISTENCE_FAILED',
     'UNSUPPORTED_QUERY_PARAM',
     'VALIDATION_FAILED',
+    'VERSION_NOT_FOUND',
+    'VERSION_NOT_RESTORABLE',
+    'WRITABLE_PACKAGE_REQUIRED',
   ],
   '@objectstack/metadata-core': [
     'METADATA_BRANCH',
@@ -214,6 +235,35 @@ export const ERROR_CODE_LEDGER = {
     'FILTER_TOKEN_UNKNOWN',       // filter references an unknown context token
     'FILTER_TOKEN_UNRESOLVED',
   ],
+  '@objectstack/hono': [
+    'AUTH_CONFIG_ERROR',             // auth service threw while the adapter mounted it
+  ],
+  '@objectstack/service-messaging': [
+    'DELIVERY_NOT_ELIGIBLE',         // delivery row is in a non-terminal state
+  ],
+  '@objectstack/trigger-api': [
+    'ENQUEUE_FAILED',                // queue accepted the call but publish threw
+    'INVALID_SIGNATURE',             // hook secret did not verify the request body
+  ],
+  '@objectstack/cloud-connection': [
+    'CLOUD_FETCH_FAILED',            // fetching the manifest/bundle from cloud failed
+    'CLOUD_UNCONFIGURED',            // no cloud endpoint configured on this runtime
+    'DEVICE_CODE_FAILED',            // cloud rejected the device-code exchange
+    'DRIVER_UNAVAILABLE',            // no driver service — cannot purge seeded rows
+    'ENVIRONMENT_BIND_FAILED',
+    'ENVIRONMENT_NOT_FOUND',
+    'INVALID_REQUEST',
+    'MANIFEST_CONFLICT',             // manifest_id already defined by local code
+    'MARKETPLACE_PROXY_FAILED',
+    'MARKETPLACE_STORAGE_FAILED',    // install-record read/write failed
+    'MARKETPLACE_UNAVAILABLE',
+    'NOTHING_TO_PURGE',              // package declares no seed datasets
+    'PLUGIN_INSTALL_FAILED',
+    'PLUGIN_MANIFEST_INVALID',
+    'PLUGIN_REGISTER_FAILED',
+    'RESEED_NO_ROWS',                // reseed ran but wrote nothing
+    'RESEED_SKIPPED',                // reseed declined to run; message carries why
+  ],
   '@objectstack/service-settings': [
     'INTERNAL',
     'SETTINGS_ACTION_FAILED',        // a declared action ran and reported ok:false
@@ -228,6 +278,7 @@ export const ERROR_CODE_LEDGER = {
   '@objectstack/service-automation': [
     'AUTOMATION_UNSCOPED_RUN_DATA_ACCESS',
     'EXECUTION_ERROR',
+    'INVALID_SIGNAL',             // resume signal writes engine-internal variables
     'NODE_FAILURE',
     'NO_EXECUTOR',
   ],
