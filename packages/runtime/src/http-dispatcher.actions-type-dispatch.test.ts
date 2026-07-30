@@ -116,7 +116,8 @@ describe('REST /actions — flow dispatch (#3915)', () => {
             }),
         );
         expect(res.response.status).toBe(200);
-        expect(res.response.body.data).toEqual({ success: true, data: { success: true, output: { converted: true } } });
+        // Single wrap (#3962): `data` is the automation engine's own result.
+        expect(res.response.body.data).toEqual({ success: true, output: { converted: true } });
     });
 
     // ── params seeding ── the half a mocked automation service could not
@@ -257,8 +258,10 @@ describe('REST /actions — flow dispatch (#3915)', () => {
 
         const res = await dispatcher.handleActions('/crm_lead/convert_lead', 'POST', {}, ctxFor());
 
-        expect(res.response.body.data.success).toBe(false);
-        expect(res.response.body.data.error).toMatch(/crm_convert_lead_wizard.*lead already converted/i);
+        // A rejected flow is a 400 with the semantic code (#3962).
+        expect(res.response.status).toBe(400);
+        expect(res.response.body.error.message).toMatch(/crm_convert_lead_wizard.*lead already converted/i);
+        expect(res.response.body.error.code).toBe('FLOW_FAILED');
     });
 
     it('reports a missing automation service as 503, not as a business failure', async () => {
@@ -347,7 +350,7 @@ describe('REST /actions — script dispatch is unchanged (#3915 regression guard
         const res = await dispatcher.handleActions('/crm_lead/mark_done', 'POST', {}, ctxFor());
 
         expect(executeAction).toHaveBeenCalledTimes(1);
-        expect(res.response.body.data).toEqual({ success: true, data: { ran: 'script' } });
+        expect(res.response.body.data).toEqual({ ran: 'script' });
     });
 
     // [ADR-0110 D3] An UNDECLARED action used to run here, ungated — this test

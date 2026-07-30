@@ -101,7 +101,7 @@ describe('REST /actions — identity is `name`, the handler key is derived (ADR-
         );
 
         expect(res.response.status).toBe(200);
-        expect(res.response.body.data).toMatchObject({ success: true, data: { ran: 'completeTask' } });
+        expect(res.response.body.data).toEqual({ ran: 'completeTask' }); // #3962 single wrap
         expect(calls).toContainEqual({ object: 'todo_task', key: 'completeTask' });
     });
 
@@ -133,7 +133,7 @@ describe('REST /actions — identity is `name`, the handler key is derived (ADR-
         );
 
         expect(res.response.status).toBe(200);
-        expect(res.response.body.data).toMatchObject({ success: true, data: { ran: 'completeTask' } });
+        expect(res.response.body.data).toEqual({ ran: 'completeTask' }); // #3962 single wrap
     });
 
     it('prefers `name` when a BODY action declares a target (the AppPlugin registration key)', async () => {
@@ -163,7 +163,7 @@ describe('REST /actions — identity is `name`, the handler key is derived (ADR-
         );
 
         expect(res.response.status).toBe(200);
-        expect(res.response.body.data).toMatchObject({ success: true, data: { ran: 'complete_task' } });
+        expect(res.response.body.data).toEqual({ ran: 'complete_task' }); // #3962 single wrap
     });
 
     it('rotates to the object-less registration keys for a global handler', async () => {
@@ -218,9 +218,9 @@ describe('REST /actions — identity is `name`, the handler key is derived (ADR-
             '/todo_task/complete_task', 'POST', {}, ctxFor(),
         );
 
-        // Business failure reports in the payload (the route's long-standing
-        // wire contract), NOT as a 404 routing miss.
-        expect(res.response.status).toBe(200);
-        expect(res.response.body.data).toMatchObject({ success: false, error: 'task already closed' });
+        // A handler that RAN and rejected is a 400 (#3962) — crucially NOT a
+        // 404 routing miss, which is what this test exists to rule out.
+        expect(res.response.status).toBe(400);
+        expect(res.response.body.error.message).toBe('task already closed');
     });
 });
