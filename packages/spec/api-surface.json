@@ -4458,6 +4458,7 @@
     "SortItemSchema (const)",
     "StaticMount (type)",
     "StaticMountSchema (const)",
+    "StrictUnknownKeyErrorOptions (interface)",
     "SystemIdentifier (type)",
     "SystemIdentifierSchema (const)",
     "TemplateExpressionInput (type)",
@@ -4487,6 +4488,7 @@
     "resilientFetch (function)",
     "safeParsePretty (function)",
     "singularToPlural (function)",
+    "strictUnknownKeyError (function)",
     "strictVisibilityError (const)",
     "suggestFieldType (function)",
     "tmpl (function)"
