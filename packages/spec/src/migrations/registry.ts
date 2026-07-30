@@ -386,6 +386,12 @@ const step17: MigrationStep = {
     'read the key (call graph closed across the collection site, the projection ' +
     'round-trip and the compiler). A pure lossless delete: outcomes are identical ' +
     'with or without it; the schema tombstones the key with the same prescription.\n\n' +
+    'The same close-out retires the four inert tool authoring keys (`category`, ' +
+    '`permissions`, `active`, `builtIn`): none is part of AIToolDefinition and no ' +
+    'execution path read them. Two were misleading in the dangerous direction — ' +
+    '`permissions` promised an invocation gate nothing enforced, and `active: false` ' +
+    'read as "withdrawn" while the tool kept reaching the LLM tool set. Lossless ' +
+    'deletes; the strict ToolSchema rejects each with its prescription.\n\n' +
     'On the wire contract it also retires the `/analytics/query` request ENVELOPE ' +
     '(#3878): `AnalyticsQueryRequestSchema` used to describe `{ cube, query: {...}, ' +
     'format }` — the dialect of the retired degraded analytics shim (#3891) that the ' +
@@ -406,6 +412,7 @@ const step17: MigrationStep = {
     'flow-node-notify-config-aliases',
     'flow-node-script-config-aliases',
     'permission-rls-priority-removed',
+    'tool-inert-authoring-keys-removed',
   ],
   semantic: [
     {
