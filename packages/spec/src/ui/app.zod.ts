@@ -570,6 +570,12 @@ export const NavigationContributionSchema = lazySchema(() => z.object({
   }),
 }).strict().describe('A navigation contribution: a package injecting nav items into an app it does not own (ADR-0029 D7)'));
 export type NavigationContribution = z.infer<typeof NavigationContributionSchema>;
+/**
+ * The authoring shape of a contribution (#4195) — `priority` is `.default(200)`
+ * and each item is a {@link NavigationItemInput}, so this is what a package
+ * declaring its menu entries actually writes.
+ */
+export type NavigationContributionInput = z.input<typeof NavigationContributionSchema>;
 
 /**
  * App Branding Configuration
