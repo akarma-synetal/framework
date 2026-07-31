@@ -3828,6 +3828,10 @@ export class ObjectStackProtocolImplementation implements
                 where: options.where,
                 groupBy: options.groupBy,
                 aggregations: options.aggregations,
+                // Enforced engine-side since #4286 (step 3) — dropping it here
+                // was finding 1: the one wire path to aggregate() lost the
+                // clause before any executor could ever see it.
+                having: options.having,
                 context: options.context,
             } as any);
             // Apply limit client-side (EngineAggregateOptions doesn't carry limit).
@@ -3860,7 +3864,11 @@ export class ObjectStackProtocolImplementation implements
         let total = records.length;
         let hasMore = false;
         if (pageLimit !== undefined) {
-            const countable = options.search == null && options.distinct == null;
+            // `distinct` used to suppress the count here too — #4286 finding 2:
+            // the flag's ONLY observable effect platform-wide, on a capability
+            // that never deduplicated a row. Removed with `query.distinct`
+            // (tombstoned in spec 18); `total`/`hasMore` are truthful again.
+            const countable = options.search == null;
             if (countable) {
                 try {
                     total = await this.engine.count(request.object, {
