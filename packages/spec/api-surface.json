@@ -2144,6 +2144,7 @@
     "FlowEdge (type)",
     "FlowEdgeParsed (type)",
     "FlowEdgeSchema (const)",
+    "FlowGraph (interface)",
     "FlowNode (type)",
     "FlowNodeAction (const)",
     "FlowNodeExpressionPath (interface)",
@@ -2266,6 +2267,7 @@
     "analyzeRegion (function)",
     "approverTypeIsOrgScoped (function)",
     "canonicalApproverType (function)",
+    "collectFlowGraphs (function)",
     "defineActionDescriptor (function)",
     "defineFlow (function)",
     "defineWebhook (function)",
@@ -2274,6 +2276,7 @@
     "flowForm (const)",
     "getApprovalNodeConfigJsonSchema (function)",
     "importBpmnToConstructs (function)",
+    "normalizeControlFlowRegions (function)",
     "normalizeDecisionOutputs (function)",
     "resolveFlowNodeExpressions (function)",
     "validateControlFlow (function)"
