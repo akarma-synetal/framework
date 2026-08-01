@@ -322,6 +322,34 @@ function resolveOverlaySchema(type: string, _item: unknown): z.ZodTypeAny | null
 }
 
 /**
+ * [#4435] The 404 a single-record operation answers when the id names no row.
+ *
+ * Extracted so the READ and the two WRITE paths cannot disagree about it. They
+ * did: `getData` answered `404 RECORD_NOT_FOUND` while `updateData` returned
+ * `200 { record: null }` and `deleteData` returned `200 { success: true }` for
+ * any string in the path — so a typo'd id, an already-deleted row and a real
+ * deletion were indistinguishable, and a client PATCHing a concurrently deleted
+ * record was told its write had landed.
+ *
+ * That is the same silent-no-op shape the v17 train removed everywhere else
+ * this window (#4240/#4303/#4315 refuse missing fields, #4169 refuses unknown
+ * params, #4190 stopped dropping filters) — a write that touched zero rows
+ * reporting 200 is that shape one level up, on the verb where it costs the
+ * most.
+ */
+function recordNotFoundError(object: string, id: string | number): Error {
+    const err = new Error(`Record ${id} not found in ${object}`) as Error & {
+        code?: string;
+        status?: number;
+        object?: string;
+    };
+    err.code = 'RECORD_NOT_FOUND';
+    err.status = 404;
+    err.object = object;
+    return err;
+}
+
+/**
  * A 400 for a `$filter` ARRAY that looks like a filter AST but is not one.
  *
  * The message has to be *actionable from the request*, which is the whole point
@@ -4609,15 +4637,7 @@ export class ObjectStackProtocolImplementation implements
                 record: result
             };
         }
-        const err = new Error(`Record ${request.id} not found in ${request.object}`) as Error & {
-            code?: string;
-            status?: number;
-            object?: string;
-        };
-        err.code = 'RECORD_NOT_FOUND';
-        err.status = 404;
-        err.object = request.object;
-        throw err;
+        throw recordNotFoundError(request.object, request.id);
     }
 
     async createData(request: { object: string, data: any, context?: any }) {
@@ -4686,13 +4706,7 @@ export class ObjectStackProtocolImplementation implements
             request.object,
             { where: { id: request.id }, ...(ctxOpt as any) } as any,
         );
-        if (!source) {
-            const err: any = new Error(`Record ${request.id} not found in ${request.object}`);
-            err.code = 'RECORD_NOT_FOUND';
-            err.status = 404;
-            err.object = request.object;
-            throw err;
-        }
+        if (!source) throw recordNotFoundError(request.object, request.id);
 
         // Copy the source, then strip the columns the engine owns so the insert
         // path re-derives them rather than carrying the source's values over.
@@ -4732,7 +4746,35 @@ export class ObjectStackProtocolImplementation implements
 
     async updateData(request: { object: string, id: string, data: any, expectedVersion?: string, context?: any }) {
         this.assertObjectRegistered(request.object); // [#3770]
-        await this.assertVersionMatch(request.object, request.id, request.expectedVersion, request.context);
+        // [#4435] ONE probe serves both gates.
+        //
+        // A PATCH of an id that names no row answered `200 { record: null }` —
+        // the caller had to null-check a SUCCESS payload to discover its write
+        // never landed, which is exactly what a client that PATCHes a
+        // concurrently deleted record does not do. `getData` has always
+        // answered 404 for the same id; the two verbs now agree.
+        //
+        // Existence is asked BEFORE the write rather than read off what comes
+        // back: the engine's update returns the post-write READBACK, which is
+        // also `null` when the row still exists but the write moved it out of
+        // the caller's row scope (reassigning `owner_id` away from yourself
+        // under an owner-scoped RLS policy). Reading that as "not found" would
+        // answer 404 to a write that succeeded. So ask existence directly.
+        //
+        // The probe asks EXISTENCE, not visibility — see `probeRecord` for why
+        // that distinction is load-bearing (it keeps this fix out of the RLS
+        // model and keeps the #1994 by-id-write proof able to go red).
+        //
+        // OCC already had to read the same row for its `updated_at`, so the two
+        // gates share this single read instead of issuing a probe each. Two
+        // round-trips per PATCH would have been a performance regression no
+        // gate reports, and the second read could even disagree with the first.
+        const current = await this.probeRecord(request.object, request.id);
+        if (!current) throw recordNotFoundError(request.object, request.id);
+        // 404 wins over 409 when both could apply: OCC has always declined to
+        // treat a missing record as a concurrency conflict, and "this record
+        // does not exist" is the more specific answer.
+        this.assertVersionOf(request.object, request.id, current, request.expectedVersion);
         const opts: any = { where: { id: request.id } };
         if (request.context !== undefined) opts.context = request.context;
         // [#3407/#3431] Capture the engine's LEGAL write strips (static `readonly`
@@ -4754,10 +4796,24 @@ export class ObjectStackProtocolImplementation implements
 
     async deleteData(request: { object: string, id: string, expectedVersion?: string, context?: any }) {
         this.assertObjectRegistered(request.object); // [#3770]
-        await this.assertVersionMatch(request.object, request.id, request.expectedVersion, request.context);
+        await this.assertVersionMatch(request.object, request.id, request.expectedVersion);
         const opts: any = { where: { id: request.id } };
         if (request.context !== undefined) opts.context = request.context;
-        await this.engine.delete(request.object, opts);
+        const deleted = await this.engine.delete(request.object, opts);
+        // [#4435] `success: true` used to be a LITERAL — the response said the
+        // same thing for a real deletion, an already-deleted row and a typo'd
+        // id, so nothing on the wire could tell them apart. The driver contract
+        // (`IDataDriver.delete` — "True if deleted, false if not found") already
+        // carries the answer; it was simply discarded here. Now it decides:
+        // `false` is a 404, matching `getData` on the same id, and `success` on
+        // the 200 finally means what it says.
+        //
+        // Read as `=== false` on purpose. That is the contract's own value for
+        // "no row matched"; anything else — a driver returning the deleted row,
+        // an `undefined` from an off-contract implementation — is not a
+        // POSITIVE not-found signal, and inventing a 404 out of it would break
+        // deletes against third-party drivers rather than report honestly.
+        if (deleted === false) throw recordNotFoundError(request.object, request.id);
         return {
             object: request.object,
             id: request.id,
@@ -4766,35 +4822,72 @@ export class ObjectStackProtocolImplementation implements
     }
 
     /**
-     * Optimistic Concurrency Control gate shared by updateData/deleteData.
+     * [#4435] Does this row EXIST? A fact about the database — deliberately
+     * NOT "may this caller see it".
      *
-     * When the caller passes a non-empty `expectedVersion` token (typically
-     * the `updated_at` value they read), this fetches the current record
-     * and compares its `updated_at` against the token. Mismatch → throw
-     * `ConcurrentUpdateError` which the REST layer maps to 409.
+     * Read with a system context so no row-level policy narrows it. That is
+     * load-bearing, and the first version of this fix got it wrong: probing
+     * with the CALLER's context turns the existence gate into an authorization
+     * gate, because a row the caller cannot read comes back `null` and the
+     * PATCH answers 404. Two things break when it does.
+     *
+     * 1. It silently changes RLS semantics. Whether an unreadable row may be
+     *    written by id is the #1994 pre-image check's decision, made inside
+     *    `engine.update` where the write policy lives. A probe in front of it
+     *    quietly adds a second, different rule — scope creep into the security
+     *    model, from a bug fix about missing records.
+     *
+     * 2. It disarms a revert-provable security proof. `@proof: rls-by-id-write`
+     *    (`packages/qa/dogfood/test/rls-fixture.dogfood.test.ts`, referenced by
+     *    the `permission.rowLevelSecurity.using` liveness ledger entry) boots a
+     *    fixture whose member can read nothing but has no write policy, and
+     *    asserts the runner reports `rls-hole`. A caller-scoped probe 404s that
+     *    PATCH, so the RED half goes green — and the gate can no longer prove
+     *    it is able to go red. If the #1994 fix were ever reverted, this probe
+     *    would MASK it. Accidentally hardening one path is not worth
+     *    permanently blinding the gate that watches the whole class.
+     *
+     * So the probe answers existence only, and authorization stays exactly
+     * where it was. The one behaviour this adds is the 404 the issue asked for:
+     * an id that names no row at all.
+     *
+     * One place, because two gates need this row — the existence gate and OCC's
+     * `updated_at` comparison — and issuing a probe each would put two
+     * round-trips on every PATCH.
+     */
+    private async probeRecord(object: string, id: string): Promise<any> {
+        return this.engine.findOne(object, { where: { id }, context: { isSystem: true } } as any);
+    }
+
+    /**
+     * Optimistic Concurrency Control — the COMPARISON half, over a row the
+     * caller has already read. Pure: it issues no query of its own, which is
+     * what lets `updateData` run the gate on its existence probe's result
+     * rather than re-reading the record (#4435).
+     *
+     * When the caller passes a non-empty `expectedVersion` token (typically the
+     * `updated_at` value they read), a mismatch throws `ConcurrentUpdateError`,
+     * which the REST layer maps to 409.
      *
      * Behaviour:
      *  - Empty/missing token → no check (opt-in semantics; existing callers
      *    that haven't yet adopted OCC are unaffected).
-     *  - Record not found → no check; downstream `engine.update` will
-     *    surface the usual `RECORD_NOT_FOUND` 404. We intentionally do not
-     *    treat "missing record" as a concurrency conflict.
+     *  - Record not found → no check. We intentionally do not treat "missing
+     *    record" as a concurrency conflict; `updateData` has already answered
+     *    404 by this point, and `deleteData` lets the driver report it.
      *  - Record has no `updated_at` field (timestamps disabled) → no check.
      *    Logging would be noisy here; OCC is opt-in and the absence of a
      *    version column is an explicit "this object doesn't support OCC"
      *    signal.
      */
-    private async assertVersionMatch(
+    private assertVersionOf(
         object: string,
         id: string,
+        current: any,
         expectedVersion: string | undefined,
-        context: any
-    ): Promise<void> {
+    ): void {
         const expected = normaliseVersionToken(expectedVersion);
         if (!expected) return;
-        const findOpts: any = { where: { id } };
-        if (context !== undefined) findOpts.context = context;
-        const current = await this.engine.findOne(object, findOpts);
         if (!current) return;
         const currentVersion = normaliseVersionToken((current as any).updated_at);
         if (!currentVersion) return;
@@ -4805,6 +4898,22 @@ export class ObjectStackProtocolImplementation implements
                 message: `Record ${object}/${id} was modified by another user (current version ${currentVersion}, expected ${expected})`,
             });
         }
+    }
+
+    /**
+     * OCC gate for `deleteData`, which — unlike `updateData` — needs no
+     * existence probe of its own: the driver's own `delete` return reports
+     * whether a row matched (#4435). So this still probes ONLY when the caller
+     * actually opted into OCC, keeping a plain DELETE at zero extra reads.
+     */
+    private async assertVersionMatch(
+        object: string,
+        id: string,
+        expectedVersion: string | undefined,
+    ): Promise<void> {
+        if (!normaliseVersionToken(expectedVersion)) return;
+        const current = await this.probeRecord(object, id);
+        this.assertVersionOf(object, id, current, expectedVersion);
     }
 
     // ==========================================
@@ -5366,7 +5475,16 @@ export class ObjectStackProtocolImplementation implements
 
         for (const id of ids) {
             try {
-                await this.engine.delete(object, { where: { id }, ...ctxOpt } as any);
+                // [#4435] Per-row honesty on the bulk path. This discarded the
+                // driver's return and pushed `success: true` unconditionally, so
+                // `{"ids":["nonexistent_1"]}` answered `succeeded: 1` — a batch
+                // of typo'd ids reported every one of them deleted. A caller
+                // reconciling "which of my 200 ids were real" got a list that
+                // agreed with whatever it sent. Same `=== false` reading as the
+                // single-record path: the contract's positive not-found value,
+                // never an inference from a falsy return.
+                const deleted = await this.engine.delete(object, { where: { id }, ...ctxOpt } as any);
+                if (deleted === false) throw recordNotFoundError(object, id);
                 results.push({ id: String(id), success: true });
                 succeeded++;
             } catch (err: any) {
