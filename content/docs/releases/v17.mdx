@@ -1017,6 +1017,7 @@ import or the authored key.
 | `ChartInteraction.zoom` / `.clickAction` | never implemented (#3752) |
 | The `workflow` service slot — `CoreServiceName 'workflow'`, `IWorkflowService`, `WorkflowProtocol`, the `Get/WorkflowState/Config/Transition` schema cluster, discovery `routes.workflow` / `services.workflow` / `features.workflow`, the `RestApiRouteCategory 'workflow'` member and the stray `graphql` provider entry | declared end to end and implemented nowhere: nothing ever registered or resolved the slot (ADR-0115 Evidence 5), no method of `WorkflowProtocol` was ever implemented, no host ever mounted `/api/v1/workflow`. State machines are `state_machine` validation rules; approvals are flow nodes (ADR-0019); record-triggered automation is hooks + `record_change` flows (#4451) |
 | `datasource.readReplicas` | replica connections nothing ever opened — no driver reads the key and no query path splits reads from writes, so every statement went to the primary. #4410 had just taught the schema to validate each entry against the declared driver's contract, which made a dead slot look rigorously alive (#4468) |
+| The `kernel` metadata-loader envelope family — `MetadataFormat`, `MetadataStats`, `MetadataLoadOptions`, `MetadataSaveOptions`, `MetadataExportOptions`, `MetadataImportOptions`, `MetadataLoadResult`, `MetadataSaveResult`, `MetadataWatchEvent`, `MetadataCollectionInfo`, `MetadataLoaderContract` (`@objectstack/spec/kernel`) | eleven names that each existed **twice**, with a different shape, on `./kernel` and `./system` — so which type you got depended on your import path. Every consumer imported the `./system` copy; the `./kernel` copies had zero consumers. Import them from `@objectstack/spec/system` (#4411, ADR-0049). `MetadataManagerConfig` / `MetadataFallbackStrategy` are unaffected and still ship from both entries |
 
 The Console side follows: `@object-ui/types` drops its
 `ObjectStack`/`ObjectOS`/`ObjectQL`/`ObjectUI` Capabilities re-exports, which
@@ -2103,7 +2104,16 @@ covers are folded into the list below rather than left to the changelog.)
   `maplibre-gl` 5→6 / `chalk` 5→6 major bumps.
 - **Type importers:** replace `ObjectStackProtocol` / `ObjectStackProtocolSchema`
   with the narrowest per-domain slices; drop GraphQL types and any of the removed
-  dead spec clusters.
+  dead spec clusters. If you imported `MetadataFormat`, `MetadataStats`,
+  `MetadataLoadOptions`, `MetadataSaveOptions`, `MetadataExportOptions`,
+  `MetadataImportOptions`, `MetadataLoadResult`, `MetadataSaveResult`,
+  `MetadataWatchEvent`, `MetadataCollectionInfo` or `MetadataLoaderContract`
+  from `@objectstack/spec/kernel`, change the path to `@objectstack/spec/system`
+  — same names, and that copy is the one the runtime has always emitted. It is
+  the *looser* of the two, so a reader may need new narrowing: notably
+  `MetadataWatchEvent.type` also carries the raw watcher values
+  `add`/`change`/`unlink`, and `metadataType`/`name`/`timestamp` are optional
+  there. Nothing to migrate at runtime — the values were always these.
 - **Multi-org:** the `group` posture requires the enterprise runtime — deployments
   relying on it self-activating must install `@objectstack/organizations` or move
   to `isolated`.
