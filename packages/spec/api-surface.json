@@ -1353,6 +1353,7 @@
     "emailTemplateForm (const)",
     "gcsStorageExample (const)",
     "hasPlatformObjectPrefix (function)",
+    "inProcessServiceMessage (function)",
     "interpolateValidationMessage (function)",
     "isDataMigrationFlagVerified (function)",
     "isPlatformProvidedObjectName (function)",
