@@ -4437,8 +4437,6 @@
     "ApplyProtectionContext (interface)",
     "BaseMetadataRecord (type)",
     "BaseMetadataRecordSchema (const)",
-    "CacheStrategy (type)",
-    "CacheStrategyEnum (const)",
     "CorsConfig (type)",
     "CorsConfigSchema (const)",
     "CronExpressionInput (type)",
