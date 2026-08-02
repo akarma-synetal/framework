@@ -76,7 +76,13 @@ export const MetadataTypeSchema = lazySchema(() => z.enum([
   // ADR-0088: there is no `trigger` metadata type — sync data-layer logic is a
   // `hook` (24 lifecycle events); async automation is a `record_change` flow.
   // (The `triggers` capability token in `requires:` is a different namespace.)
-  'validation',  // Validation rules (ValidationSchema)
+  // ADR-0088 (#4509): there is no `validation` metadata type — validation rules
+  // are authored INLINE as `object.validations[]`, which is the only shape the
+  // engine evaluates. A standalone rule had no way to say what it validated
+  // (`ValidationRuleSchema` carries no object-binding key and every variant is
+  // strict), so an item authored here bound to nothing and intercepted no write
+  // — including `state_machine` rules, which ADR-0020 routes through this same
+  // inline shape. `ValidationRuleSchema` itself is unchanged and fully live.
   'hook',        // Data hooks (HookSchema)
   'seed',        // Seed/fixture data — runtime-draftable; publishing applies it (SeedSchema)
   'mapping',     // Import/export field mappings (MappingSchema) — consumed by POST /data/:object/import via mappingName (#2611); promoted to a kind per the ADR-0088 admission test once the consumer landed
@@ -599,7 +605,13 @@ export const DEFAULT_METADATA_TYPE_REGISTRY: MetadataTypeRegistryEntry[] = [
   // are not modifiable per-org beyond layout/label; custom objects are full).
   { type: 'object', label: 'Object', filePatterns: ['**/*.object.ts', '**/*.object.yml', '**/*.object.json'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: true, executionPinned: false, loadOrder: 10, domain: 'data' },
   { type: 'field', label: 'Field', filePatterns: ['**/*.field.ts', '**/*.field.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 20, domain: 'data' },
-  { type: 'validation', label: 'Validation Rule', filePatterns: ['**/*.validation.ts', '**/*.validation.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 30, domain: 'data' },
+  // ADR-0088 (#4509) — the `validation` kind is RETIRED. It failed the
+  // admission test on its first clause: no independent lifecycle. A rule only
+  // means anything against an object, and the only shape the engine evaluates
+  // is `object.validations[]`; the standalone schema had no binding key to
+  // name its object with (and, being `.strict()` in all six variants, could not
+  // be given one by an author). Its `filePatterns` and `allowRuntimeCreate`
+  // retire with it. Author rules as `validations:` on the object.
   { type: 'hook', label: 'Hook', filePatterns: ['**/*.hook.ts', '**/*.hook.yml'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 30, domain: 'data' },
   // `seed`: fixture / initialization data (SeedSchema = object + records + mode +
   // externalId). Runtime-draftable so the AI (and any author) can stage seed
@@ -637,7 +649,41 @@ export const DEFAULT_METADATA_TYPE_REGISTRY: MetadataTypeRegistryEntry[] = [
   // ADR-0020: there is no `workflow` metadata type — record state machines are
   // a `state_machine` validation rule on the object, not a standalone artifact.
   { type: 'flow', label: 'Flow', filePatterns: ['**/*.flow.ts', '**/*.flow.yml', '**/*.flow.json'], supportsOverlay: false, allowOrgOverride: true, allowRuntimeCreate: true, supportsVersioning: true, executionPinned: true, loadOrder: 80, domain: 'automation' },
-  { type: 'job', label: 'Background Job', filePatterns: ['**/*.job.ts', '**/*.job.yml', '**/*.job.json'], supportsOverlay: false, allowOrgOverride: true, allowRuntimeCreate: true, supportsVersioning: false, executionPinned: false, loadOrder: 80, domain: 'automation' },
+  // `job`: A JOB IS A CODE ARTIFACT, and the flags now say so (#4509).
+  //
+  // `JobSchema.handler` is the name of a function in the compiled bundle's
+  // function table — the schema says as much ("must match a key in
+  // `defineStack({ functions })`"), and the scheduler is built that way:
+  // `AppPlugin` sources jobs from `bundle.jobs` alone and resolves each
+  // `handler` through `collectBundleFunctions(bundle)`, skipping any job whose
+  // handler is not in that table (packages/runtime/src/app-plugin.ts).
+  //
+  // So a job created at runtime, or overlaid per-org, could never be scheduled
+  // — not "is not yet scheduled", but CANNOT BE: its handler names a function
+  // that exists only inside a bundle the runtime writer never had. Both doors
+  // led to metadata that parses, saves, and never runs. Under ADR-0049
+  // enforce-or-remove that is not a state to leave standing, and there is
+  // nothing here to enforce: the missing piece is not a bridge but a
+  // handler-binding design.
+  //
+  // Hence allowRuntimeCreate:false (no "create job" in Studio / PUT /meta) and
+  // allowOrgOverride:false (no per-org job fork). Unlike `agent`, which is
+  // closed to third-party AUTHORING entirely (ADR-0063 §2), `job` stays a
+  // first-class authorable type: `*.job.ts` and `defineStack({ jobs })` are the
+  // supported doors, and they work — the file loader is genuinely consumed, so
+  // the kind still passes the ADR-0088 admission test and stays registered.
+  //
+  // Consequence that looks like a bug and is not: `migrateStoredMetadata`
+  // reports runtime-authored `job` rows `skipped` (no governed write path), the
+  // same way it does for `agent`. Rows already in `sys_metadata` are left
+  // alone; they were never scheduled, so nothing changes behaviorally.
+  //
+  // Re-opening this type means designing a handler a runtime writer can
+  // actually name — e.g. constraining `handler` to an already-registered flow
+  // or a named, separately-governed function — and then building the bridge
+  // from job metadata to `IJobService.schedule`. Opening the flag without that
+  // work just restores the silent no-op.
+  { type: 'job', label: 'Background Job', filePatterns: ['**/*.job.ts', '**/*.job.yml', '**/*.job.json'], supportsOverlay: false, allowOrgOverride: false, allowRuntimeCreate: false, supportsVersioning: false, executionPinned: false, loadOrder: 80, domain: 'automation' },
 
   // System Protocol
   // `datasource`: runtime-creatable (ADR-0015 Addendum) — the Studio wizard

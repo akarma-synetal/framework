@@ -19,12 +19,11 @@
  *
  * The map intentionally only contains types that meaningfully round-trip
  * through the runtime metadata API. (The former code-only placeholder kinds
- * `function`/`service`/`router` — and `trigger` — were retired from the
- * registry entirely by ADR-0088.)
+ * `function`/`service`/`router` — and `trigger`, then `validation` — were
+ * retired from the registry entirely by ADR-0088.)
  *
- * `validation` exposes the discriminated union
- * over all built-in rule variants. Custom plugin types can extend this
- * registry at runtime via `registerMetadataTypeSchema()`.
+ * Custom plugin types can extend this registry at runtime via
+ * `registerMetadataTypeSchema()`.
  */
 
 import type { z } from 'zod';
@@ -32,7 +31,6 @@ import type { z } from 'zod';
 import { FieldSchema } from '../data/field.zod';
 import { ObjectSchema } from '../data/object.zod';
 import { HookSchema } from '../data/hook.zod';
-import { ValidationRuleSchema } from '../data/validation.zod';
 import { DatasourceSchema } from '../data/datasource.zod';
 import { SeedSchema } from '../data/seed.zod';
 import { MappingSchema } from '../data/mapping.zod';
@@ -66,15 +64,25 @@ import { DEFAULT_METADATA_TYPE_REGISTRY } from './metadata-plugin.zod';
 
 /**
  * Built-in mapping from metadata type identifier → its canonical Zod
- * schema. Types omitted here have no runtime-editable form (and are
- * marked `allowRuntimeCreate: false` in `DEFAULT_METADATA_TYPE_REGISTRY`).
+ * schema. A type omitted here has no runtime-editable form.
+ *
+ * The converse does NOT hold: presence here is about schema RESOLUTION
+ * (validation, diagnostics, generated docs), not about the runtime-create
+ * door. `agent` (ADR-0063 §2) and `job` (#4509) are both listed and both carry
+ * `allowRuntimeCreate: false` in `DEFAULT_METADATA_TYPE_REGISTRY` — they are
+ * authored in code and still need their schema resolvable. That registry is
+ * the authority on who may write at runtime; this map only says what shape a
+ * given type has.
  */
 const BUILTIN_METADATA_TYPE_SCHEMAS: Partial<Record<MetadataType, z.ZodType>> = {
   // Data Protocol
   object: ObjectSchema,
   field: FieldSchema,
   hook: HookSchema,
-  validation: ValidationRuleSchema,
+  // ADR-0088 (#4509): no `validation` entry — the kind is retired. Rules are
+  // authored inline as `object.validations[]`, where `ObjectSchema` already
+  // carries `ValidationRuleSchema`, so the shape stays resolvable through its
+  // owning object.
   seed: SeedSchema, // fixture/init data; runtime-draftable, applied on publish
   mapping: MappingSchema as unknown as z.ZodType, // #2611: reusable import mapping; runtime-creatable so the wizard can save one
 
