@@ -91,6 +91,42 @@ describe('[#5347] driver-mongodb refuses a non-boolean $null comparand', () => {
     expect(refusalOf({ $not: { stage: { $null: 'x' } } }).message).toContain('filter.$not.stage.$null');
   });
 
+  /**
+   * [#5239 x #5347] A boolean identity settling the enclosing node must not
+   * skip this gate.
+   *
+   * #5368 landed this driver's gate in the emitter's `$null` arm — sound while
+   * every node reached an emitter. #5239's structural reduction ended that: a
+   * TRUE disjunct (`{}`) or a FALSE key (`$or: []`) settles the node before
+   * any emitter runs, so an emitter-only gate would refuse or ignore the same
+   * comparand depending on its SIBLINGS — the evaluation-order dependence
+   * #5368 placed driver-sql's and driver-memory's gates on their validating
+   * walks to rule out. The gate here moved to `reduceFilterKey` with the
+   * merge of the two changes; these pins hold it there. Each fixture would
+   * short-circuit to a verdict (match-all / match-nothing) if the walk did
+   * not refuse first.
+   */
+  it('is not skipped when a TRUE disjunct settles the $or (#5239 reduction)', () => {
+    const err = refusalOf({ $or: [{}, { stage: { $null: 'yes' } }] });
+    expect(err.code).toBe('INVALID_FILTER');
+    expect(err.status).toBe(400);
+    expect(err.message).toContain('filter.$or[1].stage.$null');
+  });
+
+  it('is not skipped when a FALSE sibling key settles the node (#5239 reduction)', () => {
+    const err = refusalOf({ $or: [], stage: { $null: 1 } });
+    expect(err.code).toBe('INVALID_FILTER');
+    expect(err.status).toBe(400);
+    expect(err.message).toContain('filter.stage.$null');
+  });
+
+  it('is not skipped inside a $not whose operand an identity settles (#5239 reduction)', () => {
+    const err = refusalOf({ $not: { $or: [{}, { stage: { $null: 'x' } }] } });
+    expect(err.code).toBe('INVALID_FILTER');
+    expect(err.status).toBe(400);
+    expect(err.message).toContain('filter.$not.$or[1].stage.$null');
+  });
+
   it('true and false translate exactly as before', () => {
     expect(translateFilter({ stage: { $null: true } })).toEqual({ stage: { $eq: null } });
     expect(translateFilter({ stage: { $null: false } })).toEqual({ stage: { $ne: null } });
