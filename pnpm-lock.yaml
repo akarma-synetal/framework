@@ -1355,6 +1355,9 @@ importers:
         specifier: workspace:*
         version: link:../../types
     devDependencies:
+      '@objectstack/driver-sql':
+        specifier: workspace:*
+        version: link:../../drivers/driver-sql
       '@objectstack/objectql':
         specifier: workspace:*
         version: link:../../objectql
@@ -1870,6 +1873,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@objectstack/driver-sql':
+        specifier: workspace:*
+        version: link:../drivers/driver-sql
       '@objectstack/metadata':
         specifier: workspace:*
         version: link:../metadata
@@ -2440,6 +2446,9 @@ importers:
         specifier: workspace:*
         version: link:../../spec
     devDependencies:
+      '@objectstack/driver-sql':
+        specifier: workspace:*
+        version: link:../../drivers/driver-sql
       '@objectstack/objectql':
         specifier: workspace:*
         version: link:../../objectql
