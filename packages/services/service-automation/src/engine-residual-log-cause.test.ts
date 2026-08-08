@@ -56,6 +56,8 @@ import { ObjectLogger } from '@objectstack/core';
 import { AutomationEngine } from './engine.js';
 import type { NodeExecutor, SuspendedRun, SuspendedRunStore, FlowTrigger } from './engine.js';
 import type { AutomationContext } from '@objectstack/spec/contracts';
+import { defineActionDescriptor } from '@objectstack/spec/automation';
+import { registerScreenNodes } from './builtin/screen-nodes.js';
 
 // ── fixtures ───────────────────────────────────────────────────────────────
 
@@ -83,10 +85,22 @@ function workingStore(overrides: Partial<SuspendedRunStore>): SuspendedRunStore 
     };
 }
 
-/** A pausing executor; `onRelease` optionally makes its teardown throw. */
+/**
+ * A pausing executor; `onRelease` optionally makes its teardown throw.
+ *
+ * Declares `resumeAuthority: 'any'` because these tests continue the pause
+ * through the public {@link AutomationEngine.resume} door. Since #5561 that is
+ * an opt-in: a node type that declares nothing is refused there, so a fixture
+ * exercising anything OTHER than the resume gate has to state the posture it
+ * relies on — the same declaration the four pausing built-ins carry.
+ */
 function pauser(onRelease?: () => void): NodeExecutor {
     return {
         type: 'pauser',
+        descriptor: defineActionDescriptor({
+            type: 'pauser', version: '1.0.0', name: 'Pauser',
+            supportsPause: true, resumeAuthority: 'any',
+        }),
         async execute(node) {
             return { success: true, suspend: true, correlation: `test-armature:${node.id}` };
         },
@@ -477,6 +491,14 @@ describe('#6499 sites 9–13 — engine-internal seams carrying foreign text, al
         const engine = new AutomationEngine(jsonLogger(), workingStore({
             async load(runId) { return runId === 'run_scr' ? parked : null; },
         }));
+        // The real `screen` executor, as any booted engine has it. Needed since
+        // #5561 step two: the resume below goes through the public gate, and the
+        // authority of a pause is read off the SUSPENDED NODE's descriptor — with
+        // no `screen` registered there is no descriptor, which now resolves
+        // fail-closed and refuses the resume before this seam is ever reached.
+        // `screen` declares `resumeAuthority: 'any'`, so registering it restores
+        // exactly the production shape this site is about.
+        registerScreenNodes(engine, { logger: jsonLogger(), getService() { return undefined; } } as never);
         engine.registerFlow('onboard', {
             name: 'onboard',
             label: 'Onboard',
