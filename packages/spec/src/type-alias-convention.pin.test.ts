@@ -265,7 +265,7 @@ import type * as M167 from './ui/view.zod.js';
 import type * as M170 from './ui/component.zod.js';
 
 // ---------------------------------------------------------------------------
-// 824 isomorphic aliases: `z.input` === `z.infer`, so no `XParsed` is declared.
+// 823 isomorphic aliases: `z.input` === `z.infer`, so no `XParsed` is declared.
 //
 // That number is machine-checked, not hand-kept. The runtime companion at the
 // bottom of this file recomputes the pin count from the source and asserts that
@@ -920,7 +920,8 @@ export type Iso439 = Assert<Eq< z.input< typeof M94.PluginHealthStatusSchema >, 
 export type Iso440 = Assert<Eq< z.input< typeof M94.PluginHealthReportSchema >, z.infer< typeof M94.PluginHealthReportSchema > >>;
 
 // kernel/plugin-loading.zod.ts
-export type Iso441 = Assert<Eq< z.input< typeof M95.PluginLoadingStrategySchema >, z.infer< typeof M95.PluginLoadingStrategySchema > >>;
+// (Iso441 pinned `PluginLoadingStrategySchema`, removed with the rest of the
+// `manifest.loading` block in #4914 — ADR-0049 enforce-or-remove.)
 export type Iso442 = Assert<Eq< z.input< typeof M95.PluginLoadingEventSchema >, z.infer< typeof M95.PluginLoadingEventSchema > >>;
 
 // kernel/plugin-registry.zod.ts
@@ -1621,7 +1622,7 @@ describe('ADR-0122 type-alias convention', () => {
   // this title and the section header above the pin list — are now asserted
   // against the recomputed count below, so neither can go stale without a red
   // test naming it.
-  it('still declares all 824 isomorphic pins', () => {
+  it('still declares all 823 isomorphic pins', () => {
     // The truth of each pin is proved by tsc, not here — an `Assert<Eq<...>>`
     // that stops holding is a compile error with the alias named. What tsc
     // cannot notice is a pin that was DELETED: removing the assertion removes
@@ -1757,9 +1758,16 @@ describe('ADR-0122 type-alias convention', () => {
     // the pin also took its THIRD number (759 -> 760 -> 833), each time
     // because the next-free id had been claimed by a branch that merged
     // first. The file, not the history, is the operand.
+    //
+    // 824 -> 823 is #4914's ADR-0049 retirement of the `manifest.loading`
+    // block: `Iso441` pinned `PluginLoadingStrategySchema`, one of the eleven
+    // defs unpublished with the carrier key, so its pin goes with the schema.
+    // A DECREASE, and the first here — the id is retired in place rather than
+    // renumbered, because the ids are claims about pins and not positions
+    // (`Iso824` remains the highest, and the next author still takes 825).
     const self = readFileSync(fileURLToPath(import.meta.url), 'utf8');
     const pins = self.match(/^export type Iso\d+ = Assert</gm) ?? [];
-    expect(pins).toHaveLength(824);
+    expect(pins).toHaveLength(823);
 
     // The count is stated in PROSE twice as well — this case's title and the
     // section header above the pin list — and until #6605 nothing read either
