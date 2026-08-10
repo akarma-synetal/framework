@@ -2095,12 +2095,18 @@ importers:
       '@objectstack/driver-sql':
         specifier: workspace:*
         version: link:../../drivers/driver-sql
+      '@objectstack/metadata-core':
+        specifier: workspace:*
+        version: link:../../metadata-core
       '@objectstack/objectql':
         specifier: workspace:*
         version: link:../../objectql
       '@objectstack/plugin-security':
         specifier: workspace:*
         version: link:../../plugins/plugin-security
+      '@objectstack/service-job':
+        specifier: workspace:*
+        version: link:../service-job
       '@types/node':
         specifier: ^26.1.2
         version: 26.1.2
@@ -2254,6 +2260,9 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1
     devDependencies:
+      '@objectstack/metadata-core':
+        specifier: workspace:*
+        version: link:../../metadata-core
       '@types/node':
         specifier: ^26.1.2
         version: 26.1.2
