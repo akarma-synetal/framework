@@ -819,6 +819,35 @@ const actionObject = () => strictObject({
   /** Display label */
   label: I18nLabelSchema.describe('Display label'),
 
+  /**
+   * Explanatory line shown in the action's PARAM DIALOG, under the title.
+   *
+   * The renderer half already exists and predates this key: objectui's
+   * `ActionParamDialog` renders it as the dialog's `DialogDescription`
+   * (`objectui packages/app-shell/src/views/ActionParamDialog.tsx:215`, falling
+   * back to the generic `actionDialog.description` string), fed by
+   * `actionDescription(objectName, actionName, action.description)` from two
+   * independent handlers — `useConsoleActionRuntime.tsx:206` and
+   * `RecordDetailView.tsx:586`. The resolver
+   * (`objectui packages/i18n/src/useObjectLabel.ts:463`) reads
+   * `objects.{object}._actions.{action}.description`, falls back to
+   * `globalActions.{action}.description`, then to this literal. Until #7367 no
+   * producer could reach any of it: this shape refused the key.
+   *
+   * **Use it for the question the dialog is asking.** An action that collects
+   * params and ALSO sets `confirmText` shows the user two dialogs for one
+   * decision — the confirm, then the param prompt. The maintainer's 2026-08-10
+   * ruling on #7278 is to carry the confirm question here instead: one
+   * condition, one wording, one dialog, nothing sent until its own Confirm.
+   * `confirmText` stays correct for a param-LESS action, where the confirm IS
+   * the only dialog.
+   *
+   * **Not `ai.description`.** That one is the LLM-facing tool contract
+   * (≥40 chars, required when `ai.exposed`); this one is human-facing dialog
+   * copy and is never sent to a model.
+   */
+  description: I18nLabelSchema.optional().describe('Explanatory line shown under the title in the action\'s param dialog. Carries the confirm question for an action that collects params (one dialog, not two — #7278). Not the LLM-facing `ai.description`.'),
+
   /** Target object this action belongs to (optional, snake_case) */
   objectName: z.string().regex(/^[a-z_][a-z0-9_]*$/).optional().describe('Target object this action belongs to. When set, the action is auto-merged into the object\'s actions array by defineStack().'),
   
