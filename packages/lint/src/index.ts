@@ -434,6 +434,7 @@ export type {
 export {
   validateAiAgentAuthoring,
   AGENT_AUTHORING_WITHDRAWN,
+  DEFAULT_AGENT_OUTSIDE_ROSTER,
 } from './validate-ai-agent-authoring.js';
 export type {
   AiAgentAuthoringFinding,
