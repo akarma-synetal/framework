@@ -932,6 +932,9 @@ importers:
         specifier: ^18.0.0
         version: 18.6.2
     devDependencies:
+      '@objectstack/formula':
+        specifier: workspace:*
+        version: link:../../formula
       '@types/node':
         specifier: ^26.1.2
         version: 26.1.2
@@ -967,6 +970,9 @@ importers:
         specifier: ^1.14.1
         version: 1.14.1
     devDependencies:
+      '@objectstack/formula':
+        specifier: workspace:*
+        version: link:../../formula
       '@types/node':
         specifier: ^26.1.2
         version: 26.1.2
