@@ -9409,6 +9409,19 @@ export class ObjectQL implements IObjectQLEngine {
       // ⛔ Do not reintroduce it as a guard around the by-id read. A gate on
       // whether to LOOK is not compatible with a rule about what to do when
       // nothing is there. See `update()`'s twin.
+      //
+      // [#7933] The first three entries were carried here UNVERIFIED when
+      // #7707 corrected the `plugin-audit` one, which was wrong on BOTH halves
+      // — hook name and term. All three have since been read against the
+      // function that binds them — `registerIdentityWriteGuard`,
+      // `bindRecordShareCascade`, `installFileReferenceHooks` — and all three
+      // match what is claimed above: same events, same object-less
+      // registration, same in-handler filter. Nothing above needed changing.
+      // That audit is what the retirement note's "term 1 or 2 was already true
+      // for every object" stands on, so it is recorded here rather than left
+      // in a closed issue: the enumeration outlived the gate it was written
+      // for, and it is now load-bearing for a different claim than the one it
+      // was written to support.
       const deleteSchema = this._registry.getObject(object);
       // `buildDriverOptions` is what carries the open transaction and the
       // tenant scope onto a raw driver read. Skipping it here would read
