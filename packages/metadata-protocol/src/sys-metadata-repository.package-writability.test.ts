@@ -157,7 +157,10 @@ function makeFakeEngine() {
   };
 }
 
-const objectBody = { name: 'showcase_task', label: 'Task', fields: { name: { type: 'text', label: 'Name' } } };
+// [#8308] `sharingModel` authored: the publish gate refuses an OWD-less custom
+// object (`security-owd-unset`) once #8310 declares `object` in `runtimeTypes`,
+// and this file pins the package-writability refusals, not that one.
+const objectBody = { name: 'showcase_task', label: 'Task', sharingModel: 'private', fields: { name: { type: 'text', label: 'Name' } } };
 
 /**
  * [#8146] A spec-VALID permission set — the QA run's `showcase_contributor`.
