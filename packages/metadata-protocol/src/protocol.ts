@@ -4261,97 +4261,138 @@ export class ObjectStackProtocolImplementation implements
     }
 
     /**
-     * [#8038] The `__search` half of {@link governServedItem}'s presence
-     * convergence — the third stamp in the same family, and the one the
-     * module-level function cannot carry on its own.
+     * [#8268, generalising #8038] The REGISTRY-SIDE half of
+     * {@link governServedItem}'s presence convergence: replay the registry's
+     * object-materialization seam onto the served body.
      *
      * `applyInjectedSystemColumns` (#6562) converges the columns whose
      * membership is a pure function of the document
      * (`resolveInjectedSystemColumns`), so it needs nothing but the body. The
-     * search companion is DEPLOYMENT-gated: `SchemaRegistry` provisions it at
-     * the object-materialization seam only when its own `searchCompanion` flag
+     * materialization stamps are not like that. `__search` is DEPLOYMENT-gated
+     * (`SchemaRegistry` provisions it only when its own `searchCompanion` flag
      * is on, and that flag is `options.searchCompanion ??
-     * resolveSearchPinyinEnabled()` — a host may set it explicitly. So the
-     * answer has to come from the registry that made the decision, which is why
-     * this is a method here and a `provisionSearchCompanionOnto` there, exactly
-     * as {@link foldObjectExtendersFromRegistry} is a method here and a
+     * resolveSearchPinyinEnabled()`, which a host may set explicitly), and the
+     * ADR-0079 `nameField` designation must match the answer THAT registry
+     * reached over THAT object's contributors. So the answer has to come from
+     * the registry that made the decision, which is why this is a method here
+     * and a `materializeServedObjectOnto` there, exactly as
+     * {@link foldObjectExtendersFromRegistry} is a method here and a
      * `foldObjectExtendersOnto` there (#7556).
      *
+     * ⛔ It asks for the WHOLE seam, deliberately, and this is the point of
+     * #8268 rather than an implementation detail. Three stamps of one seam —
+     * #6562's injected system columns, #8038's `__search`, #8268's `nameField`
+     * — diverged on this exact read path and were found, filed and fixed ONE AT
+     * A TIME, because each convergence reached for one named stamp. A stamp
+     * added to `materializeBaseLayer` now arrives here already converged, with
+     * no fourth method and no fourth card.
+     *
      * Applied AFTER `governServedItem` at each exit, because the registry
-     * provisions the companion after `applySystemFields` too: the source field
-     * is resolved by `resolveDisplayField` over the POST-injection field set,
-     * so injecting first is what makes this pass and the registry's own answer
-     * the same answer rather than two independent guesses.
+     * materializes after `applySystemFields` too: the title is resolved by
+     * `resolveDisplayField` over the POST-injection field set, so injecting
+     * first is what makes this pass and the registry's own answer the same
+     * answer rather than two independent guesses.
      *
      * No-op for every type but `object`, and — via the registry — for a
      * deployment with companions off, an object with no eligible display field,
-     * and a body that already carries the column (every registry-backed read,
+     * and a body already carrying every stamp (every registry-backed read,
      * which is the majority path this converges the minority onto).
      */
-    private provisionSearchCompanionFromRegistry<T>(type: string, body: T): T {
+    private materializeFromRegistry<T>(type: string, body: T): T {
         if (canonicalMetaType(type) !== 'object') return body;
         if (body === null || typeof body !== 'object') return body;
         const registry = (this.engine as any)?.registry;
         // Partial registry doubles in tests predate this method; a host that
-        // cannot answer the gate answers exactly as it did before.
-        if (!registry || typeof registry.provisionSearchCompanionOnto !== 'function') return body;
-        try {
-            return registry.provisionSearchCompanionOnto(body) as T;
-        } catch {
-            // A read over an in-memory flag and the body's own fields; a failure
-            // here must not turn a served schema into a 5xx.
-            return body;
+        // cannot answer the gate answers exactly as it did before. The
+        // `provisionSearchCompanionOnto` fallback keeps a double that was
+        // written against #8038's narrower seam serving what it served then,
+        // rather than silently losing the companion convergence to a rename.
+        if (registry && typeof registry.materializeServedObjectOnto === 'function') {
+            try {
+                return registry.materializeServedObjectOnto(body) as T;
+            } catch {
+                // A read over an in-memory flag, the registry's own resolved
+                // answer and the body's own fields; a failure here must not turn
+                // a served schema into a 5xx.
+                return body;
+            }
         }
+        if (registry && typeof registry.provisionSearchCompanionOnto === 'function') {
+            try {
+                return registry.provisionSearchCompanionOnto(body) as T;
+            } catch {
+                return body;
+            }
+        }
+        return body;
     }
 
     /**
-     * {@link governServedItem} plus the deployment-gated half it cannot reach
-     * ({@link provisionSearchCompanionFromRegistry}) — the whole of what a
-     * `/meta` READ EXIT owes an object document. Every call site of the free
-     * function that is a read exit goes through this instead; the one call site
-     * that is not — `getMetaItemLayered`'s `code` / `overlay` layers, which are
-     * deliberately raw — never called it in the first place (#6562 ruling
-     * constraint 1, #7556's boundary).
+     * {@link governServedItem} plus the registry-gated half it cannot reach
+     * ({@link materializeFromRegistry}) — the whole of what a `/meta` READ EXIT
+     * owes an object document. Every call site of the free function that is a
+     * read exit goes through this instead; the one call site that is not —
+     * `getMetaItemLayered`'s `code` / `overlay` layers, which are deliberately
+     * raw — never called it in the first place (#6562 ruling constraint 1,
+     * #7556's boundary).
      */
     private governServedObject<T>(type: string, item: T): T {
-        return this.provisionSearchCompanionFromRegistry(type, governServedItem(type, item));
+        return this.materializeFromRegistry(type, governServedItem(type, item));
     }
 
     /**
-     * [#8038] The write-side counterpart of
-     * {@link provisionSearchCompanionFromRegistry}, owed for the reason
+     * [#8268, generalising #8038] The write-side counterpart of
+     * {@link materializeFromRegistry}, owed for the reason
      * {@link stripServedSystemColumns} is owed one field family over: the write
      * path persists the request body verbatim (ADR-0005 §Validation), so a
-     * document this service's read added the companion to would otherwise be
-     * handed straight back and stored carrying it.
+     * document this service's read added a stamp to would otherwise be handed
+     * straight back and stored carrying it.
      *
      * Measured on the runtime-created object path — the write door type
      * `object` has open by default, an artifact-backed object refusing the save
      * outright with `NOT_OVERRIDABLE` — the stored row went from
      * `fields: [name]` to `fields: [__search, name]` on a single GET → PUT
-     * before this was added.
+     * before #8038 added the companion half, and gained a `nameField` the
+     * author never wrote on the same round trip before #8268 added the title
+     * half. The landed `#4326` round-trip pin catches either omission, which is
+     * why the read half and this half must move together.
+     *
+     * ⛔ Asks the registry for the WHOLE seam's inverse rather than for one
+     * named stamp — the same reason {@link materializeFromRegistry} does.
      */
-    private stripSearchCompanionFromRegistry<T>(type: string, item: T): T {
+    private stripMaterializedFromRegistry<T>(type: string, item: T): T {
         if (canonicalMetaType(type) !== 'object') return item;
         if (item === null || typeof item !== 'object') return item;
         const registry = (this.engine as any)?.registry;
-        if (!registry || typeof registry.stripProvisionedSearchCompanionFrom !== 'function') return item;
-        try {
-            return registry.stripProvisionedSearchCompanionFrom(item) as T;
-        } catch {
-            // A read over the body's own fields; a failure here must not turn a
-            // save into a 5xx.
-            return item;
+        // Partial registry doubles in tests predate this method; the narrower
+        // #8038 spelling keeps such a host stripping what it stripped before
+        // rather than silently losing the companion strip to a rename.
+        if (registry && typeof registry.stripMaterializedStampsFrom === 'function') {
+            try {
+                return registry.stripMaterializedStampsFrom(item) as T;
+            } catch {
+                // A read over the body's own fields; a failure here must not
+                // turn a save into a 5xx.
+                return item;
+            }
         }
+        if (registry && typeof registry.stripProvisionedSearchCompanionFrom === 'function') {
+            try {
+                return registry.stripProvisionedSearchCompanionFrom(item) as T;
+            } catch {
+                return item;
+            }
+        }
+        return item;
     }
 
     /**
-     * {@link stripServedSystemColumns} plus the companion half
-     * ({@link stripSearchCompanionFromRegistry}) — the whole of what the write
+     * {@link stripServedSystemColumns} plus the registry-seam half
+     * ({@link stripMaterializedFromRegistry}) — the whole of what the write
      * path owes {@link governServedObject}.
      */
     private stripServedObjectColumns<T>(type: string, item: T): T {
-        return this.stripSearchCompanionFromRegistry(type, stripServedSystemColumns(type, item));
+        return this.stripMaterializedFromRegistry(type, stripServedSystemColumns(type, item));
     }
 
     /**
