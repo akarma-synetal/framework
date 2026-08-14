@@ -2,7 +2,9 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { HttpDispatcher } from './http-dispatcher.js';
+import { assertEngineDeleteDispatch, assertEngineUpdateDispatch } from '@objectstack/metadata-core';
+
+import { HttpDispatcher, type HttpDispatcherResult } from './http-dispatcher.js';
 import { resolveExecutionContext } from './security/resolve-execution-context.js';
 import { hashApiKey } from './security/api-key.js';
 
@@ -166,5 +168,165 @@ describe('HttpDispatcher.handleKeys (POST /keys — key generation)', () => {
       request: { headers: { 'x-api-key': raw } },
     });
     expect(resolved.userId).toBeUndefined();
+  });
+});
+
+// ── [#8287] The key inherits the minter's active organization ──────────────
+
+/**
+ * Kernel whose ObjectQL also serves `sys_member`, so the mint-time membership
+ * check has something real to read.
+ */
+function makeOrgKernel(members: any[], posture?: string) {
+  const rows: any[] = [];
+  const ql = {
+    insert: async (_obj: string, data: any) => {
+      const id = `key_${rows.length + 1}`;
+      rows.push({ id, ...data });
+      return { id };
+    },
+    // REFUSES combinators rather than answering them wrong, exactly as the
+    // `makeKernel` matcher above does (`check:where-matcher-conformance`,
+    // #8494). Without the throw, `Object.entries` reads `$or`/`$and` as an
+    // ordinary FIELD NAME, compares `row.$or` (undefined) against the array,
+    // matches nothing, and hands the suite an empty result set with nothing
+    // erroring — a test that passes while asserting on a query the double
+    // never ran. Refusal is the cheap correct answer for a double that only
+    // ever sees scalar equality: it cannot go green on the wrong query.
+    find: async (obj: string, opts: any) => {
+      const where = opts?.where ?? {};
+      const table = obj === 'sys_api_key' ? rows : obj === 'sys_member' ? members : [];
+      return table.filter((r: any) => Object.entries(where).every(([k, v]) => {
+        if (k.startsWith('$')) throw new Error(`fake driver: unsupported operator ${k}`);
+        return r[k] === v;
+      }));
+    },
+    // The write verbs route through `ObjectQL`'s OWN dispatch predicates rather
+    // than a hand-written approximation of them (`check:engine-double-contract`,
+    // #4434/#5480). A double that imports the producer's decision cannot be
+    // looser than the producer — which is what keeps a green suite from meaning
+    // nothing on the day one of these stops being dormant. Only this second
+    // double is pinned; the file's pre-existing `makeKernel` double is the
+    // shrink-only baseline's measured DEBT entry and is left exactly as it was.
+    update: async (_obj: string, data: any, options?: any) => {
+      assertEngineUpdateDispatch(data, options);
+      return {};
+    },
+    delete: async (_obj: string, options?: any) => {
+      assertEngineDeleteDispatch(options);
+      return {};
+    },
+  };
+  // [#8287] The mint path resolves the EFFECTIVE posture from the kernel's
+  // `tenancy` service (ADR-0093 D4/D5), never from OS_TENANCY_POSTURE — a
+  // requested-but-unenforceable wall resolves to `single` there, and minting
+  // must follow what is ENFORCED.
+  const tenancy = posture ? { posture } : undefined;
+  const kernel: any = {
+    getService: (n: string) => (n === 'objectql' ? ql : n === 'tenancy' ? tenancy : undefined),
+    getServiceAsync: async (n: string) => (n === 'objectql' ? ql : n === 'tenancy' ? tenancy : undefined),
+  };
+  return { kernel, rows };
+}
+
+const orgCtx = (tenantId?: string) => ({
+  request: { headers: {} },
+  response: {},
+  environmentId: undefined,
+  executionContext: { userId: 'u1', isSystem: false, positions: [], permissions: [], tenantId },
+});
+
+/**
+ * `HttpDispatcherResult.response` is OPTIONAL, so every read of it is a
+ * `possibly undefined` in a type-checked program — and this package's test
+ * layer IS type-checked, by `check:type-check-debt --re-measure` against a
+ * shrink-only ledger, even though `pnpm test` never sees it.
+ *
+ * Narrow once, and narrow LOUDLY. `expect(res.response).toBeDefined()` would
+ * satisfy a reader and narrow nothing (vitest's matchers are not assertion
+ * signatures), and a `!` would silence the compiler while leaving the failure
+ * to surface as `undefined is not an object` three lines later. A dispatcher
+ * that answered no response at all is a different defect from one that
+ * answered the wrong status; this keeps them distinguishable.
+ *
+ * Scoped to the #8287 suite below on purpose: the older suite's reads are the
+ * file's share of the frozen TEST_DEBT number, and pressing that number down is
+ * a separate improvement to bank, not a rider on this repair.
+ */
+function responseOf(res: HttpDispatcherResult): NonNullable<HttpDispatcherResult['response']> {
+  const { response } = res;
+  if (!response) throw new Error('handleKeys answered no response at all');
+  return response;
+}
+
+describe('HttpDispatcher.handleKeys — organization inheritance (#8287)', () => {
+  it('stamps the minter’s active organization on the row and echoes it once', async () => {
+    const { kernel, rows } = makeOrgKernel([{ user_id: 'u1', organization_id: 'org_a', role: 'owner' }], 'isolated');
+    const res = responseOf(await dispatcher(kernel).handleKeys('POST', { name: 'agent' }, orgCtx('org_a')));
+
+    expect(res.status).toBe(201);
+    expect(rows[0].active_organization_id).toBe('org_a');
+    expect(res.body.data.active_organization_id).toBe('org_a');
+  });
+
+  /**
+   * ⛔ No org parameter, no cross-org keys in v1. The organization is
+   * INHERITED — a body that names another organization is ignored exactly the
+   * way a body naming another `user_id` already is, so minting can never be a
+   * lateral-movement step.
+   */
+  it('ignores an organization supplied in the body (inherited, never parameterized)', async () => {
+    const { kernel, rows } = makeOrgKernel([{ user_id: 'u1', organization_id: 'org_a', role: 'owner' }], 'isolated');
+    const res = responseOf(await dispatcher(kernel).handleKeys(
+      'POST',
+      { name: 'agent', organization_id: 'org_evil', active_organization_id: 'org_evil', organizationId: 'org_evil' },
+      orgCtx('org_a'),
+    ));
+
+    expect(res.status).toBe(201);
+    expect(rows[0].active_organization_id).toBe('org_a');
+  });
+
+  it('refuses when the caller is not a member of their own active organization', async () => {
+    const { kernel, rows } = makeOrgKernel([{ user_id: 'u1', organization_id: 'org_other', role: 'owner' }], 'isolated');
+    const res = responseOf(await dispatcher(kernel).handleKeys('POST', { name: 'agent' }, orgCtx('org_a')));
+
+    expect(res.status).toBe(403);
+    // Nothing was minted — a refused mint must not leave a credential behind.
+    expect(rows).toHaveLength(0);
+  });
+
+  it('refuses when the membership row exists but its ADR-0091 window has lapsed', async () => {
+    const { kernel, rows } = makeOrgKernel([
+      { user_id: 'u1', organization_id: 'org_a', role: 'owner', valid_until: '2000-01-01T00:00:00Z' },
+    ], 'isolated');
+    const res = responseOf(await dispatcher(kernel).handleKeys('POST', { name: 'agent' }, orgCtx('org_a')));
+
+    expect(res.status).toBe(403);
+    expect(rows).toHaveLength(0);
+  });
+
+  /**
+   * The card's own defect, caught one step earlier: under a walled posture a
+   * key with no organization reads nothing, so handing back a valid-looking
+   * secret is the dishonest half. Refuse at mint time, where the caller is a
+   * human at a console who can act on it.
+   */
+  it('refuses to mint an org-less key under a walled posture', async () => {
+    const { kernel, rows } = makeOrgKernel([], 'isolated');
+    const res = responseOf(await dispatcher(kernel).handleKeys('POST', { name: 'agent' }, orgCtx(undefined)));
+
+    expect(res.status).toBe(400);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('still mints an org-less key under `single` — there is no organization to inherit', async () => {
+    const { kernel, rows } = makeOrgKernel([], 'single');
+    const res = responseOf(await dispatcher(kernel).handleKeys('POST', { name: 'agent' }, orgCtx(undefined)));
+
+    expect(res.status).toBe(201);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].active_organization_id).toBeUndefined();
+    expect(res.body.data.active_organization_id).toBeUndefined();
   });
 });
