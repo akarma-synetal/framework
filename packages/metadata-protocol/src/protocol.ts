@@ -12657,6 +12657,50 @@ export class ObjectStackProtocolImplementation implements
          */
         projectionApplied?: MutationProjectionOutcome;
     }> {
+        // #4432 — CANONICAL TYPE KEY. See {@link canonicalMetaType}. This is the
+        // SEVENTH `/meta` entry point, and until #8769 it was the only one that
+        // did not funnel through the boundary fold — so the URL family
+        // `/meta/:type/:name/publish` accepted a spelling that `PUT` folds and
+        // `publish` did not resolve. Two dialects of one contract, decided by
+        // which verb you used (Prime Directive #12).
+        //
+        // What the fold reaches here that `promoteDraftForPublish`'s own
+        // `PLURAL_TO_SINGULAR` line does NOT — measured, not assumed:
+        //
+        //  • the four types the MANIFEST map legitimately omits (`field`,
+        //    `seed`, `external_catalog`, `translation` — they are not stack
+        //    collections). Unfolded, they arrive at the draftability check as
+        //    unrecognised and take the permissive PLUGIN branch of
+        //    `isRuntimeCreateAllowed` instead of their real registry entry: a
+        //    publish addressed `/meta/fields/...` passed a gate that
+        //    `/meta/field/...` answers 403 NOT_OVERRIDABLE. The #7894 shape,
+        //    one verb over.
+        //  • `getEffectiveLock`'s OVERLAY limb, which queries `sys_metadata`
+        //    with the raw `type`. Its artifact limb folds; the overlay limb
+        //    does not, so an ADR-0010 `_lock` carried by the stored active row
+        //    was not found when the publish was addressed with a plural — while
+        //    the promotion below DID find the row, because it reads the folded
+        //    `singularType`. That asymmetry is the one thing here that was not
+        //    fail-closed.
+        //  • the ADR-0010 audit row and the receipt sentence, which both read
+        //    `request.type` and so recorded the CALLER's spelling for a row
+        //    written under the canonical one — a compliance query on
+        //    `type = 'view'` missed a publish addressed `/meta/views/…`.
+        //
+        // ⚠️ `ensureObjectStorage` is NOT in that list, though it also reads
+        // `request.type`: it opens `if (type !== 'object' && type !== 'objects')`
+        // and so answered both spellings identically before this fold and after
+        // it. Its `'objects'` limb is now unreachable — both of its call sites
+        // stand behind a fold — but it is a spelling-tolerant lookup one layer
+        // down, which is the shape {@link canonicalMetaType}'s header rejects,
+        // so it is recorded rather than quietly deleted here (out of region).
+        //
+        // ⛔ This does NOT make `promoteDraftForPublish`'s fold redundant — that
+        // helper's other caller is `publishPackageDrafts`, which feeds it stored
+        // row types (data at rest, where a legacy plural row is real and nothing
+        // rewrites it on upgrade). Different input class, different map; see
+        // {@link canonicalMetaType}'s header for why the two are not one fold.
+        request = canonicalizeMetaRequestType(request);
         // [#8594] The refusal's own row is written HERE, by the route that owns
         // the (absent) transaction — see `promoteDraftForPublish`'s header. This
         // site has no transaction of its own, so recording it in the `catch` is
