@@ -83,6 +83,121 @@ export function selectRootDef(schemaName: string, schema: any): any {
 }
 
 /**
+ * Character budget for a default value spelled inside the Required cell.
+ *
+ * Over it the cell states that a default exists without printing it, and the
+ * JSON Schema under `json-schema/` stays the authority on the value — the same
+ * split this renderer already makes for constraints, which it has never printed
+ * in any position.
+ *
+ * WHY 64, and why it is NOT chosen from the density curve. Measured over the
+ * 1582 emitted documents (4676 property occurrences carrying a `default`, 360
+ * distinct values), counting occurrences whose canonical JSON is wider than
+ * each candidate:
+ *
+ *   budget   |   8 |  12 |  16 |  24 |  40 |  48 |  56 |  60 |  64 |  80 | 120
+ *   elided   | 553 | 251 | 157 |  47 |  34 |  24 |  18 |  17 |  17 |  17 |  14
+ *
+ * p50 is 5 characters and p99 is 25 — the population is overwhelmingly scalars
+ * (`false`, `0`, `"openai"`, `10`) — so a budget picked off that curve lands
+ * near 24 and the counts barely move after it. What decides this budget is the
+ * DISCONTINUITY further out, which the counts alone hide. Sorting the distinct
+ * wide values, they stop being one population at exactly one place:
+ *
+ *      43 … 59   scalars and one-line lists an author reads and copies:
+ *                `["urn:ietf:params:scim:schemas:core:2.0:User"]`,
+ *                `"/api/v1/automation/resume/{executionId}/{nodeId}"`,
+ *                `["MIT","Apache-2.0","BSD-3-Clause","BSD-2-Clause","ISC"]`
+ *      88 … 705  structural objects and arrays — a whole logging redact list,
+ *                a designer's tab layout, a mount table
+ *
+ * Nothing at all falls between 60 and 87. 64 sits inside that gap, so the rule
+ * it encodes is the real one — *spell a value the author could retype, withhold
+ * a nested structure* — rather than a percentile that would have to be
+ * re-tuned every time a default moves. It costs nothing on either side: 56 and
+ * 80 elide the same 17-18 occurrences, so the choice inside the gap is free.
+ *
+ * The Type column's budgets (80 in a shape summary, 160 in a vocabulary's own
+ * cell) are deliberately not reused: this value shares its cell with the
+ * `optional (default: …)` wrapper AND sits in the narrowest column of the table.
+ */
+export const INLINE_DEFAULT_WIDTH_LIMIT = 64;
+
+/**
+ * The Required cell for one property — `✅`, `optional`, or `optional (default: …)`.
+ *
+ * ## The defect this fixes (#8703)
+ *
+ * `build-schemas.ts` emits each def's JSON Schema as the **output** (post-parse)
+ * shape, falling back to the **input** shape only when output emission throws.
+ * In the output shape a `.default()`-bearing member is listed in `required` —
+ * the parse always produces it — so mirroring `required` straight into this
+ * column told the author "you must write this" about a key they may omit. That
+ * is precisely the question the column is read as answering, and reference
+ * tables are read far more often by an AI author than by a human (ADR-0033),
+ * for whom omitting optional keys is the normal authoring mode.
+ *
+ * Measured on the emitted tree at the time of the fix: **2526 property
+ * occurrences across 529 documents** were listed in `required` while carrying a
+ * `default`. Every one rendered `✅`.
+ *
+ * ## Why `default` is read instead of `required`
+ *
+ * A property carrying a `default` is author-omittable by construction, in BOTH
+ * emission modes — that is what the keyword means to whoever writes the
+ * document. So the presence of `default` decides this cell and the `required`
+ * array only breaks the tie for properties that have none. Two consequences,
+ * both wanted:
+ *
+ *   - The output/input split stops leaking into the docs. Before this, the same
+ *     `.default()` member rendered `✅` on an output-shape page and `optional`
+ *     on an input-shape one, so a refactor that flipped a def between the two
+ *     rewrote its whole Required column with no semantic change to what an
+ *     author must write (that flip is what #8703 was filed on). Now both modes
+ *     render the same cell.
+ *   - The cell says MORE than "optional" did: it names the value the author
+ *     gets by omitting the key, which was previously nowhere on the page.
+ *
+ * ## What is deliberately NOT changed
+ *
+ * The emitted JSON Schemas. They keep describing the post-parse shape and keep
+ * validating post-parse data — `build-schemas.ts` is untouched by this fix.
+ * Only the doc rendering reads the author's question differently.
+ *
+ * @param prop     The property's JSON Schema node.
+ * @param required Whether the enclosing object lists the property in `required`.
+ */
+export function renderRequiredCell(prop: any, required: boolean): string {
+  const hasDefault =
+    prop !== null && typeof prop === 'object' && Object.prototype.hasOwnProperty.call(prop, 'default');
+  if (!hasDefault) return required ? '✅' : 'optional';
+
+  // Canonical JSON, no whitespace — the same spelling the #4666 default ratchet
+  // fingerprints, so a value printed here and a value recorded there cannot
+  // disagree about what the author gets.
+  let json: string | undefined;
+  try {
+    json = JSON.stringify(prop.default);
+  } catch {
+    json = undefined;
+  }
+
+  // A backtick would close the code span early and spill raw JSON into the
+  // table. No emitted default contains one today; the withheld form is the
+  // honest answer if one ever arrives, and it still states the fact that
+  // matters — the key may be omitted.
+  if (json === undefined || json.length > INLINE_DEFAULT_WIDTH_LIMIT || json.includes('`')) {
+    return 'optional (has default)';
+  }
+
+  // Backslashes first, then pipes — the order every cell in this table uses,
+  // and for the reason stated at the type cell. GFM resolves a `\|` escape
+  // before inline parsing, so it survives inside the code span too.
+  const value = json.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
+  return `optional (default: \`${value}\`)`;
+}
+
+/**
  * Render one schema's section, heading included.
  *
  * `category` is not a parameter: everything category-scoped reaches this
@@ -128,7 +243,7 @@ export function renderSchemaSection(schemaName: string, schema: any, ctx: Sectio
           const typeStr = cell
             .replace(/\\/g, '\\\\')
             .replace(/\|/g, '\\|');
-          const isReq = required.has(key) ? '✅' : 'optional';
+          const isReq = renderRequiredCell(prop, required.has(key));
           // Escape for the GFM table cell last: backslashes first (so an existing
           // `\|` in a description can't decay into an escaped backslash + live
           // pipe), then pipes — an unescaped `|` (even inside a code span)
