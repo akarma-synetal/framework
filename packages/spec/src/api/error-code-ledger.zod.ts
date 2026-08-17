@@ -376,6 +376,7 @@ export const ERROR_CODE_LEDGER = {
     // and `/packages` serve protocol throws through `errorFromThrown`.
     // Reported by the #8087 dispatcher-vocabulary gate.
     'QUERY_OBJECT_MISMATCH',
+    'REGISTRY_TYPE_NOT_CANONICAL',  // [#9111] a SchemaRegistry overlay entry was offered a non-canonical metadata `type` — the mint door asserts, the caller folds
     'ROLLED_BACK',             // atomic data-batch row was written, then undone by the batch rollback (#4793)
     'STORED_TYPE_NOT_CANONICAL',  // [#8908] a package draft is stored under a non-canonical metadata type (pre-#7894 second-namespace residue) — refused at the publish pre-flight, batch-atomic
     'TENANT_SCOPE_REQUIRED',      // [#7780] destructive call named neither an organization nor an explicit cross-tenant intent; needs an explicit opt-in
