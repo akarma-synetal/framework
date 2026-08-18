@@ -531,10 +531,15 @@ const DISPATCHER_DOMAINS = {
  *
  * Say what this is NOT, because both misreadings are available and both are
  * wrong. It is not "these are legacy" — the payloads are current and correct.
- * It is not "bare bodies are fine here" — the other ratchets on this surface
+ * It is not "bare bodies are fine here" — the other entries on this surface
  * (`plugin-hono-server/src/adapter.ts`, `adapters/hono/src/index.ts`,
- * `cli/src/commands/serve.ts`) are ordinary refusals at ordinary doors and stay
- * tracked drift under #9364; the ruling does not reach them. The rejected option
+ * `cli/src/commands/serve.ts`) are ordinary refusals at ordinary doors, and the
+ * ruling never reached them. #9364 converted them instead, which is what a
+ * ratchet is FOR and the visible contrast with this block: the first two are
+ * conformant above, and what survives in `adapters/hono/src/index.ts` is its two
+ * `{ data }` discovery bodies — pre-auth like this block, but read by SDKs and
+ * codegen rather than by our own shells, so #9389's closed three-file list does
+ * not reach them either and #9436 carries that question. The rejected option
  * (A: envelope them, flip objectui's readers, carry a skew window on the least
  * versionable seam in the product) is on record in #9389 rather than lost.
  *
@@ -586,30 +591,29 @@ const PLUGIN_ROUTE_MODULES = {
   'packages/cloud-connection/src/marketplace-proxy-plugin.ts': {},
   'packages/plugins/plugin-webhooks/src/webhook-outbox-plugin.ts': {},
 
+  // Converted by #9364: the four refusals now answer the declared envelope,
+  // `{ success: false, error: { code, message } }`, with the 405's
+  // `method`/`path`/`allowed` moved into `error.details`. Conformant, so it
+  // joins the zero-entries above — and `@objectstack/http-conformance`'s
+  // `NodeHttpServer` mirrors these bodies byte-for-byte, locked cross-adapter
+  // by `fallback-seam.conformance.test.ts`.
+  'packages/plugins/plugin-hono-server/src/adapter.ts': {},
+
+  // Converted by #9364: `{ error: 'environment_not_found', message, hostname }`
+  // became the declared envelope with `ENVIRONMENT_NOT_FOUND` in the semantic
+  // slot and `hostname` under `error.details`.
+  'packages/cli/src/commands/serve.ts': {},
+
   // ── Ratchet: real, tracked, NOT blessed ─────────────────────────────────
   //
   // Measured by #9267 when this surface was added, not chosen. Each entry names
   // the issue that will drive it to zero; every number ticks DOWN only. These
   // are the finding this surface was worth adding for — none of them was
   // visible to any check in the repo before it.
-  'packages/plugins/plugin-hono-server/src/adapter.ts': {
-    unenveloped: 4,
-    stringError: 4,
-    siblingCode: 1,
-    ratchet: '#9364 (convert the adapter refusals onto the declared envelope)',
-    note: 'the adapter\'s own refusals — `{ error: \'Not found\' }` 404, `{ error: \'No response from handler\' }` 500, `{ error: \'Fallback handler failed\' }` 500, and the 405 that adds `code`/`method`/`path`/`allowed` beside `error`. The pre-#3675 dialect and its #7035 sibling, alive at a door no scan reached',
-  },
   'packages/adapters/hono/src/index.ts': {
     unenveloped: 2,
-    errorCodeNotString: 1,
-    ratchet: '#9364 (envelope the hono adapter bodies)',
-    note: 'two `{ data }` discovery bodies with no `success`, plus a shared `errorJson` writing the HTTP status into `error.code` — a number where ApiErrorSchema declares a string enum',
-  },
-  'packages/cli/src/commands/serve.ts': {
-    unenveloped: 1,
-    stringError: 1,
-    ratchet: '#9364 (envelope the serve host-resolution refusal)',
-    note: 'the unbound-hostname 404 — `{ error: \'environment_not_found\', message, hostname }`, a bare-string error with two stray top-level keys',
+    ratchet: '#9436 (envelope the hono adapter discovery bodies; Blocked-by #9389)',
+    note: 'two `{ data }` discovery bodies with no `success`. #9364 removed this file\'s `errorCodeNotString 1` — the shared `errorJson` wrote the HTTP status into `error.code` and now derives the ADR-0112 member from it through `resolveThrownHttpError`. What is left is the same PRE-AUTH bare-payload fork #9389 rules on, but on a different consumer population (SDKs and codegen read this mount\'s discovery, not the Console SPA), so #9389\'s closed three-file list does not reach it',
   },
   'packages/triggers/trigger-api/src/plugin.ts': {},
 
