@@ -10108,6 +10108,97 @@ export class ObjectQL implements IObjectQLEngine {
   }
 
   /**
+   * [#9362] The dependents probe's `where`, spelled for the KIND of reference
+   * field it is aimed at.
+   *
+   * A single-valued `lookup` / `master_detail` stores a scalar foreign key, and
+   * bare equality is the right question about it. A field declaring
+   * `multiple: true` stores an ARRAY — "Stores as Array/JSON"
+   * (`FieldSchema.multiple`) — and every SQL backend in this repo puts that
+   * array in a JSON TEXT column. Aiming bare equality at THAT column compares
+   * the whole serialization (`["a","b"]`) against one id, which can never hold;
+   * `driver-sql` refuses the spelling outright (`INVALID_FILTER` / 400, #7398),
+   * and that refusal is correct and stays. Until this method existed the probe
+   * built bare equality for both kinds, so every object pointed at by any
+   * registered `multiple: true` lookup had its delete refused with a 400 — on
+   * the stock showcase, `showcase_account`, with an EMPTY dependent table:
+   * the fault is schema-driven, not data-driven, because the probe runs per
+   * DECLARED relation.
+   *
+   * The multi-value spelling is `$contains`, which is what the refusal itself
+   * prescribes and the one membership spelling every driver here answers:
+   * `driver-sql` (and `driver-sqlite-wasm` / `driver-turso`, which extend it)
+   * lowers it to `LIKE '%v%'` over the serialization, `driver-mongodb` to
+   * `$regex` over the array, and `driver-memory` to a mingo `$regex`, which
+   * matches per ELEMENT. No public filter surface is widened: `$contains` is
+   * already declared, and this is the only construction site that changes.
+   *
+   * `$contains` is a SUBSTRING test, so on every one of those backends it
+   * answers a SUPERSET: with ids `acc_1` and `acc_10`, a row holding `acc_10`
+   * also matches a probe for `acc_1`. That is why the caller narrows the rows
+   * exactly through {@link ObjectQL.storedReferenceIncludes} — over-matching
+   * here would make `cascade` DELETE and `set_null` clear rows that never
+   * referenced this record, which is worse than the 400 being fixed. The
+   * pushdown's only job is to keep the probe from reading the whole table.
+   *
+   * The `$or` limb covers the other direction — a FALSE NEGATIVE, which on an
+   * integrity guard is the fail-OPEN that #8895 ruled out. An id needing JSON
+   * escaping (a quote, a backslash) appears in a SQL backend's serialized text
+   * in its ESCAPED form, so a probe for the raw id would miss the row that
+   * holds it; a document/in-memory backend compares the element itself and
+   * needs the RAW form. Both are asked whenever they differ, and the exact
+   * narrowing discards whatever the extra limb over-matched. Identical for an
+   * ordinary id, which is every id this engine generates.
+   */
+  private referenceProbeFilter(
+    fieldName: string,
+    fdef: { multiple?: unknown },
+    id: string | number,
+  ): Record<string, unknown> {
+    if (fdef?.multiple !== true) return { [fieldName]: id };
+    const raw = String(id);
+    // The BODY of the JSON string form — `JSON.stringify('a"b')` is `"a\"b"`,
+    // and the quotes are the serialization's, not the id's.
+    const escaped = JSON.stringify(raw).slice(1, -1);
+    if (escaped === raw) return { [fieldName]: { $contains: raw } };
+    return {
+      $or: [
+        { [fieldName]: { $contains: raw } },
+        { [fieldName]: { $contains: escaped } },
+      ],
+    };
+  }
+
+  /**
+   * [#9362] Does this STORED reference value point at `id`? The exact answer
+   * the `$contains` pushdown in {@link ObjectQL.referenceProbeFilter} can only
+   * approximate.
+   *
+   * Element-wise over the array, comparing `String(v)` — the same reading
+   * `dangling-reference-audit.ts` already applies to a stored reference
+   * (`Array.isArray(raw) ? raw : [raw]`), so the two integrity surfaces cannot
+   * disagree about what "this row references that record" means. An EXPANDED
+   * record in the slot is a read shape rather than an id write, and is skipped
+   * there for that reason; it is skipped here too.
+   *
+   * A non-array value is still compared rather than dismissed. A
+   * `multiple: true` slot holding a bare scalar is off-shape, and the two
+   * dispositions available are not symmetric: reading it as "references
+   * nothing" would drop a `restrict` refusal and let a referenced record be
+   * deleted — the fail-OPEN direction #8895 ruled out for this same guard —
+   * while reading it as a reference at most refuses a delete loudly.
+   */
+  private static storedReferenceIncludes(stored: unknown, id: string | number): boolean {
+    const wanted = String(id);
+    const values = Array.isArray(stored) ? stored : [stored];
+    for (const v of values) {
+      if (v == null || typeof v === 'object') continue;
+      if (String(v) === wanted) return true;
+    }
+    return false;
+  }
+
+  /**
    * Apply referential delete behavior for relations pointing AT this record,
    * before it is removed. For every registered object with a `master_detail`
    * or `lookup` field referencing `object`, honor the field's `deleteBehavior`:
@@ -10184,9 +10275,60 @@ export class ObjectQL implements IObjectQLEngine {
           behavior = 'restrict';
         }
 
+        // [#9362] Declared here rather than at the probe because BOTH the
+        // escalation below and the probe's filter spelling turn on it.
+        const multiValued = fdef.multiple === true;
+
+        // [#9362 -> #9438] TEMPORARY HOLDING POSITION. Delete this block, and
+        // the `multiValueHold` limb of the refusal below, when #9438 lands.
+        //
+        // `set_null` on a SET-valued foreign key has no settled meaning yet.
+        // The limb it would run writes `null` over the WHOLE array, discarding
+        // every other member — references that have nothing to do with the
+        // record being deleted. Measured on the real stack: a row holding
+        // `["acc_a","acc_b"]` re-reads as `null` after `acc_a` is deleted.
+        //
+        // That limb has never executed in this codebase: before #8895 the
+        // dependents probe swallowed its own failure and skipped the relation,
+        // after #8895 it raised `INVALID_FILTER` and aborted the delete. The
+        // probe repair one method over is what would make it run, so this is
+        // not a behaviour being taken away — it is one being held back.
+        //
+        // The RIGHT semantics is "remove the deleted member", but the residual
+        // shape when the array empties (`[]` or `null`) is observable — on the
+        // read path and to a required multi-value validator — and nothing in
+        // `FieldSchema` pins it. #9438 answers that; until it does, refusing
+        // LOUDLY decides nothing, while writing decides it by accident. A
+        // delete that is refused can still be performed by clearing the
+        // references first; data dropped by a successful 200 cannot be undone.
+        //
+        // Shaped as the required-FK escalation directly above, deliberately
+        // rather than as a new mechanism: same `behavior` reassignment, same
+        // one `if`. It reads `behavior === 'set_null'`, which is exactly what
+        // that escalation reads — `fdef.deleteBehavior || 'set_null'` collapses
+        // an ABSENT declaration and an explicitly authored `set_null` into one
+        // value, so both are covered here for the same reason both are covered
+        // there. Distinguishing them would be new machinery, and would leave
+        // the explicit spelling running the very write this holds back — the
+        // author of `set_null` on a set-valued field cannot have chosen "clear
+        // the whole set", because that semantic has never existed to choose.
+        //
+        // An explicit `cascade` or `restrict` is untouched, and a relation with
+        // no dependent rows still deletes: this only changes the DISPOSITION,
+        // so the `restrict` branch below is still reached only when the probe
+        // actually found referencing rows.
+        let multiValueHold = false;
+        if (behavior === 'set_null' && multiValued) {
+          behavior = 'restrict';
+          multiValueHold = true;
+        }
+
         let dependents: any[];
         try {
-          dependents = await this.find(childName, { where: { [fieldName]: id }, context } as any);
+          dependents = await this.find(
+            childName,
+            { where: this.referenceProbeFilter(fieldName, fdef, id), context } as any,
+          );
         } catch (error) {
           // [#8895] Discriminate by error TYPE — this probe IS the referential
           // guard, so `continue` is only truthful for the one failure that
@@ -10223,6 +10365,17 @@ export class ObjectQL implements IObjectQLEngine {
           // the probe's own failure, envelope intact.
           if (isMissingTableError(error)) continue;
           throw error;
+        }
+        // [#9362] The multi-value pushdown above is a SUPERSET, so the exact
+        // answer is taken here, on the rows themselves. Everything below —
+        // the `restrict` count in the 409 envelope, the `cascade` recursion,
+        // the `set_null` write — reads `dependents`, so narrowing anywhere
+        // later would leave one of them acting on a row that never referenced
+        // this record.
+        if (multiValued && dependents) {
+          dependents = dependents.filter((row) =>
+            ObjectQL.storedReferenceIncludes(row?.[fieldName], id),
+          );
         }
         if (!dependents || dependents.length === 0) continue;
 
@@ -10269,10 +10422,29 @@ export class ObjectQL implements IObjectQLEngine {
               { locale: msgCtx.locale, translate: msgCtx.translate },
             ),
           );
-          err.developerMessage =
-            `Cannot delete ${object} (${id}): ${dependents.length} dependent ${childName} record(s) reference it via ${fieldName}` +
-            `${required ? ` (${fieldName} is required, so it cannot be cleared)` : ''}. ` +
-            `Delete or reassign them first, or set deleteBehavior:'cascade' on ${childName}.${fieldName}.`;
+          // [#9362 -> #9438] The hold's reason is DEVELOPER-facing and rides
+          // `developerMessage` alone — the split #7307 already made on this
+          // envelope, applied to a third reason. The business `message` is
+          // unchanged because the USER's action is unchanged: clear or reassign
+          // the referencing records. Why the wire code does not split either:
+          // `operation-message.ts` states the rule for this exact envelope —
+          // "one wire code with two sentences ... splitting the SENTENCE, never
+          // the code ... `DELETE_RESTRICTED` stays one member of the ADR-0112
+          // vocabulary that clients match on". A code minted for a holding
+          // position would also have to be RETIRED under ADR-0087 when #9438
+          // lands, which is the opposite of reverting in one line. `#9438` is
+          // spelled literally so removing this is one grep.
+          err.developerMessage = multiValueHold
+            ? `Cannot delete ${object} (${id}): ${dependents.length} dependent ${childName} record(s) reference it via ` +
+              `${fieldName}, which is a multi-value reference (multiple: true) taking the default/declared ` +
+              `deleteBehavior:'set_null'. This refusal is TEMPORARY and is not a policy you configured: clearing ` +
+              `that field would null the WHOLE array and drop the other references it holds, and the correct ` +
+              `semantics ("remove just this member", and what the field holds once empty) is still open — ` +
+              `objectstack#9438. Until it lands: delete or reassign the referencing records first, or set ` +
+              `deleteBehavior:'cascade' on ${childName}.${fieldName} if the dependents should go with the parent.`
+            : `Cannot delete ${object} (${id}): ${dependents.length} dependent ${childName} record(s) reference it via ${fieldName}` +
+              `${required ? ` (${fieldName} is required, so it cannot be cleared)` : ''}. ` +
+              `Delete or reassign them first, or set deleteBehavior:'cascade' on ${childName}.${fieldName}.`;
           err.code = 'DELETE_RESTRICTED';
           err.status = 409;
           err.object = object;
