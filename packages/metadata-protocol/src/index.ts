@@ -93,6 +93,15 @@ export {
     GLOBAL_TENANT,
     ORGANIZATION_FIELD,
     ORGANIZATION_TABLE,
+    // [#9451] The durable receipt (the repair records each applied run in the
+    // existing `sys_migration` ledger) deliberately exports NOTHING from here.
+    // It has no consumer outside its own module: `backfillSeedTenancy` calls it,
+    // and `resolveSeedTenancySeam` — already exported above — carries the ledger
+    // handle on the seam. A published export with no importer is a permanent
+    // maintenance obligation bought for nothing, and an export added so a
+    // cross-package TEST can import a value is exactly the shape to catch before
+    // it ships. The well-known migration id is pinned as a literal where it is
+    // asserted, which is also what an operator copies out of the docs page.
 } from './migrations/seed-tenancy-backfill.js';
 export type { SeedTenancySeam } from './migrations/seed-tenancy-backfill.js';
 export type {
