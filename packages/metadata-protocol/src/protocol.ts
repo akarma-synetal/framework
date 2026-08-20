@@ -3300,6 +3300,34 @@ export interface MetadataMutationEvent {
 }
 
 /**
+ * [#10219] A single item reached `active` through the per-item publish door
+ * (`publishMetaItem`, i.e. `POST /api/v1/meta/:type/:name/publish`). `type` is
+ * the CANONICAL singular metadata type name — the same spelling the promoted
+ * row carries — so a subscriber can build the `'{type}/{name}'` entry the
+ * `metadata:reloaded` payload's `changed` list is made of.
+ *
+ * Subscribe via {@link ObjectStackProtocolImplementation.onMetaItemPublished}.
+ *
+ * ## Why this is NOT the existing {@link MetadataMutationEvent}
+ *
+ * The per-item publish emits BOTH. The mutation event says "a row changed" and
+ * is emitted from `runPublishSideEffects`, the phase-2 helper the BATCH door
+ * (`publishPackageDrafts`) runs once per promoted draft as well — so a
+ * subscriber that announced a full metadata reload on it would fire N times for
+ * one "publish whole app", each announce driving a complete re-sync (schema DDL,
+ * connector re-materialization, flow re-bind) for every other item in the same
+ * batch. This event is emitted ONLY by the single-item door, which is the one
+ * the batch route's own announce does not cover.
+ */
+export interface MetaItemPublishedEvent {
+    /** Canonical singular metadata type of the promoted item. */
+    type: string;
+    name: string;
+    /** Scope the promotion landed in — `null` is env-wide. */
+    organizationId: string | null;
+}
+
+/**
  * Awaited per-type mutation projector (ADR-0094). Invoked AFTER a metadata
  * mutation persists — `saveMetaItem` (draft AND active saves),
  * `publishMetaItem`, `deleteMetaItem` — and AWAITED before the write returns,
@@ -4183,6 +4211,98 @@ export class ObjectStackProtocolImplementation implements
     }
 
     /**
+     * [#10219] Per-item publish listeners — the producer-side half of the
+     * publish→re-bind signal.
+     *
+     * ## The gap this closes
+     *
+     * A metadata publish at RUNTIME leaves every boot-cached consumer holding
+     * the pre-publish view; the platform's declared signal for "re-read what
+     * you cached" is the `metadata:reloaded` lifecycle event. Two announcers
+     * existed — the metadata plugin's dev-artifact watcher, and the runtime
+     * dispatcher AFTER `POST /packages/:id/publish-drafts`. The per-item door
+     * (`POST /api/v1/meta/:type/:name/publish`) announced nothing, so a flow
+     * published one item at a time never bound its trigger until the kernel was
+     * rebuilt: measured on a cloud rig, a record-change flow published as
+     * `state='active'` produced no bind log and no execution, and only the
+     * `kernel:ready` cold-boot bind (#2560) ever picked it up.
+     *
+     * ## Why the seam is here and not at the HTTP route
+     *
+     * `publishMetaItem` is the ONE producer behind every per-item publish
+     * transport (REST today; anything else that reaches the protocol next), and
+     * the batch door's announce already lives outside the protocol. Announcing
+     * from the producer means a new transport inherits the signal instead of
+     * having to remember it — the same argument {@link onMetadataMutation}
+     * makes one method over.
+     *
+     * The protocol itself holds no kernel hook bus, so it does not announce:
+     * it NOTIFIES, and the plugin that owns this protocol instance
+     * (`ObjectQLPlugin.subscribeMetadataRebind`, which is armed for both
+     * assembly modes) translates the notification into `ctx.trigger(
+     * 'metadata:reloaded', { changed })`. That keeps the lifecycle event
+     * emitted by something that actually has the kernel, exactly as the
+     * dispatcher does for the batch door.
+     *
+     * Server-side extension only — NOT part of the ObjectStackProtocol wire
+     * contract (same status as {@link onMetadataMutation}).
+     */
+    private metaItemPublishedListeners: Array<(evt: MetaItemPublishedEvent) => void | Promise<void>> = [];
+
+    /**
+     * Subscribe to per-item publishes. Returns an unsubscribe fn.
+     *
+     * Listeners are AWAITED (unlike {@link onMetadataMutation}'s fire-and-forget
+     * fan-out) so the publish's own 2xx means "the re-bind was attempted",
+     * matching the batch door — which awaits its `metadata:reloaded` announce
+     * before answering. A caller that publishes a flow and immediately writes a
+     * record must not race the bind.
+     */
+    onMetaItemPublished(listener: (evt: MetaItemPublishedEvent) => void | Promise<void>): () => void {
+        this.metaItemPublishedListeners.push(listener);
+        return () => {
+            const i = this.metaItemPublishedListeners.indexOf(listener);
+            if (i >= 0) this.metaItemPublishedListeners.splice(i, 1);
+        };
+    }
+
+    /**
+     * Notify per-item publish listeners, awaited and isolated.
+     *
+     * Best-effort by contract: the draft is already promoted and durable when
+     * this runs, so a subscriber failure must never turn a landed publish into
+     * an error response. It IS logged — losing an in-memory re-sync is the
+     * functional degradation AGENTS.md uses as its worked example ("a trigger
+     * is not armed"), and the batch door's equivalent catch logs at `warn` for
+     * the same reason. The sentence names the consequence and the recovery
+     * rather than the internal failure alone.
+     *
+     * ⛔ The caught text is NOT copied onto the publish response. The batch door
+     * carries a `rebindError` key because its response is a batch receipt; this
+     * door's response is declared by `PublishMetaItemResponseSchema` and adding
+     * a zero-reader diagnostic key to a wire contract buys no capability
+     * (the #6955 ruling, one payload over) — the operator-facing channel is
+     * this log.
+     */
+    private async emitMetaItemPublished(evt: MetaItemPublishedEvent): Promise<void> {
+        for (const listener of this.metaItemPublishedListeners) {
+            try {
+                await listener(evt);
+            } catch (e) {
+                console.warn(
+                    `[Protocol] the post-publish re-bind announce FAILED for ${evt.type}/${evt.name} — the item IS `
+                    + `published and stored, but boot-cached consumers keep the PRE-publish view until this process `
+                    + `restarts: a newly published record-triggered flow does not bind its trigger (it will not fire), `
+                    + `an edited schedule-triggered flow keeps running its old definition, and authored hooks, actions `
+                    + `and translations are not re-synced. Nothing retries this announce. Re-publish the item once the `
+                    + `cause below is resolved (it is idempotent), or restart the process to rebuild every subscriber `
+                    + `from storage. Cause: ${e instanceof Error ? e.message : String(e)}`,
+                );
+            }
+        }
+    }
+
+    /**
      * Lazily obtain a SysMetadataRepository for the given organization.
      * Env-wide overlays (organizationId == null) share a singleton under
      * the `__env__` key.
@@ -4252,6 +4372,68 @@ export class ObjectStackProtocolImplementation implements
         if (inOrg) return requestOrgId;
         const inEnv = await this.engine.findOne('sys_metadata_history', {
             where: { organization_id: null, type: singularType, name },
+        });
+        return inEnv ? null : requestOrgId;
+    }
+
+    /**
+     * [#10219] ADR-0005 / #3115 — resolve the org scope the PENDING DRAFT of an
+     * item actually lives in, for a per-item publish whose caller may not be in
+     * that scope.
+     *
+     * This is the single-item twin of the rule `publishPackageDrafts` already
+     * follows. The batch door DISCOVERS each draft's scope (`listDrafts`
+     * surfaces a non-null-org caller's own rows AND the env-wide ones via its
+     * `$or`, and the promote targets `d.organizationId`); the per-item door
+     * DEDUCED one instead, from `organizationIdForMetaWrite(type, activeOrg)` at
+     * the REST seam. The two answers differ for exactly the types the registry
+     * declares `allowOrgOverride: true` (`view`, `dashboard`, `report`,
+     * `translation`, `email_template`): a draft authored env-wide — which is
+     * what package/AI authoring writes, and what `PUT ?mode=draft` writes when no
+     * active org is threaded — is looked up under `organization_id = <org>`,
+     * matches nothing, and answers `404 [no_draft] … nothing to publish` over a
+     * row the console's own pending-changes list is showing. Measured on a cloud
+     * rig: four AI-authored `view` drafts, visible in `sys_metadata` at
+     * `state='draft'`, all four refused by the per-item door while the batch
+     * "publish 4 changes" button promoted them.
+     *
+     * Non-org-overridable types (`object`, `flow`, …) never reached this at all:
+     * `organizationIdForMetaWrite` already answers `undefined` for them, which is
+     * why per-item publish worked for objects and flows and failed for views.
+     *
+     * Precedence is the ADR-0005 overlay order — the caller's own org shadows
+     * env-wide — so an org holding its own draft publishes THAT draft, and only
+     * an org with no draft of its own falls through to the env-wide row it was
+     * already authoring into. When NEITHER scope holds a draft the caller's own
+     * scope is returned unchanged, so a genuinely absent draft still raises the
+     * same `NO_DRAFT` refusal, from the scope the caller asked about.
+     *
+     * ⛔ This is discovery, not a tolerant fallback: it names the one row the
+     * promote will then address, and it reads DRAFT rows in `sys_metadata` (the
+     * thing being promoted) rather than the history lineage
+     * {@link resolveMetaItemOrgScope} reads — a first-ever draft of a
+     * never-published item has no lineage to resolve.
+     *
+     * Deliberately NO `catch`, for the same reason as its read-side sibling: a
+     * driver failure must fail the publish, not resolve to a scope nobody
+     * verified.
+     */
+    private async resolveDraftOrgScopeForPublish(
+        singularType: string,
+        name: string,
+        requestOrgId: string | null,
+    ): Promise<string | null> {
+        if (requestOrgId === null) return null;
+        // The package dimension is deliberately absent from both probes: the
+        // per-item door names no package, so `promoteDraft` resolves the draft
+        // with "match any package" and these reads must ask the same question
+        // it will (see `SysMetadataRepository.whereFor`).
+        const inOrg = await this.engine.findOne('sys_metadata', {
+            where: { organization_id: requestOrgId, type: singularType, name, state: 'draft' },
+        });
+        if (inOrg) return requestOrgId;
+        const inEnv = await this.engine.findOne('sys_metadata', {
+            where: { organization_id: null, type: singularType, name, state: 'draft' },
         });
         return inEnv ? null : requestOrgId;
     }
@@ -14059,6 +14241,26 @@ export class ObjectStackProtocolImplementation implements
         // rewrites it on upgrade). Different input class, different map; see
         // {@link canonicalMetaType}'s header for why the two are not one fold.
         request = canonicalizeMetaRequestType(request);
+        // [#10219] Then resolve WHICH SCOPE's draft this publish means. The
+        // caller states the scope it is IN; the draft may live env-wide. See
+        // {@link resolveDraftOrgScopeForPublish} — the single-item twin of the
+        // #3115 rule `publishPackageDrafts` already follows.
+        //
+        // Placed after the type fold (the probe must name the canonical stored
+        // `type`) and before every gate below, so the ADR-0010 lock check, the
+        // #6190 org-scoped-write refusal and the promote all judge ONE scope —
+        // the one the row is actually in. Resolving it later would gate against
+        // a partition the promotion never touches.
+        {
+            const singular = PLURAL_TO_SINGULAR[request.type] ?? request.type;
+            const resolvedOrgId = await this.resolveDraftOrgScopeForPublish(
+                singular, request.name, request.organizationId ?? null,
+            );
+            if (resolvedOrgId !== (request.organizationId ?? null)) {
+                const { organizationId: _requested, ...rest } = request;
+                request = resolvedOrgId === null ? rest : { ...rest, organizationId: resolvedOrgId };
+            }
+        }
         // [#8594] The refusal's own row is written HERE, by the route that owns
         // the (absent) transaction — see `promoteDraftForPublish`'s header. This
         // site has no transaction of its own, so recording it in the `catch` is
@@ -14131,6 +14333,19 @@ export class ObjectStackProtocolImplementation implements
         if (effects.seedApplied) response.seedApplied = effects.seedApplied;
         if (effects.materializeApplied) response.materializeApplied = effects.materializeApplied;
         if (effects.projectionApplied) response.projectionApplied = effects.projectionApplied;
+        // [#10219] LAST, and awaited: tell the host that ONE item went live, so
+        // it can announce `metadata:reloaded` and boot-cached consumers re-sync
+        // without a restart — the parity the batch door has had since #2576.
+        // After the side effects because a subscriber re-reads the protocol
+        // (`resyncFlowsFromProtocol` pulls `getMetaItems({type:'flow'})`), and
+        // it must see the finished state: the active row, its table, and any
+        // materialized rows. Before the return so the caller's 2xx means the
+        // re-bind was attempted, not merely queued.
+        await this.emitMetaItemPublished({
+            type: singularType,
+            name: request.name,
+            organizationId: orgId,
+        });
         return response;
     }
 
