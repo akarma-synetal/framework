@@ -148,10 +148,13 @@
 //   node scripts/check-cross-package-test-inputs.mjs --self-test
 
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve, relative, dirname, sep, isAbsolute } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import process from 'node:process';
+
+import { isEntrypoint } from './invoked-as.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..');
@@ -1882,6 +1885,31 @@ function selfTest() {
     unioned.length > 0 && unioned.every((i) => existsSync(resolve(REPO_ROOT, i.path))),
   );
 
+  // ── the entry guard, driven for real ────────────────────────────────────
+  //
+  // This module EXPORTS helpers, and the dispatch below used to run on IMPORT:
+  // `await import(...)` printed this gate's verdict into the importer's stdout
+  // and, on an unhappy tree, called `process.exit(1)` -- handing a consumer that
+  // asked for `globToRegExp` this gate's verdict as its own exit status.
+  // `check-examples-live-imports.mjs` hand-copied the helper rather than pay it.
+  //
+  // A spawned child is the only honest witness: the guard's answer depends on
+  // what node puts in `process.argv[1]`, which cannot be modelled in-process.
+  // Without this case the guard can be deleted as quietly as it was missing.
+  const importProbe = spawnSync(
+    process.execPath,
+    ['--input-type=module', '-e', `await import(${JSON.stringify(pathToFileURL(fileURLToPath(import.meta.url)).href)});\nconsole.log('ALIVE');`],
+    { encoding: 'utf8' },
+  );
+  ok(
+    'importing this module prints NOTHING -- the dispatch is behind the entry guard',
+    (importProbe.stdout || '').trim() === 'ALIVE' && (importProbe.stderr || '').trim() === '',
+  );
+  ok(
+    'importing this module does not exit the importer -- it survives to run its own code',
+    importProbe.status === 0 && (importProbe.stdout || '').includes('ALIVE'),
+  );
+
   const failed = cases.filter((c) => !c.cond);
   for (const c of cases) console.log(`${c.cond ? 'ok  ' : 'FAIL'} ${c.label}`);
   if (failed.length) {
@@ -1891,19 +1919,37 @@ function selfTest() {
   console.log(`\nAll ${cases.length} self-test cases passed.`);
 }
 
-const argv = process.argv.slice(2);
-if (argv.includes('--self-test')) selfTest();
-else if (argv.includes('--list-escapes')) {
-  for (const [name, info] of [...findEscapingPackages()].sort()) {
-    console.log(`${name}  (${info.dir})`);
-    for (const t of info.tests) console.log(`    ${t}`);
-  }
-} else if (argv.includes('--union-into')) {
-  const listPath = argv[argv.indexOf('--union-into') + 1];
-  const changedPath = argv[argv.indexOf('--changed') + 1];
-  if (!listPath || !changedPath) {
-    console.error('usage: check-cross-package-test-inputs.mjs --union-into <turbo-ls.json> --changed <file>');
-    process.exit(2);
-  }
-  unionInto(listPath, changedPath);
-} else verify();
+// ---------------------------------------------------------------------------
+// Entry guard -- this module EXPORTS helpers, so the dispatch must not run on
+// import.
+//
+// Until the guard was added, the `else verify()` fallthrough below fired on
+// `await import(...)` as well as on invocation. Importing the module for
+// `globToRegExp` or `findEscapingPackages` printed this gate's verdict to the
+// importer's stdout, and on an unhappy tree called `process.exit(1)` -- so a
+// consumer inherited THIS gate's verdict as its own exit status, having asked
+// only for a helper. `check-examples-live-imports.mjs` paid that cost: it
+// hand-copied `globToRegExp` rather than import it, naming this load-time gate
+// as the reason.
+//
+// `isEntrypoint` is the repo's one answer to "was I run?" -- see
+// `scripts/invoked-as.mjs` for why the hand-typed spellings are wrong, and
+// `check:entry-guard`, which fails any other spelling in `scripts/**`.
+if (isEntrypoint(import.meta.url)) {
+  const argv = process.argv.slice(2);
+  if (argv.includes('--self-test')) selfTest();
+  else if (argv.includes('--list-escapes')) {
+    for (const [name, info] of [...findEscapingPackages()].sort()) {
+      console.log(`${name}  (${info.dir})`);
+      for (const t of info.tests) console.log(`    ${t}`);
+    }
+  } else if (argv.includes('--union-into')) {
+    const listPath = argv[argv.indexOf('--union-into') + 1];
+    const changedPath = argv[argv.indexOf('--changed') + 1];
+    if (!listPath || !changedPath) {
+      console.error('usage: check-cross-package-test-inputs.mjs --union-into <turbo-ls.json> --changed <file>');
+      process.exit(2);
+    }
+    unionInto(listPath, changedPath);
+  } else verify();
+}
