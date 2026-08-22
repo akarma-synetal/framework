@@ -112,11 +112,24 @@
  *       the remainder) never landed (#8683). Delivery is read from merged PR
  *       bodies with H7's code-stripped extractors (`Part of #N`, or a closing
  *       keyword bound to `#N` — either way an OPEN dispatched card named by a
- *       merged PR is a half-state, whichever mechanism failed). Live mode
+ *       merged PR is a half-state, whichever mechanism failed), and — for the
+ *       bodies that declare NO delivery at all — from the PR's own branch name
+ *       (#11036: a merged PR whose body said only `Refs #10757` left its card
+ *       dispatched and unreported for ~22h in a sweep that got six other H8
+ *       rows right). The precedence is deliberate and the widening's whole
+ *       safety margin; `prDeliversCard` carries the argument. Live mode
  *       feeds H8 a bounded window of recently merged PRs, so it is a patrol
  *       accelerator, never an exhaustive audit: a delivery older than the
  *       window is invisible, and the finding clears when the paired write
  *       lands, not when the PR ages out.
+ *       H8 is ALSO handed the open-PR list the sweep already holds (#10468):
+ *       a card delivered in halves keeps `pm:dispatched` legitimately while
+ *       its last half is open, and the row used to fire on every sweep until
+ *       that half landed — prescribing a DESTRUCTIVE de-labelling against the
+ *       most active card on the board. That case now emits a distinct quieter
+ *       sentence that names both sides and says the label is correct, rather
+ *       than falling silent: silence would lose the genuine #8683 case where
+ *       the last half is later ABANDONED. See the predicate.
  *   H9  `pm:on-hold` without a machine-fireable `Restart-when:` line in
  *       EITHER channel — the state model (post 2026-08-16 ruling) makes the
  *       hold state legal
@@ -378,6 +391,22 @@
  *       deliberately not imported by the blocking gate that reuses H7's
  *       predicate: widening the class must not silently widen a check that
  *       fails builds.
+ *   H22 a CLOSED card still carrying a `pm:*` STATE label — the one item here
+ *       that reads closed issues, and the reason it has to (#10688). H8's
+ *       subject is a write that has not happened yet, but the card is usually
+ *       closed by the same merge that discharges the PR, so whether H8 ever
+ *       fired was decided by a race it normally loses: once the card closes,
+ *       no run looks at it again and the duty is discharged by disappearance.
+ *       Measured at filing: 129 of the 500 most recently updated closed cards
+ *       carried a live `pm:` label, 118 of them `pm:dispatched`. Direction A of
+ *       that card — ONE bounded closed reader, every other collector still
+ *       open-only, so the race closes without widening the sweep. The window is
+ *       the stated boundary and it is load-bearing here: a 2026-08-22 re-measure
+ *       paged past 500 closed `pm:dispatched` carriers repo-wide, so an
+ *       unbounded read would bury every other item under one-time historical
+ *       residue. Recent residue is a live duty; the deep tail is a backfill
+ *       question. Report-only like the rest — the remedy is a label write a
+ *       seat performs, never one this script performs.
  *
  * ## The close mechanism, measured (#8293)
  *
@@ -1140,29 +1169,130 @@ export function h7PartOfWithClosingKeyword(pr) {
 // ---------------------------------------------------------------------------
 
 /**
+ * The card number a protocol dev-branch NAMES — `claude/issue-<n>-<slug>` — as
+ * a string, or null when the ref is not that shape.
+ *
+ * Anchored end to end, and deliberately a second READER of one shape rather
+ * than a second shape: `CLAIM_BRANCH_SHAPE` is the same pattern spelled for
+ * `matchAll` over prose, and the self-test pins the two against each other so a
+ * future change to the branch convention cannot move one reader and leave the
+ * other answering the old way. (It is not literally that constant because a
+ * shared `g` regex carries `lastIndex` between callers — the warning on it.)
+ */
+export function branchNameTarget(ref) {
+  const m = /^claude\/issue-(\d+)-[A-Za-z0-9][A-Za-z0-9._-]*$/.exec(String(ref ?? '').trim());
+  return m ? m[1] : null;
+}
+
+/**
+ * Does this PR deliver card `n`? The one delivery relation H8 reads, shared by
+ * its merged side and its open side so the two can never drift apart.
+ *
+ * Two channels, in a deliberate PRECEDENCE rather than a disjunction:
+ *
+ *  1. **The body** — `Part of #N`, or a closing keyword bound to `#N`, read
+ *     through `stripMarkdownCode` (a body QUOTING either spelling in backticks
+ *     does not deliver). Bound per issue number exactly like H7.
+ *  2. **The branch name**, and ONLY when the body declares no delivery at all.
+ *
+ * ## Why the branch name is a FALLBACK and not a third `||` term
+ *
+ * Every dev branch here is `claude/issue-<n>-<slug>` by protocol, and every PR
+ * row already carries `head.ref` — so a delivery whose body spells the relation
+ * some third way (the measured specimen: a merged PR whose body said only
+ * `Refs #10757`, leaving its card dispatched and invisible for ~22h while the
+ * same sweep reported six other H8 rows correctly) is recoverable at no API
+ * cost. That is the widening this channel exists for.
+ *
+ * But widening the delivery relation has a cost the fix must pay, and reading
+ * the branch as merely one more disjunct does not pay it: a branch cut for card
+ * N and then RE-SCOPED — the body now delivering a different card — would be
+ * counted as delivering N forever, on the authority of a name nobody updated.
+ * The body is the channel an author actually maintains; the branch name is
+ * fixed at `git worktree add` time and is evidence only when nothing better
+ * exists. So a body that declares ANY delivery is authoritative, and the branch
+ * name is consulted only for the bodies that declare none — which is exactly
+ * the population the specimen came from, and no other.
+ */
+export function prDeliversCard(pr, n) {
+  const target = String(n);
+  const body = pr?.body ?? '';
+  const partOf = partOfTargets(body);
+  const closing = closingKeywordTargets(body);
+  if (partOf.has(target) || closing.has(target)) return true;
+  // The body spoke — about some OTHER card. A stale branch name does not
+  // overrule it (the re-scope case above).
+  if (partOf.size > 0 || closing.size > 0) return false;
+  return branchNameTarget(pr?.head?.ref) === target;
+}
+
+/**
  * H8 — null when clean, else the finding sentence.
  *
- * A PR "delivers" card N when its body declares `Part of #N` or binds a
- * closing keyword to `#N`, read through `stripMarkdownCode` (a body QUOTING
- * either spelling in backticks does not deliver). Only `merged_at`-set PRs
- * count — closed-unmerged is an abandoned attempt, not a delivery. Bound per
- * issue number exactly like H7.
+ * Delivery is `prDeliversCard` (body first, branch name as the fallback its
+ * docblock justifies). Only `merged_at`-set PRs count on the merged side —
+ * closed-unmerged is an abandoned attempt, not a delivery.
+ *
+ * ## The open side, and why this row DOWNGRADES rather than falls silent
+ *
+ * `openPrs` is the open-PR list the sweep already holds (its summary line
+ * reports it), so consulting it costs no request. Without it H8 could not ask
+ * the question that decides the answer — *is there ALSO an unmerged PR
+ * delivering this card?* — and on a card delivered in halves it fired on every
+ * sweep from the first half's merge until the last half landed, pointing at the
+ * card whose remaining work was most active and prescribing a DESTRUCTIVE write
+ * against it: "drop `pm:dispatched`". A reader who followed that row de-labelled
+ * a card with an open PR, which then read as un-dispatched and was liable to be
+ * re-dispatched — two agents on one card, the exact outcome the claim protocol
+ * exists to prevent (#10468, measured on #9834 + open PR #10226).
+ *
+ * Silence would fix the harm and buy a new one, and the card's caveat says so:
+ * it loses the genuine #8683 case where the last half is later ABANDONED — the
+ * merged half really is delivered, the card really is stale, and nothing would
+ * ever say so again. So the half-delivered case gets its own quieter sentence
+ * instead: it names both sides, states the counts, and — the whole point —
+ * says `pm:dispatched` is CORRECT here and must not be dropped. The destructive
+ * prescription fires only when every delivering PR has merged.
+ *
+ * Drafts are deliberately NOT filtered out of the open side: the measured
+ * specimen (#10226) was `draft: true`, and a draft delivering half is exactly
+ * the live work this row must not step on.
  */
-export function h8MergedPrStillDispatched(issue, mergedPrs) {
+export function h8MergedPrStillDispatched(issue, mergedPrs, openPrs) {
   if (!labelNames(issue).includes('pm:dispatched')) return null;
   const n = String(issue.number);
   const delivering = [];
   for (const pr of mergedPrs ?? []) {
     if (!pr?.merged_at) continue;
-    const body = pr.body ?? '';
-    if (partOfTargets(body).has(n) || closingKeywordTargets(body).has(n)) {
-      delivering.push(pr);
-    }
+    if (prDeliversCard(pr, n)) delivering.push(pr);
   }
   if (delivering.length === 0) return null;
   const list = delivering
     .map((p) => `#${p.number} (merged ${String(p.merged_at).slice(0, 10)})`)
     .join(', ');
+
+  const stillOpen = [];
+  for (const pr of openPrs ?? []) {
+    // A merged row appearing in the open list is not an outstanding half; the
+    // merged side above already judged it.
+    if (pr?.merged_at) continue;
+    if (prDeliversCard(pr, n)) stillOpen.push(pr);
+  }
+  if (stillOpen.length > 0) {
+    const openList = stillOpen
+      .map((p) => `#${p.number}${p.draft ? ' (draft)' : ''}`)
+      .join(', ');
+    const total = delivering.length + stillOpen.length;
+    return (
+      `delivered IN PART — ${delivering.length} of ${total} delivering PR(s) merged ` +
+      `(${list}), while ${openList} is still OPEN against this card. ` +
+      `\`pm:dispatched\` is CORRECT here and must NOT be dropped: the card is not ` +
+      `finished, and de-labelling it would read as un-dispatched work and invite a ` +
+      `second seat onto it. No action — this row exists so an abandoned last half is ` +
+      `still visible, not to prescribe one.`
+    );
+  }
+
   return (
     `delivering PR ${list} is MERGED but the card still carries \`pm:dispatched\` — ` +
     `the merge's paired write never landed. Drop \`pm:dispatched\` and re-grade the ` +
@@ -3127,6 +3257,86 @@ export function h21NegatedClosingKeyword(pr) {
 }
 
 // ---------------------------------------------------------------------------
+// H22 — a CLOSED card still carrying a `pm:*` STATE label (#10688).
+//
+// Every other item here is scoped to open issues by construction, and for most
+// of them that is right. It is a gap for H8 specifically, because H8's whole
+// subject is a write that has not happened yet — and the card is usually closed
+// by the same merge that discharges the PR, often by a `Closes #N` in the same
+// instant. So whether H8 ever got to fire was decided by a RACE: if the patrol
+// happened to run between "PR merged" and "card closed" the finding was raised;
+// if the card closed first — the normal path — the duty was silently discharged
+// by disappearance, because no run would ever look at that card again.
+//
+// Measured at filing (2026-08-21, the 500 most recently updated closed issues):
+// 129 closed cards still carried a live `pm:` label, 118 of them
+// `pm:dispatched` — the signature of exactly the write H8 was built to catch,
+// unmet at scale because the card closed first.
+//
+// This is direction A of that card: keep the open-only default for every other
+// collector and add ONE bounded closed reader, so the race closes without
+// widening the sweep. It is the direction matching what H8 already claims to be
+// for. The counterargument — that labels on a closed card are historical
+// metadata — does not dispose of it: `pm:dispatched` is not descriptive, it is
+// a claim of in-flight-ness, and this file's own H8 treats leaving it set as a
+// defect worth a named rule. If that is a defect at 09:00 while the card is
+// open and not a defect at 09:01 once it closes, the rule is about the board's
+// tidiness rather than about the duty, and H8's text says otherwise.
+// ---------------------------------------------------------------------------
+
+/**
+ * The `pm:*` labels that are STATE CLAIMS, and therefore residue on a closed
+ * card. Exactly the five the #10688 census measured.
+ *
+ * ⚠️ This is deliberately NOT `PM_STATE_LABELS` (H13's), and the two must not
+ * be unified on the strength of the similar name. H13 asks "does any label make
+ * this card visible to a named reader?", so its list carries `finding`,
+ * `needs-user-decision`, `pm:epic` and `pm:seat` and deliberately OMITS
+ * `pm:blocking`. H22 asks a different question — "does this label CLAIM work is
+ * in flight?" — and the answers diverge in both directions: `pm:blocking` is
+ * such a claim (it is what the lane selection order ranks on) while `finding`
+ * and `needs-user-decision` are perfectly good states for a closed card to have
+ * ended in. Sharing one list would make H22 report every closed finding card on
+ * the board and miss the blocking-cache residue entirely.
+ *
+ * Three `pm:*` labels are excluded here because they are not claims that work
+ * is in flight:
+ *
+ *   `pm:seat`     a seat-registry post's TYPE sticker — the protocol carrier
+ *                 itself, whose label is what makes the seat list page a board.
+ *                 A closed seat card keeps it as identity, not as state.
+ *   `pm:epic`     a delegation marker on a parent, the same kind of identity.
+ *   `pm:retriage` a request for re-judgement. Plausibly residue too, and it did
+ *                 not appear in the census — so it stays out until something
+ *                 measures it, rather than being widened in on a hunch. The
+ *                 set is one edit away when that measurement exists.
+ */
+export const PM_RESIDUE_LABELS = ['pm:dispatched', 'pm:queue', 'pm:blocked', 'pm:on-hold', 'pm:blocking'];
+
+/**
+ * H22 — null when the closed card is clean, else the finding sentence.
+ *
+ * Gated on the card being CLOSED: handed an open issue it returns null, so the
+ * predicate cannot double-report the population every other item already reads.
+ * That gate is the predicate's own, not the caller's, because it is the one
+ * thing separating this row from a restatement of H3.
+ */
+export function h22ClosedCardPmResidue(issue) {
+  if (issue?.state !== 'closed') return null;
+  const residue = labelNames(issue ?? {}).filter((l) => PM_RESIDUE_LABELS.includes(l));
+  if (residue.length === 0) return null;
+  const list = residue.map((l) => `\`${l}\``).join(', ');
+  const reason = issue.state_reason ? ` (closed \`${issue.state_reason}\`)` : '';
+  return (
+    `card is CLOSED${reason} but still carries ${list} — a state label is a claim that work ` +
+    `is in flight, and the card left the board without the paired write that clears it. ` +
+    `H8 would have flagged this while the card was open; it closed first, which is the ` +
+    `normal path rather than the rare one. Strip the \`pm:*\` state label(s); no other ` +
+    `write is owed, the card is already closed.`
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Report rendering — pure over (findings, counts), so `--self-test` pins both
 // media offline. The live sweep below picks a renderer and prints it; nothing
 // about WHAT is swept or WHICH predicates fire depends on the format.
@@ -3175,7 +3385,7 @@ export function isLoudFinding(message) {
  * without them still renders a sentence, never the string `undefined`.
  *
  * @param {{ repo: string, issues: number, unscoped: number, prs: number,
- *   merged: number, conflictProbed?: number, conflictCandidates?: number,
+ *   merged: number, closed?: number, conflictProbed?: number, conflictCandidates?: number,
  *   holdProbed?: number, holdCandidates?: number, fallbackProbed?: number,
  *   fallbackCandidates?: number, restartProbed?: number,
  *   restartCandidates?: number, blockerResolved?: number,
@@ -3220,6 +3430,8 @@ export function summaryLine(counts, findingCount) {
     `issue(s) in the unscoped pass (H13–H15, H18), ${counts.prs} open PR(s) ` +
     `(merge state read on ${probed} of ${candidates} H16 candidate(s)) ` +
     `and ${counts.merged} recently-merged PR(s) in ${counts.repo} — ${findingCount} half-state(s) found. ` +
+    `H22 read ${counts.closed ?? 0} recently-closed issue(s) for \`pm:*\` state residue (bounded window; ` +
+    `older closed carriers are outside it by design). ` +
     `Hold comments read on ${held} of ${holdCandidates} H17 candidate(s). ` +
     `\`Blocked-by:\` comment fallback read on ${fbProbed} of ${fbCandidates} candidate(s)` +
     `${fbProbed < fbCandidates ? " — H14's stale direction is SUSPENDED for this sweep (the index is known incomplete)" : ''}. ` +
@@ -3999,6 +4211,8 @@ async function sweep(options = {}) {
   const seenPrs = new Map();
   const seenMerged = new Map();
   const seenUnscoped = new Map();
+  // H22's bounded closed-card window (#10688) — the one closed-issue read here.
+  const seenClosed = new Map();
   // H16's per-row fetch is the one input that can fail partially, so its
   // tally rides out of the sweep and into the summary line (see `summaryLine`).
   const stats = {
@@ -4020,9 +4234,9 @@ async function sweep(options = {}) {
   // summary line the same `read X of Y`.
   const hold = { entries: [], candidates: 0, probed: 0 };
   try {
-    await sweepInto(findings, seen, seenPrs, seenMerged, seenUnscoped, stats, hold);
+    await sweepInto(findings, seen, seenPrs, seenMerged, seenUnscoped, seenClosed, stats, hold);
   } catch (err) {
-    err.sweptSoFar = seen.size + seenPrs.size + seenMerged.size + seenUnscoped.size;
+    err.sweptSoFar = seen.size + seenPrs.size + seenMerged.size + seenUnscoped.size + seenClosed.size;
     throw err;
   }
 
@@ -4033,6 +4247,7 @@ async function sweep(options = {}) {
     unscoped: seenUnscoped.size,
     prs: seenPrs.size,
     merged: seenMerged.size,
+    closed: seenClosed.size,
     conflictCandidates: stats.conflictCandidates,
     conflictProbed: stats.conflictProbed,
     holdCandidates: hold.candidates,
@@ -4092,6 +4307,34 @@ async function listRecentlyMergedPullRequests() {
 }
 
 /**
+ * The bounded closed-card window H22 reads (#10688) — most recently UPDATED
+ * closed issues, capped at two pages, the same `sort=updated` convention and
+ * the same quota decision as the merged-PR window above.
+ *
+ * The cap is the item's stated boundary, and here it carries more weight than
+ * usual: the label-scoped population of closed carriers is very large (a
+ * 2026-08-22 re-measure paged past 500 closed `pm:dispatched` carriers alone
+ * and was still going, because the label has been applied since the protocol
+ * began and dropped only sporadically). Reporting all of them would drown every
+ * other item in one-time historical residue. So this window deliberately
+ * reports the RECENT residue — the population where the paired write is still
+ * a live duty someone remembers — and the deep tail is a backfill question,
+ * not a patrol question. `state=closed` is the ONLY closed-issue read in this
+ * file; every other collector stays open-only by construction.
+ */
+async function listRecentlyClosedIssues() {
+  const out = [];
+  for (let page = 1; page <= 2; page++) {
+    const batch = await rest(
+      `/repos/${OWNER_REPO}/issues?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`,
+    );
+    out.push(...batch.filter((i) => !i.pull_request));
+    if (batch.length < 100) break;
+  }
+  return out;
+}
+
+/**
  * The unscoped listing H13 needs: the domain-without-pm-state shape is
  * DEFINED by the absence of every label the listings below key on, so no
  * label page can ever return it — the very property that hides it from seat
@@ -4110,7 +4353,7 @@ async function listAllOpenIssues() {
   return out;
 }
 
-async function sweepInto(findings, seen, seenPrs, seenMerged, seenUnscoped, stats = {}, hold = null) {
+async function sweepInto(findings, seen, seenPrs, seenMerged, seenUnscoped, seenClosed, stats = {}, hold = null) {
   for (const label of ['pm:dispatched', 'pm:queue', 'pm:blocked', 'pm:seat', 'pm:on-hold', 'priority:p0']) {
     for (const issue of await listIssues(label)) seen.set(issue.number, issue);
   }
@@ -4316,11 +4559,27 @@ async function sweepInto(findings, seen, seenPrs, seenMerged, seenUnscoped, stat
 
   // H8 — one bounded merged-PR listing (window note at the helper), matched
   // against the already-collected open `pm:dispatched` cards; no per-card fetch.
+  //
+  // The open-PR list is handed in alongside it (#10468). It is already in hand
+  // from the H7/H12/H21 pass above, so the half-delivered question costs no
+  // request — and without it this row prescribed a destructive label drop
+  // against cards whose remaining half was still open.
   for (const pr of await listRecentlyMergedPullRequests()) seenMerged.set(pr.number, pr);
   const mergedWindow = [...seenMerged.values()];
+  const openWindow = [...seenPrs.values()];
   for (const issue of seen.values()) {
-    const stale = h8MergedPrStillDispatched(issue, mergedWindow);
+    const stale = h8MergedPrStillDispatched(issue, mergedWindow, openWindow);
     if (stale) findings.push([issue, 'H8', stale]);
+  }
+
+  // H22 — the one closed-issue read in this file (#10688). Kept in its own
+  // collection for the same reason H13's unscoped listing is: the open-only
+  // default of every other collector stays exactly as it was, and the summary
+  // line can say what this pass covered on its own terms.
+  for (const issue of await listRecentlyClosedIssues()) {
+    seenClosed.set(issue.number, issue);
+    const residue = h22ClosedCardPmResidue(issue);
+    if (residue) findings.push([issue, 'H22', residue]);
   }
 
   // H13 — the one item whose population no label page can list (note at
@@ -5027,6 +5286,225 @@ function selfTest() {
   );
   t('H8: empty merged window -> clean', h8MergedPrStillDispatched(dispatched(4321), []), null);
   t('H8: missing merged window -> clean', h8MergedPrStillDispatched(dispatched(4321), undefined), null);
+
+  // -- H8: the branch-name fallback (#11036) ---------------------------------
+  // The card's ⚠️ is the load-bearing clause: this WIDENS the delivery
+  // relation, so BOTH directions are pinned — the hit must report, and a
+  // re-scoped branch must not.
+  const onBranch = (number, body, ref, merged_at = '2026-08-21T14:00:28Z') => ({
+    number,
+    body,
+    merged_at,
+    head: { ref },
+  });
+
+  // Direction 1 — the measured specimen's shape: merged, body carries NEITHER
+  // recognised spelling (`Refs #N` is not one), branch named for the card.
+  t(
+    'H8 branch: a `Refs #N`-only body delivers via its branch name',
+    typeof h8MergedPrStillDispatched(
+      dispatched(10757),
+      [onBranch(10824, 'Refs #10757', 'claude/issue-10757-dedupe-per-request-queries')],
+    ),
+    'string',
+  );
+  t(
+    'H8 branch: …and the finding names the delivering PR',
+    h8MergedPrStillDispatched(
+      dispatched(10757),
+      [onBranch(10824, 'Refs #10757', 'claude/issue-10757-dedupe-per-request-queries')],
+    ).includes('#10824'),
+    true,
+  );
+  // An empty body is the same population — nothing declared, so the branch is
+  // the only evidence there is.
+  t(
+    'H8 branch: an empty body delivers via its branch name',
+    typeof h8MergedPrStillDispatched(dispatched(4321), [onBranch(4400, '', 'claude/issue-4321-x')]),
+    'string',
+  );
+
+  // Direction 2 — the RE-SCOPED branch, the false-fire this widening could
+  // otherwise buy. Branch still named for 4321; body now delivers 9999. The
+  // body is the channel an author maintains, so it wins and 4321 stays clean.
+  t(
+    'H8 branch: a re-scoped branch does NOT deliver the card it is NAMED for',
+    h8MergedPrStillDispatched(dispatched(4321), [onBranch(4400, 'Part of #9999', 'claude/issue-4321-x')]),
+    null,
+  );
+  t(
+    'H8 branch: …and the card the re-scoped body DOES name still reports',
+    typeof h8MergedPrStillDispatched(dispatched(9999), [onBranch(4400, 'Part of #9999', 'claude/issue-4321-x')]),
+    'string',
+  );
+  t(
+    'H8 branch: a closing keyword for another card also suppresses the fallback',
+    h8MergedPrStillDispatched(dispatched(4321), [onBranch(4400, 'Fixes #9999', 'claude/issue-4321-x')]),
+    null,
+  );
+  // …and the widening does not reach past the merged/unmerged line, nor past
+  // the label gate, nor onto a non-protocol branch name.
+  t(
+    'H8 branch: a closed-UNMERGED PR on the card branch is still not a delivery',
+    h8MergedPrStillDispatched(dispatched(4321), [onBranch(4400, '', 'claude/issue-4321-x', null)]),
+    null,
+  );
+  t(
+    'H8 branch: a non-protocol branch name delivers nothing',
+    h8MergedPrStillDispatched(dispatched(4321), [onBranch(4400, '', 'feat/some-hand-cut-branch')]),
+    null,
+  );
+  t(
+    'H8 branch: a branch named for a DIFFERENT card is clean',
+    h8MergedPrStillDispatched(dispatched(4321), [onBranch(4400, '', 'claude/issue-9999-x')]),
+    null,
+  );
+  t('H8 branch: a PR row with no head at all does not crash', h8MergedPrStillDispatched(dispatched(4321), [mergedPr(4400, '')]), null);
+
+  // The extractor itself, and its agreement with the prose-scanning constant —
+  // one branch SHAPE, two readers, pinned together so a convention change
+  // cannot move only one of them.
+  t('H8 branch: the target is the issue number as a string', branchNameTarget('claude/issue-10757-dedupe'), '10757');
+  t('H8 branch: surrounding whitespace is tolerated', branchNameTarget('  claude/issue-1-a  '), '1');
+  t('H8 branch: a slug with dots and underscores survives', branchNameTarget('claude/issue-1-a.b_c-d'), '1');
+  t('H8 branch: a slugless branch is not the protocol shape', branchNameTarget('claude/issue-1'), null);
+  t('H8 branch: a trailing path segment is not the protocol shape', branchNameTarget('claude/issue-1-a/b'), null);
+  t('H8 branch: a prefixed ref is not the protocol shape', branchNameTarget('refs/heads/claude/issue-1-a'), null);
+  t('H8 branch: `main` yields nothing', branchNameTarget('main'), null);
+  t('H8 branch: a missing ref yields nothing', branchNameTarget(undefined), null);
+  t(
+    'H8 branch: the anchored reader agrees with CLAIM_BRANCH_SHAPE on the protocol shape',
+    [...'claude/issue-10757-dedupe-per-request-queries'.matchAll(CLAIM_BRANCH_SHAPE)][0][0],
+    'claude/issue-10757-dedupe-per-request-queries',
+  );
+
+  // -- H8: the open-PR side — a card delivered in HALVES (#10468) ------------
+  // The measured specimen: #9834's duration half merged as #10004 while its
+  // error-counter half sat OPEN as draft #10226. The old row fired every sweep
+  // and prescribed dropping `pm:dispatched` off a card with live work.
+  const openHalf = (number, body, draft = false) => ({ number, body, draft, merged_at: null });
+  const halves = (openPrs) =>
+    h8MergedPrStillDispatched(dispatched(9834), [mergedPr(10004, 'Part of #9834')], openPrs);
+
+  t('H8 open: a half-delivered card still reports', typeof halves([openHalf(10226, 'Part of #9834', true)]), 'string');
+  // The whole point of the downgrade: the destructive prescription must not
+  // fire on a card whose remaining half is open.
+  t(
+    'H8 open: …and does NOT prescribe dropping the label',
+    halves([openHalf(10226, 'Part of #9834', true)]).includes('Drop `pm:dispatched`'),
+    false,
+  );
+  t(
+    'H8 open: …and says the label is CORRECT here',
+    halves([openHalf(10226, 'Part of #9834', true)]).includes('must NOT be dropped'),
+    true,
+  );
+  t('H8 open: …and names the open half', halves([openHalf(10226, 'Part of #9834', true)]).includes('#10226'), true);
+  t('H8 open: …and the merged half too', halves([openHalf(10226, 'Part of #9834', true)]).includes('#10004'), true);
+  t('H8 open: …and counts them, N of M', halves([openHalf(10226, 'Part of #9834', true)]).includes('1 of 2'), true);
+  // A draft open half is the specimen's own shape — never filtered out.
+  t('H8 open: …and marks the open half as a draft', halves([openHalf(10226, 'Part of #9834', true)]).includes('(draft)'), true);
+  t('H8 open: a NON-draft open half counts identically', typeof halves([openHalf(10226, 'Part of #9834', false)]), 'string');
+
+  // …and the row it replaces is unchanged whenever every deliverer HAS merged —
+  // the genuine #8683 case, which must keep its prescription.
+  t(
+    'H8 open: no open deliverer -> the destructive prescription still fires',
+    halves([]).includes('Drop `pm:dispatched`'),
+    true,
+  );
+  t('H8 open: a missing open list is the pre-#10468 reading', halves(undefined).includes('Drop `pm:dispatched`'), true);
+  t(
+    'H8 open: an open PR delivering a DIFFERENT card does not downgrade the row',
+    halves([openHalf(10226, 'Part of #9999')]).includes('Drop `pm:dispatched`'),
+    true,
+  );
+  // No merged deliverer at all is still clean — the open side never MANUFACTURES
+  // a row, it only softens one the merged side already raised.
+  t(
+    'H8 open: an open deliverer with no merged half is clean',
+    h8MergedPrStillDispatched(dispatched(9834), [], [openHalf(10226, 'Part of #9834')]),
+    null,
+  );
+  // The open side reads delivery through the SAME relation, branch fallback
+  // included — a `Refs #N` open half is as live as a `Part of #N` one.
+  t(
+    'H8 open: the branch-name fallback applies to the open side too',
+    halves([{ number: 10226, body: 'Refs #9834', draft: false, merged_at: null, head: { ref: 'claude/issue-9834-error-counter' } }]).includes('must NOT be dropped'),
+    true,
+  );
+  // …and its re-scope guard travels with it.
+  t(
+    'H8 open: a re-scoped open branch does not soften the row',
+    halves([{ number: 10226, body: 'Part of #9999', draft: false, merged_at: null, head: { ref: 'claude/issue-9834-x' } }]).includes('Drop `pm:dispatched`'),
+    true,
+  );
+  // A merged row appearing in the open list is not an outstanding half.
+  t(
+    'H8 open: a merged row in the open list is not an open half',
+    halves([{ number: 10226, body: 'Part of #9834', merged_at: '2026-08-20T00:00:00Z' }]).includes('Drop `pm:dispatched`'),
+    true,
+  );
+
+  // -- H22: a CLOSED card still carrying a `pm:*` state label (#10688) -------
+  const closedCard = (labels, state_reason = 'completed') => ({
+    ...issue(labels),
+    number: 8531,
+    state: 'closed',
+    state_reason,
+  });
+
+  t('H22: closed + pm:dispatched -> finding', typeof h22ClosedCardPmResidue(closedCard(['pm:dispatched'])), 'string');
+  t('H22: …and names the residue label', h22ClosedCardPmResidue(closedCard(['pm:dispatched'])).includes('`pm:dispatched`'), true);
+  t('H22: …and names the close reason', h22ClosedCardPmResidue(closedCard(['pm:dispatched'])).includes('closed `completed`'), true);
+  t(
+    'H22: …and prescribes only the label strip, no other write',
+    h22ClosedCardPmResidue(closedCard(['pm:dispatched'])).includes('already closed'),
+    true,
+  );
+  t('H22: a not_planned close is residue too', typeof h22ClosedCardPmResidue(closedCard(['pm:queue'], 'not_planned')), 'string');
+  t('H22: a missing state_reason still renders a sentence', typeof h22ClosedCardPmResidue({ ...closedCard(['pm:queue']), state_reason: null }), 'string');
+  t(
+    'H22: …and never prints the string undefined',
+    h22ClosedCardPmResidue({ ...closedCard(['pm:queue']), state_reason: null }).includes('undefined'),
+    false,
+  );
+  t('H22: several residue labels are all named', h22ClosedCardPmResidue(closedCard(['pm:blocked', 'pm:blocking'])).includes('`pm:blocking`'), true);
+
+  // The gate that keeps this from restating H3: an OPEN card is never this
+  // row's, whatever it carries — every other item here already reads it.
+  t('H22: an OPEN card carrying pm:dispatched is out of scope', h22ClosedCardPmResidue({ ...issue(['pm:dispatched']), number: 1, state: 'open' }), null);
+  t('H22: a card with no state field is out of scope', h22ClosedCardPmResidue(issue(['pm:dispatched'])), null);
+  t('H22: a closed card with no pm label is clean', h22ClosedCardPmResidue(closedCard(['domain:cli', 'bug'])), null);
+  t('H22: a closed card with no labels at all is clean', h22ClosedCardPmResidue(closedCard([])), null);
+  t('H22: a missing issue does not crash', h22ClosedCardPmResidue(undefined), null);
+
+  // The identity stickers, pinned OUT — a closed seat card keeps `pm:seat` as
+  // what it IS, not as a claim that work is in flight (see PM_RESIDUE_LABELS).
+  t('H22: `pm:seat` on a closed card is identity, not residue', h22ClosedCardPmResidue(closedCard(['pm:seat'])), null);
+  t('H22: `pm:epic` likewise', h22ClosedCardPmResidue(closedCard(['pm:epic'])), null);
+  t('H22: `pm:retriage` is deliberately out of the measured set', h22ClosedCardPmResidue(closedCard(['pm:retriage'])), null);
+  // …but a seat card ALSO carrying a state label is still residue.
+  t('H22: `pm:seat` + a state label is residue for the state label', h22ClosedCardPmResidue(closedCard(['pm:seat', 'pm:dispatched'])).includes('`pm:dispatched`'), true);
+  t('H22: …and does not name the identity sticker', h22ClosedCardPmResidue(closedCard(['pm:seat', 'pm:dispatched'])).includes('`pm:seat`'), false);
+
+  // The census's five, each pinned — the set is the item's scope, so a silent
+  // edit to it should break a test rather than quietly change what patrols.
+  t('H22: the measured residue set is the five from the census', PM_RESIDUE_LABELS.join(','), 'pm:dispatched,pm:queue,pm:blocked,pm:on-hold,pm:blocking');
+  // …and the two similarly-named sets stay APART: H13's carries `finding`, this
+  // one carries `pm:blocking`, and unifying them would break both items.
+  t('H22: the residue set is NOT H13\'s visibility set', PM_RESIDUE_LABELS.join(',') === PM_STATE_LABELS.join(','), false);
+  t('H22: …H13\'s set carries `finding`, which is a fine state to close in', PM_STATE_LABELS.includes('finding'), true);
+  t('H22: …and this one does not', PM_RESIDUE_LABELS.includes('finding'), false);
+  t('H22: …while `pm:blocking` is residue here and absent from H13\'s', PM_RESIDUE_LABELS.includes('pm:blocking') && !PM_STATE_LABELS.includes('pm:blocking'), true);
+  for (const label of PM_RESIDUE_LABELS) {
+    t(`H22: \`${label}\` on a closed card is residue`, typeof h22ClosedCardPmResidue(closedCard([label])), 'string');
+  }
+
+  // The summary line's H22 clause — a pass that read nothing must not read the
+  // same as a board with no residue (#4690), so the count is always stated.
+  t('summary: the H22 clause states what the closed pass read', summaryLine({ repo: 'r', issues: 1, unscoped: 1, prs: 0, merged: 0, closed: 200 }, 0).includes('H22 read 200 recently-closed issue(s)'), true);
+  t('summary: an absent closed count degrades to 0, never to undefined', summaryLine({ repo: 'r', issues: 1, unscoped: 1, prs: 0, merged: 0 }, 0).includes('H22 read 0 recently-closed'), true);
 
   // -- H9: `pm:on-hold` without a machine-fireable `Restart-when:` ------------
   const hold = (body) => issue(['pm:on-hold'], [], body);
