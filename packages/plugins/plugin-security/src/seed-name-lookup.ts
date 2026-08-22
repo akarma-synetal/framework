@@ -63,9 +63,36 @@
  * `ceil(N / 500)` reads — constant for every realistic declaration count and,
  * unlike an unchunked read, incapable of turning a large environment's boot
  * into a hard driver error.
+ *
+ * ## Organization scope (#10103)
+ *
+ * The catalog these seeders write is materialized PER ORGANIZATION under a
+ * walled posture, so this oracle answers "does THIS organization have a row for
+ * this name" — not "does any row anywhere carry this name". Two consequences,
+ * and the second is the one that bites:
+ *
+ *  - the read is threaded with the organization, so it routes through
+ *    `SqlDriver.applyTenantScope` (the governed chokepoint) rather than
+ *    re-implementing a wall predicate here;
+ *  - "first row wins" stops being right. `applyTenantScope` returns the
+ *    caller's rows AND organization-less ones, so a page can carry two rows for
+ *    one name, in driver order. Taking whichever came first would let a PRE-FIX
+ *    organization-less row answer for this organization, the loop would take its
+ *    update branch, and no per-organization copy would ever be created — a
+ *    silent no-op that leaves a walled deployment exactly as broken as before
+ *    while reporting success. It was measured. So the two are separated:
+ *    {@link ExistingLookupResult} `present` means THIS organization's own row,
+ *    and an organization-less leftover comes back on the `absent` result as
+ *    {@link ExistingLookupResult} `organizationLessResidue`, so the caller both
+ *    creates the copy and can report the leftover loudly.
+ *
+ * A pass with no organization (the `single`-posture carve-out) is unchanged in
+ * every respect: nothing is threaded, and the first row is the row.
  */
 
-const SYSTEM_CTX = { isSystem: true };
+import { resolveOwnOrganizationRow, seedCtx as lookupCtx } from './per-organization-catalog.js';
+
+
 
 /** Names bound into one `$in` read. See the chunking note in the module header. */
 export const NAME_CHUNK_SIZE = 500;
@@ -89,7 +116,13 @@ export interface SeedLookupLogger {
  */
 export type ExistingLookupResult =
   | { status: 'present'; row: any }
-  | { status: 'absent' }
+  /**
+   * No row for this name IN THIS ORGANIZATION. `organizationLessResidue` names a
+   * pre-fix row that belongs to no organization and is visible here only through
+   * the driver's compatibility arm — the caller creates its own copy anyway and
+   * reports the leftover (#10103).
+   */
+  | { status: 'absent'; organizationLessResidue?: any }
   | { status: 'unknown' };
 
 const ABSENT: ExistingLookupResult = { status: 'absent' };
@@ -120,13 +153,26 @@ export interface ExistingByNameIndex {
  * Read one page of names. Returns `null` — distinct from `[]` — when the driver
  * did not return a result set at all.
  */
-async function readNamePage(ql: any, object: string, names: string[]): Promise<any[] | null> {
+async function readNamePage(
+  ql: any,
+  object: string,
+  names: string[],
+  organizationId?: string,
+): Promise<any[] | null> {
   let rows: any;
   try {
     rows = await ql.find(
       object,
-      { where: { name: { $in: names } }, limit: names.length },
-      { context: SYSTEM_CTX },
+      {
+        where: { name: { $in: names } },
+        // [#10103] `names.length` was exactly right while one row existed per
+        // name. Once the catalog is per organization the driver returns this
+        // organization's rows AND any organization-less ones, so that cap
+        // TRUNCATES — and a truncated page reads as "absent", which inserts.
+        // Bounded, just wide enough to admit both.
+        limit: organizationId ? names.length * 2 : names.length,
+      },
+      { context: lookupCtx(organizationId) },
     );
   } catch {
     return null;
@@ -144,21 +190,48 @@ async function readNamePage(ql: any, object: string, names: string[]): Promise<a
  * `remember` is a deliberate no-op: this oracle re-reads the database on every
  * call, so it already sees rows the loop inserted a moment ago.
  */
-function perItemIndex(ql: any, object: string): ExistingByNameIndex {
+function perItemIndex(ql: any, object: string, organizationId?: string): ExistingByNameIndex {
   return {
     async get(name: string): Promise<ExistingLookupResult> {
       let rows: any;
       try {
-        rows = await ql.find(object, { where: { name }, limit: 1 }, { context: SYSTEM_CTX });
+        // Limit 5, not 1, when scoped: a single row would be whichever the
+        // driver ordered first, and this read must be able to tell this
+        // organization's row from an organization-less leftover.
+        rows = await ql.find(
+          object,
+          { where: { name }, limit: organizationId ? 5 : 1 },
+          { context: lookupCtx(organizationId) },
+        );
       } catch {
         return UNKNOWN;
       }
       const list = Array.isArray(rows) ? rows : Array.isArray(rows?.records) ? rows.records : null;
       if (list === null) return UNKNOWN;
-      return list[0] ? { status: 'present', row: list[0] } : ABSENT;
+      return resolveForOrganization(list, organizationId);
     },
     remember() { /* re-read every call — nothing to cache */ },
   };
+}
+
+/**
+ * Which of the rows a read returned for ONE name is this organization's,
+ * expressed as this module's tri-state.
+ *
+ * The organization split itself is NOT decided here — it delegates to
+ * {@link resolveOwnOrganizationRow}, the one spelling of that question the
+ * catalog has. Two spellings of "which row is mine" is exactly the shape that
+ * produced the defect this scoping repairs (one question, two implementations,
+ * the ungoverned copy winning), so this function only translates that answer
+ * into `present` / `absent` + leftover.
+ *
+ * Unscoped (the `single`-posture pass) the first row is the row, exactly as
+ * before.
+ */
+function resolveForOrganization(rows: any[], organizationId?: string): ExistingLookupResult {
+  const { own, organizationLessResidue } = resolveOwnOrganizationRow(rows, organizationId);
+  if (own) return { status: 'present', row: own };
+  return organizationLessResidue ? { status: 'absent', organizationLessResidue } : ABSENT;
 }
 
 /**
@@ -172,17 +245,25 @@ export async function buildExistingByName(
   object: string,
   names: readonly (string | null | undefined)[],
   logger?: SeedLookupLogger,
+  /**
+   * Answer for THIS organization (#10103). Omitted = the pre-existing
+   * installation-wide question, which is what a `single`-posture pass wants.
+   */
+  organizationId?: string,
 ): Promise<ExistingByNameIndex> {
-  const index = new Map<string, any>();
+  // Every row the page carried for a name, so the organization split can be
+  // judged per name rather than by arrival order.
+  const index = new Map<string, any[]>();
   const fromIndex: ExistingByNameIndex = {
     async get(name: string): Promise<ExistingLookupResult> {
-      const row = index.get(name);
       // The batched read ANSWERED for every requested name, so a miss here is
       // the driver's own "no such row", not a gap in what we know.
-      return row ? { status: 'present', row } : ABSENT;
+      return resolveForOrganization(index.get(name) ?? [], organizationId);
     },
     remember(name: string, row: any) {
-      if (name && row && !index.has(name)) index.set(name, row);
+      if (!name || !row) return;
+      const rows = index.get(name);
+      if (rows) rows.push(row); else index.set(name, [row]);
     },
   };
 
@@ -198,22 +279,28 @@ export async function buildExistingByName(
   if (wanted.length === 0) return fromIndex;
 
   for (let i = 0; i < wanted.length; i += NAME_CHUNK_SIZE) {
-    const page = await readNamePage(ql, object, wanted.slice(i, i + NAME_CHUNK_SIZE));
+    const page = await readNamePage(ql, object, wanted.slice(i, i + NAME_CHUNK_SIZE), organizationId);
     if (page === null) {
       // ⛔ NOT "none of them exist" — see the module header. Fall back to the
       // per-item read so behaviour is exactly what it was before the hoist.
       logger?.warn?.(
         '[security] batched seed existence read failed — falling back to one read per item',
-        { object, names: wanted.length },
+        { object, names: wanted.length, ...(organizationId ? { organization: organizationId } : {}) },
       );
-      return perItemIndex(ql, object);
+      return perItemIndex(ql, object, organizationId);
     }
     for (const row of page) {
       const name = row?.name;
       if (name == null) continue;
-      // First row wins: the caller's own uniqueness rules decide what a
-      // duplicate name means, and this read must not reorder that judgement.
-      if (!index.has(String(name))) index.set(String(name), row);
+      // [#10103] EVERY row is kept, not just the first. A scoped page can carry
+      // this organization's row and an organization-less leftover for the same
+      // name, in driver order, and `resolveForOrganization` — not arrival order
+      // — decides which one answers. Unscoped, the first row is still the row:
+      // the caller's own uniqueness rules decide what a duplicate name means and
+      // this read does not reorder that judgement.
+      const key = String(name);
+      const rows = index.get(key);
+      if (rows) rows.push(row); else index.set(key, [row]);
     }
   }
   return fromIndex;

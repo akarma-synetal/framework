@@ -6,7 +6,7 @@
  *
  * Reads the validated `position` metadata (registered from the stack's `positions: []`
  * via `metadataService.list('position')`) and idempotently upserts each into
- * `sys_position` by `name`, so the runtime position→permission-set resolution
+ * `sys_position` by `(name, organization_id)`, so the runtime position→permission-set resolution
  * (`resolveExecutionContext` → `sys_position` → `sys_position_permission_set`) and
  * sharing-rule position recipients stop being decorative. Runs on `kernel:ready`
  * alongside the platform-admin bootstrap.
@@ -15,11 +15,18 @@
  * HIERARCHY is NOT seeded here: per ADR-0057 D5 the position is a capability
  * bundle, and "manager sees subordinates" lives on the `sys_business_unit`
  * tree, not `sys_position.parent`.
+ *
+ * [#10103] ONE PASS PER ORGANIZATION under a walled posture: the object spells
+ * its name index `unique: 'organization'`, and a row belonging to no
+ * organization is invalid state there — it was measured unreadable by every
+ * principal, because Layer 0's strict `organization_id = :tenant` AND-composes
+ * over the driver's compatibility arm and leaves the strict equality alone.
+ * `single` posture keeps exactly one organization-less pass. Doctrine, and the
+ * loud guard that stands in place of a reap: `per-organization-catalog.ts`.
  */
 
 import { buildExistingByName } from './seed-name-lookup.js';
-
-const SYSTEM_CTX = { isSystem: true };
+import { seedCtx, warnPreFixOrganizationLessRows } from './per-organization-catalog.js';
 
 function genId(prefix: string): string {
   const rand = Math.random().toString(36).slice(2, 10);
@@ -27,15 +34,20 @@ function genId(prefix: string): string {
   return `${prefix}_${ts}${rand}`;
 }
 
-async function tryInsert(ql: any, object: string, data: any): Promise<any | null> {
-  try { return await ql.insert(object, data, { context: SYSTEM_CTX }); } catch { return null; }
+async function tryInsert(ql: any, object: string, data: any, organizationId?: string): Promise<any | null> {
+  try { return await ql.insert(object, data, { context: seedCtx(organizationId) }); } catch { return null; }
 }
-async function tryUpdate(ql: any, object: string, data: any): Promise<boolean> {
-  try { await ql.update(object, data, { context: SYSTEM_CTX }); return true; } catch { return false; }
+async function tryUpdate(ql: any, object: string, data: any, organizationId?: string): Promise<boolean> {
+  try { await ql.update(object, data, { context: seedCtx(organizationId) }); return true; } catch { return false; }
 }
 
 interface SeedOptions {
   logger?: { info: (m: string, meta?: Record<string, any>) => void; warn: (m: string, meta?: Record<string, any>) => void };
+  /**
+   * Seed THIS organization's copies. Omitted = the `single`-posture pass, the
+   * one place an organization-less catalog row is the correct shape.
+   */
+  organizationId?: string;
 }
 
 /**
@@ -95,12 +107,18 @@ export async function bootstrapDeclaredPositions(
   // See `seed-name-lookup.ts` for why a read that cannot ANSWER must never be
   // read as "none of them exist" — that conflation would re-create every
   // position on every boot.
+  const organizationId = options.organizationId;
   const existingByName = await buildExistingByName(
     ql,
     'sys_position',
     positions.map((r) => r?.name),
     options.logger,
+    organizationId,
   );
+  // Names for which a PRE-FIX organization-less row is still standing. This
+  // organization's own row is created regardless — the leftover is reported,
+  // never treated as "already seeded" (#10103).
+  const residue: string[] = [];
 
   let seeded = 0;
   let updated = 0;
@@ -114,6 +132,12 @@ export async function bootstrapDeclaredPositions(
     // every boot the database is briefly unreachable.
     const lookup = await existingByName.get(String(r.name));
     if (lookup.status === 'unknown') { unreadable += 1; continue; }
+    // [#10103] `absent` can still carry a PRE-FIX organization-less row that is
+    // merely VISIBLE here through the driver's compatibility arm. It is not
+    // this organization's row, so the copy below is created either way — the
+    // leftover is only reported. Reading it as "already seeded" is the silent
+    // no-op the per-organization catalog exists to prevent.
+    if (lookup.status === 'absent' && lookup.organizationLessResidue) residue.push(String(r.name));
     const existing = lookup.status === 'present' ? lookup.row : undefined;
     if (existing?.id) {
       // [#10946] Only write when the stored row actually differs. An
@@ -128,14 +152,14 @@ export async function bootstrapDeclaredPositions(
       // re-seed (#2909 T2), so they can neither cause nor suppress one.
       if (!positionRecordDiffers(existing, fields)) {
         unchanged += 1;
-      } else if (await tryUpdate(ql, 'sys_position', { id: existing.id, ...fields })) {
+      } else if (await tryUpdate(ql, 'sys_position', { id: existing.id, ...fields }, organizationId)) {
         updated += 1;
       }
     } else {
       const row = {
         id: genId('position'), name: r.name, ...fields, active: true, is_default: false,
       };
-      const created = await tryInsert(ql, 'sys_position', row);
+      const created = await tryInsert(ql, 'sys_position', row, organizationId);
       if (created) {
         seeded += 1;
         // The batched oracle is a snapshot taken before the loop; a name
@@ -145,14 +169,20 @@ export async function bootstrapDeclaredPositions(
       }
     }
   }
+  if (organizationId) {
+    warnPreFixOrganizationLessRows(options.logger, 'sys_position', residue, organizationId);
+  }
   if (unreadable > 0) {
     // Said once, with the count — see the sibling warn in
     // `bootstrap-declared-permissions.ts`.
     options.logger?.warn?.(
       '[security] declared positions left untouched — their records could not be read',
-      { unreadable, total: positions.length },
+      { unreadable, total: positions.length, ...(organizationId ? { organization: organizationId } : {}) },
     );
   }
-  options.logger?.info?.('[security] declared positions seeded into sys_position', { seeded, updated, unchanged, unreadable, total: positions.length });
+  options.logger?.info?.('[security] declared positions seeded into sys_position', {
+    seeded, updated, unchanged, unreadable, total: positions.length,
+    ...(organizationId ? { organization: organizationId } : {}),
+  });
   return { seeded, updated, unchanged, unreadable };
 }
