@@ -1,5 +1,6 @@
 // Copyright (c) 2025 ObjectStack. Licensed under the Apache-2.0 license.
 
+import { P } from '@objectstack/spec/shared';
 import type { Page } from '@objectstack/spec/ui';
 
 /**
@@ -57,8 +58,34 @@ export const SysUserDetailPage: Page = {
     // current user viewing their own profile (admins looking at other
     // users see nothing — they can use Setup actions instead).
     alerts: [
+      // The gate is the ADR-0089 canonical, component-NODE `visibleWhen` — a
+      // sibling of `properties`, never a key inside it. `record:alert` also
+      // DECLARES `properties.visible`, but `PageComponentSchema.properties` is
+      // an opaque record served verbatim, so a predicate there never reaches
+      // `ExpressionInputSchema` and is evaluated by the console's LEGACY JS
+      // evaluator, which has no `has()`.
+      //
+      // ⚠️ The envelope is load-bearing, and `P` is not decoration. This page is
+      // authored as a RAW `Page` object literal, so — unlike a page built with
+      // `definePage()` — nothing runs `ExpressionInputSchema`'s transform over
+      // it and whatever is written here reaches the wire verbatim. Measured in
+      // the real console at the pinned objectui SHA: a BARE string in
+      // `visibleWhen` also stays on that legacy evaluator ("bare strings and
+      // `${…}` templates stay on the legacy path … only an explicit
+      // `{ dialect: 'cel' }` envelope is rerouted"), so `has()` throws, the
+      // surface is fail-soft, and the banner shows on EVERY user — including
+      // other people's profiles. `P` emits the `{ dialect: 'cel', source }`
+      // envelope that routes to CEL, where `has()` is a real function.
+      //
+      // On CEL an absent key is a FAULT and that face is fail-soft too, hence
+      // the `has()` guards (the same shape the sibling
+      // `resend_verification_email` action predicate already carries). And
+      // hence no `visible` beside it: a node `visibleWhen` and
+      // `properties.visible` compose as AND, so leaving both would keep the
+      // legacy predicate load-bearing.
       {
         type: 'record:alert',
+        visibleWhen: P`has(record.id) && has(record.email_verified) && record.id == ctx.user.id && record.email_verified == false`,
         properties: {
           severity: 'warning',
           icon: 'mail',
@@ -76,7 +103,6 @@ export const SysUserDetailPage: Page = {
             'ja-JP': 'パスワードリセットや重要なシステム通知を受け取るには、メールアドレスを認証してください。',
             'es-ES': 'Verifica tu correo para recibir restablecimientos de contraseña y notificaciones importantes del sistema.',
           },
-          visible: 'record.id == ctx.user.id && record.email_verified == false',
           dismissible: false,
           action: {
             actionName: 'resend_verification_email',
