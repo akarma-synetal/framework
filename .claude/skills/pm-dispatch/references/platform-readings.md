@@ -13,17 +13,15 @@
   `GET /repos/{owner}/{repo}/issues/{pr}/timeline`),⛔ 不看 `auto_merge` 字段 ——
   入队后它回落为 off,零信息量(维护者 2026-08-11 裁定)。队列分支(ls-remote 拼写见
   「零成本等价物」)正命中即已入队,缺席不作反证 —— 队列满载时分支尚未建出。
-- **成功序列读间隔不读事件名**:`removed_from_merge_queue` 后 ~1 秒内跟 `merged`
-  是落地不是被踢;真被踢是其后无 `merged`、几分钟后 PR 仍 open。
+- **成功序列读间隔不读事件名**:`removed_from_merge_queue` 后 ~1 秒内跟 `merged` 是落地不是被踢;真被踢是其后无 `merged`、几分钟后 PR 仍 open。
 - 「不在 `origin/main` 上」是二义读数(在队列里等 / 没入队,处置相反)—— 落地检查
-  永远两个读数:**队列成员资格 和 `origin/main`**,缺一不可。
+  永远两个读数:**队列成员资格 和 `origin/main`**,缺一不可;`origin/main` 那一读**按内容读**(grep 本 PR 该产出的产物),⛔ 不按 PR head sha 的祖先性、也不按 `merged` 布尔:队列落的是**另一个提交**,于是 `git merge-base --is-ancestor <pr-head> origin/main` 对一个已完全合入的 PR 答 NO(非浅检出,与「读数陷阱」浅检出坑不同因),而同一 PR 的 `list_pull_requests` 在 `fields` 投影下实测回过自相矛盾的一行:`merged: false` 与 `merged_at` 有值 + `state: closed` 并存 —— 只读布尔的一切判据把已落地读成「没合」(2026-08-23 落地时刻实测)。
 - **`mergeable_state` 惰性计算**:首次 GET 可能回 `unknown` —— 重读一次拿真值;
   `dirty` 即队列入口否决(冲突对象是**当前** main);draft PR 恒回 `draft`
   (「draft+clean」组合不存在);本地试合并随 fetch 老化,该字段不老化。只在入队
   决策点 `get` 一次:挂了 flip 定点(landing-operations)就到点再读,⛔「又查又等」双份支出。
 - **状态核验用最小字段**(search/list + `fields`)或等事件,整对象 `get` 留给入队
-  决策点;门禁放行判据 = 承载门禁族 job 的 conclusion,聚合(`blocked`/`dirty`)
-  只作阴性筛查再定位,放行按名定向读单条 job,⛔ 不拉全表(按名定位失败才拉)。
+  决策点;门禁放行判据 = 承载门禁族 job 的 conclusion,聚合(`blocked`/`dirty`)只作阴性筛查再定位,放行按名定向读单条 job,⛔ 不拉全表(按名定位失败才拉)。
 - **PR 转回 draft 同时掉 auto-merge 与队列成员资格,均不自动恢复**(转正后必须重
   新挂);反方向同理:要真踢出队列只有转 draft —— `disable_pr_auto_merge` 单独调用**不解除队列成员资格**,PR 照样落地。
 - **`enable_pr_auto_merge` 一律显式传 `mergeMethod: "SQUASH"`**(不传时静默退回被
@@ -62,6 +60,7 @@
 - **公开仓降级读法:WebFetch github.com 网页零 API 配额**(带 label 过滤的 issue
   列表、issue 全文含评论、PR 页含 checks,实测撑得起整轮盘点);边界:~15 分钟缓存、列表行不含 assignee、内容是渲染层。
 - **查重先 `search_issues`**(2026-08-18 23:3xZ 实测:单次调用按 issue body 内文本命中且 `total_count` 精确 ——「search API 对本会话不可用/回错误对象」的继承说法实测为**假**;继承说法不是读数,复述必须带实测日期):body 文本匹配是 repo-scoped `list` 做不到的(全量抓取再 grep 才等价),`list` + 对照组降为回退。
+- **`search_issues` 可整会话静默归零 —— 控制词一并归零**(2026-08-23 实测:某会话对**每个**查询回 `total_count: 0`,含已知必中的控制词;同时刻另一会话同工具正常 ⇒ 故障是**会话级**,不是工具/平台级)。诊断:结果可疑时先跑一个带 `repo:` 限定、已知必中的控制词;回 0 ⇒ 本会话 search 已坏,**立刻换通道,⛔ 不重试**(重试只烧配额)。正确退路 = **REST 列表端点** `GET /repos/{o}/{r}/issues?state=open&labels=a,b&per_page=100&page=N`(走 core 桶、结果**完整**;`GET /search/issues` **不是**退路 —— 出口代理按设计只放 repo-scoped 路径);⛔ **不要用 MCP `list_issues` 手扫**:它走 GraphQL 稀缺桶,且分页手扫极易半途而废(实测 226 张 open 只扫了 100 张)—— **不完整枚举比零结果更危险,它读作「搜过了,没有」**。⛔ 已推翻的候选机理,别再追:「查询串里带 GitHub 限定符(`repo:`/`is:open`)把语义 search 打成零」—— 两次实测反证:带 `repo:` 的控制词回 `total_count: 5`;另一席同工具两腿对照,`repo:… is:open …` 回 1(精确命中)而裸词回 13(语义扩散),限定符在那儿**收窄**结果而非破坏。归零机理仍未定(候选:scope 过滤层静默清空 / search 桶 403 被 MCP 层吞成空结果),要定它必须在复现会话里抓原始响应。
 - **`search_issues` 不可靠地返回分钟级新卡**:同轮发现的东西查重,搜索之外必须按创建时间列近期 issue(`list_issues` + `orderBy: CREATED_AT`)—— 实测一张 ~7 分钟大的同实例卡被关键词与语义搜索双双漏掉,靠按日期列表才逮到;边界:两次观察、索引延迟未实测,断言只到「search 可能漏掉分钟级 issue」,更硬的窗口要另测(2026-08-20 实测)。
 - **会话中途轮换凭据把 GitHub MCP 服务器杀到不可恢复**:此后一切 `mcp__github__*`
   回 `Streamable HTTP error: invalid session`(含几分钟前还好的工具),只有新会话
@@ -70,13 +69,13 @@
   盘仍是合法 JSON,期待列表的脚本会静默报假「0 issues」—— 零命中纪律覆盖 list 读:空车道先对仓库 `open_issues_count` 反查再信。
 - **MCP 参数两陷阱**:`list_issues` 多标签过滤是 **OR(并集)**不是 AND —— 混入别
   车道同状态卡与本车道全状态卡,结果良构、失效全静默;正确读法 = **整车道单标签一
-  次读全 + 本地对 labels 求交**。`issue_write` 的 `labels` 是**整组替换**不是追加
+  次读全 + 本地对 labels 求交**,或改走 REST —— **两个通道的 `labels` 语义相反**:REST 列表端点的 `labels=a,b` 是**真 AND**(交集),MCP `list_issues` 的 `labels` 数组是 **OR**,要交集就用 REST(2026-08-23 两席各自独立实测 OR 侧:一席请求 `domain:ui` ∩ `pm:queue` 回来 154 张、含 `domain:spec`/`domain:devx`/`pm:blocked`,另一席 `[domain:skills, finding]` 回来别车道的 finding 卡)。`issue_write` 的 `labels` 是**整组替换**不是追加
   —— 同一动作内重读现值合并再写(隔轮旧读数 = 无效快照,按其回写静默剥别的标签);真追加走 REST `POST /issues/{n}/labels`;写后照标签纪律回读。
 - **`list_issues` 永不返回 assignees**(`fields` 枚举无此成员,不传也没有)—— 已
   认领卡与空闲卡响应逐字节相同,清单只是**候选名单**:每条认领前必须过完整 `issue_read`(它才返回 `assignees`),⛔ 不把清单当候选集直接认领。
 - **MCP `issue_read` 的 body 实体转义是纯读侧伪影**(撇号/引号/尖括号成数字实体;
   comments 原样),存储体是明文,**先解码实体再写回**往返实测安全(无双重转义)——
-  腐蚀 body 的恰是把转义读数原样回写;可逆的只有读侧,写侧剥除(HTML 注释、tag
+  腐蚀 body 的恰是把转义读数原样回写;⚠️ 但读侧**并非一律可逆** —— 行内反引号里的尖括号片段被 MCP 读路径**整个丢弃**(不是转义,无从解码回来),判据与处置见「读数陷阱」判截断行;写侧剥除(HTML 注释、tag
   形状片段 —— 细则见「读数陷阱」写侧行)是**真实存储损耗**,⛔ 两类不并成一条「API 会改 body」,写后回读因此必做;实体归属(MCP 还是 GitHub API)与 `&amp;` 类未实测。
 - **`Blocked-by:` 行归 BODY(单通道反向索引)**:追加按上条「解码后写回」执行;历
   史上寄放在评论里的行按同程序**增量**回填(⛔ 不搞批量突击 —— 限流压力);解锁扫
@@ -103,6 +102,7 @@
   公开发出的诊断被推翻时,更正发在同样公开的位置,据它开的 PR 撤回 draft、解绑 `Fixes`。
 - **判「正文被截断」必须双读取**:`.body` 原文 + `Accept:
   application/vnd.github.full+json` 的 `.body_html`,两者同一处断掉才算 issue 端截断。读侧实测有确定性触发:正文含字面 script 开标记形状的 token(less-than 紧跟 script 字样;doctype 开标记、object 标签形状同触发)时,API/MCP 读回在该 token 处静默截断而网页全文完好 —— 存储体无损,⛔ 不「修复」只在 API 读短的卡:先 WebFetch 渲染页核对全文,重写会毁掉本来正确的正文。
+  **第三条读路径,同一个坑、读路径对调**:MCP `issue_read` / PR 读路径把**行内反引号里的尖括号片段整个吃掉**,而 GitHub 存储字节完好(raw REST 取回一字不差)⇒ ⛔ **永不单凭 MCP 读判截断,先取 raw REST 核对再判** —— 否则「repair-first」规则被**正确**地应用到一张完好的卡上,重写毁掉的是正确内容(同日三席独立观察,一次已到差点重写的地步,拦住它的只是那位 dev 自己的核验习惯 —— 无任何机械守卫)。判据 = 数**空的行内代码跨度**:一个空的行内代码恰是短尖括号片段被吃掉的签名(对照:一份读作 0 空跨度、10 个存活字面尖括号 tag 的正文即完好;阴性对照 —— 有的正文本来就把标识符不带尖括号写,所以判据是**尖括号**不是反引号);数字实体(撇号 / 引号成 `&#39;` / `&#34;`)是普通实体编码,**不是**截断证据(2026-08-23 实测)。
 - **落库删字节,网页同显、围栏不防护**:「less-than + 感叹号 + 左方括号」序列(markup-declaration 开标记,恰是负向后行断言接字符类的形状)里的感叹号在存储层被删,幸存文本仍像代码但意义已变;裸「less-than + 感叹号」存活;作者规则并入下一条。
 - 写侧另一半:sanitizer 在**写入时按 tag 形状删,不按尖括号**(2026-08-18 issue body 实测):行内反引号里的 tag 形状 token(读作未知 HTML 标签者 —— 注释标记、`<n>` 类占位符、泛型)整个被删;孤立 less-than / greater-than 在行内代码**存活**;⛔ **围栏不防护 tag 形状 token**(2026-08-20 issue body 三写实测,推翻旧「围栏块整体存活」读数):HTML 注释形状标记裸写被整删留空行,入围栏照删留空围栏;非 tag 形状的带尖括号正则在围栏中实测存活(2026-08-18,上一条删感叹号仍另计);同日实测同类标记在**评论**里存活,但 ⛔ 不据此推「评论豁免」(下条:评论体照样被整段截断);裸标识符(无尖括号)存活 ⇒ SKILL 提取契约(字面文本 grep + 裸标识符回退)仍有效;写返回 200,损耗只在回读可见。
   作者规则一条管三坑:必须字面携带 tag/script/markup-declaration 形状的文本进围栏并把危险字符用词拼出,或改花括号占位符(`{n}`)/整句用词描述;要字面尖括号写实体 `&lt;` / `&gt;`;含尖括号的任何写后回读逐个确认(失效完全静默;⛔ 回读不豁免评论 —— 2026-08-18/19 四次评论写入里那次未归因的标记缺席,归因在下条)。
