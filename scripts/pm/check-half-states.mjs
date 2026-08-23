@@ -34,6 +34,28 @@
  * treat as a failure is its own non-delivery — a patrol that cannot land its
  * report is the disease, not a finding.
  *
+ * ## Adopting the patrol in a sibling repo (#11217)
+ *
+ * The pair (this file + that workflow) is copied VERBATIM into a sibling repo;
+ * the only per-repo input is one repository variable naming that repo's anchor
+ * issue (`HALF_STATE_ANCHOR_ISSUE`). Each install runs on its own runner with
+ * its own `GITHUB_TOKEN` and reads its own board — ⛔ no cross-repo credential
+ * anywhere, which is the route ruled at grading rather than a matrix job.
+ *
+ * Two things make "verbatim" actually safe, and both are new: the swept repo is
+ * resolved from the runner's own `GITHUB_REPOSITORY` rather than a hardcoded
+ * default (`resolveSweepRepo` carries the argument), and the workflow REFUSES
+ * to run with an unconfigured anchor instead of writing this repo's anchor
+ * number in someone else's repo. It was measured worth doing: with three of the
+ * four repos uninstalled, 37 of the fleet's 59 open `pm:blocked` cards had
+ * never been swept, and 7 of objectui's 12 machine-readable blocks were
+ * already expired when a human read them by hand.
+ *
+ * What still does NOT travel, stated so a reader does not assume it does:
+ * cross-repo `Blocked-by:` targets stay unresolvable per install (each token
+ * reads its own repo), so H19 reports them as UNJUDGED — accepted, and made
+ * loud separately.
+ *
  * ## Why report-only, and why the exit code is ALWAYS 0 on a completed sweep
  *
  * The pm-dispatch state model (.claude/skills/pm-dispatch/SKILL.md, "State
@@ -435,6 +457,72 @@
  *       (2026-08-22); a blocking posture for this surface is a later card on
  *       its own baseline.
  *
+ * ## H24 + H25 — the queue/assignee contradiction, and the state that closes it
+ *
+ *   H24 an OPEN card carrying `pm:queue` with a NON-EMPTY assignee — the queue
+ *       view reads it as dispatchable, the claim rule reads it as taken, and
+ *       both readers are right about the field they read, so the card is
+ *       available to everyone and forbidden to everyone at once. A pure
+ *       intersection of two fields: no threshold, no timestamp, no identity
+ *       test. Every adjacent row declines the shape for a reason of its own —
+ *       H1 wants NO assignee, H2 wants a MISSING claim comment (the measured
+ *       carriers have complete ones), H3 wants two LABELS while here the
+ *       second half of the contradiction is a FIELD — which is how 17 cards
+ *       across three repos (2026-08-23 census: 6 objectstack, 10 objectui, 1
+ *       cloud) sat in it with nothing reporting them. The measured origin is a
+ *       state ROLLBACK that swaps the label and leaves the field: of the three
+ *       rollback paths, only dead-claim reclamation ever named the assignee
+ *       drop, so H8's and H19's remedy sentences now name it too (「同笔摘
+ *       assignee」). ⚠️ The field carries two meanings — dead agent claims and
+ *       genuine human ownership — and the row deliberately does NOT try to tell
+ *       them apart: the ruling of 2026-08-23 puts the rule FIRST and any
+ *       true-ownership exemption in an explicit marker LATER, never the other
+ *       way round. It names the login instead, and states the asymmetric
+ *       remedy (an agent may clear agent residue; ⛔ never a human's).
+ *   H25 `pm:awaiting-maintainer` coexisting with another pm STATE label — the
+ *       exclusivity half of the new state ruled in on 2026-08-23 (「可以新标
+ *       签,最好 pm: 开头」). The state exists because the board had no legal
+ *       place for "everything mechanical is done, a human must now act":
+ *       `needs-user-decision` is the ruling inbox (the ruling here is already
+ *       given) and `pm:on-hold` requires a machine-fireable `Restart-when:`
+ *       (H9), which this card can never have. Each forbidden pairing is a
+ *       specific lie about which mechanism will release the card, and the row
+ *       names the one it found. Written while the population is zero, which is
+ *       the cheapest moment to pin a vocabulary. The label also joins H11's
+ *       parked inventory, H13's state vocabulary and H22's residue set, so the
+ *       new state is a first-class citizen of every reader rather than a hole
+ *       four rows wide. ⛔ Deferred, declared rather than dropped: the SKILL.md
+ *       state-model row (its protocol face) and applying the label to the
+ *       specimen card, which is a seat's write.
+ *
+ * ## H26 — the block that nothing can ever release
+ *
+ *   H26 an open `pm:blocked` card whose resolvable `Blocked-by:` target is OPEN
+ *       and parked in a state that can never close — `pm:on-hold` or
+ *       `needs-user-decision`, both by definition states a card sits in WHILE
+ *       OPEN. The unlock predicate is "the target closed", so such a block is
+ *       structurally indefinite and nothing reported it: the waiting card is
+ *       perfectly well-formed (H4 clean, target resolves, target open, so H19
+ *       clean, label correct), and H9 — the nearest neighbour — audits the HELD
+ *       card rather than the waiting one. Six measured instances, all found by
+ *       a human reading: two cloud cards on one hold parked since July, a third
+ *       on another, and objectos's ENTIRE blocked inventory (2 of 2) waiting on
+ *       its single unanswered decision card, which is also the only item in the
+ *       fleet's decision inbox — one ruling clears that repo. A second leg on
+ *       the same data flags a target that is itself `pm:blocked` (the wait is
+ *       transitive: the measured chain was real one hop up and false two hops
+ *       up, its target being an H19 finding on the same sweep) — it names the
+ *       hop rather than chasing it, which would cost a request per hop and can
+ *       cycle. FREE: H19 already resolves every distinct target, and a resolved
+ *       target's labels rode in on a payload this sweep had already paid for.
+ *       ⛔ Not a judgement that the block is wrong — waiting on a deferred card
+ *       is sometimes right; the row says the wait has no releasing mechanism,
+ *       which is a fact a human should be handed rather than discover.
+ *       Deliberately NOT reported: a target labelled `pm:queue` while titled
+ *       `[Decision]` (one of the six). That is a mislabelling, not a fact in
+ *       the labels, and a title heuristic would make this sweeper guess at
+ *       intent.
+ *
  * ## The close mechanism, measured (#8293)
  *
  * A half-delivered card (#8131) was closed `completed` two seconds after its
@@ -651,7 +739,78 @@ import process from 'node:process';
 import { execFileSync } from 'node:child_process';
 import { isEntrypoint } from '../invoked-as.mjs';
 
-const OWNER_REPO = process.env.PM_SWEEP_REPO ?? 'objectstack-ai/objectstack';
+/**
+ * The repo this file sweeps when nothing says otherwise. It is a FALLBACK for a
+ * seat's terminal, never the answer on a runner — see `resolveSweepRepo`.
+ */
+export const DEFAULT_SWEEP_REPO = 'objectstack-ai/objectstack';
+
+/** `owner/name`, GitHub's own character set for both halves. */
+export const SWEEP_REPO_SHAPE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+
+/**
+ * WHICH repo this sweep reads — resolved, and the resolution is the whole
+ * point of the parameterisation (#11217).
+ *
+ * ## The trap this closes, measured
+ *
+ * The patrol pair (this file + `.github/workflows/half-state-patrol.yml`) is
+ * installed in objectstack only, so 37 of the fleet's 59 open `pm:blocked`
+ * cards had never been machine-swept, and a hand-run of H19's predicate over
+ * objectui's blocked inventory found SEVEN blocks whose blocker had already
+ * closed — 58% of that repo's machine-readable blocks were false, some for a
+ * week. The difference was never discipline: one repo has a caller and three
+ * do not.
+ *
+ * The fix is adoption by COPY — a sibling repo takes both files verbatim, runs
+ * them with its OWN `GITHUB_TOKEN` against its own board, and writes its own
+ * anchor (the route ruled at grading: per-repo installs, zero new credentials,
+ * ⛔ never a matrix with a cross-repo token). And a hardcoded default is
+ * exactly what makes "verbatim" unsafe: a copy of this file in objectui, run
+ * with no `PM_SWEEP_REPO`, would cheerfully sweep OBJECTSTACK and write the
+ * findings into objectui's anchor — a full, green, entirely wrong report, whose
+ * only symptom is card numbers that do not exist in the repo reading them.
+ *
+ * So the resolution order is:
+ *
+ *   1. `PM_SWEEP_REPO` — the explicit override, unchanged, and still first: a
+ *      seat pointing this at another board is a deliberate act.
+ *   2. `GITHUB_REPOSITORY` — what Actions sets on every runner, i.e. the repo
+ *      the workflow is INSTALLED IN. This is the line that makes a verbatim
+ *      copy correct by default, and it is why the default below can never be
+ *      reached on a runner.
+ *   3. `DEFAULT_SWEEP_REPO` — a seat's terminal, where neither is set.
+ *
+ * The objectstack leg is unchanged by construction: its runner sets
+ * `GITHUB_REPOSITORY=objectstack-ai/objectstack`, which is the same string the
+ * hardcoded default carried, so every request path is byte-identical. The
+ * workflow ALSO passes `PM_SWEEP_REPO: ${{ github.repository }}` — belt and
+ * braces, and it keeps the wiring visible where a reader of the workflow looks.
+ *
+ * A malformed value is REFUSED rather than silently replaced by the default:
+ * substituting a different board for the one the caller named is how a report
+ * about the wrong repo gets written, which is the disease above. The refusal
+ * happens at the CLI so that importers of this module (`ci-failure.mjs` takes
+ * the transport classifier) are unaffected by a variable they never read.
+ *
+ * @param {Record<string, string|undefined>} [env]
+ * @returns {{ repo: string, source: string, valid: boolean }}
+ */
+export function resolveSweepRepo(env = {}) {
+  const candidates = [
+    ['PM_SWEEP_REPO', env.PM_SWEEP_REPO],
+    ['GITHUB_REPOSITORY', env.GITHUB_REPOSITORY],
+  ];
+  for (const [source, raw] of candidates) {
+    const value = String(raw ?? '').trim();
+    if (!value) continue;
+    return { repo: value, source, valid: SWEEP_REPO_SHAPE.test(value) };
+  }
+  return { repo: DEFAULT_SWEEP_REPO, source: 'default', valid: true };
+}
+
+const SWEEP_REPO = resolveSweepRepo(process.env);
+const OWNER_REPO = SWEEP_REPO.repo;
 const API = 'https://api.github.com';
 const TOKEN = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? '';
 
@@ -663,6 +822,38 @@ const TOKEN = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? '';
 export function labelNames(issue) {
   return (issue.labels ?? []).map((l) => (typeof l === 'string' ? l : l.name));
 }
+
+/**
+ * The "awaiting a manual maintainer action" state (#11196 fix 5, maintainer
+ * ruling 2026-08-23, verbatim: 「可以新标签,最好 pm: 开头」 — the spelling is
+ * finalized here, in the implementing PR the ruling sent it to).
+ *
+ * It exists because the board had NO legal state for its shape, and the two
+ * adjacent states are both wrong in a way that made a card oscillate between
+ * them (the measured specimen, #7276: everything mechanical is done and the
+ * remaining action is the maintainer clicking through a Routines UI):
+ *
+ *   `needs-user-decision`  is the DECISION inbox — a question awaiting an
+ *                          answer. Here the decision is already made; what is
+ *                          outstanding is an ACT, and parking it in the inbox
+ *                          makes the inbox lie about how many rulings are owed.
+ *   `pm:on-hold`           requires a machine-fireable `Restart-when:` line
+ *                          (H9), and `Restart-when: manual — …` counts as
+ *                          MISSING there by deliberate design. A hold is the
+ *                          one state this card can never be well-formed in.
+ *
+ * ⛔ It is defined here, at the top of the predicates, and not beside the item
+ * that introduced it: four separate readers key on it (H11's parked inventory,
+ * H13's state vocabulary, H22's residue set, H25's exclusivity) and a module
+ * constant they all import cannot drift the way four string literals would —
+ * which is the failure family this whole file belongs to.
+ *
+ * Deliberately NOT decided here, and declared rather than dropped: the
+ * SKILL.md state-model table row (its protocol face — who applies it, who
+ * removes it, what a card in it owes) lands separately, and applying the label
+ * to the specimen card is the seat's write, never this script's.
+ */
+export const AWAITING_MAINTAINER_LABEL = 'pm:awaiting-maintainer';
 
 export function h1DispatchedNoAssignee(issue) {
   const labels = labelNames(issue);
@@ -1350,7 +1541,13 @@ export function h8MergedPrStillDispatched(issue, mergedPrs, openPrs) {
   return (
     `delivering PR ${list} is MERGED but the card still carries \`pm:dispatched\` — ` +
     `the merge's paired write never landed. Drop \`pm:dispatched\` and re-grade the ` +
-    `remainder (re-queue, close, or block the un-delivered half) in the same stroke.`
+    `remainder (re-queue, close, or block the un-delivered half) in the same stroke, ` +
+    `and 「同笔摘 assignee」 — the landing re-label owes the ASSIGNEE DROP too. A ` +
+    `re-graded card that keeps the finished dev's assignee lands straight in H24's ` +
+    `two-views contradiction (\`pm:queue\` + assigned = dispatchable to the queue view, ` +
+    `taken to the claim rule), which is how 17 cards across three repos got stuck where ` +
+    `nobody could legally move them (#11196). ⚠️ Agent identity only: a HUMAN assignment ` +
+    `may be real ownership and is ⛔ never cleared by an agent.`
   );
 }
 
@@ -1532,6 +1729,21 @@ export function h10StaleUnclaimedP0(issue, nowMs = Date.now()) {
 export const IMPORTANT_PARKED_STALE_DAYS = 7;
 
 /**
+ * The states H11 counts as PARKED — every state in which an open card is
+ * legitimately not being worked, so an importance signal can sit inside it
+ * indefinitely without anyone's queue showing it.
+ *
+ * `pm:awaiting-maintainer` joined the set with the state itself (#11196 fix 5)
+ * rather than being left for a later card, because the omission would have
+ * re-created H11's own defect one state to the left: a `bug` card parked
+ * awaiting a manual action is the exact inventory the maintainer named
+ * (2026-08-16, 「我担心的优先的,重要的问题…被放进 blocked 或者 on-hold 没人理
+ * 会」), and a new parked state invisible to the inventory row is a new place
+ * for it to hide.
+ */
+export const PARKED_STATE_LABELS = ['pm:blocked', 'pm:on-hold', AWAITING_MAINTAINER_LABEL];
+
+/**
  * H11 — null when clean, else the finding sentence.
  *
  * Importance is read from BOTH the native issue type (`Bug`, object or string
@@ -1544,7 +1756,7 @@ export const IMPORTANT_PARKED_STALE_DAYS = 7;
  */
 export function h11ImportantParked(issue, nowMs = Date.now()) {
   const labels = labelNames(issue);
-  const parked = labels.includes('pm:blocked') || labels.includes('pm:on-hold');
+  const parked = labels.some((l) => PARKED_STATE_LABELS.includes(l));
   if (!parked) return null;
   const typeName = typeof issue.type === 'string' ? issue.type : issue.type?.name;
   const signals = [];
@@ -1556,16 +1768,26 @@ export function h11ImportantParked(issue, nowMs = Date.now()) {
   const created = Date.parse(issue.created_at ?? '');
   const ageDays = Number.isFinite(created) ? (nowMs - created) / 86_400_000 : null;
   if (ageDays !== null && ageDays <= IMPORTANT_PARKED_STALE_DAYS) return null;
-  const state = labels.includes('pm:blocked') ? 'pm:blocked' : 'pm:on-hold';
+  const state = PARKED_STATE_LABELS.find((l) => labels.includes(l));
   const age =
     ageDays === null
       ? 'an unreadable `created_at` (which must not read as fresh)'
       : `open ~${Math.round(ageDays)}d`;
+  // The exit a parked card owes is state-specific, so the remedy names the one
+  // this card actually has: a hold/block is re-checked mechanically, while
+  // `pm:awaiting-maintainer` has no machine exit BY CONSTRUCTION (that is why
+  // it exists), and prescribing a `Restart-when:` re-check for it would send
+  // the reader to look for a line the state is defined by not having.
+  const exit =
+    state === AWAITING_MAINTAINER_LABEL
+      ? `This state has NO machine exit by construction — the release is the maintainer action the ` +
+        `card names — so an important card in it ages out of sight unless a human is re-asked. ` +
+        `Re-surface it to the maintainer in the triage round.`
+      : `Re-check the card's \`Blocked-by:\` / \`Restart-when:\` liveness in the triage round.`;
   return (
     `important card parked: ${signals.join(' + ')} sitting in \`${state}\`, ${age} ` +
     `(threshold ${IMPORTANT_PARKED_STALE_DAYS}d) — the important-parked inventory exists so a bug ` +
-    `or security card cannot age out of sight inside a parked state. Re-check the card's ` +
-    `\`Blocked-by:\` / \`Restart-when:\` liveness in the triage round.`
+    `or security card cannot age out of sight inside a parked state. ${exit}`
   );
 }
 
@@ -1643,6 +1865,12 @@ export const PM_STATE_LABELS = [
   'pm:dispatched',
   'pm:blocked',
   'pm:on-hold',
+  // A card awaiting a manual maintainer action HAS a state and a named reader
+  // (the triage round re-surfaces it), so it is not the half-annotated shape
+  // H13 reports. Omitting it here would make every card in the new state a
+  // standing H13 finding two hours after it entered — a new label that fires a
+  // false row on every carrier is worse than no label at all.
+  AWAITING_MAINTAINER_LABEL,
   'pm:epic',
   'pm:seat',
   'needs-user-decision',
@@ -2783,7 +3011,11 @@ export function h19BlockOutlivedBlocker(issue, resolutions) {
     'condition already spent, re-fired, reinstates an expired premise as the current one), and ② refuse ' +
     'to release when the card carries a MERGED PR newer than that conversion comment (the card moved on ' +
     'after the condition was written, so the cited fact can be true and no longer current). This row ' +
-    'surfaces the candidate; the unlock sweep releases it — ⛔ never a label written from this script.';
+    'surfaces the candidate; the unlock sweep releases it — ⛔ never a label written from this script. ' +
+    'When that release does happen, its paired write includes 「同笔摘 assignee」: a card returned to ' +
+    '`pm:queue` still carrying the assignee of the seat that parked it is dispatchable to the queue ' +
+    'view and taken to the claim rule at the same time (H24), which is the state the unlock scan was ' +
+    'measured leaving behind — ⚠️ agent identity only, a HUMAN assignment is ⛔ never cleared by an agent.';
 
   if (closed.length > 0) {
     const rest =
@@ -3365,7 +3597,22 @@ export function h21NegatedClosingKeyword(pr) {
  *                 measures it, rather than being widened in on a hunch. The
  *                 set is one edit away when that measurement exists.
  */
-export const PM_RESIDUE_LABELS = ['pm:dispatched', 'pm:queue', 'pm:blocked', 'pm:on-hold', 'pm:blocking'];
+export const PM_RESIDUE_LABELS = [
+  'pm:dispatched',
+  'pm:queue',
+  'pm:blocked',
+  'pm:on-hold',
+  'pm:blocking',
+  // `pm:awaiting-maintainer` is residue on a closed card for the same reason
+  // `pm:on-hold` is: it claims an action is still OWED. It joins the set with
+  // the state itself (#11196 fix 5) rather than waiting for a census the way
+  // `pm:retriage` does, and the two cases are not alike — `pm:retriage` was
+  // measured absent from a live population, while this label has no live
+  // population at all yet. Adding it now costs nothing (it can only match a
+  // card that carries it) and means the state cannot accumulate exactly the
+  // closed-card residue this row exists to catch before anyone measures it.
+  AWAITING_MAINTAINER_LABEL,
+];
 
 /**
  * H22 — null when the closed card is clean, else the finding sentence.
@@ -3555,6 +3802,304 @@ export function h23CommitMessageContradiction(commit) {
     `false on this surface. The only fix here is to REWORD, so that no closing keyword sits next to ` +
     `a card number.`
   );
+}
+
+// ---------------------------------------------------------------------------
+// H24 — an OPEN card that is `pm:queue` AND assigned: the board saying two
+// contradictory things about one card at once (#11196 fix 1).
+//
+// ## Why it is its own row rather than a widening of H1/H2/H3
+//
+// Every adjacent row declines this shape for a reason of its own, which is how
+// 17 cards across three repos sat in it with nothing reporting them: H1 wants a
+// dispatched card with NO assignee (this one HAS one), H2 wants a MISSING claim
+// comment (the measured carriers have complete ones — they were claimed, worked
+// and then rolled back), and H3 wants two LABELS (here exactly one label is
+// present and the second half of the contradiction lives in a different FIELD).
+// The shape falls precisely between them.
+//
+// ## What the contradiction costs
+//
+// The two readers disagree and BOTH are right about what they read:
+//
+//   the queue view    reads `pm:queue` as "dispatchable now";
+//   the claim rule    reads a non-empty assignee as "taken, ⛔ never reassign".
+//
+// So the card is simultaneously available to everyone and forbidden to
+// everyone, and the outcome is not a race but PARALYSIS — a card nobody can
+// legally move, in the one state no seat has a reason to look at twice. The
+// census this row was filed on (2026-08-23, REST full pagination): 135 open
+// `pm:queue` cards in objectstack of which 6 were assigned, 146/10 in objectui,
+// 19/1 in cloud.
+//
+// ## Zero judgement, by construction — and the ordering that makes it safe
+//
+// The predicate is a pure intersection of two fields with no threshold, no
+// timestamp and no identity test in it. That is deliberate: the same census
+// found the assignee field carrying TWO different meanings (dead agent claims
+// left by a state rollback, and genuine human ownership on a handful of
+// objectui cards), and a row that tried to tell them apart would be guessing at
+// the one thing this file refuses to guess at. The maintainer's ruling settles
+// the order (2026-08-23): the rule lands FIRST and any true-ownership exemption
+// is an explicit marker LATER — never the other way round. An exemption
+// invented here, in the absence of that marker, would silently un-report the
+// exact population the row exists for.
+//
+// ⛔ And the remedy is asymmetric, so the sentence says so: an agent may clear
+// a dead agent claim on the evidence, and must NEVER clear a human's
+// assignment.
+// ---------------------------------------------------------------------------
+
+/**
+ * H24 — null when clean, else the finding sentence.
+ *
+ * Gated on the card being OPEN (like H22's gate, in mirror image): a closed
+ * card carrying `pm:queue` is H22's residue row, and reporting it here too
+ * would double-count one card under two items that prescribe different writes.
+ * `state` is absent from some fixtures and every live open listing sets it, so
+ * only an explicit `closed` declines — an unknown state is judged, never used
+ * as a silent exemption.
+ */
+export function h24QueuedWithAssignee(issue) {
+  if (issue?.state === 'closed') return null;
+  if (!labelNames(issue ?? {}).includes('pm:queue')) return null;
+  const logins = (issue?.assignees ?? [])
+    .map((a) => (typeof a === 'string' ? a : a?.login))
+    .filter(Boolean);
+  if (logins.length === 0) return null;
+  return (
+    `\`pm:queue\` while ASSIGNED to ${logins.map((l) => `\`${l}\``).join(', ')} — the board makes ` +
+    'two contradictory claims about this one card: the queue view reads `pm:queue` as ' +
+    'dispatchable NOW, and the claim protocol reads a non-empty assignee as TAKEN (⛔ never ' +
+    'reassign). Both readers are right about what they read, so the card is available to everyone ' +
+    'and forbidden to everyone at once — not a race, a card nobody can legally move. The measured ' +
+    'origin is a state ROLLBACK that swapped the label and left the field: the landing re-label ' +
+    'and the unlock scan both owe 「同笔摘 assignee」 and only dead-claim reclamation ever said ' +
+    'so (17 carriers across three repos at the 2026-08-23 census). Remedy: whichever write set ' +
+    '`pm:queue` owes the assignee drop in the SAME stroke — do it now. ⚠️ Asymmetric: an agent ' +
+    'identity in that field is dead-claim residue and may be cleared on its evidence; a HUMAN ' +
+    'assignment may be real ownership and ⛔ must never be cleared by an agent — take it to the ' +
+    'maintainer. This row fires either way and states the login so the reader can tell them ' +
+    'apart: the rule lands first and an ownership exemption is an explicit marker later, never ' +
+    'the other way round (ruling 2026-08-23).'
+  );
+}
+
+// ---------------------------------------------------------------------------
+// H25 — `pm:awaiting-maintainer` coexisting with another pm STATE label
+// (#11196 fix 5, the exclusivity half of the new state).
+//
+// The state model makes the pm state labels ONE-OF: each is a claim about
+// where the card is, and two of them at once leaves every reader to pick. H3
+// is the same invariant for the one pair that was measured drifting, and this
+// row is the same invariant for the newest state — written now, while the
+// population is zero, because the cheapest moment to pin a vocabulary is
+// before anything can carry it.
+//
+// Each coexistence is a specific lie, not a generic tidiness complaint:
+//
+//   + `pm:queue`             dispatchable AND waiting on a human — H24's
+//                            two-views contradiction with a different second
+//                            half, and the shape this whole family is about.
+//   + `pm:dispatched`        a dev is on it AND nobody is: the label pair says
+//                            an agent is working a card whose next act is the
+//                            maintainer's.
+//   + `pm:blocked`           two different release mechanisms are declared at
+//                            once (an unlock scan over `Blocked-by:`, and a
+//                            human act), so neither reader can tell which one
+//                            will actually free it.
+//   + `pm:on-hold`           the hold requires a machine-fireable
+//                            `Restart-when:` (H9) and this state exists
+//                            precisely for the card that cannot have one.
+//                            Carrying both claims an exit that does not exist.
+//   + `needs-user-decision`  the decision inbox says a RULING is owed; this
+//                            state says a ruling was already given and an ACT
+//                            is owed. Both at once inflates the inbox with a
+//                            question nobody has to answer.
+//
+// ⛔ Deliberately NOT here, and deferred rather than dropped: any requirement
+// that the card NAME the awaited action. That is a grammar for a protocol face
+// the SKILL.md state-model row has not been written for yet, and inventing one
+// in the sweeper would make the sweeper the author of the protocol it audits.
+// ---------------------------------------------------------------------------
+
+/** The states `pm:awaiting-maintainer` must never coexist with. */
+export const AWAITING_MAINTAINER_EXCLUSIVE_LABELS = [
+  'pm:queue',
+  'pm:dispatched',
+  'pm:blocked',
+  'pm:on-hold',
+  'needs-user-decision',
+];
+
+/**
+ * Why each coexistence is a contradiction — one clause per label, so the
+ * finding names the specific lie rather than "these two labels disagree".
+ */
+const AWAITING_MAINTAINER_CONFLICT_REASON = {
+  'pm:queue': 'dispatchable now AND waiting on a human act',
+  'pm:dispatched': 'an agent is working it AND the next act is the maintainer\'s',
+  'pm:blocked': 'two different release mechanisms declared at once (unlock scan vs. a human act)',
+  'pm:on-hold': 'a hold owes a machine-fireable `Restart-when:` (H9) and this state is for the card that cannot have one',
+  'needs-user-decision': 'the decision inbox says a ruling is owed; this state says one was already given',
+};
+
+/** H25 — null when clean, else the finding sentence. */
+export function h25AwaitingMaintainerExclusivity(issue) {
+  if (issue?.state === 'closed') return null;
+  const labels = labelNames(issue ?? {});
+  if (!labels.includes(AWAITING_MAINTAINER_LABEL)) return null;
+  const conflicts = AWAITING_MAINTAINER_EXCLUSIVE_LABELS.filter((l) => labels.includes(l));
+  if (conflicts.length === 0) return null;
+  const named = conflicts
+    .map((l) => `\`${l}\` (${AWAITING_MAINTAINER_CONFLICT_REASON[l]})`)
+    .join('; ');
+  return (
+    `\`${AWAITING_MAINTAINER_LABEL}\` coexists with ${named} — the pm state labels are ONE-OF, ` +
+    'and two state claims on one card leave every reader to pick which is true. The awaiting ' +
+    'state is the card whose remaining work is a MANUAL maintainer action, which is exactly why ' +
+    'it has no machine exit; pairing it with a state that declares a different exit tells the ' +
+    'unlock scan, the queue view and the decision inbox three different stories. Keep the ONE ' +
+    'state that is true and drop the other(s) in a single write.'
+  );
+}
+
+// ---------------------------------------------------------------------------
+// H26 — a block whose target can never CLOSE, and the stale chain (#11219).
+//
+// The unlock predicate is "the `Blocked-by:` target CLOSED". `pm:on-hold` and
+// `needs-user-decision` are, by definition, states a card sits in WHILE OPEN.
+// A block naming such a target is therefore structurally indefinite: nothing in
+// the machinery can ever fire it, and until this row nothing said so.
+//
+// ## Why every existing check passes on these cards
+//
+// The waiting card is perfectly well-formed — it has its machine-readable line
+// (H4 clean), its target resolves, the target is open (H19 clean), its label is
+// correct. H9 is the nearest neighbour and asks the mirror question: it audits
+// the HELD card for a fireable `Restart-when:`. Nobody audited the card WAITING
+// on one. So the card passes every gauge and still cannot move — which is why
+// the six measured instances were found by a human reading, not by any sweep:
+//
+//   cloud#1119, cloud#799  -> cloud#987      (`pm:on-hold`), parked since July
+//   cloud#861              -> cloud#855      (`pm:on-hold`)
+//   objectos#75, #135      -> objectos#68    (`needs-user-decision`)
+//   cloud#1332             -> cloud#1331     (`pm:queue`, titled `[Decision]`)
+//
+// The last row is deliberately NOT reported by this predicate: a decision card
+// wearing a work label is a mislabelling to fix, not a fact readable from the
+// labels this row reads, and inventing a title heuristic would make the sweeper
+// guess at intent. Two of the rows are one repo's ENTIRE blocked inventory
+// waiting on its one unanswered decision card — one ruling clears the repo.
+//
+// ## The second leg: the stale chain
+//
+// `cloud#1395` -> `objectstack#10101`, which is OPEN, so the block reads live.
+// But #10101 was itself an H19 finding on the same sweep: both of ITS blockers
+// had already closed. The block was real one level up and false two levels up,
+// and a single-level predicate cannot see that. Flagging a target that is
+// itself `pm:blocked` is the cheap, honest version of that: it does not chase
+// the chain (which would cost a request per hop and could cycle), it says the
+// wait is TRANSITIVE so a reader knows to look one level further.
+//
+// ## Quota
+//
+// Free. H19 already resolves each distinct target — from an open listing this
+// sweep holds, or with one GET — and a resolved target's LABELS are a field
+// that was already in the payload. Nothing here adds a request; the resolution
+// rows simply stopped throwing the labels away.
+//
+// Report-only, and pointedly not a judgement that the block is WRONG: waiting
+// on a deferred card is sometimes exactly right. The row says this block has no
+// mechanism that will ever release it, which is the thing a human should see
+// rather than discover in a hand sweep.
+// ---------------------------------------------------------------------------
+
+/**
+ * Target states that can never satisfy the unlock predicate, because they are
+ * states an OPEN card sits in. `pm:blocked` is deliberately not here — that is
+ * the chain leg below, and it says something different: the target CAN close,
+ * once its own blocker does.
+ */
+export const INDEFINITE_TARGET_LABELS = ['pm:on-hold', 'needs-user-decision'];
+
+/**
+ * H26 — null when every open target can still close on its own, else the
+ * finding sentence.
+ *
+ * ## What an unjudged target does here, and why it is silent rather than loud
+ *
+ * A row whose `labels` is not an array is one this sweep could not read, and
+ * every such target is ALREADY firing H19's unresolved branch on this very
+ * card, with a sentence that says the liveness is unjudged. Repeating it here
+ * would double-report one gap under two items; the #4690 duty is discharged,
+ * once, in the item that owns it.
+ *
+ * @param {object} issue — an OPEN issue.
+ * @param {{ key: string, number: number, local: boolean,
+ *   state: 'open'|'closed'|'unresolved', labels?: string[]|null }[]} resolutions
+ */
+export function h26BlockOnIndefiniteTarget(issue, resolutions) {
+  if (!needsBlockerLiveness(issue)) return null;
+  const open = (resolutions ?? []).filter(
+    (r) => r?.state === 'open' && Array.isArray(r.labels),
+  );
+  if (open.length === 0) return null;
+
+  const indefinite = open
+    .map((r) => ({ row: r, states: INDEFINITE_TARGET_LABELS.filter((l) => r.labels.includes(l)) }))
+    .filter((r) => r.states.length > 0);
+  // A target that is BOTH parked and blocked is named once, under the reading
+  // that ends the wait forever rather than the one that merely lengthens it.
+  const chained = open.filter(
+    (r) => r.labels.includes('pm:blocked') && !indefinite.some((i) => i.row.key === r.key),
+  );
+  if (indefinite.length === 0 && chained.length === 0) return null;
+
+  const parts = [];
+  if (indefinite.length > 0) {
+    const named = indefinite
+      .slice(0, H19_TARGET_LIST_CAP)
+      .map(
+        ({ row, states }) =>
+          `\`${row.local ? `#${row.number}` : row.key}\` (${states.map((s) => `\`${s}\``).join(' + ')})`,
+      )
+      .join(', ');
+    const more =
+      indefinite.length > H19_TARGET_LIST_CAP
+        ? ` +${indefinite.length - H19_TARGET_LIST_CAP} more`
+        : '';
+    parts.push(
+      `\`pm:blocked\` on ${indefinite.length} target(s) that can never CLOSE: ${named}${more}. ` +
+        'The unlock predicate is "the `Blocked-by:` target closed", and `pm:on-hold` / ' +
+        '`needs-user-decision` are by definition states a card sits in WHILE OPEN — so this ' +
+        'block has NO MECHANISM THAT WILL EVER RELEASE IT. Every existing check passes on this ' +
+        'card (the line is present, the target resolves, the target is open, the label is ' +
+        'correct), which is why the measured instances were found by a human reading and by no ' +
+        'gauge; H9 asks the mirror question about the HELD card and nothing asked about the ' +
+        'WAITING one. ⚠️ Not a claim that the block is wrong — waiting on a deferred card is ' +
+        'sometimes exactly right. It says the wait is indefinite BY CONSTRUCTION, so the release ' +
+        'has to come from the target\'s own state changing (a ruling answered, a hold restarted) ' +
+        'and someone has to want that.',
+    );
+  }
+  if (chained.length > 0) {
+    const named = chained
+      .slice(0, H19_TARGET_LIST_CAP)
+      .map((r) => `\`${r.local ? `#${r.number}` : r.key}\``)
+      .join(', ');
+    const more =
+      chained.length > H19_TARGET_LIST_CAP ? ` +${chained.length - H19_TARGET_LIST_CAP} more` : '';
+    parts.push(
+      `The wait is TRANSITIVE: ${named}${more} ${chained.length === 1 ? 'is' : 'are'} itself ` +
+        '`pm:blocked`, so this card is waiting on a card that is waiting. A single-level ' +
+        'predicate cannot see past one hop, and the measured chain was real one level up and ' +
+        'FALSE two levels up (the target was an H19 finding on the same sweep — both of ITS ' +
+        'blockers had closed). This row does not chase the chain; it says to look one level ' +
+        'further.',
+    );
+  }
+  return parts.join(' ');
 }
 
 // ---------------------------------------------------------------------------
@@ -4532,16 +5077,103 @@ async function listOpenPullRequests() {
 }
 
 /**
- * The merged-PR window H8 reads: most recently UPDATED closed PRs, merged
- * ones only, capped at two pages — a quota decision whose consequence is
- * H8's stated boundary (a delivery older than the window is invisible). At
- * ~18 merges/day two pages reach well past the longest measured
- * unexecuted-verdict latency; `sort=updated` so a long-lived PR that merges
- * late is still in the window when it matters.
+ * How this file states a bounded window's boundary, in ONE place (#11118).
+ *
+ * Every window here is a page cap, and a page cap is meaningless until it is
+ * divided by a rate. The three windows below used to state their boundaries in
+ * prose, each derived from a rate measured whenever that item was written — and
+ * one of them (H8's) was still quoting `~18 merges/day` from a repo that had
+ * since accelerated more than sevenfold. The sentence justifying the cap was
+ * describing an ~11-day reach for a window that had become ~1.8 days, and
+ * nothing in the file said so, because nothing in the file could: the
+ * arithmetic was prose, so no reader and no test could ever disagree with it.
+ *
+ * These two helpers make the derivation executable instead. The self-test pins
+ * them; the docblocks below quote numbers these functions produce.
+ *
+ * @param {number} rows — the window's size in rows (pages × per_page).
+ * @param {number} ratePerDay — the measured production rate of those rows.
+ * @returns {number|null} days of coverage, or null when the rate cannot divide.
  */
+export function windowCoverageDays(rows, ratePerDay) {
+  if (!Number.isFinite(rows) || !Number.isFinite(ratePerDay) || ratePerDay <= 0) return null;
+  return rows / ratePerDay;
+}
+
+/** How many consecutive patrol runs see a given row before it ages out. */
+export function sweepOverlap(coverageDays, cadenceHours = PATROL_CADENCE_HOURS) {
+  if (!Number.isFinite(coverageDays) || !Number.isFinite(cadenceHours) || cadenceHours <= 0) {
+    return null;
+  }
+  return (coverageDays * 24) / cadenceHours;
+}
+
+/** The scheduled patrol's period — `cron: '37 1,7,13,19 * * *'` in the workflow. */
+export const PATROL_CADENCE_HOURS = 6;
+
+/**
+ * The default-branch merge rate, MEASURED — the divisor every window below
+ * uses, and the number the stale `~18/day` was replaced with.
+ *
+ * Window pinned as full ISO INSTANTS, deliberately: `git log --since=` is an
+ * approxidate that fills the time-of-day from *now*, and two runs twelve
+ * minutes apart returned 1,443 and 1,441 messages for what read as one window
+ * (#11118's own warning, which this re-derivation obeys rather than repeats).
+ *
+ *   read     2026-08-23T08:42:15Z, `GET /repos/{repo}/commits`, 3 pages
+ *   window   2026-08-21T04:00:19Z … 2026-08-23T08:22:47Z  (2.18 days)
+ *   rows     300 commits, 300 of them carrying the `(#N)` squash marker
+ *   rate     300 / 2.18 = ~137.5 merges/day
+ *
+ * `main` is linear (measured on the same corpus at #10942's filing: 1,975
+ * reachable = 1,975 first-parent, 0 merge commits), so the commit count and the
+ * merge count are one count. The figure agrees with the independent 2026-08-22
+ * measurement this card was filed on (1,546 commits in 11.7 days ≈ 132/day),
+ * which is what makes it a rate rather than a spike.
+ */
+export const MEASURED_MERGES_PER_DAY = 137.5;
+
+/**
+ * The merged-PR window H8 reads: most recently UPDATED closed PRs, merged ones
+ * only, capped at four pages — a quota decision whose consequence is H8's
+ * stated boundary (a delivery older than the window is invisible).
+ * `sort=updated` so a long-lived PR that merges late is still in the window
+ * when it matters.
+ *
+ * ## The boundary, re-derived (#11118)
+ *
+ * The cap was two pages, justified by a sentence claiming they "reach well past
+ * the longest measured unexecuted-verdict latency" — true at ~18 merges/day,
+ * which is where that sentence came from, and false at the measured 137.5.
+ * Both readings, taken 2026-08-23T08:42:15Z over the live endpoint:
+ *
+ *   2 pages = 200 rows -> 197 merged, oldest merge 2026-08-21T14:00:28Z = 1.78d
+ *   4 pages = 400 rows -> 397 merged, oldest merge 2026-08-20T09:41:02Z = 2.96d
+ *
+ * (Derivation and reading agree: `windowCoverageDays(400, 137.5)` = 2.91d. The
+ * merged-only filter costs almost nothing — 397 of 400 closed PRs in the window
+ * were merged — so rows and merges are interchangeable here in practice.)
+ *
+ * Four pages is chosen over an honest restatement because this row's damage
+ * model is asymmetric in the direction that punishes a short window: H8 reports
+ * a card whose delivering PR merged while the card still says `pm:dispatched`,
+ * i.e. precisely the paired write NOBODY noticed — which correlates with age.
+ * The population most likely to age out is the population the row exists for.
+ * The measured H8 specimen (#11036) sat unreported ~22h, so a 1.78-day window
+ * left the row about 2x its own worst measured latency; 2.96 days restores the
+ * "comfortably past it" the docblock always claimed. Cost: two extra requests
+ * per sweep, four sweeps a day, against a 15,000/h core quota.
+ *
+ * At the 6-hourly cadence that is `sweepOverlap(2.96)` ≈ 11.8 consecutive runs
+ * that see a given merge — the window is a detection HORIZON, not a retry
+ * budget: past it the finding is not delayed, it is gone (H22 catches the part
+ * of that population whose card later closes; nothing catches the rest).
+ */
+export const MERGED_WINDOW_PAGES = 4;
+
 async function listRecentlyMergedPullRequests() {
   const out = [];
-  for (let page = 1; page <= 2; page++) {
+  for (let page = 1; page <= MERGED_WINDOW_PAGES; page++) {
     const batch = await rest(
       `/repos/${OWNER_REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`,
     );
@@ -4566,10 +5198,39 @@ async function listRecentlyMergedPullRequests() {
  * a live duty someone remembers — and the deep tail is a backfill question,
  * not a patrol question. `state=closed` is the ONLY closed-issue read in this
  * file; every other collector stays open-only by construction.
+ *
+ * ## The boundary, re-derived — and the surprise in it (#11118)
+ *
+ * "Recent" was never measured here; it was assumed to mean roughly what H8's
+ * window meant. It did not, and the divisor is the reason: this window is
+ * ordered by `updated`, and a closed card is BUMPED by every later comment,
+ * label write and cross-reference, so the rows are consumed by issue ACTIVITY
+ * rather than by closures. Read 2026-08-23T08:42:15Z over the live endpoint:
+ *
+ *   2 pages = 200 rows -> updated 2026-08-22T17:05:44Z … 2026-08-23T08:39:14Z
+ *                         = 0.65d (~15.6 HOURS of update-recency)
+ *   4 pages = 400 rows -> updated 2026-08-21T15:44:49Z … 2026-08-23T08:39:14Z
+ *                         = 1.70d
+ *
+ * At 6-hourly runs the old cap gave `sweepOverlap(0.65)` ≈ 2.6 consecutive
+ * sweeps — and the derived floor is tighter still (200 rows / ~308 updates/day
+ * ≈ 1.30d for four pages against the 1.70d measured), because the rate is
+ * BURSTY: a triage round that touches a few hundred closed cards can eject a
+ * fresh residue card inside one cadence, and it does so exactly when residue is
+ * being produced fastest. That correlation is what makes 2.6 sweeps thin rather
+ * than merely small.
+ *
+ * Four pages restores what the anti-drowning argument above was actually
+ * choosing — a couple of days of recent residue — rather than the fifteen hours
+ * it turned out to be buying. It does NOT reopen the deep tail: the population
+ * that argument refuses is the 500+ historical carriers spanning months, and
+ * 1.7 days is not in it. Cost: two extra requests per sweep.
  */
+export const CLOSED_ISSUE_WINDOW_PAGES = 4;
+
 async function listRecentlyClosedIssues() {
   const out = [];
-  for (let page = 1; page <= 2; page++) {
+  for (let page = 1; page <= CLOSED_ISSUE_WINDOW_PAGES; page++) {
     const batch = await rest(
       `/repos/${OWNER_REPO}/issues?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`,
     );
@@ -4603,9 +5264,16 @@ async function listRecentlyClosedIssues() {
  * Measured over the corpus above: 1,546 commits in 11.7 days ≈ 132/day. Three
  * pages ≈ 300 commits ≈ 2.3 days, against a patrol that fires every 6 hours —
  * roughly a 9× overlap, so a message has to survive nine consecutive sweeps to
- * age out unseen. (The `~18 merges/day` figure in `listRecentlyMergedPullRequests`
- * predates that acceleration; nothing here depends on it, but a future reader
- * re-deriving a window from it should re-measure first.)
+ * age out unseen.
+ *
+ * RE-MEASURED 2026-08-23T08:42:15Z and unchanged, which is why this window
+ * alone kept its cap while H8's and H22's were widened (#11118): the same three
+ * pages read 300 commits spanning 2026-08-21T04:00:19Z … 2026-08-23T08:22:47Z
+ * = 2.18 days at ~137.5/day, i.e. `sweepOverlap(2.18)` ≈ 8.7 runs. This item's
+ * docblock was the only one that DERIVED its cap from a measured rate instead
+ * of quoting a remembered one, and it is the only one that survived contact
+ * with a re-measure — the argument for keeping the derivation executable
+ * (`windowCoverageDays`, `MEASURED_MERGES_PER_DAY`) rather than in prose.
  *
  * No `sha=` parameter: the endpoint defaults to the repository's own default
  * branch, which keeps this reader repo-agnostic exactly like every other listing
@@ -4617,7 +5285,7 @@ async function listRecentlyClosedIssues() {
  * commits would simply feed this row a few branch-side messages, which are a
  * surface GitHub's parser reads too — wider, never wrong.
  */
-const COMMIT_WINDOW_PAGES = 3;
+export const COMMIT_WINDOW_PAGES = 3;
 
 async function listRecentDefaultBranchCommits() {
   const out = [];
@@ -4649,7 +5317,14 @@ async function listAllOpenIssues() {
 }
 
 async function sweepInto(findings, seen, seenPrs, seenMerged, seenUnscoped, seenClosed, stats = {}, hold = null) {
-  for (const label of ['pm:dispatched', 'pm:queue', 'pm:blocked', 'pm:seat', 'pm:on-hold', 'priority:p0']) {
+  // `pm:awaiting-maintainer` is listed like every other state label (#11196
+  // fix 5). H25's exclusivity carriers would be reachable through the label
+  // they wrongly coexist with, but a card in the state ALONE would otherwise be
+  // swept by nothing at all — no H2 claim check, no H11 parked inventory — and
+  // "the patrol's input set is narrower than the states the board produces" is
+  // the defect this whole family is about. One label page per sweep, four
+  // sweeps a day, against a 15,000/h core quota.
+  for (const label of ['pm:dispatched', 'pm:queue', 'pm:blocked', 'pm:seat', 'pm:on-hold', AWAITING_MAINTAINER_LABEL, 'priority:p0']) {
     for (const issue of await listIssues(label)) seen.set(issue.number, issue);
   }
 
@@ -4729,6 +5404,14 @@ async function sweepInto(findings, seen, seenPrs, seenMerged, seenUnscoped, seen
     if (h3QueueAndDispatched(issue)) {
       findings.push([issue, 'H3', '`pm:queue` and `pm:dispatched` both present']);
     }
+    // H24 + H25 — two field/label intersections over cards this loop already
+    // holds, so neither costs a request. H24's population is the `pm:queue`
+    // listing; H25's carriers are all listed too, either by the awaiting label
+    // page below or by the very state label they wrongly coexist with.
+    const queuedAndTaken = h24QueuedWithAssignee(issue);
+    if (queuedAndTaken) findings.push([issue, 'H24', queuedAndTaken]);
+    const doubleState = h25AwaitingMaintainerExclusivity(issue);
+    if (doubleState) findings.push([issue, 'H25', doubleState]);
     // H4 — judged across BOTH channels. The fetch is gated by
     // `needsBlockedByComments`, so it costs a request only for the body-clean
     // cards whose verdict it can actually change (~2/3 of the blocked
@@ -5040,16 +5723,24 @@ async function sweepInto(findings, seen, seenPrs, seenMerged, seenUnscoped, seen
   //
   // One request per DISTINCT target, cached across cards: several cards
   // waiting on one epic is the normal shape, and it costs one read.
-  const openLocalNumbers = new Set();
-  for (const number of seen.keys()) openLocalNumbers.add(number);
-  for (const number of seenUnscoped.keys()) openLocalNumbers.add(number);
+  //
+  // The map holds the ISSUE, not just its number, because H26 (#11219) asks a
+  // second question of the same target — is it parked in a state that can never
+  // close? — and the answer is a field the payload already carried. Free by
+  // construction: a locally-open target is answered from a listing in hand, and
+  // a fetched one arrives with its labels on the same response. Nothing here
+  // adds a request; the resolution rows simply stop discarding the labels.
+  const openLocalIssues = new Map();
+  for (const [number, issue] of seenUnscoped) openLocalIssues.set(number, issue);
+  for (const [number, issue] of seen) openLocalIssues.set(number, issue);
   const blockerCache = new Map();
   const resolveBlockerTarget = async (target) => {
     const cached = blockerCache.get(target.key);
     if (cached) return cached;
     let resolved;
-    if (target.local && openLocalNumbers.has(target.number)) {
-      resolved = { ...target, state: 'open', closedAt: null, detail: null };
+    const localOpen = target.local ? openLocalIssues.get(target.number) : undefined;
+    if (localOpen) {
+      resolved = { ...target, state: 'open', closedAt: null, detail: null, labels: labelNames(localOpen) };
     } else {
       try {
         const row = await rest(`/repos/${target.repo}/issues/${target.number}`);
@@ -5058,6 +5749,7 @@ async function sweepInto(findings, seen, seenPrs, seenMerged, seenUnscoped, seen
           state: row.state === 'closed' ? 'closed' : 'open',
           closedAt: row.closed_at ?? null,
           detail: null,
+          labels: labelNames(row),
         };
       } catch (err) {
         // Per-target, never fatal — and deliberately NOT the rethrow H16/H17
@@ -5089,6 +5781,13 @@ async function sweepInto(findings, seen, seenPrs, seenMerged, seenUnscoped, seen
     }
     const expired = h19BlockOutlivedBlocker(issue, resolutions);
     if (expired) findings.push([issue, 'H19', expired]);
+    // H26 — the same resolutions, asked the OTHER question: not "has the target
+    // closed" but "can it ever". Both rows can fire on one card (a two-target
+    // block where one blocker closed and the other is parked indefinitely), and
+    // they must: they name different halves of the same wait and prescribe
+    // different reads.
+    const indefinite = h26BlockOnIndefiniteTarget(issue, resolutions);
+    if (indefinite) findings.push([issue, 'H26', indefinite]);
   }
   // Distinct targets, which is the unit the cache and the request count are
   // in — and the word is in the summary sentence so the number cannot be read
@@ -5814,9 +6513,14 @@ function selfTest() {
   t('H22: `pm:seat` + a state label is residue for the state label', h22ClosedCardPmResidue(closedCard(['pm:seat', 'pm:dispatched'])).includes('`pm:dispatched`'), true);
   t('H22: …and does not name the identity sticker', h22ClosedCardPmResidue(closedCard(['pm:seat', 'pm:dispatched'])).includes('`pm:seat`'), false);
 
-  // The census's five, each pinned — the set is the item's scope, so a silent
-  // edit to it should break a test rather than quietly change what patrols.
-  t('H22: the measured residue set is the five from the census', PM_RESIDUE_LABELS.join(','), 'pm:dispatched,pm:queue,pm:blocked,pm:on-hold,pm:blocking');
+  // The census's five plus the state ruled in on 2026-08-23, each pinned — the
+  // set is the item's scope, so a silent edit to it should break a test rather
+  // than quietly change what patrols. `pm:awaiting-maintainer` is the ONE
+  // member not drawn from the #10688 census, and deliberately so: it had no
+  // live carriers to census when it was created, and admitting it at creation
+  // is what keeps the state from accruing the residue this row exists to catch
+  // before anyone thinks to measure it (#11196 fix 5).
+  t('H22: the residue set is the census five + the newly ruled state', PM_RESIDUE_LABELS.join(','), 'pm:dispatched,pm:queue,pm:blocked,pm:on-hold,pm:blocking,pm:awaiting-maintainer');
   // …and the two similarly-named sets stay APART: H13's carries `finding`, this
   // one carries `pm:blocking`, and unifying them would break both items.
   t('H22: the residue set is NOT H13\'s visibility set', PM_RESIDUE_LABELS.join(',') === PM_STATE_LABELS.join(','), false);
@@ -7631,6 +8335,212 @@ function selfTest() {
     false,
   );
 
+  // -- H24: `pm:queue` + a non-empty assignee (#11196 fix 1) ------------------
+  // The two-field intersection, both directions, plus the three adjacent rows
+  // that decline the shape (which is why it had no reader for 17 cards).
+  const queued = (labels, assignees = [], extra = {}) => ({
+    number: 10638,
+    state: 'open',
+    labels: labels.map((name) => ({ name })),
+    assignees: assignees.map((login) => ({ login })),
+    body: '',
+    title: '',
+    ...extra,
+  });
+  t('H24: queued + assignee -> finding', typeof h24QueuedWithAssignee(queued(['pm:queue'], ['os-elon'])), 'string');
+  t('H24: queued + no assignee -> clean', h24QueuedWithAssignee(queued(['pm:queue'], [])), null);
+  t('H24: assigned but not queued is out of scope (H1/H2 own it)', h24QueuedWithAssignee(queued(['pm:dispatched'], ['os-elon'])), null);
+  t('H24: neither -> clean', h24QueuedWithAssignee(queued(['domain:skills'], [])), null);
+  t('H24: a missing issue does not crash', h24QueuedWithAssignee(undefined), null);
+  t('H24: …and the row names the login so residue and ownership are separable', h24QueuedWithAssignee(queued(['pm:queue'], ['yinlianghui'])).includes('`yinlianghui`'), true);
+  t('H24: every assignee is named, not just the first', h24QueuedWithAssignee(queued(['pm:queue'], ['os-elon', 'qq9340100'])).includes('`qq9340100`'), true);
+  t('H24: assignees given as plain logins are read too', typeof h24QueuedWithAssignee({ ...queued(['pm:queue']), assignees: ['os-elon'] }), 'string');
+  // The ruling's ORDER, pinned: the rule fires on a human assignment too, and
+  // the sentence carries the asymmetric remedy rather than an exemption.
+  t('H24: a human assignment still fires (exemption is a later explicit marker)', typeof h24QueuedWithAssignee(queued(['pm:queue'], ['yinlianghui'])), 'string');
+  t('H24: …and the row refuses the human-clearing write', h24QueuedWithAssignee(queued(['pm:queue'], ['yinlianghui'])).includes('never be cleared by an agent'), true);
+  t('H24: …and names the paired write it is owed', h24QueuedWithAssignee(queued(['pm:queue'], ['os-elon'])).includes('同笔摘 assignee'), true);
+  t('H24: …and names both contradicting readers', h24QueuedWithAssignee(queued(['pm:queue'], ['os-elon'])).includes('dispatchable NOW'), true);
+  // The closed gate, in mirror image to H22's open gate: one card, one row.
+  t('H24: a CLOSED queued+assigned card is H22 residue, not this row', h24QueuedWithAssignee(queued(['pm:queue'], ['os-elon'], { state: 'closed' })), null);
+  t('H24: …and H22 does fire on that same card', typeof h22ClosedCardPmResidue(queued(['pm:queue'], ['os-elon'], { state: 'closed', state_reason: 'completed' })), 'string');
+  // An absent `state` is JUDGED — an unknown field must never act as a silent
+  // exemption (#4690 direction).
+  t('H24: an absent state field is judged, not exempted', typeof h24QueuedWithAssignee({ ...queued(['pm:queue'], ['os-elon']), state: undefined }), 'string');
+  // The adjacent rows stay silent on the measured shape — the reason it needed
+  // a row of its own rather than a widening.
+  t('H24 adjacency: H1 is silent (the card HAS an assignee)', h1DispatchedNoAssignee(queued(['pm:queue'], ['os-elon'])), false);
+  t('H24 adjacency: H3 is silent (only ONE label is present)', h3QueueAndDispatched(queued(['pm:queue'], ['os-elon'])), false);
+  t('H24 adjacency: H2 is silent when the claim comment is complete', h2AssigneeNoClaimComment(queued(['pm:queue'], ['os-elon']), ['Claim: PM loop round 1\nSession: session_x']), false);
+
+  // -- The paired-write remedy texts (#11196 fix 2) ---------------------------
+  // H8's landing re-label and H19's unlock scan are the two rollback paths that
+  // never named the assignee drop; both sentences name it now, and the
+  // half-delivered branch must NOT (there the label and the claim are CORRECT).
+  const pairedMerged = [{ number: 900, merged_at: '2026-08-22T10:00:00Z', body: 'Fixes #10638', head: { ref: 'x' } }];
+  const pairedOpenHalf = [{ number: 901, merged_at: null, draft: true, body: 'Part of #10638', head: { ref: 'y' } }];
+  t('H8: the full-delivery remedy names 同笔摘 assignee', h8MergedPrStillDispatched(queued(['pm:dispatched'], ['os-elon']), pairedMerged, []).includes('同笔摘 assignee'), true);
+  t('H8: …and points at H24 as the state it prevents', h8MergedPrStillDispatched(queued(['pm:dispatched'], ['os-elon']), pairedMerged, []).includes('H24'), true);
+  t('H8: …and keeps the human-assignment refusal', h8MergedPrStillDispatched(queued(['pm:dispatched'], ['os-elon']), pairedMerged, []).includes('never cleared by an agent'), true);
+  t('H8: the HALF-delivered branch prescribes no assignee drop', h8MergedPrStillDispatched(queued(['pm:dispatched'], ['os-elon']), pairedMerged, pairedOpenHalf).includes('同笔摘 assignee'), false);
+  t('H8: …and still says the label is correct there', h8MergedPrStillDispatched(queued(['pm:dispatched'], ['os-elon']), pairedMerged, pairedOpenHalf).includes('must NOT be dropped'), true);
+  t('H19: the release text names 同笔摘 assignee', h19BlockOutlivedBlocker(queued(['pm:blocked']), [{ key: 'objectstack-ai/objectstack#2', number: 2, local: true, state: 'closed' }]).includes('同笔摘 assignee'), true);
+  t('H19: …on the unresolved branch too (one release contract, one sentence)', h19BlockOutlivedBlocker(queued(['pm:blocked']), [{ key: 'objectstack-ai/cloud#2', number: 2, local: false, state: 'unresolved', detail: 'HTTP 404' }]).includes('同笔摘 assignee'), true);
+
+  // -- H25 + the `pm:awaiting-maintainer` vocabulary (#11196 fix 5) -----------
+  t('the ruled spelling is pm:-prefixed', AWAITING_MAINTAINER_LABEL, 'pm:awaiting-maintainer');
+  t('H25: awaiting + pm:queue -> finding', typeof h25AwaitingMaintainerExclusivity(queued([AWAITING_MAINTAINER_LABEL, 'pm:queue'])), 'string');
+  t('H25: …and the row names the coexisting label', h25AwaitingMaintainerExclusivity(queued([AWAITING_MAINTAINER_LABEL, 'pm:queue'])).includes('`pm:queue`'), true);
+  t('H25: …and the specific lie, not a tidiness complaint', h25AwaitingMaintainerExclusivity(queued([AWAITING_MAINTAINER_LABEL, 'pm:on-hold'])).includes('Restart-when'), true);
+  t('H25: awaiting ALONE -> clean', h25AwaitingMaintainerExclusivity(queued([AWAITING_MAINTAINER_LABEL])), null);
+  t('H25: awaiting + a non-state label -> clean', h25AwaitingMaintainerExclusivity(queued([AWAITING_MAINTAINER_LABEL, 'domain:skills', 'priority:p0', 'pm:blocking'])), null);
+  t('H25: no awaiting label -> out of scope however many states', h25AwaitingMaintainerExclusivity(queued(['pm:queue', 'pm:dispatched'])), null);
+  t('H25: a CLOSED card is H22 residue, not a live exclusivity breach', h25AwaitingMaintainerExclusivity(queued([AWAITING_MAINTAINER_LABEL, 'pm:queue'], [], { state: 'closed' })), null);
+  t('H25: a missing issue does not crash', h25AwaitingMaintainerExclusivity(undefined), null);
+  t('H25: several conflicts are ALL named', h25AwaitingMaintainerExclusivity(queued([AWAITING_MAINTAINER_LABEL, 'pm:queue', 'needs-user-decision'])).includes('`needs-user-decision`'), true);
+  for (const conflicting of AWAITING_MAINTAINER_EXCLUSIVE_LABELS) {
+    t(`H25: awaiting + \`${conflicting}\` -> finding`, typeof h25AwaitingMaintainerExclusivity(queued([AWAITING_MAINTAINER_LABEL, conflicting])), 'string');
+  }
+  // The four readers the new state joins — each pinned in BOTH directions, so
+  // the vocabulary cannot be half-added (the defect class this family is about).
+  t('vocabulary: H13 treats awaiting as a real state -> clean', h13DomainWithoutPmState(domainCard(['domain:skills', AWAITING_MAINTAINER_LABEL], hoursAgo(200)), NOW), null);
+  t('vocabulary: …while the same card without it is still H13', typeof h13DomainWithoutPmState(domainCard(['domain:skills'], hoursAgo(200)), NOW), 'string');
+  t('vocabulary: H22 counts awaiting as residue on a closed card', h22ClosedCardPmResidue(closedCard([AWAITING_MAINTAINER_LABEL])).includes(`\`${AWAITING_MAINTAINER_LABEL}\``), true);
+  t('vocabulary: …and an open card carrying it is not H22 residue', h22ClosedCardPmResidue(queued([AWAITING_MAINTAINER_LABEL])), null);
+  t('vocabulary: H11 sees awaiting as a PARKED state', typeof h11ImportantParked(parkedCard(['bug', AWAITING_MAINTAINER_LABEL]), NOW), 'string');
+  t('vocabulary: …and names it as the parked state', h11ImportantParked(parkedCard(['bug', AWAITING_MAINTAINER_LABEL]), NOW).includes(`\`${AWAITING_MAINTAINER_LABEL}\``), true);
+  t('vocabulary: …with the exit this state actually has (no Restart-when re-check)', h11ImportantParked(parkedCard(['bug', AWAITING_MAINTAINER_LABEL]), NOW).includes('Restart-when'), false);
+  t('vocabulary: …and it says the state has no machine exit', h11ImportantParked(parkedCard(['bug', AWAITING_MAINTAINER_LABEL]), NOW).includes('NO machine exit'), true);
+  t('vocabulary: H11 keeps the mechanical remedy for a BLOCKED card', h11ImportantParked(parkedCard(['bug', 'pm:blocked']), NOW).includes('Restart-when'), true);
+  t('vocabulary: a fresh awaiting park is still clean', h11ImportantParked(parkedCard(['bug', AWAITING_MAINTAINER_LABEL], { created: daysAgo(2) }), NOW), null);
+  t('vocabulary: an UNimportant awaiting card is not inventory', h11ImportantParked(parkedCard([AWAITING_MAINTAINER_LABEL]), NOW), null);
+
+  // -- The window arithmetic (#11118) ----------------------------------------
+  // The derivation is executable so that a cap and the sentence justifying it
+  // cannot drift apart again: H8's docblock quoted `~18 merges/day` while the
+  // repo ran at ~132, which turned a claimed ~11-day reach into ~1.8 days with
+  // nothing able to notice.
+  t('windows: coverage is rows / rate', windowCoverageDays(400, 100), 4);
+  t('windows: H8 four pages against the measured rate', Number(windowCoverageDays(MERGED_WINDOW_PAGES * 100, MEASURED_MERGES_PER_DAY).toFixed(2)), 2.91);
+  t('windows: …which is what the live reading measured (2.96d), within a rounding', windowCoverageDays(MERGED_WINDOW_PAGES * 100, MEASURED_MERGES_PER_DAY) > 2.5, true);
+  t('windows: the OLD two-page cap was under two days, not the ~11 its prose claimed', Number(windowCoverageDays(200, MEASURED_MERGES_PER_DAY).toFixed(2)), 1.45);
+  t('windows: …and the stale ~18/day figure is what produced the ~11-day claim', Number(windowCoverageDays(200, 18).toFixed(1)), 11.1);
+  t('windows: H23 keeps three pages', COMMIT_WINDOW_PAGES, 3);
+  t('windows: …and its re-measured coverage still clears two days', windowCoverageDays(COMMIT_WINDOW_PAGES * 100, MEASURED_MERGES_PER_DAY) > 2, true);
+  t('windows: H22 widened to four pages', CLOSED_ISSUE_WINDOW_PAGES, 4);
+  t('windows: H8 widened to four pages', MERGED_WINDOW_PAGES, 4);
+  // The cadence side: a window is a detection HORIZON, and the overlap says how
+  // many runs see a row before it is gone for good.
+  t('windows: the patrol cadence is the workflow\'s', PATROL_CADENCE_HOURS, 6);
+  t('windows: overlap is coverage over cadence', sweepOverlap(1, 6), 4);
+  t('windows: H8\'s new window is seen by ~12 runs', Math.round(sweepOverlap(windowCoverageDays(400, MEASURED_MERGES_PER_DAY))), 12);
+  t('windows: H22\'s OLD 0.65d reading was ~2.6 runs (the thin one)', Number(sweepOverlap(0.65).toFixed(1)), 2.6);
+  t('windows: H22\'s measured new reading is ~6.8 runs', Number(sweepOverlap(1.7).toFixed(1)), 6.8);
+  // Degenerate inputs answer "cannot divide" rather than Infinity or NaN — a
+  // number no reading produced must never be renderable as a boundary.
+  t('windows: a zero rate cannot divide', windowCoverageDays(200, 0), null);
+  t('windows: a negative rate cannot divide', windowCoverageDays(200, -5), null);
+  t('windows: a missing rate cannot divide', windowCoverageDays(200, undefined), null);
+  t('windows: a missing row count cannot divide', windowCoverageDays(undefined, 137.5), null);
+  t('windows: a zero cadence has no overlap', sweepOverlap(2, 0), null);
+  t('windows: an unusable coverage has no overlap', sweepOverlap(null), null);
+
+  // -- H26: a block whose target can never close, + the stale chain (#11219) --
+  // The measured cards, by name, and both directions of every leg.
+  const waiting = (number = 1119) => ({
+    number,
+    state: 'open',
+    labels: [{ name: 'pm:blocked' }],
+    assignees: [],
+    body: 'Blocked-by: #987',
+    title: '',
+  });
+  const tgt = (number, labels, extra = {}) => ({
+    key: `objectstack-ai/cloud#${number}`,
+    number,
+    local: true,
+    state: 'open',
+    labels,
+    ...extra,
+  });
+  t('H26: target parked in pm:on-hold -> finding', typeof h26BlockOnIndefiniteTarget(waiting(), [tgt(987, ['pm:on-hold'])]), 'string');
+  t('H26: …and the row says the block has no releasing mechanism', h26BlockOnIndefiniteTarget(waiting(), [tgt(987, ['pm:on-hold'])]).includes('NO MECHANISM THAT WILL EVER RELEASE IT'), true);
+  t('H26: …and names the target and its state', h26BlockOnIndefiniteTarget(waiting(), [tgt(987, ['pm:on-hold'])]).includes('`#987` (`pm:on-hold`)'), true);
+  t('H26: target parked in needs-user-decision -> finding', typeof h26BlockOnIndefiniteTarget(waiting(75), [tgt(68, ['needs-user-decision'])]), 'string');
+  t('H26: a target carrying BOTH indefinite states names both', h26BlockOnIndefiniteTarget(waiting(), [tgt(987, ['pm:on-hold', 'needs-user-decision'])]).includes('`pm:on-hold` + `needs-user-decision`'), true);
+  // The clean directions — an ordinary open target is not this row's business.
+  t('H26: an ordinary open target -> clean', h26BlockOnIndefiniteTarget(waiting(), [tgt(987, ['pm:queue', 'domain:devx'])]), null);
+  t('H26: an unlabelled open target -> clean', h26BlockOnIndefiniteTarget(waiting(), [tgt(987, [])]), null);
+  t('H26: no targets at all -> no row (H4 owns the missing line)', h26BlockOnIndefiniteTarget(waiting(), []), null);
+  t('H26: absent resolutions -> no row', h26BlockOnIndefiniteTarget(waiting(), undefined), null);
+  t('H26: the label gate outranks an indefinite target', h26BlockOnIndefiniteTarget({ ...waiting(), labels: [{ name: 'pm:queue' }] }, [tgt(987, ['pm:on-hold'])]), null);
+  // A CLOSED target is H19's row, never this one: it closed, so the unlock CAN
+  // fire — the two items must not double-report one target.
+  t('H26: a CLOSED target is H19\'s row, not this one', h26BlockOnIndefiniteTarget(waiting(), [{ ...tgt(987, ['pm:on-hold']), state: 'closed' }]), null);
+  t('H26: …and H19 does fire on it', typeof h19BlockOutlivedBlocker(waiting(), [{ ...tgt(987, ['pm:on-hold']), state: 'closed' }]), 'string');
+  // An unresolved target is silent HERE and loud in H19 — one gap, one row.
+  t('H26: an unresolved target is silent (H19 owns the unjudged sentence)', h26BlockOnIndefiniteTarget(waiting(), [{ ...tgt(987, null), state: 'unresolved', detail: 'HTTP 404' }]), null);
+  t('H26: …and a labels-less open row cannot be judged either', h26BlockOnIndefiniteTarget(waiting(), [{ ...tgt(987, undefined) }]), null);
+  t('H26: …while H19 states that gap', h19BlockOutlivedBlocker(waiting(), [{ ...tgt(987, null), state: 'unresolved', detail: 'HTTP 404' }]).includes('UNJUDGED'), true);
+  // The chain leg.
+  t('H26: a target that is itself pm:blocked -> the transitive row', typeof h26BlockOnIndefiniteTarget(waiting(1395), [tgt(10101, ['pm:blocked'])]), 'string');
+  t('H26: …and it says to look one level further', h26BlockOnIndefiniteTarget(waiting(1395), [tgt(10101, ['pm:blocked'])]).includes('TRANSITIVE'), true);
+  t('H26: …and does not claim the block can never release', h26BlockOnIndefiniteTarget(waiting(1395), [tgt(10101, ['pm:blocked'])]).includes('NO MECHANISM'), false);
+  // Both legs at once, on two different targets, in one row.
+  const bothLegs = h26BlockOnIndefiniteTarget(waiting(), [tgt(987, ['pm:on-hold']), tgt(10101, ['pm:blocked'])]);
+  t('H26: both legs report together', bothLegs.includes('NO MECHANISM THAT WILL EVER RELEASE IT') && bothLegs.includes('TRANSITIVE'), true);
+  // A target that is BOTH parked and blocked is named ONCE, under the reading
+  // that ends the wait forever rather than the one that merely lengthens it.
+  const bothOnOne = h26BlockOnIndefiniteTarget(waiting(), [tgt(987, ['pm:on-hold', 'pm:blocked'])]);
+  t('H26: a parked AND blocked target is named once, as indefinite', bothOnOne.includes('NO MECHANISM THAT WILL EVER RELEASE IT'), true);
+  t('H26: …and not a second time as a chain', bothOnOne.includes('TRANSITIVE'), false);
+  // A partially indefinite block still reports: one live blocker does not make
+  // the indefinite one fireable.
+  t('H26: one indefinite target among open ones still fires', typeof h26BlockOnIndefiniteTarget(waiting(), [tgt(900, ['pm:queue']), tgt(987, ['pm:on-hold'])]), 'string');
+  // The render cap, shared with H19 so one card cannot flood the anchor body.
+  const manyIndefinite = h26BlockOnIndefiniteTarget(waiting(), [1, 2, 3, 4, 5, 6, 7].map((n) => tgt(n, ['pm:on-hold'])));
+  t('H26: the target list is capped like H19\'s', manyIndefinite.includes(`+${7 - H19_TARGET_LIST_CAP} more`), true);
+  t('H26: …and still counts the full set', manyIndefinite.includes('on 7 target(s)'), true);
+  // Cross-repo targets are addressed by full key, as in H19's rows.
+  t('H26: a cross-repo target is named owner/repo#N', h26BlockOnIndefiniteTarget(waiting(), [{ ...tgt(68, ['needs-user-decision']), local: false, key: 'objectstack-ai/objectos#68' }]).includes('`objectstack-ai/objectos#68`'), true);
+  // Both rows can fire on ONE card — different halves of one wait.
+  const expiredAndIndefinite = [{ ...tgt(900, ['pm:queue']), state: 'closed' }, tgt(987, ['pm:on-hold'])];
+  t('H26 + H19: a partially expired, partially indefinite block fires both', Boolean(h19BlockOutlivedBlocker(waiting(), expiredAndIndefinite)) && Boolean(h26BlockOnIndefiniteTarget(waiting(), expiredAndIndefinite)), true);
+
+  // -- resolveSweepRepo: the parameterisation that makes a verbatim sibling
+  // -- install correct rather than a green report about the wrong board (#11217)
+  t('sweep repo: PM_SWEEP_REPO wins when set', resolveSweepRepo({ PM_SWEEP_REPO: 'objectstack-ai/cloud', GITHUB_REPOSITORY: 'objectstack-ai/objectui' }).repo, 'objectstack-ai/cloud');
+  t('sweep repo: …and says where the answer came from', resolveSweepRepo({ PM_SWEEP_REPO: 'objectstack-ai/cloud' }).source, 'PM_SWEEP_REPO');
+  // The line that makes a copied file sweep the repo it was copied INTO.
+  t('sweep repo: a runner with no override sweeps its OWN repo', resolveSweepRepo({ GITHUB_REPOSITORY: 'objectstack-ai/objectui' }).repo, 'objectstack-ai/objectui');
+  t('sweep repo: …reported as such', resolveSweepRepo({ GITHUB_REPOSITORY: 'objectstack-ai/objectui' }).source, 'GITHUB_REPOSITORY');
+  t('sweep repo: a bare terminal falls back to the default', resolveSweepRepo({}).repo, DEFAULT_SWEEP_REPO);
+  t('sweep repo: …and names the fallback as the source', resolveSweepRepo({}).source, 'default');
+  // The objectstack leg, pinned in the exact shape its runner provides: same
+  // string as the hardcoded default this replaced, so every request path is
+  // byte-identical and the behaviour is unchanged by construction.
+  t('sweep repo: the objectstack runner resolves to the pre-change constant', resolveSweepRepo({ PM_SWEEP_REPO: 'objectstack-ai/objectstack', GITHUB_REPOSITORY: 'objectstack-ai/objectstack' }).repo, DEFAULT_SWEEP_REPO);
+  t('sweep repo: …and with only GITHUB_REPOSITORY set, identically', resolveSweepRepo({ GITHUB_REPOSITORY: 'objectstack-ai/objectstack' }).repo, DEFAULT_SWEEP_REPO);
+  t('sweep repo: …and that reading is valid', resolveSweepRepo({ GITHUB_REPOSITORY: 'objectstack-ai/objectstack' }).valid, true);
+  // Empty/whitespace is UNSET, not a value: Actions expressions expand to ''
+  // for an unset variable, and treating '' as a repo would sweep nothing while
+  // reporting a completed run.
+  t('sweep repo: an empty override is unset, not a repo', resolveSweepRepo({ PM_SWEEP_REPO: '', GITHUB_REPOSITORY: 'objectstack-ai/cloud' }).repo, 'objectstack-ai/cloud');
+  t('sweep repo: whitespace is unset too', resolveSweepRepo({ PM_SWEEP_REPO: '   ' }).repo, DEFAULT_SWEEP_REPO);
+  t('sweep repo: surrounding whitespace is trimmed, not rejected', resolveSweepRepo({ PM_SWEEP_REPO: ' objectstack-ai/cloud ' }).repo, 'objectstack-ai/cloud');
+  // A malformed value is REFUSED (the CLI exits 2 on it) and never silently
+  // replaced by the default — substituting a different board is the disease.
+  t('sweep repo: a bare name is invalid', resolveSweepRepo({ PM_SWEEP_REPO: 'objectui' }).valid, false);
+  t('sweep repo: …and is reported as itself, not as the default', resolveSweepRepo({ PM_SWEEP_REPO: 'objectui' }).repo, 'objectui');
+  t('sweep repo: a URL is invalid', resolveSweepRepo({ PM_SWEEP_REPO: 'https://github.com/objectstack-ai/objectui' }).valid, false);
+  t('sweep repo: a three-segment path is invalid', resolveSweepRepo({ PM_SWEEP_REPO: 'a/b/c' }).valid, false);
+  t('sweep repo: a trailing slash is invalid', resolveSweepRepo({ PM_SWEEP_REPO: 'objectstack-ai/' }).valid, false);
+  t('sweep repo: dots, dashes and underscores are legal repo characters', resolveSweepRepo({ PM_SWEEP_REPO: 'my-org/some_repo.js' }).valid, true);
+  t('sweep repo: no env at all is the same as an empty one', resolveSweepRepo().repo, DEFAULT_SWEEP_REPO);
+  // The sweep target rides into the rendered report, so a reader of a sibling
+  // repo's anchor can see WHICH board was read (and a wrong one is legible).
+  t('sweep repo: the rendered summary names the swept repo', summaryLine({ repo: 'objectstack-ai/objectui', issues: 3, unscoped: 4, prs: 1, merged: 2 }, 0).includes('objectstack-ai/objectui'), true);
+
   let failed = 0;
   for (const [name, actual, expected] of cases) {
     const ok = actual === expected;
@@ -7646,6 +8556,20 @@ function selfTest() {
 
 const isMain = isEntrypoint(import.meta.url);
 if (isMain) {
+  // A malformed sweep target is bad usage (exit 2), refused BEFORE any request
+  // — including the probe's, whose second stage is a repo-scoped read of this
+  // very string. Silently falling back to the default would sweep a board
+  // nobody asked for and render a green report about it (#11217). The
+  // self-test path is exempt: it makes no request and must stay runnable in
+  // any container, whatever the environment carries.
+  if (!process.argv.includes('--self-test') && !SWEEP_REPO.valid) {
+    console.error(
+      `check-half-states: ${SWEEP_REPO.source}=${JSON.stringify(SWEEP_REPO.repo)} is not an ` +
+        '`owner/name` repository. Refusing to fall back to a different board — a report about ' +
+        'the wrong repo reads exactly like a report about this one.',
+    );
+    process.exit(2);
+  }
   if (process.argv.includes('--self-test')) {
     selfTest();
   } else if (process.argv.includes('--probe')) {
