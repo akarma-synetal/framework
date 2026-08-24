@@ -616,6 +616,10 @@ export const esESObjects: NonNullable<TranslationData['objects']> = {
       }
     },
     _actions: {
+      invite_user: {
+        label: "Invitar usuario",
+        successMessage: "Invitación enviada"
+      },
       add_member: {
         label: "Añadir miembro",
         successMessage: "Miembro añadido"
