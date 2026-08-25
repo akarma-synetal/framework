@@ -219,8 +219,8 @@ localStorage / auth gotchas.
 11. **Worktree-first — never edit on the shared `main` checkout.** This repo is edited by **multiple agents at once**;
     the shared tree has its HEAD switched and reset *under you*, silently clobbering uncommitted work — a feature
     branch on the *shared* checkout is **not** enough (it still gets switched under you). Before your **first file
-    edit**, be in a dedicated worktree on a feature branch:
-    `git worktree add ../objectstack-<task> -b <branch> main && cd ../objectstack-<task> && pnpm install`. Two
+    edit**, be in a dedicated worktree on a feature branch: `git fetch origin main &&
+    git worktree add ../objectstack-<task> -b <branch> origin/main && cd ../objectstack-<task> && pnpm install`. Two
     PreToolUse hooks **enforce** this — `.claude/hooks/guard-main-checkout.sh` blocks `Edit`/`Write`/`NotebookEdit`,
     and `.claude/hooks/guard-main-checkout-bash.sh` blocks the identical write arriving through **Bash** (`>`/`>>`
     redirection, `sed -i`, `perl -i`, `tee`, `cp`, `mv`, `rm`, `touch`) — and both check the **target file's own
@@ -355,9 +355,9 @@ localStorage / auth gotchas.
 ## Multi-agent working discipline
 
 This repo is worked on by **multiple agents in parallel**. **Use one git worktree per
-agent/task** (`git worktree add ../objectstack-<task> -b <branch>`; run `pnpm install` in
-the new tree) so file systems are physically isolated — mandatory, not a preference (Prime
-Directive #11), and hook-enforced. Working in the shared `main` checkout is *not* a
+agent/task** (`git fetch origin main && git worktree add ../objectstack-<task> -b <branch>
+origin/main`; run `pnpm install` in the new tree) so file systems are physically isolated —
+mandatory, not a preference (Prime Directive #11), and hook-enforced. Working in the shared `main` checkout is *not* a
 supported fallback: branches get switched and shared files — including ones you just wrote
 — get reset *under you* mid-task (full sessions were silently reverted before enforcement).
 
