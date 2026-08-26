@@ -309,6 +309,48 @@ const FLOW_WRITE_DENY_MESSAGE =
     `Authoring automation flows requires the \`${FLOW_AUTHORING_CAPABILITY}\` capability.`;
 
 /**
+ * [#11666] The enablement arm's own refusal text — the same capability, the
+ * same `code` and the same `status` as {@link FLOW_WRITE_DENY_MESSAGE}, and a
+ * different sentence, because a different operation was attempted.
+ *
+ * ⛔ Copy, not policy. [#10243]'s ruling put `POST /:name/toggle` into the
+ * authoring write set and that classification is untouched here: the same
+ * callers are refused, with the same `PERMISSION_DENIED` and the same 403.
+ * What moves is only what a refused caller is TOLD. Switching a shipped flow
+ * OFF was answered with "Authoring automation flows requires …" — accurate
+ * about the policy, and naming a verb the caller did not use.
+ *
+ * Shaped on {@link SCREEN_READ_DENY_MESSAGE} (#7968) one screen up: a second
+ * constant for a second question, rather than a reworded shared one. Rewording
+ * the shared sentence was considered and declined — it reads correctly for the
+ * authoring writes that reach it (`POST /`, `PUT /:name`, `DELETE /:name`, and
+ * [#12156]'s `POST /:name/clone`), and widening it to cover both would degrade
+ * it for every one of them in order to fix one.
+ *
+ * It satisfies #7450 exactly as its sibling does: it names the capability that
+ * would admit ANY caller, and nothing about this one.
+ */
+const FLOW_ENABLEMENT_DENY_MESSAGE =
+    `Enabling or disabling an automation flow requires the \`${FLOW_AUTHORING_CAPABILITY}\` capability.`;
+
+/**
+ * [#11666] Is THIS request the enablement door, `POST /automation/:name/toggle`?
+ *
+ * Extracted so the question is asked once. {@link isFlowAuthoringWrite} needs
+ * it to decide whether the route is gated at all, and
+ * {@link refuseUngrantedFlowWrite} needs the SAME answer to decide which
+ * sentence the refusal carries — and this file's own rule is that a question
+ * spelled at two call sites is two questions that happen to agree today.
+ *
+ * ⛔ The truth table is [#10243]'s, moved nowhere: the exclusion of
+ * `parts[0] === 'trigger'` and the absence of any depth bound are that arm's,
+ * for that arm's reasons, restated below where they are read.
+ */
+function isFlowEnablementWrite(parts: string[], method: string): boolean {
+    return method === 'POST' && parts[1] === 'toggle' && parts[0] !== 'trigger';
+}
+
+/**
  * [#10145] Which `/automation` routes the `manage_metadata` write set covers.
  *
  * One predicate, for the reason {@link isRunStateRead} is one predicate: this
@@ -378,7 +420,11 @@ function isFlowAuthoringWrite(parts: string[], method: string): boolean {
     //     toggle arm, so for a flow literally named `toggle` the path
     //     `/automation/trigger/toggle` RUNS that flow. Gating it would over-block
     //     an execution door, which is the one thing the ruling did not do.
-    if (method === 'POST' && parts[1] === 'toggle') return parts[0] !== 'trigger';
+    //
+    // [#11666] Delegated to `isFlowEnablementWrite` rather than inlined, because
+    // the refusal text now asks the same question; under this guard the helper
+    // reduces to exactly the `parts[0] !== 'trigger'` it replaces.
+    if (method === 'POST' && parts[1] === 'toggle') return isFlowEnablementWrite(parts, method);
     // [#12156] `POST /automation/:name/clone` — the ADR-0126 §7.1 clone door.
     //
     // It CREATES a flow, so it belongs to this set for the same reason
@@ -456,7 +502,11 @@ function isFlowActivationWrite(parts: string[], method: string): boolean {
  * not permission-SET names, which ride `permissions` (#4705).
  *
  * The message names the CAPABILITY it wants and nothing about the caller (no
- * positions, no permission-set names — #7450).
+ * positions, no permission-set names — #7450). [#11666] There are two of them,
+ * picked by the arm that was actually refused — the definition writes get
+ * {@link FLOW_WRITE_DENY_MESSAGE}, the enablement door gets
+ * {@link FLOW_ENABLEMENT_DENY_MESSAGE}. ⛔ `code` and `status` are shared and
+ * do not vary: one policy, one envelope, two sentences.
  *
  * ⚠️ Callers MUST run this BEFORE the automation service is resolved and before
  * any body validation, so (a) an unentitled caller cannot use the 501-vs-403
@@ -488,14 +538,22 @@ const refuseUngrantedFlowActivationWrite = (
 function refuseUngrantedFlowWrite(
     deps: DomainHandlerDeps,
     context: HttpProtocolContext,
+    parts: string[],
+    method: string,
 ): HttpDispatcherResult | undefined {
     const ec: any = context?.executionContext;
     if (ec?.isSystem) return undefined;
     if (new Set<string>(ec?.systemPermissions ?? []).has(FLOW_AUTHORING_CAPABILITY)) return undefined;
 
+    // [#11666] Which sentence, decided from the SAME predicate that decided the
+    // route is gated — never a second reading of the path.
+    const message = isFlowEnablementWrite(parts, method)
+        ? FLOW_ENABLEMENT_DENY_MESSAGE
+        : FLOW_WRITE_DENY_MESSAGE;
+
     return {
         handled: true,
-        response: deps.error(FLOW_WRITE_DENY_MESSAGE, FLOW_WRITE_DENY_STATUS, { code: FLOW_WRITE_DENY_CODE }),
+        response: deps.error(message, FLOW_WRITE_DENY_STATUS, { code: FLOW_WRITE_DENY_CODE }),
     };
 }
 
@@ -876,6 +934,8 @@ async function respondToFlowTrigger(
  *                                  ⚑ authoring write — `manage_metadata` (#10243):
  *                                    enablement is environment-wide, so an
  *                                    unentitled toggle reached every organization
+ *                                    ⚑ refused with its OWN sentence (#11666) —
+ *                                    same capability, code and status
  *   POST   /:name/clone          → clone the whole definition under a NEW machine
  *                                  name (ADR-0126 §7.1, #12156). Body
  *                                  `{ name, label }`, both mandatory; unknown source
@@ -967,7 +1027,7 @@ export async function handleAutomationRequest(deps: DomainHandlerDeps, path: str
     // /:name/toggle` moved INSIDE it by ruling, and moved by editing that one
     // predicate rather than by adding a check here.
     if (isFlowAuthoringWrite(parts, m)) {
-        const refusal = refuseUngrantedFlowWrite(deps, context);
+        const refusal = refuseUngrantedFlowWrite(deps, context, parts, m);
         if (refusal) return refusal;
     }
 
