@@ -10225,6 +10225,40 @@ export class RestServer {
             code: 'NOT_IMPLEMENTED',
             message: 'Reports service is not configured on this deployment',
         });
+        // [#11926] The door states the contract for `POST /reports` below.
+        // `IReportService.saveReport` takes a `SaveReportInput`
+        // (`packages/spec/src/contracts/report-service.ts`), on which `name`,
+        // `object` and `query` are all REQUIRED — but an HTTP body is untyped,
+        // so forwarding it unchecked handed the service a value merely CLAIMED
+        // to be a `SaveReportInput`. That left the requirement for every
+        // implementation to re-derive privately: the bundled
+        // `@objectstack/plugin-reports` does re-derive it, a third-party one
+        // need not, and a caller could not tell which one it was talking to.
+        // Refusing here makes the contract true for every implementation, in
+        // the same envelope `handleValidation` already produces (400 /
+        // VALIDATION_FAILED, ADR-0112).
+        // It THROWS rather than writing a response, and that is the design, not
+        // a detour: `handleValidation` below is this surface's single place for
+        // building a VALIDATION_FAILED body. Writing a second one here would
+        // make one route answer the same refusal in two different envelopes —
+        // and would add a non-conforming body to the `check:route-envelope`
+        // ratchet, which only ticks down. Raised before `saveReport` is called,
+        // so the door refuses rather than the service.
+        const assertSaveReportInput = (body: any): void => {
+            const missing = (['name', 'object', 'query'] as const)
+                .filter((field) => body?.[field] === undefined || body?.[field] === null);
+            if (missing.length > 0) {
+                throw new Error(
+                    `VALIDATION_FAILED: ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required`,
+                );
+            }
+            // `query` is a `ReportQuery` envelope — never a scalar and never a
+            // list. A string here is the shape an authoring mistake actually
+            // takes, and it reaches storage as a stringified scalar otherwise.
+            if (typeof body.query !== 'object' || Array.isArray(body.query)) {
+                throw new Error('VALIDATION_FAILED: query must be a ReportQuery object');
+            }
+        };
         const handleValidation = (res: any, err: any): boolean => {
             const msg = String(err?.message ?? err ?? '');
             if (msg.startsWith('VALIDATION_FAILED')) {
@@ -10278,6 +10312,11 @@ export class RestServer {
                     const svc = await resolveService(environmentId);
                     if (!svc) return respond501(res);
                     try {
+                        // AFTER the 501 on purpose: "no reports service is
+                        // mounted" is a deployment fact and outranks anything
+                        // about the body. Inside the try so the refusal reaches
+                        // `handleValidation` like any other VALIDATION_FAILED.
+                        assertSaveReportInput(req.body ?? {});
                         const row = await svc.saveReport(req.body ?? {}, context ?? {});
                         res.status(201).json(row);
                     } catch (err: any) {
