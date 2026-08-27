@@ -126,11 +126,49 @@ type ObjectFoldScalarKey = (typeof OBJECT_FOLD_SCALAR_KEYS)[number];
 
 /**
  * Deep merge two ServiceObject definitions.
- * Fields are merged additively. Other props: later value wins.
  *
- * [#8460] …except that "later value wins" is now conditional for the three
- * SCALARS. `tenantAuthored` names the scalars the fold's BASE has authored away
- * from the packaged owner's value; an extender yields on those. See
+ * The merge set is CLOSED and enumerable — this is NOT "every prop, later
+ * value wins":
+ *   - `fields`, `validations`, `indexes` are merged ADDITIVELY.
+ *   - The three {@link OBJECT_FOLD_SCALAR_KEYS} (`label`, `pluralLabel`,
+ *     `description`) are overridden last-writer-wins, subject to the
+ *     `tenantAuthored` yield rule below.
+ *
+ * **Every other top-level prop on `extension` is silently discarded.**
+ * `merged` starts as `{ ...base }` and nothing outside the list above is ever
+ * copied onto it — a caller that hands this function an extension body
+ * carrying an undeclared key, e.g. `tenancy: { enabled: false }`, gets a
+ * valid-but-inert no-op HERE: no error, no warning from this function, the
+ * base's existing value simply wins as if the extension had never named the
+ * key (issue #12680).
+ *
+ * Declarative authors never reach that silence, though: `ObjectExtensionSchema`
+ * (`packages/spec/src/data/object.zod.ts`) is `.strict()` — its shape is
+ * exactly `extend` / `fields` / `label` / `pluralLabel` / `description` /
+ * `validations` / `indexes` / `priority`, so an `objectExtensions` entry
+ * naming `tenancy`, `permissions`, or any other key outside that list fails
+ * LOUDLY at authoring time with a prescription (#4001; the same rule is
+ * documented at `content/docs/data-modeling/object-extensions.mdx`). This
+ * function's discard is reachable only by a caller that bypasses that
+ * schema — a direct, programmatic `registry.registerObject(def, pkg,
+ * undefined, 'extend', …)` call, which is how this package's own pin
+ * (`registry-object-extension-nonenumerated-prop-discard.test.ts`) exercises
+ * the rule. Extender-writable `tenancy`/`permissions` would in any case be a
+ * separate, much bigger decision that has NOT been made.
+ *
+ * Unlike `tenancy`/`permissions`, this one is not blocked by schema:
+ * `_provenance` is a real top-level prop an `extend` contributor carries
+ * TODAY. Copying it through (as "later value
+ * wins" would) lets a third-party extender flip a tenant-authored object's
+ * `_provenance` to the extending package's — reaching, by a different route,
+ * the exact outcome ADR-0029 D9.3's priority-reranking guard exists to
+ * prevent. `registry-object-overlay-layer.test.ts` ("an extender declaring
+ * priority 140 does not become the base layer") fails if this merge set is
+ * widened to copy it through.
+ *
+ * [#8460] …the SCALAR override above is conditional. `tenantAuthored` names
+ * the scalars the fold's BASE has authored away from the packaged owner's
+ * value; an extender yields on those. See
  * {@link SchemaRegistry.tenantAuthoredScalars} for why the set is computed once
  * over the base rather than re-derived from the running `merged`.
  */
