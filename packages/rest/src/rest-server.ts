@@ -2,6 +2,9 @@
 
 import {
     IHttpServer, resolveAuthzContext, resolveLocalizationContext, isAuthGateAllowlisted,
+    // [#13279] Re-raise a permission-store OUTAGE through the fail-closed nets
+    // below instead of degrading it into an anonymous/denied answer.
+    rethrowAuthzStoreUnavailable,
     effectiveTenancyPosture,
     assembleExecutionContext, normalizeAuthGate, type AuthGate,
     shouldDenyAnonymous, ANONYMOUS_DENY_BODY, ANONYMOUS_DENY_STATUS,
@@ -1519,7 +1522,7 @@ export class RestServer {
      */
     resolvePackageRouteExecutionContext(req: any): Promise<any | undefined> {
         const environmentId = req?.params?.environmentId ?? undefined;
-        return this.resolveExecCtx(environmentId, req).catch(() => undefined);
+        return this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
     }
 
     /**
@@ -1599,7 +1602,7 @@ export class RestServer {
         // ignored outright — it is not consulted for user principals, and not
         // as a fallback for unauthenticated ones either, so there is no shape
         // in which a caller can choose the name the audit row records.
-        const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+        const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
         const userId = (ctx as any)?.userId;
         return typeof userId === 'string' && userId ? userId : undefined;
     }
@@ -1620,7 +1623,7 @@ export class RestServer {
         req: any,
         opts: { needPermissionSets: boolean },
     ): Promise<{ authenticated: boolean; permissionSets?: string[] }> {
-        const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+        const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
         const authenticated = !!ctx?.userId;
         if (!authenticated || !opts.needPermissionSets || !this.securityServiceProvider) {
             return { authenticated };
@@ -2042,8 +2045,16 @@ export class RestServer {
             if (isPerfDisclosurePrincipal(execCtx)) allowPerfDisclosure();
 
             return execCtx;
-        } catch {
-            return undefined;
+        } catch (err) {
+            // [#13279] The FIRST net, and the one that actually fires: every
+            // seam below this resolves with `undefined` rather than rejecting,
+            // so a blanket swallow here decides the answer for the whole
+            // server. A permission-store OUTAGE must not be laundered into
+            // "no context" — that only swaps the 403 disguise for the 401 one
+            // (measured: with `tryFind` loud but this net untouched, the
+            // package door answered 401, byte-identical to a genuine anonymous
+            // caller). Every OTHER fault still fails closed exactly as before.
+            return rethrowAuthzStoreUnavailable(err);
         }
     }
 
@@ -2733,7 +2744,7 @@ export class RestServer {
         // non-overridable type keeps reading env-wide (see that predicate for
         // why naming the org unconditionally would resurrect #6190's phantoms).
         const layeredCtx = await this.resolveExecCtx(environmentId, req)
-            .catch(() => undefined);
+            .catch(rethrowAuthzStoreUnavailable);
         const layeredOrganizationId = organizationIdForMetaRead(
             // [#10340] FOLDED, not raw — see the PUT door's org-scope comment
             // for the measurement.
@@ -2806,7 +2817,7 @@ export class RestServer {
         }
         // Resolved ONCE per request, not once per item: the list read asks the
         // same caller about every object it serves.
-        const context = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+        const context = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
         const security = await this.resolveSecurityService(environmentId, req);
         const telemetry = {
             warn: (message: string, meta: Record<string, unknown>) => logWarn(message, meta),
@@ -3935,7 +3946,7 @@ export class RestServer {
                         // the `isScoped ? req.params.environmentId : undefined`
                         // each `/data` handler derives.
                         const environmentId = req?.params?.environmentId;
-                        const context = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                        const context = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                         // [#3963] `audience: 'public'` is a DECLARED capability, so it
                         // must not depend on a deployment flipping its whole data plane
                         // open. An anonymous read of the
@@ -4175,7 +4186,7 @@ export class RestServer {
                         // unauthorized caller cannot use the 501-vs-200 answer to
                         // probe which kernels support drafts (same posture as
                         // `_migrate-stored` below).
-                        const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                        const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                         if (!isObjectSchemaMaskExempt(ctx)) {
                             res.status(403).json({
                                 error: {
@@ -4264,7 +4275,7 @@ export class RestServer {
                         // to the caller's own active organization" condition can
                         // never hold here. `manage_metadata`-only, unchanged —
                         // do not copy the item doors' acceptance in.
-                        const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                        const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                         const held = new Set<string>(
                             Array.isArray(ctx?.systemPermissions) ? ctx!.systemPermissions : [],
                         );
@@ -4374,7 +4385,7 @@ export class RestServer {
                         // simply not in the list. Same memoised `resolveExecCtx`
                         // and same registry gate as every other read door here.
                         const listCtx = await this.resolveExecCtx(environmentId, req)
-                            .catch(() => undefined);
+                            .catch(rethrowAuthzStoreUnavailable);
                         const listOrganizationId = organizationIdForMetaRead(
                             // [#10340] FOLDED, not raw — see the PUT door's
                             // org-scope comment for the measurement.
@@ -4472,7 +4483,7 @@ export class RestServer {
                                     ? ((raw as any).items as any[])
                                     : null;
                             if (list) {
-                                const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                                const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                                 if (ctx?.userId) {
                                     const sysPerms = new Set<string>(
                                         Array.isArray(ctx.systemPermissions) ? ctx.systemPermissions : [],
@@ -4579,7 +4590,7 @@ export class RestServer {
                                     ? ((raw as any).items as any[])
                                     : null;
                             if (list) {
-                                const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                                const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                                 const registered = await this.resolveRegisteredServices((ctx as any)?.__kernel, list);
                                 const serviceGate = registered ? (n: string) => registered.has(n) : undefined;
                                 if (serviceGate) {
@@ -5212,7 +5223,7 @@ export class RestServer {
                         // ⚠️ NOT a new seam: memoised per request, and this
                         // handler resolves the same context again further down.
                         const readCtx = await this.resolveExecCtx(environmentId, req)
-                            .catch(() => undefined);
+                            .catch(rethrowAuthzStoreUnavailable);
                         const readOrganizationId = organizationIdForMetaRead(
                             // [#10340] FOLDED, not raw — see the PUT door's
                             // org-scope comment for the measurement.
@@ -5400,7 +5411,7 @@ export class RestServer {
                             // lacks the app's `requiredPermissions`, and strip
                             // forbidden nav entries from the returned schema.
                             if (isAppType && visible) {
-                                const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                                const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                                 if (ctx?.userId) {
                                     const sysPerms = new Set<string>(
                                         Array.isArray(ctx.systemPermissions) ? ctx.systemPermissions : [],
@@ -5474,7 +5485,7 @@ export class RestServer {
                             // ADR's "the server is the authoritative gate" true
                             // rather than merely written down.
                             if (isDashboardType && visible) {
-                                const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                                const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                                 const registered = await this.resolveRegisteredServices((ctx as any)?.__kernel, [visible]);
                                 const serviceGate = registered ? (n: string) => registered.has(n) : undefined;
                                 if (serviceGate) visible = this.filterDashboardForUser(visible, serviceGate);
@@ -5628,7 +5639,7 @@ export class RestServer {
                     // very value `organizationIdForMetaWrite` threads below, so
                     // an admitted write can only land org-scoped in the caller's
                     // own partition: never env-wide, never another org's.
-                    const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                    const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                     {
                         const verdict = metaWriteCapabilityVerdict({
                             isSystem: ctx?.isSystem === true,
@@ -5860,7 +5871,7 @@ export class RestServer {
                     // one (see the [#8805] comment below). `?dropStorage=true`
                     // is `object`-only, and `object` is not org-overridable,
                     // so the org capability can never reach it.
-                    const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                    const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                     {
                         const verdict = metaWriteCapabilityVerdict({
                             isSystem: ctx?.isSystem === true,
@@ -6130,7 +6141,7 @@ export class RestServer {
                     // hands back — the same reasoning the `/published` route
                     // states below — not from the request payload. It is still
                     // read on the two lines that need it.
-                    const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                    const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                     // The `(p as any)` casts this door carried came off when
                     // `MetadataProtocol` declared `auditMetaItem` (the #11006
                     // pattern, same as the publish door below): the literal is
@@ -6205,7 +6216,7 @@ export class RestServer {
                     // the draft through `getOverlayRepo(orgId)`, so an admitted
                     // org-presentation publish promotes only the caller's own
                     // org partition.
-                    const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                    const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                     {
                         const verdict = metaWriteCapabilityVerdict({
                             isSystem: ctx?.isSystem === true,
@@ -6398,7 +6409,7 @@ export class RestServer {
                     // org-presentation rollback restores only a version of the
                     // caller's own org overlay — the env-wide row and its
                     // history stay out of reach.
-                    const ctx = await this.resolveExecCtx(environmentId, req).catch(() => undefined);
+                    const ctx = await this.resolveExecCtx(environmentId, req).catch(rethrowAuthzStoreUnavailable);
                     {
                         const verdict = metaWriteCapabilityVerdict({
                             isSystem: ctx?.isSystem === true,
@@ -6745,7 +6756,7 @@ export class RestServer {
                         if (typeof publishedProtocol?.getMetaItemLayered === 'function') {
                             try {
                                 const publishedCtx = await this.resolveExecCtx(environmentId, req)
-                                    .catch(() => undefined);
+                                    .catch(rethrowAuthzStoreUnavailable);
                                 const layered = await publishedProtocol.getMetaItemLayered({
                                     type,
                                     name,
