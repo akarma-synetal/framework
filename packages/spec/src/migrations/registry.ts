@@ -1249,8 +1249,9 @@ const step17: MigrationStep = {
       'with a notice each. Nothing is lost: `compileDataset` refused both by name already, so ',
       'such a measure never produced a number. `QueryAST.aggregations[].function` is a request ',
       'surface with no stored source — one semantic TODO below. The mongodb and in-memory ',
-      'backends that implemented these two are inside the #5499 freeze and are untouched; their ',
-      'code is simply no longer reachable through a spec-valid request.\n\n',
+      'backends that implemented these two were inside the #5499 freeze when this was decided ',
+      '(it was lifted on 2026-08-11) and are untouched; their code is simply no longer reachable ',
+      'through a spec-valid request.\n\n',
       'The same aggregation node loses one more member, and it is the sharper class of the two: ',
       '`aggregations[].distinct` is removed (#6815, ADR-0049, maintainer ruling 2026-08-09). ',
       'The functions above were declared and UNLOWERED — a caller on a SQL datasource got a ',
@@ -1270,8 +1271,9 @@ const step17: MigrationStep = {
       'per the ruling: `count_distinct` (which just took the enforce leg above, and whose SQL ',
       'lowering #6409 landed) already covers the only deduplicating spelling with measured ',
       'demand, while `SUM(DISTINCT …)` / `AVG(DISTINCT …)` are near-universally a modelling ',
-      'mistake and would have to be lowered across five faces, two of them frozen under #5499, ',
-      'to buy it. The blast radius inside the fallback is narrower than the key suggests and was ',
+      'mistake and would have to be lowered across five faces, two of them then frozen under ',
+      '#5499 (lifted 2026-08-11, after this ruling), to buy it. The blast radius inside the ',
+      'fallback is narrower than the key suggests and was ',
       'measured rather than assumed: only `sum` and `avg` ever changed answer — `count` returned ',
       'from its own branch before reaching the dedupe, `count_distinct` fed a Set, and dedupe ',
       'does not move `min`/`max`. `AggregationNodeSchema` is non-strict, so the key is ',
@@ -1693,7 +1695,8 @@ const step17: MigrationStep = {
         + 'fed the values into a Set (dedupe-then-Set is Set), and dedupe does not move '
         + '`min`/`max`. ENFORCE was weighed and rejected (maintainer ruling 2026-08-09): '
         + '`count_distinct` already covers the only spelling anyone has measured demand for, '
-        + 'and lowering `SUM(DISTINCT …)` across five faces — two of them frozen under #5499 — '
+        + 'and lowering `SUM(DISTINCT …)` across five faces — two of them then frozen under '
+        + '#5499, a freeze lifted 2026-08-11, after this ruling — '
         + 'buys a shape that is near-universally a modelling mistake. A REQUEST surface — '
         + '`QueryAST` is the client SDK builder\'s output and the `POST /data/:object/query` '
         + 'body, never stored in stack metadata — so there is no source for the chain to '
@@ -2794,8 +2797,9 @@ const step17: MigrationStep = {
         + 'valid filter — one constraining columns named `object` and `where` — and so is a '
         + 'FilterArray. Both reach `distinct` type-checked and are refused at run time, '
         + 'loudly, with INVALID_FILTER / 400. `driver-memory`\'s opposite half — where the '
-        + 'BARE spelling returns the unfiltered set in silence — stays open under the #5499 '
-        + 'freeze (#6320). ADR-0087, #6320.',
+        + 'BARE spelling returns the unfiltered set in silence — stayed open under the #5499 '
+        + 'freeze, which was lifted on 2026-08-11; it is still open, now unexcused rather than '
+        + 'deferred (#6320). ADR-0087, #6320.',
       acceptanceCriteria:
         'No caller passes a non-object to `distinct()`\'s third argument. A scalar there is '
         + 'now a compile error (`TS2345: Argument of type \'string\' is not assignable to '
@@ -4046,7 +4050,8 @@ const step17: MigrationStep = {
         + 'run on `driver-mongodb` and on the engine\'s in-memory fallback, which is what makes '
         + 'this the one narrowing in the batch that removes reachable behaviour: an aggregation '
         + 'that worked on one backend and failed on another is exactly the unpredictability the '
-        + 'ruling ended, and #5499 has both of those backends frozen. `count_distinct` was '
+        + 'ruling ended, and #5499 had both of those backends frozen at the time (that freeze '
+        + 'was lifted on 2026-08-11). `count_distinct` was '
         + 'deliberately NOT retired with them (maintainer, 2026-08-07) — it takes ADR-0049\'s '
         + 'enforce leg, and its SQL lowering is a separate drivers-side card. ADR-0049, #6188.',
       acceptanceCriteria:
