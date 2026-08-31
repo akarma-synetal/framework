@@ -1675,12 +1675,22 @@ export { maskComments };
  * comment convention: `function selfTest() {` at column 0, optionally `export`
  * and/or `async`, with any name that spells self-test (`selfTest`,
  * `fixtureSelfTest`, `selfTestReadSeams`, `prePushIsArmedSelfTest`,
- * `decisionTableSelfTest` — the five spellings this tree actually uses).
+ * `decisionTableSelfTest` — four of the 18 compound names this tree uses).
  *
- * Measured across the 61 scripts under `scripts/` that carry one: 53 write
- * `function selfTest() {`, 7 write `async function selfTest() {`, and the four
- * remaining names are the compound ones above — 61 of 61 at column 0, none of
- * them an arrow-function const. If a script ever spells one as
+ * Re-derived at 6193e576d across the 169 scripts under `scripts/` that carry
+ * one — 185 declarations: 111 `function selfTest(`, 28
+ * `export function selfTest(`, 19 `async function selfTest(`, 8
+ * `export async function selfTest(`, and 19 compound names — one of which is
+ * this module's own `maskSelfTests`, so this file's masker blanks its own body
+ * whenever it scans itself. That was true long before the helper follow below
+ * existed and it costs nothing today, because none of the functions it reaches
+ * spells a path; it is recorded because it is the kind of thing that stops
+ * being free the day one of them does. The load-bearing half holds: 185 of 185
+ * at column 0, and a column-0 scan for the const/arrow spelling finds ZERO.
+ * ⚠ The counts in this paragraph read 61/53/7/4 when it was written and had
+ * gone stale by a factor of three before anyone re-read them — re-derive them
+ * rather than quoting them; only the two PROPERTIES are what this pattern
+ * rests on. If a script ever spells one as
  * `const selfTest = () => {`, widen this pattern rather than reaching for a
  * comment marker; a declaration is a thing the language guarantees, a marker
  * comment is a thing an author has to remember.
@@ -1689,7 +1699,261 @@ const SELF_TEST_DECL =
   /^(?:export[ \t]+)?(?:async[ \t]+)?function[ \t]+[A-Za-z0-9_$]*[Ss]elf[_]?[Tt]est[A-Za-z0-9_$]*[ \t]*\(/gm;
 
 /**
- * The source with the BODY of every top-level self-test function blanked.
+ * Every TOP-LEVEL declaration in a module body: `export`ness, name, span, and
+ * whether it is CALLABLE (a `function`/`class`, whose body runs only when
+ * something calls it) or a VALUE (`const`/`let`/`var`, evaluated at module
+ * load). Anchored at column 0 for the same structural reason the self-test
+ * anchor above is, and measured on the same corpus.
+ *
+ * Destructuring binders (`const { a } = x`) are deliberately unmatched: the
+ * declaration below is only ever used to decide what NOT to read, so a binder
+ * this pattern cannot name stays in the module body, which is the direction
+ * that masks LESS.
+ */
+const TOP_LEVEL_DECL =
+  /^(export[ \t]+)?(?:(?:default[ \t]+)?(?:async[ \t]+)?function[ \t]*\*?[ \t]*([A-Za-z_$][\w$]*)[ \t]*\(|(?:default[ \t]+)?class[ \t]+([A-Za-z_$][\w$]*)[\s{]|(?:const|let|var)[ \t]+([A-Za-z_$][\w$]*)[ \t]*=)/gm;
+
+/** One JavaScript identifier. Read as a REFERENCE, wherever it stands. */
+const IDENTIFIER_TOKEN = /[A-Za-z_$][\w$]*/g;
+
+/**
+ * The end of a brace-balanced body, or -1 if the braces never close.
+ *
+ * `skipParams` walks the parameter list first, and it is not a refinement: a
+ * destructured default puts braces in the SIGNATURE, and counting those closes
+ * the body before it opens. `release-rehearsal-clone.mjs` writes two of them
+ * among its fixture builders — and, the half this docblock asserted backwards
+ * once, THREE self-test ENTRY POINTS in the `scripts/` tree carry one TODAY, so
+ * this repairs live files rather than guarding against a future spelling:
+ *
+ *   scripts/check-test-completeness.mjs:576
+ *   scripts/measure-position-name-fold-census.mjs:689
+ *       both `function selfTest({ quiet = false } = {})`
+ *   scripts/workspace-enumerator.mjs:328
+ *       `export function selfTest({ root = null } = {})`
+ *
+ * Measured at 6193e576d — bytes `maskSelfTests` changes in each file, this
+ * module against a staged copy of the one on `origin/main`: 30 -> 14848,
+ * 30 -> 3961, 34 -> 6294. Thirty bytes is the destructured parameter and
+ * nothing else; the entire self-test body was surviving the mask. The control
+ * that makes those three a reading rather than an artifact is a self-test with
+ * no brace in its signature, identical both ways —
+ * `check-empty-changeset.mjs`, 48044 -> 48044.
+ *
+ * It did not move the hint census, and that is LUCK rather than design: those
+ * three bodies happen to carry no path literal their module bodies do not
+ * already carry, so `extractWatchHints` returns the same set on both sides
+ * (`[]`, `[]`, and the same 8 hints). A fourth file with the same signature
+ * shape and one fixture path in it would have been a live fabricated lead.
+ */
+function bracedBodyEnd(source, scan, start, skipParams) {
+  let i = start;
+  if (skipParams) {
+    let parens = 0;
+    let openedParen = false;
+    for (; i < source.length; i++) {
+      if (scan.comment[i] || scan.literal[i]) continue;
+      if (source[i] === '(') {
+        parens++;
+        openedParen = true;
+      } else if (source[i] === ')') {
+        parens--;
+        if (openedParen && parens === 0) {
+          i++;
+          break;
+        }
+      }
+    }
+    if (!openedParen) return -1;
+  }
+  let depth = 0;
+  let opened = false;
+  for (; i < source.length; i++) {
+    if (scan.comment[i] || scan.literal[i]) continue;
+    if (source[i] === '{') {
+      depth++;
+      opened = true;
+    } else if (source[i] === '}') {
+      depth--;
+      if (opened && depth === 0) return i + 1;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The end of a value declaration — the first `;` at bracket depth 0 — or -1
+ * when the statement has none (ASI). Braces, brackets and parens are counted
+ * over CODE positions only, so a `;` inside a fixture string or a regex cannot
+ * end the statement early.
+ */
+function valueDeclEnd(source, scan, start) {
+  let depth = 0;
+  for (let i = start; i < source.length; i++) {
+    if (scan.comment[i] || scan.literal[i]) continue;
+    const c = source[i];
+    if (c === '(' || c === '[' || c === '{') depth++;
+    else if (c === ')' || c === ']' || c === '}') depth--;
+    else if (c === ';' && depth === 0) return i + 1;
+  }
+  return -1;
+}
+
+/**
+ * The module's top-level declarations, in source order and non-overlapping.
+ *
+ * A declaration whose span cannot be closed is DROPPED rather than run to end
+ * of file: one unterminated span would otherwise swallow every declaration
+ * after it, including the self-test the mask exists to find. Its text stays in
+ * the module body — again the direction that masks less. The mask-to-end-of-
+ * file behaviour a malformed self-test has always had is kept where it lives,
+ * in `maskSelfTests` itself.
+ */
+function topLevelDecls(source, scan, selfTestStarts) {
+  const decls = [];
+  let guard = 0;
+  for (const m of source.matchAll(TOP_LEVEL_DECL)) {
+    const start = m.index;
+    if (start < guard) continue;
+    if (scan.comment[start] || scan.literal[start]) continue;
+    const isFunction = m[2] !== undefined;
+    const callable = isFunction || m[3] !== undefined;
+    const end = callable ? bracedBodyEnd(source, scan, start, isFunction) : valueDeclEnd(source, scan, start);
+    if (end < 0) continue;
+    decls.push({
+      name: m[2] ?? m[3] ?? m[4],
+      start,
+      end,
+      callable,
+      exported: m[1] !== undefined,
+      selfTest: selfTestStarts.has(start),
+    });
+    guard = end;
+  }
+  return decls;
+}
+
+/**
+ * The top-level CALLABLES that only the self-test can reach.
+ *
+ * ## The defect this answers
+ *
+ * `SELF_TEST_DECL` finds the ENTRY POINT and nothing else. A helper the entry
+ * point calls is named for what it builds — `makeSource`, `buildFixtureTree`,
+ * `stampFor`, `fixtureCommit` — and no part of that name spells self-test, so
+ * its body survived the mask and its fixture literals were read as paths the
+ * gate opens. Measured on `scripts/pm/release-rehearsal-clone.mjs`, whose
+ * `makeSource` writes a fixture `.changeset` tree: the hint set carried
+ * `.changeset/one.md` and `.changeset/two.md`, and the residue printed a cause
+ * for them — "the tree stops at .changeset; the layout moved under it" — that
+ * describes a directory rename which never happened. A fabricated lead, from
+ * the same fixture family the entry-point mask was written to refuse.
+ *
+ * ## Why reachability, and not a banner comment
+ *
+ * The obvious alternative is to mask everything below the block-comment
+ * `self-test` banner these scripts write. `SELF_TEST_DECL`'s docblock argues
+ * against it directly, and that argument is adopted here rather than
+ * re-litigated: a declaration is a thing the language guarantees, a marker
+ * comment is a thing an author has to remember. The banner is also not
+ * load-bearing anywhere else, so nothing would go red when one is missing — the mask would simply
+ * stop reaching, silently, which is the failure family this whole module is
+ * built to refuse.
+ *
+ * ## The predicate, and which half is the safety half
+ *
+ * A callable is masked when it is reachable from a self-test body AND NOT
+ * reachable from anything else the module does. The second conjunct is the
+ * safety half: a helper shared by the self-test and the real gate body stays
+ * unmasked, or the mask would drop a population the gate really reads. The
+ * roots of "anything else" are the module-body statements outside every
+ * declaration (the `import`s, the top-level side effects, the `export { … }`
+ * lists, the entrypoint guard at the bottom) plus every `export`ed
+ * declaration, which is reachable from outside this file by definition. A
+ * self-test body is REACHED but never TRAVERSED — the bottom of these scripts
+ * calls `selfTest()` from module scope, so traversing it would make every
+ * helper root-reachable and the whole predicate vacuous.
+ *
+ * ## Why VALUE declarations are excluded, measured rather than assumed
+ *
+ * Extending the same predicate to `const`/`let`/`var` was implemented and
+ * REFUSED. A top-level constant that carries path literals and is referenced
+ * from no executing code is, in this tree, overwhelmingly a gate DECLARING its
+ * population for this very scanner to read — `ROOT_DIR_WATCH_HINTS`,
+ * `ROOT_FILE_WATCH_HINTS`, `ROOT_WATCH_HINTS`, the shape
+ * `scripts/check-watch-hint-literal.mjs` exists to enforce. Being unreferenced
+ * is what those declarations ARE. Measured over the 204 files this derivation
+ * scans: masking values as well takes 36 files and 175 hints instead of 9 and
+ * 104, and the 71 extra include the declared populations of eight gates
+ * (`.claude/**`, `content/**`, `docs/**`, `skills/**`, `packages/drivers/**`,
+ * `examples/**`, `scripts/**`, `ARCHITECTURE.md/**`) — the mask erasing
+ * exactly the declarations it is supposed to see. The fixture TABLES it would
+ * also have caught (`SELF_TEST_CASES` and friends) are left behind
+ * deliberately: keeping a false hint costs a CI round, dropping a declared
+ * population costs a gate.
+ *
+ * ## What counts as a reference
+ *
+ * Identifiers at CODE positions, plus identifiers inside `${…}`
+ * interpolations, which are code — `scan.interpolation` exists for exactly
+ * this and skipping it is not academic: `release-rehearsal-clone.mjs` names
+ * its own path constant only from inside template literals, so a scan that
+ * read `${SELF}` as string text would have found `SELF` unreferenced and
+ * masked away the one hint that file really declares. Prose is excluded (a
+ * docblock naming a helper is not a call), and so is plain string text;
+ * admitting string text too was measured over the same 204 files and moved
+ * nothing at all, so it buys no safety worth its cost.
+ *
+ * An identifier is counted wherever it stands, property accesses and shadowing
+ * locals included. That over-counts references, and over-counting can only
+ * keep a declaration unmasked.
+ */
+function selfTestOnlyCallables(source, scan, selfTestStarts) {
+  const decls = topLevelDecls(source, scan, selfTestStarts);
+  if (!decls.some((d) => d.selfTest)) return [];
+  const refs = decls.map(() => new Set());
+  const moduleBodyRefs = new Set();
+  let at = 0;
+  for (const m of source.matchAll(IDENTIFIER_TOKEN)) {
+    const i = m.index;
+    if (scan.comment[i]) continue;
+    if (scan.literal[i] && !scan.interpolation[i]) continue;
+    while (at < decls.length && decls[at].end <= i) at++;
+    if (at < decls.length && i >= decls[at].start) refs[at].add(m[0]);
+    else moduleBodyRefs.add(m[0]);
+  }
+  const byName = new Map();
+  for (let k = 0; k < decls.length; k++) {
+    const list = byName.get(decls[k].name);
+    if (list) list.push(k);
+    else byName.set(decls[k].name, [k]);
+  }
+  const reach = (seeds) => {
+    const seen = new Set();
+    const queue = [...seeds];
+    while (queue.length > 0) {
+      const name = queue.pop();
+      if (seen.has(name)) continue;
+      seen.add(name);
+      for (const k of byName.get(name) ?? []) {
+        // Reached, never traversed: what a self-test body calls is not part of
+        // what this module DOES.
+        if (decls[k].selfTest) continue;
+        for (const next of refs[k]) if (!seen.has(next)) queue.push(next);
+      }
+    }
+    return seen;
+  };
+  const roots = new Set(moduleBodyRefs);
+  for (const d of decls) if (d.exported) roots.add(d.name);
+  const live = reach(roots);
+  const fromSelfTest = reach(decls.flatMap((d, k) => (d.selfTest ? [...refs[k]] : [])));
+  return decls.filter((d) => d.callable && !d.selfTest && fromSelfTest.has(d.name) && !live.has(d.name));
+}
+
+/**
+ * The source with the BODY of every top-level self-test function blanked, and
+ * with it every top-level callable ONLY the self-test can reach.
  *
  * ## Why the self-test is not part of what a gate reads
  *
@@ -1703,38 +1967,40 @@ const SELF_TEST_DECL =
  * through `check:changeset-gate-self-tests`, which resolves to all three
  * changeset gates at once and inherits the union of their fixtures.
  *
+ * The fixture builders those self-tests CALL are the other half, and they are
+ * `selfTestOnlyCallables`' subject: the declaration's own name is what
+ * `SELF_TEST_DECL` reads, and a helper's name never spells self-test. Measured
+ * over the 204 scripts this derivation scans, adding them removes 104 hints
+ * from 9 files and adds none; every one of the 104 is attributable to a single
+ * fixture-building declaration, and no family loses coverage of a file it
+ * still opens.
+ *
  * The end of the body is found by counting braces over code positions only, so
  * a `}` inside a fixture string or a `{1,6}` inside a regex cannot close it
- * early. A declaration whose braces never balance masks to end of file: recall
- * loss on a malformed script, never a fabricated lead.
+ * early. A self-test declaration whose braces never balance masks to end of
+ * file: recall loss on a malformed script, never a fabricated lead.
  *
  * Compose comment masking FIRST — otherwise a `function selfTest() {` written
  * at column 0 inside a block comment (a docblock example, exactly the kind this
  * file is full of) would anchor a mask over real code.
+ *
+ * The result is a strict superset of the mask this function applied before the
+ * helper follow existed: the self-test spans are computed exactly as they were,
+ * and the helpers are added to them. Nothing that used to be blanked survives.
  */
 export function maskSelfTests(source) {
-  const { comment, literal } = scanSource(source);
+  const scan = scanSource(source);
   const flags = new Uint8Array(source.length);
+  const selfTestStarts = new Set();
   for (const m of source.matchAll(SELF_TEST_DECL)) {
     const start = m.index;
-    if (comment[start] || literal[start]) continue;
-    let depth = 0;
-    let opened = false;
-    let end = start;
-    for (; end < source.length; end++) {
-      if (comment[end] || literal[end]) continue;
-      if (source[end] === '{') {
-        depth++;
-        opened = true;
-      } else if (source[end] === '}') {
-        depth--;
-        if (opened && depth === 0) {
-          end++;
-          break;
-        }
-      }
-    }
-    for (let k = start; k < end; k++) flags[k] = 1;
+    if (scan.comment[start] || scan.literal[start]) continue;
+    selfTestStarts.add(start);
+    const end = bracedBodyEnd(source, scan, start, true);
+    for (let k = start; k < (end < 0 ? source.length : end); k++) flags[k] = 1;
+  }
+  for (const decl of selfTestOnlyCallables(source, scan, selfTestStarts)) {
+    for (let k = decl.start; k < decl.end; k++) flags[k] = 1;
   }
   return blank(source, flags);
 }
@@ -8573,6 +8839,128 @@ function selfTest() {
     "const REAL = 'packages/ddd/src';",
   ].join('\n');
   t('a self-test declaration inside a comment anchors nothing', extractWatchHints(declInComment).includes('packages/ddd/src'));
+
+  // ── The helpers the self-test CALLS ──────────────────────────────────────
+  //
+  // `SELF_TEST_DECL` finds the ENTRY POINT by name, and a fixture builder is
+  // named for what it builds, so its body used to survive the mask whole.
+  // Measured specimen, live on this tree:
+  // `scripts/pm/release-rehearsal-clone.mjs` commits a fixture `.changeset`
+  // tree inside `makeSource`, and its two entries were read as paths that gate
+  // OPENS — the residue printed "the tree stops at .changeset; the layout moved
+  // under it" for them, a directory rename that never happened.
+  //
+  // The safety half is pinned beside it: a helper the module body can also
+  // reach is a path the gate really reads, and must survive.
+  const helperFixtures = [
+    "const REAL = 'packages/runtime/src';",
+    'function makeFixture(root) {',
+    "  write(root, 'packages/fixture-only/one.ts');",
+    '}',
+    'function shared() {',
+    "  return 'packages/shared/src';",
+    '}',
+    'function unreferenced() {',
+    "  return 'packages/dead/src';",
+    '}',
+    'export function alsoExported() {',
+    "  return 'packages/exported/src';",
+    '}',
+    'function selfTest() {',
+    '  makeFixture(tmp);',
+    '  shared();',
+    '  alsoExported();',
+    '}',
+    'function run() {',
+    '  return shared();',
+    '}',
+    'run();',
+  ].join('\n');
+  const helperHints = extractWatchHints(helperFixtures);
+  t(
+    'a fixture literal in a helper only the self-test calls is not a hint',
+    !helperHints.includes('packages/fixture-only/one.ts'),
+  );
+  t('…but a helper the module body also reaches keeps its literal', helperHints.includes('packages/shared/src'));
+  t('…and a declaration nothing references at all is left alone', helperHints.includes('packages/dead/src'));
+  t('…and an exported helper is reachable from outside this file, so it stays', helperHints.includes('packages/exported/src'));
+  t('the module body around them still hints', helperHints.includes('packages/runtime/src'));
+
+  // Transitive, and through a signature that carries braces. Counting the
+  // SIGNATURE's braces closes the body before it opens — the mask then covers
+  // 29 characters and reports success, which is how
+  // `function makeSource(root, name, { branch = 'main', … } = {})` reads.
+  const transitiveHelpers = [
+    'function writeOne(root, rel) {',
+    "  return rel === 'packages/leaf/fixture.ts';",
+    '}',
+    'function buildTree(root, { depth = 0 } = {}) {',
+    "  writeOne(root, 'packages/branch/fixture.ts');",
+    '}',
+    'function selfTest() {',
+    '  buildTree(root);',
+    '}',
+  ].join('\n');
+  const transitiveHints = extractWatchHints(transitiveHelpers);
+  t('a helper reached only THROUGH another helper is masked too', !transitiveHints.includes('packages/leaf/fixture.ts'));
+  t(
+    'a destructured default in the signature does not end the body early',
+    !transitiveHints.includes('packages/branch/fixture.ts'),
+  );
+
+  // A population DECLARED for this very scanner is referenced by no executing
+  // code — being unreferenced is what such a declaration IS. Extending the mask
+  // to value declarations was implemented and REFUSED on this evidence: over
+  // the 204 scripts this derivation scans it took 175 hints from 36 files
+  // instead of 104 from 9, and the 71 extra were the declared populations of
+  // eight gates (`ROOT_DIR_WATCH_HINTS` and its spellings).
+  const declaredPopulation = [
+    "const ROOT_DIR_WATCH_HINTS = ['packages/drivers/**'];",
+    'function selfTest() {',
+    '  return ROOT_DIR_WATCH_HINTS;',
+    '}',
+  ].join('\n');
+  t(
+    'a declaration constant only the self-test names is still a declaration',
+    extractWatchHints(declaredPopulation).includes('packages/drivers/**'),
+  );
+
+  // `${…}` is CODE, and reading it as string text is not academic: the live
+  // specimen names its own path only from inside template literals, so a scan
+  // blind to interpolations finds that constant unreferenced and masks the one
+  // hint the file really declares.
+  const interpolatedReference = [
+    'function banner() {',
+    "  return 'scripts/pm/thing.mjs';",
+    '}',
+    'function usage() {',
+    '  return `node ${banner()} --help`;',
+    '}',
+    'function selfTest() {',
+    '  banner();',
+    '}',
+    'usage();',
+  ].join('\n');
+  t(
+    'a reference from inside a template interpolation keeps a helper alive',
+    extractWatchHints(interpolatedReference).includes('scripts/pm/thing.mjs'),
+  );
+
+  // The specimen itself, on the live tree rather than in a fixture — both
+  // directions, so a future edit that deletes the file or empties its
+  // declaration cannot leave this green by vacuity.
+  const rehearsalPath = 'scripts/pm/release-rehearsal-clone.mjs';
+  const rehearsalAbs = join(ROOT, rehearsalPath);
+  t('the fixture-in-helper specimen is still on the tree', existsSync(rehearsalAbs));
+  if (existsSync(rehearsalAbs)) {
+    const rehearsalHints = extractWatchHints(readFileSync(rehearsalAbs, 'utf8'), rehearsalPath);
+    t(
+      'the fixture changesets it commits are not hints',
+      !rehearsalHints.some((h) => /^\.changeset\/(one|two)\.md$/.test(h)),
+    );
+    t('…while the population it really declares survives', rehearsalHints.includes('.changeset/*.md'));
+    t('…and so does its own path', rehearsalHints.includes(rehearsalPath));
+  }
   // Module-relative spellings: `new URL('../../x', import.meta.url)` is how
   // these scripts name a repo path, and the leading segments are the script's
   // own depth, not part of what it watches.
