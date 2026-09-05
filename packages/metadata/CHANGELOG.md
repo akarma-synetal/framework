@@ -1,5 +1,999 @@
 # @objectstack/metadata
 
+## 17.3.0
+
+### Minor Changes
+
+- 32448d4: feat(metadata): the artifact door registers stack-declared `capabilities` (#12892 step 1)
+  
+  `ARTIFACT_FIELD_TO_TYPE` — the map that decides which collections of a compiled
+  artifact reach `MetadataManager` — now carries `capabilities: 'capability'`.
+  This is step 1 of the maintainer's 2026-08-29 ruling on #12892 (option 1: *the
+  door owns the registration route* for the five artifact security collections).
+  
+  **FROM.** `capabilities` is an authorable top-level stack collection (ADR-0066
+  D1), but the door did not map it while `AppPlugin`'s ADR-0057 `SECURITY_FIELDS`
+  block did — making that block the collection's **sole registrar on an artifact
+  boot**, and it registers the raw bundle bytes with no strict parse, no schema
+  default and no ADR-0010 provenance. On a `bootstrap: 'artifact-only'` runtime
+  where `AppPlugin` does not run, a package's declared capabilities reached no
+  registry at all: `GET /meta/capability` answered **empty**, and
+  `bootstrapDeclaredCapabilities` seeded **no `sys_capability` row** for them.
+  
+  **TO.** The door registers them like every other mapped collection: strict
+  parse, schema defaults, ADR-0010 provenance. Measured on a real artifact-only
+  kernel boot with no `AppPlugin`, over a package declaring
+  `{ name: 'crm.export', label: 'Export CRM data' }`:
+  
+  - `GET /meta/capability` went from `[]` to one item carrying `scope:'platform'`
+    (the `CapabilitySchema` default) plus `_packageId` / `_packageVersion` /
+    `_provenance`;
+  - `sys_capability` went from 9 rows (platform-curated only) to 10 — the
+    declaration now materializes with `managed_by:'package'` and its `package_id`.
+  
+  **What this does NOT change, deliberately.** On the ordinary artifact boot
+  `AppPlugin` still registers `capabilities` and still runs last, so its unparsed
+  copy still wins the registry — measured byte-identical before and after this
+  change. Two registrars on one route is the interim state the ruling explicitly
+  permits while step 2 (that block stops registering the five on the **artifact**
+  path, after a census of the non-artifact boots that depend on it) lands. No
+  authoring surface moves, and no artifact that parses today stops parsing.
+- f4e7ae5: fix(security): gate the metadata HMR door on an explicit development posture (#12140)
+  
+  **BREAKING** surface narrowing — `GET`/`POST /api/v1/dev/metadata-events` are no
+  longer mounted unless `NODE_ENV` is exactly `development`. Shipped as `minor`
+  under the repo's launch-window convention for breaking changes.
+  
+  `MetadataPlugin` mounted both HMR routes whenever a raw-app-capable HTTP server
+  was present, with no authentication and no environment condition of its own. The
+  dev-only posture the path (`/api/v1/dev/…`) advertises lived only in prose —
+  "production deployments simply won't have a CLI POSTing to this endpoint" — which
+  is a claim about who is on the network, not a gate that stops them, and the same
+  structural shape #9391 closed for the `datasource-admin` family: both mounts take
+  the host's framework-native app handle, which is outside REST's `enforceAuth`
+  seam by construction.
+  
+  The distributions were enumerated rather than assumed, because "a dev-only
+  surface lacking a gate that says so" and "an unauthenticated door on a real
+  deployment" want different repairs. The official container image runs `os start`
+  under `NODE_ENV=production`; that boot reaches `createStandaloneStack`, which
+  composes `MetadataPlugin` unconditionally (only `artifactWatch` was
+  NODE_ENV-gated) onto a kernel that registers the Hono server whenever it serves.
+  So a production-shaped boot did mount both routes and did answer them — `POST`
+  re-reading the compiled artifact from disk and broadcasting a reload frame to
+  every connected client, unauthenticated.
+  
+  `registerMetadataHmrRoutes` now refuses at its first statement, ahead of every
+  side effect it performs, and returns `null` so "nothing was mounted" is a fact
+  the compiler forces its caller to handle. Unset `NODE_ENV` is closed, per the
+  maintainer's 2026-08-06 ruling that an absent value reads as `production`; `test`
+  and unrecognised spellings (`staging`, `preview`, `qa`) are closed too — a gate
+  must not treat a spelling nobody recognises as a key.
+  
+  Who is affected, in both directions:
+  
+  - `os dev` is unchanged. It spawns `os serve --dev`, which sets
+    `NODE_ENV='development'` before any plugin starts, so the watch-recompile loop
+    still gets its `200` and Studio still gets its reload frames.
+  - A deployment that was reaching this endpoint on a production-posture boot now
+    gets its host app's `404`. That door was never advertised, never in the SDK
+    (`@objectstack/client` builds no such URL) and is a build-tool loopback; if you
+    need a supported production reload trigger, that is a product decision, not
+    this endpoint.
+  - The server-side artifact-file watcher is untouched on every boot shape that had
+    it: the reload still happens, only the broadcast to (now absent) SSE clients is
+    skipped.
+  
+  <!-- adr-0087: not-required (no-migration-prescription) a mounted HTTP route stops existing under a non-development posture; no authorable key, no spec declaration, no Zod schema and no stored value moves, so `objectstack migrate meta` has nothing to rewrite and no ledger entry could reach anyone this affects -->
+- 9e0ba21: feat(spec): retire the paper metadata-customization protocol with its full coupling set (#13135, re-charter of #12057; ADR-0049, ADR-0126)
+  
+  <!-- adr-0087: registered metadata-customization-protocol-retired -->
+  
+  **BREAKING** export removal + authorable-key retirement, landing after the
+  v17.0.0 cut (the lockstep launch-window convention ships it as `minor`; the
+  prescriptions are registered under protocol major 18 —
+  `RETIRED_DEFS_BY_MAJOR[18]`, `RETIRED_KEYS_BY_MAJOR[18]` and the D3 semantic
+  entry `metadata-customization-protocol-retired` — where `os migrate meta`
+  users will look).
+  
+  `kernel/metadata-customization.zod.ts` declared a three-layer platform/user
+  patch-overlay protocol (field-level change tracking, customization policies, a
+  3-way-merge story) that nothing reachable implemented: no route ever served
+  the paper `…/overlay` / `…/effective` endpoints, the only implementation
+  (`packages/metadata`'s manager limb) was called solely by its own unit tests,
+  no merge engine ever existed, and no code read a `CustomizationPolicy`.
+  ADR-0126 §6 wall 4 supersedes the protocol as a matter of record ("nothing may
+  build against it"); the maintainer adopted retirement on #12057 (2026-08-29,
+  「同意」), and #13135 charters the full coupling set the fork report measured.
+  
+  FROM → TO:
+  
+  - `MetadataOverlaySchema` / `FieldChangeSchema` / `CustomizationOriginSchema` /
+    `MergeConflictSchema` / `MergeStrategyConfigSchema` / `MergeResultSchema` /
+    `CustomizationPolicySchema` and their `…`/`…Parsed` types
+    (`@objectstack/spec/kernel`) → *(removed — no replacement protocol)*. The
+    customization that actually ships: ADR-0005's org-scoped overlay
+    (`allowOrgOverride` on `DEFAULT_METADATA_TYPE_REGISTRY`, `sys_metadata` org
+    rows, layered read `code`/`overlay`/`effective`) and ADR-0126's
+    packaged-metadata model (clone + ledger disable).
+  - `MetadataOverlayResponseSchema` / `MetadataOverlaySaveRequestSchema` /
+    `MetadataEffectiveResponseSchema` (`@objectstack/spec/api` §5) →
+    *(removed)* — contracts for endpoints no adapter ever served; the layered
+    read's contracts (`getMetaItemLayered`) are the live API.
+  - `IMetadataService.getOverlay` / `.saveOverlay` / `.removeOverlay` /
+    `.getEffective` optional members (`@objectstack/spec/contracts`) →
+    *(removed)*, together with `packages/metadata`'s in-memory limb and its
+    `'overlay'` feature log entry.
+  - `MetadataPluginConfig.customizationPolicies` / `.mergeStrategy` and
+    `MetadataManagerConfig.persistence.overlayWritable` → *(removed — retiredKey
+    tombstones)*: authoring one is now a `tsc` error and a parse error carrying
+    the prescription. Delete the keys; nothing replaces them (`persistence.writable`
+    remains the base write gate).
+  
+  One-line fix: delete the keys and any code building against the removed
+  exports — they configured and described nothing that ever ran; org-level
+  customization keeps riding the ADR-0005 overlay unchanged.
+  
+  The retirement kit: whole-module deletion + kernel barrel line; 10
+  `RETIRED_DEFS_BY_MAJOR[18]` entries (7 kernel defs + 3 api §5 contracts); 3
+  `RETIRED_KEYS_BY_MAJOR[18]` tombstone entries (no D2 conversion —
+  plugin/manager configs are not stack collection members, the
+  `kernel/MetadataPluginConfig:additionalTypes` precedent); D3 semantic entry
+  `metadata-customization-protocol-retired`; retirement pin test
+  (`kernel/metadata-customization-retirement.test.ts`); type-alias pin rows
+  Iso408-411 vacated; api-surface / export-origins / json-schema manifest /
+  authorable-surface / reference docs regenerated (the
+  `kernel/metadata-customization` reference page disappears with the module).
+- 4cda78c: fix(metadata,objectql,metadata-protocol): require a missing-table error to name the table that was READ (#13324)
+  
+  `isMissingTableError` answers the one question that licenses a fail-soft caller
+  to treat an empty result as the truth: "did this read fail because the table has
+  not been provisioned yet?". It matched the *shape* of the dialect phrase and
+  never asked WHICH table the phrase names.
+  
+  Measured on a real libsql database: a view whose base table is gone fails with
+  `no such table: main.<base>` when the view itself is read. The phrase matches,
+  so a read of a relation that **exists and may be backed by rows** was classified
+  benign, and every fail-soft consumer on that path — `probeInstallOrganizations`,
+  `resolveFileReferences`, `seedAutonumber`, the cascade-delete dependents probe,
+  `DatabaseLoader`, `SeedLoaderService`, the `sys_metadata` overlay reads —
+  computed its answer from data it never read. That is a false "benign", the
+  direction the module's own docblock calls far more expensive than a false
+  "real".
+  
+  The predicate now takes the object the caller was reading and refuses the
+  benign verdict when the phrase names a different relation. Shape alone cannot
+  separate the two cases: measured, a view over a missing base table and a
+  genuine missing table the caller qualified produce byte-identical messages, so
+  the read's name is a parameter rather than another regex.
+  
+  The parameter is **optional** — omitting it reproduces the previous behaviour
+  exactly, so no external caller of `@objectstack/metadata/errors` changes. Every
+  in-repo call site now passes it. The comparison folds away schema/database
+  qualifiers, the legacy `namespace__short` prefix and case, so every shape
+  recognised before for a genuine missing table (sqlite `no such table: X`,
+  Postgres `relation "x" does not exist`, MySQL `table "x" doesn't exist`,
+  `unknown table`, the SQLSTATE and errno limbs) still answers benign.
+
+### Patch Changes
+
+- 54e2d36: Artifacts built by released 17.x tooling boot again on ≥17.2 runtimes: the artifact-ingestion door now runs a versioned ADR-0087 forward conversion before the strict parse (#12772).
+  
+  A compiled artifact whose declared `engines.protocol` floor predates the running `@objectstack/spec` version replays the full conversion chain — retired entries included — before validation, exactly the policy the stored-row read path already applies to `sys_metadata` rows. Measured incident: `dist/objectstack.json` built by `@objectstack/cli` 17.1.0 carries the then-legal `allowRestore`/`allowPurge` permission bits (75 of each, injected by the released builder), and spec 17.2.0's `retiredKey` tombstone refused the boot with no operator remedy (`os migrate meta` targets sources, not built artifacts).
+  
+  The conversion is versioned, not a blanket amnesty: an artifact authored at the current (or a newer) spec version converts nothing and still refuses at the tombstone — the retired keys return with the M2 lifecycle initiative (#1883), and artifacts authored against that surface are never stripped by history. Conversion notices surface operator-visibly and deduped, one summary line per conversion per artifact. New exports from `@objectstack/metadata-core`: `applyArtifactForwardConversions`, `resolveInstalledSpecVersion`, `parseRangeFloor`, `resolveDeclaredRange`.
+- 7ef0268: fix(metadata,runtime): retire the `policies` dead pointer in both artifact registrars, and pin the map that carried it (#12894)
+  
+  Zero behaviour change, by construction. Both readers of an artifact boot carried
+  a `policies` -> `policy` entry — the artifact door's `ARTIFACT_FIELD_TO_TYPE`
+  (`packages/metadata/src/plugin.ts`) and `AppPlugin`'s ADR-0057 `SECURITY_FIELDS`
+  list (`packages/runtime/src/app-plugin.ts`) — and **neither could ever match**.
+  `ObjectStackDefinitionSchema` is a `strictObject` that declares no top-level
+  `policies` key, so a definition carrying a `policies` array is refused outright
+  by the door's strict parse and reaches neither registry. The word is real but
+  lives one level down: on a permission set `policies` is an alias for
+  `rowLevelSecurity` (`PERMISSION_SET_KEY_ALIASES`) — a key on an **item**, never a
+  collection. Both entries are removed, each leaving in place the note the map
+  already writes for a retirement: what it pointed at, and why it could not match.
+  
+  That was the third entry retired from `ARTIFACT_FIELD_TO_TYPE` for exactly this
+  reason (`themes`, then `roles` -> `positions`, which "matched nothing and
+  silently dropped compiled positions"). So the deletion ships with the thing the
+  two predecessors did not have — a check that fails when the pattern recurs:
+  
+  - `check:stack-collection-maps` now reconciles **eight** hand-maintained
+    enumerations against the schema, not seven. `SECURITY_FIELDS` is the new
+    eighth, and how it was missing is the finding rather than a footnote: it is
+    the only one of the eight that pairs its keys as `[collection, kind]` tuples,
+    which neither existing extractor could read, so the site was skipped rather
+    than reported. Re-adding `policies` — or any other key the schema does not
+    declare — to **either** registrar now fails the gate with the site named.
+  - A new `tupleFirstItems` extractor reads that shape, with a self-test case
+    (13 assertions, up from 12) covering the comment/nesting cases the flat
+    string-array extractor already pins.
+  
+  The mirror-image half of the same measurement is **carried, not shipped**:
+  `capabilities` is a declared top-level collection that `SECURITY_FIELDS`
+  registers and the door's map does not, making `AppPlugin` its sole registrar on
+  an artifact boot. Adding it to the door changes what an artifact boot registers,
+  so it is measured and handed to the route-ownership decision (#12892) instead of
+  being smuggled in here. The new waiver row records the asymmetry in place.
+- b745157: feat(metadata-core,metadata): warn the operator when a pre-current-era artifact carries form-view predicates that fault open (#12915)
+  
+  A form-view predicate binds `record` (+ `previous`, `parent`) in runtime record
+  forms, or `data` in metadata-editing forms. The contract states the failure mode
+  beside the vocabulary: **a bare identifier is unbound, the predicate faults, and
+  `visibleWhen`'s fault fallback is `true`** — so a field the predicate was
+  authored to hide renders for everyone.
+  
+  That is quiet alone and lethal in combination with the authoring pattern it
+  serves. Measured on a real deployment: an artifact built by released
+  `@objectstack/cli` 17.1.0 authors
+  `{ field: 'disqualification_reason', required: true, visibleWhen: 'status == "unqualified"' }`
+  — the era's working spelling. On a 17.2 runtime the predicate faults open, the
+  conditionally hidden field renders, and its unconditional `required: true`
+  blocks **every** record creation through the console, while the same payload
+  POSTs 201 through REST. Nothing refused and nothing logged, so the operator —
+  the only person who can rebuild the artifact — had no signal at all.
+  
+  The framework artifact door now emits **one deduped `warn` line per artifact**
+  naming the authored `engines.protocol` floor and the runtime spec version, how
+  many predicates on which views (with the first path as an anchor), the
+  fault-open consequence, and the remedy (`os build`). It rides the same funnel
+  that already carries the forward-conversion summaries, so both SaaS shapes are
+  covered: a single-DB multi-org runtime warns once at boot, and per-tenant-DB
+  kernels each warn at their own.
+  
+  **No behaviour change.** No refusal, no rewrite, no schema or contract edit —
+  the predicate keeps faulting open exactly as before, and the artifact bytes are
+  untouched. Rewriting a bare root to `record.` is a separate, deferred ADR-0087
+  conversion.
+  
+  **Scoped to legacy artifacts by construction.** The notice fires only inside the
+  versioned window the forward conversion already opens (declared floor below the
+  running spec, or undeclared), read off that pass's own verdict rather than
+  recomputed. An artifact declaring the current or a newer floor gets zero notices
+  from this feature even when it carries bare roots — the boundary that keeps a
+  notice about legacy artifacts out of contract territory.
+  
+  Detection is exported from `@objectstack/metadata-core` as
+  `detectUnboundFormViewPredicateRoots` (with `BOUND_FORM_VIEW_PREDICATE_ROOTS`)
+  so other composed artifact doors can reuse one policy rather than fork it. It is
+  pure, read-only, and tuned to prefer silence over a false accusation: string
+  literals are stripped before the scan, only root position counts, call targets
+  are not roots, comprehension macros (whose iteration variable is locally bound)
+  are skipped whole, and AST-only envelopes pass.
+- 6a180e4: fix(core,rest,services)!: a permission-store read failure now fails LOUD instead of resolving as an authenticated caller holding zero capabilities (#13279)
+  
+  **BREAKING** runtime behaviour change on the shared authorization resolver,
+  shipped as `minor` under the repo's launch-window convention.
+  
+  `resolveAuthzContext`'s per-read helper `tryFind` answered a THROWN read exactly
+  the way it answered an EMPTY one: `[]`. So an outage of the permission store
+  resolved as a well-formed context for an authenticated principal holding no
+  capabilities, and the package-management door answered
+  `403 FORBIDDEN` — "Reading packages requires the `studio.access` or
+  `setup.access` capability." That answer was measured byte-identical
+  (`JSON.stringify` equal, against a control that separates two answers which do
+  differ) to what a caller who genuinely holds nothing receives. An administrator
+  was told they lack a capability, during an outage of the store that holds the
+  capability.
+  
+  Maintainer ruling 2026-08-30, verbatim 「第一批其余同意」: `tryFind` 区分「无行」
+  与「读失败」,读失败 fail-loud —— 权限库不可达时不再解析为「已认证零能力」,而是
+  响亮拒绝(与真实能力拒绝的 403 可区分)。
+  
+  Second maintainer ruling the same day (第 5 场总监席决裁批 #9, verbatim 「同意」),
+  after implementing the first one showed that "the read failed" is two facts:
+  采**选项 A** —— 把 `isMissingTableError` 从 `@objectstack/metadata` 迁至
+  `@objectstack/types`(core 已依赖),metadata 保留 re-export 兼容;`tryFind` 仅对
+  **未被判定为「表未 provision」**的读失败抛 `AuthzStoreUnavailableError`。
+  
+  **What changed.** A permission-store read that is issued and throws now raises
+  `AuthzStoreUnavailableError`, which carries the EXISTING ADR-0112 wire code
+  `SERVICE_UNAVAILABLE` and status `503`. No code is added to the closed wire
+  vocabulary and no response envelope gains or loses a key — only which declared
+  code an outage selects. Doors that map thrown errors through
+  `resolveThrownHttpError` answer 503 with no per-door change.
+  
+  **What did NOT change**, and is pinned:
+  
+  - A reachable, genuinely EMPTY store (reads return no rows) still resolves to
+    zero capabilities.
+  - A genuine capability denial still answers `403 FORBIDDEN` with its message.
+  - An ABSENT engine (`ql` unwired, so no read is ever issued) still resolves to
+    an empty-but-valid envelope.
+  - Anonymous requests never reach the store, so an outage cannot make them loud.
+  - A REAL engine whose `sys_*` tables were never provisioned resolves to zero
+    capabilities, quietly — pinned to be byte-identical to the empty-store
+    envelope, in every dialect spelling and in the production wrapper shape where
+    the driver's phrase is on `cause` rather than the outer message.
+  
+  **The boundary between the two kinds of read failure.** An earlier revision of
+  this changeset claimed "embedders without a data plane are unaffected". That
+  claim was too broad; it is retracted here, and the gap it named is now closed
+  rather than merely disclosed. A read also throws when the table was never
+  PROVISIONED — a real engine, wired and reachable, whose `sys_*` tables were
+  never created — and that is a supported deployment shape, not an outage. There
+  "zero capabilities" is the TRUE answer rather than a fabrication: nothing is
+  provisioned, so nothing was withheld. Only an UNREACHABLE store — the ruling's
+  own word 不可达 — leaves the capability set unknown, and only an unknown answer
+  may not be reported as a denial.
+  
+  Treating the two alike was measured, not theorised: it turned four CI suites
+  red, all from `no such table` on `sys_user` / `sys_member` /
+  `sys_user_position` / `sys_user_permission_set`. Ordinary CRUD in
+  `@objectstack/client` answered `503`; batch validation errors that owe `400`
+  answered `503`, because authorization refused before validation ran; runtime
+  notifications answered `401` where authenticated callers must be served `200`;
+  and two `.integration.test.ts` noise guards reported that the driver and engine
+  diagnostics for `sys_position` stopped being emitted — the eager throw aborted
+  the resolution before that later read was ever issued, so a change made to stop
+  a failed read being silent had made two other channels silent.
+  
+  `tryFind` therefore raises `AuthzStoreUnavailableError` only for a read failure
+  that is NOT positively identified as an unprovisioned table.
+  
+  **`isMissingTableError` moved to `@objectstack/types`.** The classifier that
+  draws that boundary already existed and was already right — driver-code based
+  rather than prose-sniffing, documented so that "cannot say" never means "be
+  loud". It lived in `@objectstack/metadata`, which DEPENDS ON `@objectstack/core`,
+  so the resolver could not import it. Rather than keep a second copy of a
+  security-relevant predicate, the ruling relocated the one classifier to
+  `@objectstack/types` — the package core already depends on, and the repo's own
+  stated Home rule for a cross-package error predicate ("every consumer of the
+  question already depends on it, so adopting the predicate never adds an edge",
+  `packages/types/src/unique-violation.ts`). `@objectstack/metadata/errors` still
+  exports `isMissingTableError`, re-exported from the new home, so no consumer of
+  that published subpath changes.
+  
+  Its sibling `isSchemaAlreadyExistsError` moved with it — the two are not two
+  modules but two signatures over one matcher, and separating them would have
+  meant re-rolling the matcher, which is the duplication the module exists to
+  prevent. Both are now exported from `@objectstack/types`; the metadata subpath
+  deliberately still publishes only `isMissingTableError`, which is the only one
+  anything imports through it.
+  
+  ⚠️ **Signed-off risk, recorded because it is load-bearing.** Gating loudness on
+  a driver-error predicate was approved with its false-positive direction stated:
+  mis-reading a genuine outage as "table not provisioned" silently restores the
+  quiet 403 this change removes, with no thrown error and no other failing test.
+  That direction is accepted, not overlooked — the predicate keys on driver codes,
+  SQLSTATEs and errnos first, excludes the known superstring traps up front, and
+  returns `false` for anything it does not positively recognise, so an
+  unrecognised outage stays loud by default. The risk is written beside the
+  predicate in `resolve-authz-context.ts` and both directions are pinned by name
+  in `authz-store-unavailable.test.ts`. ⛔ Do not widen `isMissingTableError` to
+  make a first boot quieter: every widening moves outages into the quiet branch.
+  
+  **All-transport, not just REST.** Every transport authorizing through
+  `resolveAuthzContext` inherits this. Six of the eight production transports
+  wrapped the call in a fail-closed `catch` that would have re-silenced the
+  outage — measured, not assumed: with the resolver loud but the nets untouched,
+  the package door answered `401`, i.e. the outage merely changed disguises. Those
+  `catch` blocks now re-raise via `isAuthzStoreUnavailableError` and keep their
+  previous behaviour for every other fault. The transport set is rebuilt from
+  source and audited for set equality on every test run, so a transport added
+  later cannot inherit the old silence unnoticed.
+  
+  Callers that treat any throw from `resolveAuthzContext` as "anonymous" should
+  re-raise `isAuthzStoreUnavailableError(err)` instead: degrading it restores the
+  disguise this removes.
+  
+  <!-- adr-0087: not-required (runtime-interface-only packages/core/src/security/resolve-authz-context.ts#ResolvedAuthzContext, packages/core/src/security/authz-store-unavailable.ts#AuthzStoreUnavailableError) The breaking surface is runtime TypeScript in `@objectstack/core`'s security module and nothing else: `resolveAuthzContext` stops always-resolving and raises `AuthzStoreUnavailableError` when a permission-store read is issued and throws. NO metadata surface is touched in either direction. No Zod schema changes, no `packages/spec` declaration is added or removed, no authorable key moves, no stored row shape changes, and no object definition is edited — a customer's metadata app is byte-for-byte unaffected, so `objectstack migrate meta` has nothing to visit and there is no tombstone to mint. The wire vocabulary is likewise untouched: `SERVICE_UNAVAILABLE` is an EXISTING `StandardErrorCode` member that `HttpStatusErrorCodeMap` already maps to 503, so this change only selects a different DECLARED code for an outage rather than adding one. Both named symbols resolve at HEAD as exported declarations whose files are not `*.zod.ts`, are not under `packages/spec/src/contracts/`, are not object definitions and are not `z.input` projections; neither is referenced in code by any metadata surface (the `packages/spec` hits for `resolveAuthzContext` are comment prose describing the envelope, which this gate masks). The channel that reaches an affected consumer is therefore code review and this changeset, never the upgrade guide: a ledger entry could not express "your fail-closed catch should re-raise this error", because there is no metadata for a migration to rewrite. -->
+- e7191ce: fix(build): give each `exports` condition its own `types` target in the 28 dual-build packages (#13112)
+  
+  **Published-surface change, zero runtime change.** No emitted byte moves; what
+  moves is which declaration file a resolver READS. Maintainer ruling 2026-08-29
+  (decision batch #3, verbatim 「同意」) chose declaring the files over deleting
+  them.
+  
+  ## What was wrong
+  
+  These 28 packages are `"type": "module"` and dual-built, and each spelled one
+  `types` condition as a **sibling** of `import`/`require`:
+  
+  ```json
+  "exports": { ".": {
+    "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs"
+  } }
+  ```
+  
+  A sibling `types` answers for **both** conditions, so a CommonJS consumer was
+  handed `dist/index.d.ts` — an ES-module declaration, because the package is
+  `"type": "module"` — for an entry point it reaches with `require`. Measured with
+  `tsc --traceResolution` on a `"type": "commonjs"` fixture at `moduleResolution:
+  node16`:
+  
+  ```
+  error TS1479: The current file is a CommonJS module whose imports will produce
+  'require' calls; however, the referenced file is an ECMAScript module and cannot
+  be imported with 'require'.
+  ```
+  
+  The JavaScript at `dist/index.cjs` loads perfectly (`check:dual-build-cjs-loads`
+  has asserted that for months). It is the **types** that told the consumer the
+  supported `require` entry point could not be required. The `dist/index.d.cts`
+  twin tsup emits beside it — 36 files, 5,517,701 B on this build — was named by
+  no condition at all and shipped in every tarball unreachable.
+  
+  ## What changed
+  
+  Each condition now names its own declaration, the shape TypeScript documents:
+  
+  ```json
+  "exports": { ".": {
+    "import":  { "types": "./dist/index.d.ts",  "default": "./dist/index.js" },
+    "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+  } }
+  ```
+  
+  33 entry points across 27 packages, subpaths included. The root `types` field is
+  untouched, so `node10` resolvers are unaffected; the `import` condition resolves
+  exactly what it resolved before, measured as an unchanged control in the same
+  run.
+  
+  ## `@objectstack/core` is deliberately NOT changed
+  
+  Splitting a declaration in two makes TypeScript compare it nominally, and
+  `ObjectKernel` carries a `private plugins` member that reaches every plugin
+  through `PluginContext.getKernel()`. With core split, whole-repo `pnpm build`
+  fails in `@objectstack/verify` with 5 × TS2345 ("Types have separate
+  declarations of a private property 'plugins'"); with core held back and the
+  other 27 split, 71/71 tasks pass. So core keeps the sibling-`types` shape and
+  its two `.d.cts` files (220,854 B) stay unreachable, declared as such in
+  `check:dual-build-cjs-loads`. Splitting it needs a decision about core's public
+  types, not about an exports map.
+  
+  ## For consumers
+  
+  - **ESM consumers: nothing changes.** Same declaration file, byte for byte.
+  - **CJS consumers under `node16`/`nodenext`: TS1479 goes away** and the
+    declarations they get are the ones built for CommonJS.
+  - **`node10` / `moduleResolution: node` consumers: nothing changes** — they never
+    read `exports`.
+  - Nothing is removed: every path that resolved before still resolves.
+  
+  Packages that are CJS-first (`require` → `./dist/index.js`, no `"type": "module"`)
+  were already correct and are untouched — their `dist/index.d.ts` really is the
+  CommonJS declaration. Their ESM mirror (an unreachable `.d.mts` under the
+  `import` condition) is a separate, larger population and is filed separately per
+  the ruling, not fixed here.
+  
+  `check:dual-build-cjs-loads` grew a fourth invariant (TYPED) that reds on the old
+  shape, so the drift cannot return silently.
+- 200d255: fix(metadata-core,metadata): a form SECTION binds `current_user` too, so the unbound-root notice stops flagging one (#13072)
+  
+  Second correction to the unbound-root boot notice, and the same defect as the
+  first one a surface later. The notice judged a SECTION-level predicate against
+  `record` / `previous` / `parent` / `data`, sourced faithfully from the section
+  contract prose — which was stale.
+  
+  `current_user` and its ADR-0068 alias roots (`user`, `ctx.user`, `os.user`)
+  **resolve on a section-level `visibleWhen`**: objectui#6110 threads the host
+  shell's predicate scope into `isSectionVisible` where it used to pass
+  `undefined`, and objectui#6111 copies the authored `visibleWhen` onto the
+  `section-divider` pseudo-field whose predicate the SDUI form renderer evaluates
+  with that scope bound. #12914 re-measured the contract text accordingly. Until
+  this change, a legacy artifact carrying a legitimate section-level
+  `current_user.role == "admin"` predicate was reported at boot as an unbound root
+  that faults open — a notice about a predicate that resolves, which is the
+  cry-wolf failure the module's own doc forbids and the one that trains operators
+  to ignore the channel.
+  
+  **What changes:** one vocabulary now serves both form-view predicate surfaces —
+  `record`, `previous`, `parent`, `data`, `current_user`, `user`, `ctx`, `os`. A
+  section predicate rooted at the `current_user` family is silent; a section
+  predicate rooted at a bare field identifier is still reported, and the operator
+  line still prints the rule per surface for the surfaces the findings implicate.
+  
+  **Blast radius, stated without inflation:** this is a **notice**, not a refusal
+  — no parse change, no gate, no behaviour change, and it only runs inside the
+  versioned window `applyArtifactForwardConversions` opens. The cost it removes is
+  a false operator signal on legacy artifacts, not a broken runtime.
+  
+  **Removed export, with its migration:** `FIELD_ONLY_BOUND_PREDICATE_ROOTS` is
+  gone from `@objectstack/metadata-core`. The section binding empties it, and an
+  exported constant named `FIELD_ONLY_…` holding `[]` asserts a per-surface
+  difference that no renderer makes. FROM → TO: read
+  `BOUND_FORM_VIEW_PREDICATE_ROOTS` (every root bound on any form-view predicate)
+  or `BOUND_FORM_FIELD_PREDICATE_ROOTS` (the field question, the same list today).
+  No consumer can be carrying it: the notice has never shipped — the two
+  changesets that introduce it are still pending in `.changeset/`, the newest
+  published `@objectstack/metadata-core` is 17.2.0, and the commit that added
+  `form-predicate-root-policy.ts` is in no release tag. This was the last moment
+  at which the removal cost nothing.
+  
+  **Why the vocabulary is no longer justified by quoting the contract.** Both
+  times this list has been wrong, it was wrong by transcribing a correct-looking
+  sentence that the renderer had already moved past. The prose is a transcription
+  of a renderer and can only lag one, so membership is now stated as the mechanism
+  — *a root is bound on a surface iff some renderer threads a scope carrying it
+  into that surface's evaluator* — with the threading site named per entry, and
+  the module's test reads the LIVE `.describe()` text of
+  `FormFieldSchema.visibleWhen` / `FormSectionSchema.visibleWhen` out of
+  `@objectstack/spec` instead of copying it into a comment. A comment quoting that
+  sentence goes stale in silence, twice now; an assertion that fetches it cannot.
+  
+  <!-- adr-0087: not-required (unpublished) the removed export FIELD_ONLY_BOUND_PREDICATE_ROOTS was added after 17.2.0 and is in no release tag, so no upgrader can be holding it and there is nothing to migrate from. -->
+- 2852acc: fix(metadata-core,metadata): split the form-view predicate root vocabulary per surface, so a field-level `current_user` test is not false-flagged (#12915)
+  
+  Same-day correction to the unbound-root boot notice. The notice judged **every**
+  form-view predicate against one vocabulary (`record` / `previous` / `parent` /
+  `data`), sourced faithfully from the contract prose — which, for the field-level
+  slot, was stale.
+  
+  `current_user` and its ADR-0068 alias roots (`user`, `ctx.user`, `os.user`)
+  **resolve on a field-level `visibleWhen`** since objectui#6010; three spec text
+  sites still said otherwise until #12930 re-measured them, and one of those sites
+  was the sentence this policy was written against. A legacy artifact carrying a
+  legitimate `current_user.role == "admin"` field predicate was therefore reported
+  as faulting open — the cry-wolf failure the notice is explicitly built to avoid,
+  and the one that trains operators to ignore the channel.
+  
+  The vocabulary is now per surface, which is what the contract actually says:
+  
+  - **Field-level** (`BOUND_FORM_FIELD_PREDICATE_ROOTS`): the shared base plus
+    `current_user`, `user`, `ctx`, `os`. Silent on all of them.
+  - **Section-level** (`BOUND_FORM_VIEW_PREDICATE_ROOTS`, unchanged in name and
+    value): the base alone. `current_user` is still flagged there — the section
+    docblock states it is unbound at that level and faults open.
+  
+  Two limits of the field binding deliberately do **not** change the answer: it is
+  a rendering rule rather than authorization (an authoring hazard, not a
+  version-drift one), and the scope is empty on the console's public `/f/:slug`
+  route (equally true of a freshly built current artifact, so it says nothing
+  about the artifact's era — the only thing this notice claims to detect).
+  
+  The emitted warn line now prints the bound roots **per surface, and only for the
+  surfaces the findings implicate**, so an operator is never shown a rule their
+  artifact has no instance of. Findings carry a `surface` field.
+  
+  `unboundRootsInCelSource` takes the vocabulary as an optional second argument;
+  its default is unchanged (the stricter base), so existing callers behave exactly
+  as before.
+- e7f56d6: Make the settings engine facade and the metadata database loader bind the row
+  they resolved, not a row the payload names
+  
+  Two ingresses resolved an authoritative row id and then folded it into the
+  write payload with the **losing** spread order — `{ id, ...data }` — so a
+  caller-supplied `data.id` spread over the id the ingress had just resolved and
+  silently retargeted the write:
+  
+  - `wrapEngineAsSettingsEngine`'s by-id `update` branch
+    (`@objectstack/service-settings`), whose id comes from the caller's
+    `where.id`.
+  - `DatabaseLoader._update` (`@objectstack/metadata`), whose id arrives as a
+    separate parameter every caller resolves first (`existing.id`, from the read
+    immediately above).
+  
+  Both now spell it `{ ...data, id }` — the operation's id **after** the spread,
+  so it wins. That is the convention the repo's other two ingresses already
+  document: `rest-server.ts`'s batch update arm ("the operation's id AFTER the
+  spread, so it wins") and `protocol.updateData`'s #6479 fix
+  (`{ ...request.data, id: request.id }`).
+  
+  **No wrong write is known to have been reachable.** Both sites' current callers
+  build fresh field literals and never put an `id` inside `data`, so this is
+  hardening a fragile pattern rather than repairing a measured defect. What makes
+  it worth the three characters is that neither site can be caught downstream:
+  both pass **no `where`** to the engine, so the payload is the only id the engine
+  ever sees, and the engine's conflicting-id refusal (`UPDATE_ID_MISMATCH`, 400)
+  needs two disagreeing declarations before it can fire. The fold is the entire
+  trust boundary at both sites, and it is one refactor — a caller handing back a
+  row copy, and rows carry `id` — from the #6479 shape.
+  
+  Both are pinned with a payload whose `id` names a **different** row than the
+  one the ingress resolved, asserting the resolved row is still the row bound. A
+  pin exercising a payload without an `id` would have passed against both
+  spellings. The doubles answer "which row does this bind?" with the producer's
+  own `assertEngineUpdateDispatch`, so they cannot be kinder about it than a
+  running server.
+- a7002ce: Canonicalise driver-materialised timestamps at the metadata adapter boundaries
+  
+  `MetadataItem.authoredAt` is declared `z.string()` ('ISO-8601 timestamp') and
+  `MetadataStats.mtime` is declared `z.string().datetime()`, but three producers
+  adapted a driver row into those declared types without converting the value.
+  `created_at` / `updated_at` are builtin audit columns and `recorded_at` is a
+  declared `Field.datetime`; `SqlDriver#formatOutput` repairs both only inside its
+  `if (this.isSqlite)` arm, so on Postgres and MySQL a JS `Date` landed in a field
+  every consumer reads as a `string`.
+  
+  `SysMetadataRepository#get` / `#getByHash` and `DatabaseLoader#stat` now emit
+  canonical ISO-8601 text on every dialect, matching the sibling producers that
+  already spelled it correctly. Values that were already canonical (SQLite) pass
+  through byte-identically.
+- 0ae9e1e: fix(metadata): `migrateProjectIdToEnvironmentId`'s raw-driver guard stated its instruction sentence twice (#13219)
+  
+  An operator who called `migrateProjectIdToEnvironmentId` with a driver that has
+  no `raw()` was refused correctly, but read the same remedy twice in one message:
+  
+  ```
+  migrateProjectIdToEnvironmentId: driver must expose a .raw(sql, bindings?) method. migrateProjectIdToEnvironmentId: driver must expose a .raw(sql, bindings?) method. SqlDriver (better-sqlite3/knex) supports this; cloud-side TursoDriver also conforms.
+  ```
+  
+  The sentence was concatenated twice, a copy-paste artifact — the sibling
+  `migrateEnvIdToProjectId` carries the correct single-sentence form of the
+  identical guard. Cosmetic and operator-facing only: the guard fires on exactly
+  the same condition, the remedy it names is unchanged, and nothing parses the
+  message. The duplicate line is deleted; the surviving sentence keeps the
+  trailing space that separates it from the one naming the conforming drivers.
+  
+  The refusal case in the package's tests now pins the properties — the
+  instruction appears exactly once, no sentence runs into the next, and the
+  supporting sentence is still present — rather than substring-matching the
+  message, which could not see a second copy and so passed either way.
+- ef76342: fix(metadata): stop `migrateProjectIdToEnvironmentId` renaming into a column no declaration knows about (#13205)
+  
+  `AFFECTED_TABLES` was a hand-written list, and it outlived the declarations it
+  described. The branch/project-removal amendment (M1) took `environment_id` out
+  of `sys_metadata_history`'s declaration in `@objectstack/metadata-core`; the
+  migration kept naming that table. Its only guard asks whether `project_id` is
+  present **physically** (`_columnExists`) — which says nothing about the target
+  column being **declared** — so against any database whose physical
+  `sys_metadata_history` still carried the pre-v5 column, the migration renamed it
+  to `environment_id`: a fresh orphan column that no declaration, no `syncSchema`
+  and no reader knows about.
+  
+  The list is now **derived from the declarations** rather than restated beside
+  them. A candidate table is migrated only if its current declaration carries the
+  target column, so the two cannot drift apart again — the derivation and the
+  declaration are the same fact. `@objectstack/metadata-core` was already a
+  dependency of this package, so this adds no dependency edge.
+  
+  A candidate that does not declare the target column is now **reported** as
+  `status: 'skipped_not_declared'` (an additive member of the result union)
+  instead of silently vanishing from the result array: an operator reading the
+  results can tell "considered and deliberately skipped" from "forgotten again",
+  which is the state this defect started in.
+  
+  The sibling `migrateEnvIdToProjectId` is deliberately left alone: its target
+  (`project_id`) is an intermediate column that no current declaration carries by
+  design, so the "target must be declared" rule is sound only for the terminal
+  migration in the chain.
+  
+  No behaviour changes for `sys_metadata`, whose declaration does carry
+  `environment_id`: it is renamed exactly as before.
+- 2a18117: fix(metadata): every migration in `@objectstack/metadata/migrations` refused every driver this repo ships (#14023)
+  
+  All four helpers exported from `@objectstack/metadata/migrations` guarded on —
+  and drove through — `driver.raw(sql, bindings?)`. **No data driver in this repo
+  defines `raw`.** `SqlDriver` keeps its knex handle `protected` and declares no
+  `raw` member, and `SqliteWasmDriver` inherits that; the only `raw(` member
+  anywhere outside a test double is an HTTP harness in `packages/verify` whose
+  signature is `(path, init)`. So an operator who passed their platform driver was
+  refused by all four:
+  
+  ```
+  migrateSysNotificationToEvent({ driver, data })  ->  { status: 'error', migrated: 0 }
+  ```
+  
+  The failure was quiet in the shape that matters. `migrateSysNotificationToEvent`
+  *returns* `{ status: 'error' }` rather than throwing, and the message blamed the
+  caller's driver for lacking a method instead of saying the migration had not
+  run — so someone following the ADR-0030 cut-over runbook, which names this call
+  as the supported way to preserve users' existing bell notifications, would read
+  it as a problem with their own driver.
+  
+  It was not only an operator-facing path. `DatabaseLoader` calls
+  `migrateProjectIdToEnvironmentId(driver)` on bootstrap with a real driver, at
+  two call sites, each wrapped in a catch — so the v5.0 `project_id` ->
+  `environment_id` forward migration threw and was swallowed on every boot.
+  
+  The four helpers now resolve their raw-SQL entry point through one shared
+  resolver (`src/migrations/driver-exec.ts`) that tries `execute` first and falls
+  back to `raw`. `execute` goes first because it is the surface the contract
+  declares: `IDataDriver` (`@objectstack/spec/contracts`) declares
+  `execute(command, parameters?, options?)` **non-optionally**, with bound
+  parameters as the second positional argument — exactly the shape `raw(sql,
+  bindings?)` was being called in — and has never declared `raw`. `raw` is kept as
+  a fallback so a host or third-party driver that does define it keeps working;
+  nothing that worked before stops working, and the refusal now fires only for a
+  driver offering neither surface.
+  
+  Two sibling directories already resolved both surfaces instead of assuming one,
+  in opposite orders (`metadata-protocol`'s `partial-index-probe` tries `raw`
+  first, its `seed-tenancy-backfill` tries `execute` first, and `protocol.ts`'s
+  `ensureOverlayIndex` is a third). One operation with three implementations and
+  two behaviours resolves to the declaration-bound side, which is why this
+  directory adopts `execute`-first uniformly rather than copying either precedent.
+  
+  The refusal message now names both surfaces. It keeps the properties pinned
+  after the doubled-sentence defect: the remedy is stated exactly once, the
+  sentences stay separated, and a conforming driver is still named.
+  
+  Tests: every pre-existing case in this directory built its own double carrying a
+  `raw` method — including the case asserting the guard fires — so the suite
+  pinned the guard's wording while never exercising a driver the platform ships.
+  Swapping `raw` for `execute` in the helpers and in the doubles would have moved
+  that hole rather than closed it. A new `real-driver-exec-surface.test.ts` drives
+  all four migrations through a real `SqliteWasmDriver` against real in-process
+  SQLite, asserting the physical schema rather than the returned status, and pins
+  the surface reality the file exists for: the real driver has no `raw` and does
+  have `execute`.
+- c9d4de3: fix(metadata): `migrateSysNotificationToEvent` writes canonical ISO timestamps, not `Date.prototype.toString` (#13998)
+  
+  `selectLegacyRows` reads the legacy `sys_notification` table through
+  `driver.raw`/`execute` — a door that does not run `formatOutput`, so none of its
+  repairs apply. On SQLite the legacy stamps come back as canonical ISO text and
+  `String(row.created_at)` is the identity. On Postgres and MySQL an instant
+  column materialises as a JS `Date`, so the migration wrote
+  
+  ```
+  Sun Aug 30 2026 18:19:25 GMT+0800 (China Standard Time)
+  ```
+  
+  into `created_at` on the new `sys_inbox_message` row and into `created_at` / `at`
+  on the new `sys_notification_receipt` row — whole seconds in the **migrating
+  host's** zone with the milliseconds dropped, or a value no dialect's timestamp
+  grammar accepts at all. The migration is one-way, so that spelling is what the
+  platform would carry afterwards.
+  
+  Both stamps are now canonicalised at the migration, matching the repo's existing
+  correct form: a `Date` is rendered with `toISOString()`, ISO text passes through
+  untouched. Neither column could be repaired further upstream —  `created_at` is a
+  builtin audit column that `formatOutput` repairs only in its `if (this.isSqlite)`
+  arm, and `read_at` is a legacy column ADR-0030 removed from the object, so it is
+  not a declared `Field.datetime` either and no coercion could ever reach it.
+  
+  Pinned with a hand-made `Date` driven through the migration's read path under a
+  forced process zone, which is what breaks the SQLite identity that kept the
+  existing cases green while the defect was live.
+- Updated dependencies [387e231]
+- Updated dependencies [cae2169]
+- Updated dependencies [2d4fa75]
+- Updated dependencies [0e4e51b]
+- Updated dependencies [e84bbf6]
+- Updated dependencies [c45d8e6]
+- Updated dependencies [40a93b5]
+- Updated dependencies [dda969c]
+- Updated dependencies [277948f]
+- Updated dependencies [8bdd955]
+- Updated dependencies [54e2d36]
+- Updated dependencies [b745157]
+- Updated dependencies [4f24e9d]
+- Updated dependencies [4bd6faa]
+- Updated dependencies [86cbe37]
+- Updated dependencies [6a180e4]
+- Updated dependencies [474242f]
+- Updated dependencies [803eaab]
+- Updated dependencies [983edf1]
+- Updated dependencies [eae824e]
+- Updated dependencies [f6fa22c]
+- Updated dependencies [8a483b3]
+- Updated dependencies [3bc2e38]
+- Updated dependencies [df59de0]
+- Updated dependencies [96e25a8]
+- Updated dependencies [f75a38a]
+- Updated dependencies [7a25e7d]
+- Updated dependencies [1fa05a6]
+- Updated dependencies [c85a265]
+- Updated dependencies [dcb10a5]
+- Updated dependencies [776a098]
+- Updated dependencies [5060877]
+- Updated dependencies [4f6325d]
+- Updated dependencies [52954c0]
+- Updated dependencies [d23ebb9]
+- Updated dependencies [93809a3]
+- Updated dependencies [7c0d0c3]
+- Updated dependencies [daae7aa]
+- Updated dependencies [8dc22d6]
+- Updated dependencies [fa5d137]
+- Updated dependencies [3b4c56c]
+- Updated dependencies [ae8edd2]
+- Updated dependencies [e25403c]
+- Updated dependencies [a81aa9d]
+- Updated dependencies [64baa68]
+- Updated dependencies [9fa70d7]
+- Updated dependencies [09db64a]
+- Updated dependencies [92916e7]
+- Updated dependencies [a84f3ea]
+- Updated dependencies [f2eaae8]
+- Updated dependencies [56c093c]
+- Updated dependencies [c09451b]
+- Updated dependencies [ba64877]
+- Updated dependencies [e7191ce]
+- Updated dependencies [7345308]
+- Updated dependencies [30d96ab]
+- Updated dependencies [f658793]
+- Updated dependencies [0fd4899]
+- Updated dependencies [c95ad19]
+- Updated dependencies [4a17645]
+- Updated dependencies [3795c5f]
+- Updated dependencies [e25e839]
+- Updated dependencies [5997207]
+- Updated dependencies [8b13cc8]
+- Updated dependencies [00d8f65]
+- Updated dependencies [86e765a]
+- Updated dependencies [53dc739]
+- Updated dependencies [fd289be]
+- Updated dependencies [03bf7b1]
+- Updated dependencies [f90e820]
+- Updated dependencies [e8bd715]
+- Updated dependencies [a28a3c0]
+- Updated dependencies [200d255]
+- Updated dependencies [2852acc]
+- Updated dependencies [daeaaf9]
+- Updated dependencies [c459da6]
+- Updated dependencies [e914733]
+- Updated dependencies [f887e52]
+- Updated dependencies [881f8d8]
+- Updated dependencies [3bfa1e6]
+- Updated dependencies [0a8ebf3]
+- Updated dependencies [901355c]
+- Updated dependencies [bfe13c8]
+- Updated dependencies [4635f3e]
+- Updated dependencies [fd289be]
+- Updated dependencies [ee3595c]
+- Updated dependencies [09b4f4e]
+- Updated dependencies [3a04b01]
+- Updated dependencies [3954fb7]
+- Updated dependencies [4805b56]
+- Updated dependencies [b9e9227]
+- Updated dependencies [d395692]
+- Updated dependencies [5894d30]
+- Updated dependencies [a3765f6]
+- Updated dependencies [2d5cee3]
+- Updated dependencies [e22158f]
+- Updated dependencies [7404925]
+- Updated dependencies [0c2334f]
+- Updated dependencies [d2619fd]
+- Updated dependencies [af56546]
+- Updated dependencies [6acb11a]
+- Updated dependencies [33c5fd3]
+- Updated dependencies [20b0fdb]
+- Updated dependencies [905019b]
+- Updated dependencies [a286411]
+- Updated dependencies [98c0d33]
+- Updated dependencies [93ea19b]
+- Updated dependencies [9ee2dcf]
+- Updated dependencies [8cb96ec]
+- Updated dependencies [8f10a79]
+- Updated dependencies [6269a55]
+- Updated dependencies [a17da05]
+- Updated dependencies [a8c00e2]
+- Updated dependencies [0fb8760]
+- Updated dependencies [e5ce2ed]
+- Updated dependencies [be21955]
+- Updated dependencies [bc56e18]
+- Updated dependencies [be21955]
+- Updated dependencies [a9ee989]
+- Updated dependencies [15d58db]
+- Updated dependencies [d63b014]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [2cc7122]
+- Updated dependencies [15d55fb]
+- Updated dependencies [9e0ba21]
+- Updated dependencies [a07a831]
+- Updated dependencies [311433f]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [b7131f3]
+- Updated dependencies [ce7e497]
+- Updated dependencies [51ecb2f]
+- Updated dependencies [9086761]
+- Updated dependencies [f6344e7]
+- Updated dependencies [42a117b]
+- Updated dependencies [4297fe7]
+- Updated dependencies [e398863]
+- Updated dependencies [d79c602]
+- Updated dependencies [f11fc61]
+- Updated dependencies [8f79379]
+- Updated dependencies [e6ca40e]
+- Updated dependencies [0c77ea4]
+- Updated dependencies [52954c0]
+- Updated dependencies [7131f12]
+- Updated dependencies [aa5994e]
+- Updated dependencies [be93457]
+- Updated dependencies [a65db76]
+- Updated dependencies [2cf5a96]
+- Updated dependencies [15eb2c9]
+- Updated dependencies [5691b07]
+- Updated dependencies [2a6122b]
+- Updated dependencies [225e769]
+- Updated dependencies [8af88dd]
+- Updated dependencies [fb5fbb8]
+- Updated dependencies [d7b3963]
+- Updated dependencies [33184fd]
+- Updated dependencies [7c41693]
+- Updated dependencies [b72db01]
+- Updated dependencies [dce5cd4]
+- Updated dependencies [9688f58]
+- Updated dependencies [556ebc1]
+- Updated dependencies [177ebdc]
+- Updated dependencies [8d237b4]
+- Updated dependencies [2d2e6f0]
+- Updated dependencies [2d8dd8d]
+- Updated dependencies [b5a2398]
+- Updated dependencies [348860c]
+- Updated dependencies [5383fa6]
+- Updated dependencies [5b3ff63]
+- Updated dependencies [1a6a19c]
+- Updated dependencies [064d484]
+- Updated dependencies [527e050]
+- Updated dependencies [dd33bf9]
+- Updated dependencies [4cb2a90]
+- Updated dependencies [74a7804]
+- Updated dependencies [49f0dcf]
+- Updated dependencies [033a34c]
+- Updated dependencies [4d25d22]
+- Updated dependencies [1ffee51]
+- Updated dependencies [5ae4303]
+- Updated dependencies [ece4dad]
+- Updated dependencies [146f448]
+- Updated dependencies [735f5c7]
+- Updated dependencies [366f895]
+- Updated dependencies [dc75ba8]
+- Updated dependencies [cce0aa9]
+- Updated dependencies [cff17af]
+- Updated dependencies [39404f3]
+- Updated dependencies [ca1965f]
+- Updated dependencies [8619f95]
+- Updated dependencies [b706af9]
+- Updated dependencies [db8c288]
+- Updated dependencies [0e5fe7f]
+- Updated dependencies [add4360]
+- Updated dependencies [e0abc38]
+- Updated dependencies [fc9ba76]
+- Updated dependencies [1272f0a]
+- Updated dependencies [a11c1a5]
+- Updated dependencies [71f9cd1]
+- Updated dependencies [ee17d86]
+- Updated dependencies [cdbd920]
+- Updated dependencies [18c432e]
+- Updated dependencies [3c418c4]
+- Updated dependencies [a933ed7]
+- Updated dependencies [b3ca463]
+- Updated dependencies [a933ed7]
+- Updated dependencies [0d4a6a8]
+- Updated dependencies [518d5e5]
+- Updated dependencies [6643ba1]
+- Updated dependencies [eeba2ef]
+- Updated dependencies [ec4c4d2]
+- Updated dependencies [424f73c]
+- Updated dependencies [cccbe51]
+- Updated dependencies [a8d6b1d]
+- Updated dependencies [e4a7695]
+- Updated dependencies [87075b1]
+- Updated dependencies [14cfc00]
+- Updated dependencies [dfebfc8]
+- Updated dependencies [598b7ec]
+- Updated dependencies [d028b37]
+- Updated dependencies [f7b25c5]
+- Updated dependencies [122ef38]
+- Updated dependencies [428f9b2]
+- Updated dependencies [aa7ff56]
+- Updated dependencies [811a3c2]
+- Updated dependencies [d41d166]
+- Updated dependencies [c4db311]
+- Updated dependencies [750fff5]
+- Updated dependencies [c19035e]
+- Updated dependencies [ececf7a]
+- Updated dependencies [d173125]
+- Updated dependencies [8425c17]
+- Updated dependencies [a5ef1d8]
+- Updated dependencies [772d5de]
+- Updated dependencies [ce80ec2]
+- Updated dependencies [b372318]
+- Updated dependencies [29d0676]
+- Updated dependencies [6bd3231]
+- Updated dependencies [b799ac5]
+- Updated dependencies [8f74307]
+- Updated dependencies [d23dc08]
+- Updated dependencies [644ad50]
+- Updated dependencies [9735662]
+- Updated dependencies [4d5b4f8]
+- Updated dependencies [3e8f5b0]
+- Updated dependencies [5d16379]
+- Updated dependencies [0da7cd2]
+- Updated dependencies [28a5c3e]
+- Updated dependencies [4bc18e5]
+  - @objectstack/spec@17.3.0
+  - @objectstack/metadata-core@17.3.0
+  - @objectstack/core@17.3.0
+  - @objectstack/types@17.3.0
+  - @objectstack/platform-objects@17.3.0
+  - @objectstack/metadata-fs@17.3.0
+
 ## 17.2.0
 
 ### Patch Changes

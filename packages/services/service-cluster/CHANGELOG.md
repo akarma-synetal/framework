@@ -1,5 +1,570 @@
 # @objectstack/service-cluster
 
+## 17.3.0
+
+### Minor Changes
+
+- 4bd6faa: feat(engine,core,cluster): the authorization-cache invalidation substrate — an engine-seam write epoch, the `authz.invalidated` channel, and a non-optional boot-time posture statement (#11968)
+  
+  The substrate step (§10.3) of the accepted #11633 cross-request caching design
+  (maintainer acceptance 2026-08-25, Fork 2 → B). It ships the invalidation
+  machinery once, before the grants cache (#11967) that will consume it, so that
+  leg does not carry it. **Nothing here caches anything.**
+  
+  - **`ObjectQL.writeEpoch`** — a monotonic counter advanced by the engine
+    middleware seam on every `insert` / `update` / `delete`, ahead of the whole
+    chain (and so ahead of any `isSystem` bypass a middleware applies). It
+    generalises the private counter `@objectstack/plugin-security` has carried
+    since #10757: the mechanism was always the engine's, and hoisting it lets a
+    second consumer share **one** signal instead of minting a parallel one that
+    watches a different set of writes. A seam rather than a list of call sites,
+    because a forgotten call site fails as silent over-permission and writing
+    through the engine is the only way to write at all — including better-auth's
+    own adapter.
+  - **`authz.invalidated`** — one new channel on the existing `IPubSub`, bridged
+    in the shape `MetadataClusterBridgePlugin` already uses. ⭐ **The TTL a
+    consuming cache carries is the correctness contract; this channel is not.** No
+    shipped driver delivers better than at-most-once (`cluster.mdx` §4.2), so a
+    missed message is *expected*, the bridge stays out of the write path (a
+    publish failure is logged and swallowed, never awaited by the writer), and the
+    channel only moves the *typical* convergence from one TTL to one network hop.
+    That statement lives in the code at the channel, where a consumer reads it.
+  - **The boot-time posture statement** — non-optional by the ruling. Whenever a
+    grants cache is enabled (`OS_AUTHZ_GRANTS_CACHE_TTL_MS` > 0) and there is no
+    cross-node invalidation bus, the deployment is told so at `warn`, every boot,
+    naming the window it accepted and the remedy. It is a statement, not a
+    refusal: a TTL-bounded per-process cache is a legitimate configuration. It is
+    said out loud because a silently-absent invalidation bridge is how a security
+    control gets disabled with nobody noticing (#4785). The in-process `memory`
+    driver counts as **no** bus — a cluster service exists on the shipped default
+    while fanning out to nobody, which is the case a "is a cluster service
+    registered?" check answers `yes` to and is wrong about.
+  
+  **Runtime behaviour is unchanged.** With no cache consumer the epoch has zero
+  subscribers, so nothing is published and nothing is invalidated; with the
+  shipped default TTL of `0` the bridge attaches nothing and logs nothing above
+  `debug`. The one composition change worth naming: `Runtime` now registers
+  `AuthzClusterBridgePlugin` **unconditionally**, including under `cluster: false`
+  — that is not an oversight, it is the loudest case the posture check has, and
+  skipping it there would put the statement's absence exactly where the missing
+  bus is.
+  
+  `@objectstack/plugin-security` is a `patch`: its permission-set memo now reads
+  the engine's epoch when the wired engine exposes one and keeps its private
+  counter otherwise (test doubles, embeddings). The covered set of writes is
+  identical — the plugin's own middleware was already global — and it is now
+  identical *by construction* rather than by two files agreeing on which
+  operations count.
+- bfe13c8: fix(types,cli): resolve host-declared packages through the `import` condition, and read the cluster registry instead of assuming it (#13330)
+  
+  `createHostImporter`'s declared leg resolved with `hostRequire.resolve(pkg)` — a
+  **CommonJS** resolution, which answers the `require` condition. Every `tsup`
+  dual build publishes `{ "import": "./dist/index.js", "require": "./dist/index.cjs" }`,
+  so a package loaded through that leg evaluated as its **CommonJS** build while
+  the callers (`packages/cli` is `"type": "module"`) held the **ESM** build of the
+  same package. The process ended up with two instances of everything the loaded
+  package shares with its caller, each with its own module-scope state.
+  
+  Measured consequence, on the shipped EE multi-node path (ADR-0018): `os serve`
+  loaded `@objectstack/service-cluster-redis` through this leg, the driver's
+  load-time `registerClusterDriver('redis', …)` ran against the CommonJS copy of
+  `@objectstack/service-cluster`, and the ESM `Runtime` read the ESM copy and
+  found nothing — `OS_CLUSTER_DRIVER=redis` died at `defineCluster()` with
+  `Cluster driver "redis" is not registered`, about a package that was installed,
+  declared and resolvable. Any module-scope registry crossing this seam had the
+  same defect; the cluster driver is the instance that shipped.
+  
+  **The seam.** The declared leg now imports the entry the `import` condition
+  names. The host anchor is untouched — the CJS resolver still answers *where*
+  the package is, because no flagless Node API resolves a bare specifier against
+  an arbitrary parent; only the *condition* is re-decided, by reading that
+  package's own `exports` map. Deliberately narrow at the **resolution** level —
+  no load that works today resolves differently unless the package itself
+  publishes a valid, existing import-condition target: a package with no
+  `exports` map is untouched (CJS resolution already returned `main`), a package
+  publishing no import-condition target is untouched, and anything unreadable or
+  absent on disk falls back to the CJS-resolved path. That narrowness does not
+  extend to **evaluation**: a dual-published package whose `import` build exists
+  but throws while its `require` build works used to mask that break by silently
+  loading the CJS build, and now surfaces it — arguably the correct reading of a
+  broken published build, but a behaviour change, not a no-op.
+  
+  **The reading.** A residual split is still possible above the seam — two
+  *physical* copies of one package are two instances in any module system, and no
+  resolver condition merges them — so `os serve` no longer assumes the driver
+  registered. `@objectstack/service-cluster` exports `listClusterDrivers()`, the
+  registry `defineCluster()` itself consults, and `serve` queries it after the
+  load. The silent `catch` is gone: a driver that loaded but stayed invisible, one
+  that could not be resolved, and one that resolved and then crashed now read as
+  three different diagnoses instead of arriving as `not registered` one line
+  later. An app on an older `@objectstack/service-cluster` has no accessor to
+  call; that case is silent — `serve` declines to claim either answer rather
+  than printing one.
+  
+  No behaviour downstream of the diagnosis changed: an absent driver still reaches
+  `defineCluster()`'s documented error (`cluster.mdx` §8.1) rather than silently
+  downgrading to the in-memory cluster, and the only documented downgrade here —
+  a multi-node gate denial — is untouched.
+- d41d166: fix: the `./testing` subpaths are ESM-only — they no longer advertise a `require` condition vitest refuses to serve (#12985)
+  
+  Both packages published their test-harness subpath as a dual entry point:
+  
+  ```jsonc
+  // FROM — @objectstack/metadata-core and @objectstack/service-cluster
+  "./testing": {
+    "types": "./dist/testing.d.ts",
+    "import": "./dist/testing.js",
+    "require": "./dist/testing.cjs"
+  }
+  
+  // TO
+  "./testing": {
+    "types": "./dist/testing.d.ts",
+    "import": "./dist/testing.js"
+  }
+  ```
+  
+  The `require` half was a promise neither package could keep. Both subpaths
+  re-export `vitest`, and vitest **refuses** to be loaded from CommonJS by
+  design — its CJS entry is a single `throw`:
+  
+  ```
+  node -e "require('@objectstack/metadata-core/testing')"
+  Error: Vitest cannot be imported in a CommonJS module using require(). Please use "import" instead.
+  ```
+  
+  The emitted bytes parse; the load fails inside vitest's own entry, for every
+  consumer and every code path. So the condition could never resolve to working
+  code, on any release, since it was first declared. It is removed rather than
+  repaired because the failure is not ours to fix: a test harness has no business
+  advertising a `require` condition when the test runner it re-exports does not
+  serve one.
+  
+  **Nothing that worked stops working**, and that is why this is not filed as a
+  breaking removal. A CJS consumer that resolved through the old condition got a
+  hard `Error` at load; it now gets a resolution error from node instead — a
+  different message for the same non-working call, and an earlier and clearer
+  one. The `import` condition, the types and the runtime API are untouched, and
+  every in-repo consumer already reaches these subpaths through `import`
+  (`@objectstack/metadata-fs`, `@objectstack/metadata-protocol`,
+  `@objectstack/rest`, `@objectstack/runtime`, `@objectstack/service-cluster-redis`).
+  
+  **If you did spell it as `require`** — `require('@objectstack/metadata-core/testing')`
+  or `require('@objectstack/service-cluster/testing')` — switch the call to
+  `await import('@objectstack/metadata-core/testing')`, or move the calling
+  module to ESM. That is the same change the old condition already forced on
+  you, one error message earlier.
+  
+  `dist/testing.cjs` is still emitted (both packages build every entry in both
+  formats) and still parsed by `pnpm check:dual-build-cjs-loads`; it is simply no
+  longer reachable through the manifest. Removing it from the build is a
+  tsup-config change with its own risks and is not folded in here.
+
+### Patch Changes
+
+- c85a265: feat(spec): remove the dangling `postgres` and `nats` values from `ClusterDriverSchema` (#13393)
+  
+  <!-- adr-0087: registered cluster-driver-dangling-values-removed -->
+  
+  **BREAKING** accept-set narrowing on `ClusterDriverSchema`
+  (`kernel/cluster.zod.ts`), shipped as `minor` under the repo's launch-window
+  convention for breaking changes; the migration prescription is registered
+  under protocol major 18.
+  
+  `postgres` and `nats` validated in `ClusterDriverSchema` but no package
+  implemented either — the only non-test `registerClusterDriver()` caller is
+  `@objectstack/service-cluster-redis` — so `defineCluster({ driver: 'postgres' })`
+  (or `'nats'`) passed schema validation and then reached the unconditional
+  `Cluster driver "<name>" is not registered` throw at runtime. Maintainer
+  ruling on objectstack-ai/cloud#1626 (2026-08-24, option B adopted): the
+  DB-first postgres driver is not built absent concrete customer pull, and —
+  the ruling's principle rider — a schema-valid value must not be an
+  unconditional runtime throw. The honest schema states the accept set the
+  runtime serves.
+  
+  FROM → TO:
+  
+  - `cluster: { driver: 'postgres' }` → `cluster: { driver: 'redis', url }`
+    (`@objectstack/service-cluster-redis`, the production recommendation), or
+    `cluster: { driver: 'custom' }` + `registerClusterDriver(name, factory)`
+    for a self-provided transport. Same mapping for `'nats'`. One-line fix:
+    pick a driver that ships. No stored config breaks at rest — a config
+    naming either value never survived boot in the first place.
+  - `ClusterDriver` (the `z.input` type) no longer includes the two spellings;
+    TypeScript call sites typing them fail `tsc` on upgrade with the same
+    remedy.
+  - The `useExistingPool` field **stays** (it is a ledgered authorable field);
+    only its postgres-only prose was corrected — it is forwarded verbatim to
+    the registered driver factory and is meaningful for database-backed
+    `custom` drivers.
+  
+  If a future ruling flips under the recorded reversal condition (a concrete
+  multi-node customer/contract), a value returns to the enum in the same
+  release that ships its implementation.
+  
+  `@objectstack/service-cluster` patch: doc comments no longer instruct the
+  removed spellings (`defineCluster({ driver: 'postgres' })` →
+  `{ driver: 'redis' }` in the `registerClusterDriver()` example); no runtime
+  behaviour change.
+- d23ebb9: fix(metadata-core,service-cluster): stop emitting and publishing the CJS half of `./testing` (#13013)
+  
+  #13001 made both `./testing` subpaths ESM-only, dropping the `require` condition
+  that pointed at `dist/testing.cjs`. The build kept emitting those files and
+  `files: ["dist"]` kept packing them, so every release shipped bytes no exports
+  condition could reach. Measured with `npm pack --dry-run`, before → after:
+  
+  | package | files | unpacked | dropped |
+  |---|---|---|---|
+  | `@objectstack/metadata-core` | 22 → 16 | 3.3 MB → 3.2 MB | `testing.cjs` (28.0 kB), `testing.cjs.map` (48.4 kB), `testing.d.cts` (9.4 kB), `chunk-H2D6OJ76.cjs` (4.2 kB) + map (10.6 kB), `repository-*.d.cts` |
+  | `@objectstack/service-cluster` | 15 → 12 | 364.1 kB → 336.9 kB | `testing.cjs` (11.9 kB), `testing.cjs.map` (14.5 kB), `testing.d.cts` (794 B) |
+  
+  Nothing reachable changed. The whole ESM surface of both packages — `index.js`,
+  `testing.js`, their maps, the shared chunk, and every declaration the manifest
+  names — is **byte-for-byte identical** to the previous build (sha256, before vs
+  after). `index.cjs` changes only because what was a shared CJS chunk is now
+  inlined into the sole remaining CJS entry.
+  
+  Each `tsup.config.ts` becomes an array of two configs split **by format** —
+  ESM keeps both entries, CJS takes `src/index.ts` alone. The split is by format
+  and never by entry: `index` and `testing` share a chunk carrying the error
+  classes, and one config per entry would give `testing.js` its own copies, so
+  `ConflictError` reached through `@objectstack/metadata-core/testing` would stop
+  being the class thrown by `@objectstack/metadata-core` — which the published
+  contract suite asserts (`.rejects.toBeInstanceOf(ConflictError)`).
+  
+  `clean` moves out of tsup and into the `build` script (`rm -rf dist && tsup`).
+  tsup runs an array config through `Promise.all`, so the halves build
+  concurrently and a `clean` in either races the other's writes; the script-level
+  clean is also stronger than tsup's own, which preserves `*.d.{ts,cts,mts}` and
+  would therefore have left a stale `dist/testing.d.cts` behind on every rebuild
+  of an existing worktree.
+- e7191ce: fix(build): give each `exports` condition its own `types` target in the 28 dual-build packages (#13112)
+  
+  **Published-surface change, zero runtime change.** No emitted byte moves; what
+  moves is which declaration file a resolver READS. Maintainer ruling 2026-08-29
+  (decision batch #3, verbatim 「同意」) chose declaring the files over deleting
+  them.
+  
+  ## What was wrong
+  
+  These 28 packages are `"type": "module"` and dual-built, and each spelled one
+  `types` condition as a **sibling** of `import`/`require`:
+  
+  ```json
+  "exports": { ".": {
+    "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs"
+  } }
+  ```
+  
+  A sibling `types` answers for **both** conditions, so a CommonJS consumer was
+  handed `dist/index.d.ts` — an ES-module declaration, because the package is
+  `"type": "module"` — for an entry point it reaches with `require`. Measured with
+  `tsc --traceResolution` on a `"type": "commonjs"` fixture at `moduleResolution:
+  node16`:
+  
+  ```
+  error TS1479: The current file is a CommonJS module whose imports will produce
+  'require' calls; however, the referenced file is an ECMAScript module and cannot
+  be imported with 'require'.
+  ```
+  
+  The JavaScript at `dist/index.cjs` loads perfectly (`check:dual-build-cjs-loads`
+  has asserted that for months). It is the **types** that told the consumer the
+  supported `require` entry point could not be required. The `dist/index.d.cts`
+  twin tsup emits beside it — 36 files, 5,517,701 B on this build — was named by
+  no condition at all and shipped in every tarball unreachable.
+  
+  ## What changed
+  
+  Each condition now names its own declaration, the shape TypeScript documents:
+  
+  ```json
+  "exports": { ".": {
+    "import":  { "types": "./dist/index.d.ts",  "default": "./dist/index.js" },
+    "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+  } }
+  ```
+  
+  33 entry points across 27 packages, subpaths included. The root `types` field is
+  untouched, so `node10` resolvers are unaffected; the `import` condition resolves
+  exactly what it resolved before, measured as an unchanged control in the same
+  run.
+  
+  ## `@objectstack/core` is deliberately NOT changed
+  
+  Splitting a declaration in two makes TypeScript compare it nominally, and
+  `ObjectKernel` carries a `private plugins` member that reaches every plugin
+  through `PluginContext.getKernel()`. With core split, whole-repo `pnpm build`
+  fails in `@objectstack/verify` with 5 × TS2345 ("Types have separate
+  declarations of a private property 'plugins'"); with core held back and the
+  other 27 split, 71/71 tasks pass. So core keeps the sibling-`types` shape and
+  its two `.d.cts` files (220,854 B) stay unreachable, declared as such in
+  `check:dual-build-cjs-loads`. Splitting it needs a decision about core's public
+  types, not about an exports map.
+  
+  ## For consumers
+  
+  - **ESM consumers: nothing changes.** Same declaration file, byte for byte.
+  - **CJS consumers under `node16`/`nodenext`: TS1479 goes away** and the
+    declarations they get are the ones built for CommonJS.
+  - **`node10` / `moduleResolution: node` consumers: nothing changes** — they never
+    read `exports`.
+  - Nothing is removed: every path that resolved before still resolves.
+  
+  Packages that are CJS-first (`require` → `./dist/index.js`, no `"type": "module"`)
+  were already correct and are untouched — their `dist/index.d.ts` really is the
+  CommonJS declaration. Their ESM mirror (an unreachable `.d.mts` under the
+  `import` condition) is a separate, larger population and is filed separately per
+  the ruling, not fixed here.
+  
+  `check:dual-build-cjs-loads` grew a fourth invariant (TYPED) that reds on the old
+  shape, so the drift cannot return silently.
+- 2d5cee3: docs(core,service-cluster): retire the two docblocks left stale by `IPubSub`'s corrected delivery guarantee (#12836)
+  
+  #12651 corrected `IPubSub`'s contract docblock: delivery is whatever the
+  configured driver declares, no shipped driver exceeds at-most-once, a missed
+  message is EXPECTED, and handlers must be idempotent **and** tolerate loss.
+  Two docblocks elsewhere still described the world before that correction.
+  
+  **`@objectstack/core` — `security/authz-invalidation-channel.ts`.** It carried a
+  paragraph asserting, in the present tense, that the interface docblock "still
+  says" *At-least-once delivery*, and that repairing it was a `packages/spec`
+  change filed separately. That filing was #12651 and it has landed, so the
+  paragraph is now false rather than merely stale — it sends the next reader
+  looking for a live disagreement between the interface and the drivers that no
+  longer exists. Replaced with a plain pointer to the interface docblock.
+  Everything else in that docblock is unchanged: the at-most-once reasoning, the
+  TTL-is-the-bound rule, and the best-effort-at-the-publish-site note all still
+  hold.
+  
+  **`@objectstack/service-cluster` — `memory/pubsub.ts`.** The line "At-least-once
+  semantics held vacuously (a single in-process delivery)" was wrong on its own
+  terms even before #12651: the same docblock states that handler errors are
+  swallowed and logged via `onError`, so a handler that throws loses the message
+  with no retry and no persistence. That is not at-least-once in any sense, and
+  "vacuously" does not save it. Replaced with the honest statement — one
+  synchronous in-process delivery attempt per subscriber, no persistence, no
+  retry, no replay.
+  
+  Prose only. No behaviour change, and no test changed.
+- Updated dependencies [387e231]
+- Updated dependencies [cae2169]
+- Updated dependencies [2d4fa75]
+- Updated dependencies [0e4e51b]
+- Updated dependencies [e84bbf6]
+- Updated dependencies [c45d8e6]
+- Updated dependencies [40a93b5]
+- Updated dependencies [dda969c]
+- Updated dependencies [277948f]
+- Updated dependencies [8bdd955]
+- Updated dependencies [4f24e9d]
+- Updated dependencies [4bd6faa]
+- Updated dependencies [86cbe37]
+- Updated dependencies [6a180e4]
+- Updated dependencies [474242f]
+- Updated dependencies [803eaab]
+- Updated dependencies [983edf1]
+- Updated dependencies [eae824e]
+- Updated dependencies [f6fa22c]
+- Updated dependencies [8a483b3]
+- Updated dependencies [df59de0]
+- Updated dependencies [96e25a8]
+- Updated dependencies [f75a38a]
+- Updated dependencies [7a25e7d]
+- Updated dependencies [1fa05a6]
+- Updated dependencies [c85a265]
+- Updated dependencies [dcb10a5]
+- Updated dependencies [776a098]
+- Updated dependencies [5060877]
+- Updated dependencies [4f6325d]
+- Updated dependencies [52954c0]
+- Updated dependencies [93809a3]
+- Updated dependencies [7c0d0c3]
+- Updated dependencies [daae7aa]
+- Updated dependencies [8dc22d6]
+- Updated dependencies [3b4c56c]
+- Updated dependencies [ae8edd2]
+- Updated dependencies [e25403c]
+- Updated dependencies [64baa68]
+- Updated dependencies [9fa70d7]
+- Updated dependencies [09db64a]
+- Updated dependencies [92916e7]
+- Updated dependencies [a84f3ea]
+- Updated dependencies [f2eaae8]
+- Updated dependencies [c09451b]
+- Updated dependencies [ba64877]
+- Updated dependencies [7345308]
+- Updated dependencies [30d96ab]
+- Updated dependencies [f658793]
+- Updated dependencies [c95ad19]
+- Updated dependencies [4a17645]
+- Updated dependencies [3795c5f]
+- Updated dependencies [e25e839]
+- Updated dependencies [5997207]
+- Updated dependencies [8b13cc8]
+- Updated dependencies [86e765a]
+- Updated dependencies [53dc739]
+- Updated dependencies [fd289be]
+- Updated dependencies [03bf7b1]
+- Updated dependencies [f90e820]
+- Updated dependencies [e8bd715]
+- Updated dependencies [a28a3c0]
+- Updated dependencies [daeaaf9]
+- Updated dependencies [c459da6]
+- Updated dependencies [e914733]
+- Updated dependencies [f887e52]
+- Updated dependencies [881f8d8]
+- Updated dependencies [3bfa1e6]
+- Updated dependencies [0a8ebf3]
+- Updated dependencies [901355c]
+- Updated dependencies [4635f3e]
+- Updated dependencies [fd289be]
+- Updated dependencies [ee3595c]
+- Updated dependencies [3a04b01]
+- Updated dependencies [b9e9227]
+- Updated dependencies [d395692]
+- Updated dependencies [5894d30]
+- Updated dependencies [a3765f6]
+- Updated dependencies [2d5cee3]
+- Updated dependencies [e22158f]
+- Updated dependencies [7404925]
+- Updated dependencies [0c2334f]
+- Updated dependencies [d2619fd]
+- Updated dependencies [af56546]
+- Updated dependencies [6acb11a]
+- Updated dependencies [33c5fd3]
+- Updated dependencies [20b0fdb]
+- Updated dependencies [905019b]
+- Updated dependencies [a286411]
+- Updated dependencies [98c0d33]
+- Updated dependencies [93ea19b]
+- Updated dependencies [9ee2dcf]
+- Updated dependencies [8cb96ec]
+- Updated dependencies [8f10a79]
+- Updated dependencies [6269a55]
+- Updated dependencies [a17da05]
+- Updated dependencies [a8c00e2]
+- Updated dependencies [0fb8760]
+- Updated dependencies [e5ce2ed]
+- Updated dependencies [be21955]
+- Updated dependencies [bc56e18]
+- Updated dependencies [be21955]
+- Updated dependencies [a9ee989]
+- Updated dependencies [15d58db]
+- Updated dependencies [d63b014]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [2cc7122]
+- Updated dependencies [9e0ba21]
+- Updated dependencies [311433f]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [b7131f3]
+- Updated dependencies [ce7e497]
+- Updated dependencies [51ecb2f]
+- Updated dependencies [9086761]
+- Updated dependencies [42a117b]
+- Updated dependencies [4297fe7]
+- Updated dependencies [e398863]
+- Updated dependencies [f11fc61]
+- Updated dependencies [8f79379]
+- Updated dependencies [e6ca40e]
+- Updated dependencies [0c77ea4]
+- Updated dependencies [52954c0]
+- Updated dependencies [7131f12]
+- Updated dependencies [aa5994e]
+- Updated dependencies [be93457]
+- Updated dependencies [a65db76]
+- Updated dependencies [15eb2c9]
+- Updated dependencies [5691b07]
+- Updated dependencies [2a6122b]
+- Updated dependencies [225e769]
+- Updated dependencies [8af88dd]
+- Updated dependencies [fb5fbb8]
+- Updated dependencies [d7b3963]
+- Updated dependencies [33184fd]
+- Updated dependencies [7c41693]
+- Updated dependencies [b72db01]
+- Updated dependencies [dce5cd4]
+- Updated dependencies [9688f58]
+- Updated dependencies [556ebc1]
+- Updated dependencies [177ebdc]
+- Updated dependencies [8d237b4]
+- Updated dependencies [2d2e6f0]
+- Updated dependencies [2d8dd8d]
+- Updated dependencies [b5a2398]
+- Updated dependencies [348860c]
+- Updated dependencies [5383fa6]
+- Updated dependencies [5b3ff63]
+- Updated dependencies [1a6a19c]
+- Updated dependencies [527e050]
+- Updated dependencies [dd33bf9]
+- Updated dependencies [4cb2a90]
+- Updated dependencies [74a7804]
+- Updated dependencies [49f0dcf]
+- Updated dependencies [033a34c]
+- Updated dependencies [4d25d22]
+- Updated dependencies [1ffee51]
+- Updated dependencies [5ae4303]
+- Updated dependencies [ece4dad]
+- Updated dependencies [146f448]
+- Updated dependencies [735f5c7]
+- Updated dependencies [366f895]
+- Updated dependencies [dc75ba8]
+- Updated dependencies [cce0aa9]
+- Updated dependencies [cff17af]
+- Updated dependencies [39404f3]
+- Updated dependencies [ca1965f]
+- Updated dependencies [8619f95]
+- Updated dependencies [b706af9]
+- Updated dependencies [add4360]
+- Updated dependencies [fc9ba76]
+- Updated dependencies [a11c1a5]
+- Updated dependencies [71f9cd1]
+- Updated dependencies [ee17d86]
+- Updated dependencies [cdbd920]
+- Updated dependencies [18c432e]
+- Updated dependencies [3c418c4]
+- Updated dependencies [a933ed7]
+- Updated dependencies [b3ca463]
+- Updated dependencies [a933ed7]
+- Updated dependencies [0d4a6a8]
+- Updated dependencies [518d5e5]
+- Updated dependencies [6643ba1]
+- Updated dependencies [eeba2ef]
+- Updated dependencies [ec4c4d2]
+- Updated dependencies [424f73c]
+- Updated dependencies [cccbe51]
+- Updated dependencies [a8d6b1d]
+- Updated dependencies [e4a7695]
+- Updated dependencies [87075b1]
+- Updated dependencies [14cfc00]
+- Updated dependencies [dfebfc8]
+- Updated dependencies [d028b37]
+- Updated dependencies [f7b25c5]
+- Updated dependencies [122ef38]
+- Updated dependencies [428f9b2]
+- Updated dependencies [aa7ff56]
+- Updated dependencies [c4db311]
+- Updated dependencies [750fff5]
+- Updated dependencies [c19035e]
+- Updated dependencies [ececf7a]
+- Updated dependencies [d173125]
+- Updated dependencies [8425c17]
+- Updated dependencies [a5ef1d8]
+- Updated dependencies [772d5de]
+- Updated dependencies [ce80ec2]
+- Updated dependencies [b372318]
+- Updated dependencies [29d0676]
+- Updated dependencies [6bd3231]
+- Updated dependencies [b799ac5]
+- Updated dependencies [8f74307]
+- Updated dependencies [d23dc08]
+- Updated dependencies [644ad50]
+- Updated dependencies [0da7cd2]
+- Updated dependencies [28a5c3e]
+- Updated dependencies [4bc18e5]
+  - @objectstack/spec@17.3.0
+  - @objectstack/core@17.3.0
+
 ## 17.2.0
 
 ### Patch Changes

@@ -1,5 +1,960 @@
 # @objectstack/lint
 
+## 17.3.0
+
+### Minor Changes
+
+- 09ae32e: Judge `visibleWhen` / `readonlyWhen` / `requiredWhen` examples in the docs corpus
+  as CEL — where the enclosing structure says which layer they are about
+  
+  `{/* os:check */}` blocks are type-checked by `tsc --noEmit`, and every CEL
+  string is the same type as every other CEL string, so
+  `visibleWhen: "record.status != 'closed' && user.hasRole('admin')"` type-checked
+  perfectly. `hasRole` is a CEL function that exists nowhere — it is in no stdlib
+  registry and on no contract — so the predicate faults at runtime, and a
+  field-level `visibleWhen` fault is fail-**open**: `resolveFieldRuleState`
+  evaluates visibility with `fallback: true`, so the element the author wrote the
+  predicate to hide is shown to everyone who copies the page. That is not a
+  hypothetical shape — a shipped doc taught it (#11034 fixed the instance).
+  
+  `check:doc-formula-expressions` gains this as a third scan surface rather than a
+  second gate, because two gates with opinions about one contract is the thing
+  Prime Directive #12 exists to prevent. The verdict is imported whole: syntax, the
+  unknown-function catch and the bare-reference rule come from
+  `@objectstack/formula`'s `validateExpression`, and the closed-root rule comes
+  from `fieldRuleRootIssue` — the same two the metadata walk applies to the same
+  slot, in the same order, in the same words.
+  
+  **The layer is decided first, and a layer that cannot be decided is skipped and
+  printed.** `visibleWhen` is one key spelling several unrelated contracts, and the
+  binding root really does differ: an object field binds `record` + `previous`
+  (+ `parent`), a per-option predicate binds `record` plus the host predicate scope
+  including `current_user`, a page component binds the user roots and `app`, and a
+  flow-screen field **flattens its own field names to top level**. A gate keyed on
+  the key alone would have gone red on
+  `content/docs/automation/flows.mdx`'s correct `visibleWhen:
+  'createOpportunity == true'` and on `content/docs/ui/pages.mdx`'s correct
+  `'sales_manager' in current_user.positions` — and a gate whose reds are wrong is
+  worse than no gate, because it teaches people to add ignores.
+  
+  So admission is structural and schema-backed, never keyed on the key: a
+  `Field.*({ … })` factory call, or a raw field definition carrying `type:` inside
+  an object-literal `fields:` **map**. The map-versus-array test is the load-bearing
+  half and it is read off the schemas — `ObjectSchema.fields` is
+  `z.record(name, FieldSchema)` while `FormFieldSchema` and `ScreenFieldConfigSchema`
+  are both `z.array(…)`, so a `fields:` map is the object-field layer and nothing
+  else, and a `fields:` array is exactly the case that cannot be told apart.
+  
+  **The skip list is printed and counted on every run, including green ones.** A
+  gate that skips in silence is the same false-green one level up, so the summary
+  names every skipped site and why. Measured on the corpus as it stands: 23
+  text-level `*When:` occurrences, of which 13 are admitted and judged, 7 are
+  listed as skipped, and 3 are the ADR quoting `field.zod.ts`'s schema
+  (`visibleWhen: ExpressionInputSchema.optional()`) rather than authoring a
+  predicate. Three of those seven were invisible to an AST-only walk — a bare
+  `visibleWhen: "…"` line at statement position is a labelled statement, not a
+  property — so a text-level tripwire reconciles the two counts and any site the
+  parser never surfaced is listed rather than dropped.
+  
+  `@objectstack/lint` newly exports `fieldRuleRootIssue` and
+  `FIELD_RULE_BOUND_ROOTS`. The field-rule root decision was a closure inside
+  `validateStackExpressions` — correct while it had one caller, and exactly how a
+  second caller comes to own a dialect of a rule instead of the rule. Behaviour is
+  unchanged: the metadata walk now calls the extracted function and its 2271 tests
+  pass untouched.
+- 12e306a: The canonical-expression-envelope detector for raw-literal `Page` exports gets a shared home in `@objectstack/lint` (#11480). New public API beside `walkPageComponents`: `auditPageExpressionEnvelopes(page, label)` runs the three parse doors (`PageSchema` / `PageComponentSchema` / `ComponentPropsMap`) over one authored page and reports bare-expression findings plus every door's precondition failures; `renderBareExpressionFindings(findings)` renders the actionable red; types `BareExpressionFinding`, `PageEnvelopeAudit`, `EnvelopeAuditDoor`. The detector previously lived package-local to `@objectstack/platform-objects`' gate, which could not reach raw-literal pages shipped by other packages. `@objectstack/cloud-connection`'s two shipped pages are now covered by the same gate, and `MarketplaceInstalledPage` is declared `: Page` (type-level only; no runtime change) so export-shape page discovery sees it.
+- 225e769: Author-time rejection for unknown `PageComponentSchema.type` strings inside the spec's own namespaces — the type-vocabulary half of the "Component Placeholder" gap.
+  
+  `PageComponentSchema.type` is `z.union([PageComponentType, z.string()])`, and the open string arm is deliberate: custom and registered components (`object-grid`, `mcp:connect-agent`, `custom.widget`, kebab SDUI blocks) keep parsing exactly as before — nothing about the parse changed. What is new is that the spec now answers for its own namespaces (`page:` `record:` `nav:` `global:` `user:` `ai:` `app:` `element:`, derived from the enum): a type inside them that the vocabulary does not declare is refused at author time by the new gating rule `component-type-unknown` (`os validate` / `os build` / `os lint`), with the closest declared spellings suggested. Previously `global:serch` validated clean and the published page drew a literal "Component Placeholder" scaffold in front of the end user.
+  
+  - `@objectstack/spec` exports the vocabulary claim from `@objectstack/spec/ui`: `RESERVED_COMPONENT_TYPE_NAMESPACES` (derived), `KNOWN_COMPONENT_TYPES` / `KNOWN_COMPONENT_TYPE_CANDIDATES`, `STRING_ARM_REGISTERED_TYPES` (the evidenced ledger of registered-but-row-less types, currently `record:line_items`), and the `hasReservedComponentNamespace` / `isKnownComponentType` predicates.
+  - `@objectstack/lint` ships `validateComponentTypes` (rule id `component-type-unknown`, severity `error`) on all three CLI commands; the runtime publish door is deliberately deferred pending a measured false-refusal budget over stored tenant page rows.
+  
+  If a page authored a type in a reserved namespace that nothing declares, the fix is the rule's own hint: rename to the suggested declared type, or move a genuinely custom component to its own namespace (e.g. `my-plugin:widget`) so it cannot be mistaken for platform vocabulary.
+- 5383fa6: React-tier vocabulary converges on the metadata-tier spelling, deprecate-first (#11284, maintainer ruling 2026-08-23). `<ListView>`'s canonical bindings are now the spec ListView schema's own props: `data={{ provider: 'object', object: '…' }}` for the object binding (objectui#2890 A6) and `type` for the visualization kind. `objectName` and `viewType` remain published and accepted as deprecated aliases for the whole deprecation window — nothing is removed in this release — with the deprecation visible at authoring time: `[DEPRECATED → …]` markers in the generated react-blocks contract, and a new `react-prop-deprecated` lint warning (never an error) on every use of a deprecated spelling. The lint accepts either spelling as satisfying `<ListView>`'s required binding and resolves field-name props (`columns`, `searchableFields`, filter positions, …) against the object bound by whichever spelling is present, canonical winning when both are. `<ObjectForm>` / `<ObjectChart>` `objectName` are unchanged: the form's spec counterpart is explicitly not 1:1 (objectui#2890 Scope B), and the chart has no metadata-tier object binding to converge on (charts bind through a dashboard `dataset` there — see chart.zod.ts guidance). Removal of the deprecated aliases is a later card after the deprecation window.
+- 46b53a2: Add `validateReadonlyActionWrites` — an author-time warning on an action body writing a `readonlyWhen` field through `ctx.api`.
+  
+  The action surface is the third write surface in the readonly family, after `flow-update-readonly-field` and `hook-api-update-readonly-field`, and it is the one where the family's answer differs. An action body's `ctx.api` is `createContext({ ...callerEnvelope, isSystem: true })` — elevated by design, so RLS/FLS-bypassing trusted execution is the documented posture — and the engine's **static** readonly strip runs only for non-system callers. Measured against a real engine over a memory driver:
+  
+  | channel | static `readonly` | `readonlyWhen`, predicate TRUE |
+  | --- | --- | --- |
+  | action body `ctx.api` | lands | **stripped** |
+  | hook body `ctx.api`, non-system trigger | stripped | stripped |
+  | `ctx.api.sudo()` | lands | **stripped** |
+  
+  So exactly one shape is a silent no-op on this surface, and that is what the new rule reports:
+  
+  - `action-api-update-readonly-when-field` — **warning**. A literal `ctx.api.object('…').update()` / `.updateById()` in an action body writing a field the named object declares `readonlyWhen`. The conditional strip takes no `isSystem` exemption, so elevation is not a workaround and the hint does not offer one: confirm the call only targets records whose predicate is FALSE, or derive the field in a `beforeUpdate` hook on the target object (a hook-written value is not caller-supplied and does land).
+  
+  A static-`readonly` counterpart is deliberately **not** shipped: an elevated action write lands on such a field, so the finding would state a falsehood and, at the hook rule's `error` grade, would gate a build over working code.
+  
+  Wired through `REFERENCE_INTEGRITY_RULES`, so it runs on `os validate`, `os lint` and `os compile` at once. It reuses the existing machinery rather than adding any: `buildReadonlyIndex` from the flow rule for the field metadata, and `collectActionBodies` from the action rule for the body walk (both registration sites, with the merged-action de-duplication that walk owns).
+  
+  `ctx.record` is excluded from the match set, and that exclusion is the rule's load-bearing decision: an action's `ctx.record` is a dead snapshot the runtime never writes back, so no readonly strip is ever consulted on it and a readonly verdict there would be false on every occurrence. `action-record-write-discarded` already owns that shape and states its real reason. Also skipped, each for a stated reason: `insert` / `create` (INSERT is exempt from both strips), `ctx.input` writes (an action's `ctx.input` is its params bag), dynamic object names, non-literal payloads, objects this stack does not declare, fields the object does not declare, and `id` in an `update` payload (the row address, not a field write).
+- 36d2878: Add `validateReadonlyHookWrites` — an author-time gate on a hook body writing a `readonly` field through `ctx.api`.
+  
+  A hook's `ctx.api` is a `ScopedContext` over the **triggering** operation's execution context, so `ctx.api.object('x').update({ someReadonlyField })` reaches the engine as an ordinary non-system caller and the update path strips the key. The call returns success, the step looks clean, and the column is simply always null — a failure only an end-to-end read-back detects. This completes the hook side of the flow-side gate that shipped as `flow-update-readonly-field`.
+  
+  Two new rule ids, wired through `REFERENCE_INTEGRITY_RULES` so they run on `os validate`, `os lint` and `os compile`:
+  
+  - `hook-api-update-readonly-field` — **error**. A literal `ctx.api.object('…').update()` / `.updateById()` writing a field the named object declares `readonly: true`.
+  - `hook-api-update-readonly-when-field` — **warning**. The same write against a `readonlyWhen` field, which strips per record state.
+  
+  The rule keys on the write **channel**, not on the field, so the correct and widely used pairing is untouched: a `beforeInsert`/`beforeUpdate` body stamping `ctx.input.<field> = …` writes a server value that survives the strip and is **never** flagged. Also skipped, each for a stated reason: `ctx.api.sudo()` chains (elevated — the intended channel), `insert`/`create` (INSERT is engine-exempt), dynamic object names, non-literal payloads, objects this stack does not declare, fields the object does not declare, and `id` in an `update` payload (the row address, not a field write).
+- 39404f3: feat(spec,lint): a layout section can reference a declared field group instead of copying its members (#13855)
+  
+  Additive accept widening. Maintainer ruling 2026-08-31 (option B on #13855):
+  「直接处理b」.
+  
+  ADR-0085 makes `fieldGroups` + `Field.group` the canonical grouping, assembled in
+  one place — `deriveFieldGroupLayout` (ADR-0085 §5). The two layout escape hatches
+  were whole-takeover shapes with no way back to it: a custom record page's
+  `record:details` `properties.sections` and a view-level `form.sections` each
+  enumerated their members by hand, so an author who reached for either had to
+  hand-copy the same membership fact a second and third time. Nothing linked the
+  copies to the declaration, so every field added to the object afterwards made
+  them quietly staler — measured on a real app as three disagreeing groupings of
+  one object, with the detail page missing two fields the form showed.
+  
+  **A section may now name the group instead.** On both surfaces:
+  
+  ```ts
+  sections: [
+    { group: 'contact_info' },                 // members + presentation derived
+    { label: 'Notes', fields: ['note'] },      // enumerated, unchanged
+  ]
+  ```
+  
+  Members (every visible field whose `Field.group` points at the key, in
+  field-declaration order) and the group's own presentation (label, icon,
+  description, `collapse`, `visibleWhen`, and the drop when a group has no visible
+  members) all come from `deriveFieldGroupLayout`. Nothing is re-implemented in
+  section land.
+  
+  **The mixing rule**, declared once for both surfaces and pinned:
+  
+  - `group` and `fields` are mutually exclusive; a section declaring neither is
+    refused (before this change it was unrepresentable, because `fields` was
+    required).
+  - A group-referencing section carries no key the group already declares —
+    `name`, `label`, `icon`/`description`, the collapse pair, `visibleWhen` (and
+    its deprecated `visibleOn` spelling) are refused beside `group`, each with the
+    pointer to the `fieldGroups` entry that owns it. Not a precedence rule: the
+    absence of one. The surface keys the group says nothing about — `columns`,
+    `pane`, `hideEmpty`, `showBorder`, `headerColor` — ride alongside as usual.
+  - Across sections, both kinds coexist in declared array order; a
+    group-referencing section occupies one slot and expands in place.
+  - ⛔ Not on a wizard step: a group carries `visibleWhen` and `collapse`, and a
+    wizard step has no slot for either (the #13704 refusals, reached through the
+    object's declaration instead of the step's own keys).
+  
+  **Existence is checked by reference diagnostics, not at parse.** The key names
+  something on a different schema, so the spec door takes any well-formed
+  snake_case key — the `UserFilterFieldSchema.field` precedent. `@objectstack/lint`
+  reports a dangling one as `page-section-group-unknown` (`record:details`) or
+  `form-section-group-unknown` (form views, both the canonical `sections` and the
+  legacy `groups` bucket), advisory like every other dangling-reference finding in
+  that family, with the object's declared groups listed in the hint.
+  
+  The key grammar is now single-sourced as `FIELD_GROUP_KEY_PATTERN` beside the
+  derivation, so the declaring surface (`ObjectFieldGroupSchema.key`) and the two
+  referencing surfaces cannot drift into accepting different keys.
+  
+  **Type-surface note for consumers.** `fields` becomes optional on both section
+  shapes (that is what makes `group` the other way to declare the same fact), so
+  `z.infer` now types it `… | undefined`. A consumer that reads `section.fields`
+  unconditionally must handle the reference form; every in-repo reader already
+  guards it. No authored metadata changes shape, and nothing that parsed before
+  stops parsing — `fields: []` included.
+  
+  The renderer half (objectui) is tracked separately; until it lands, a
+  group-referencing section is declared and diagnosed but not yet rendered.
+- d23dc08: feat(spec,lint,metadata-protocol): a `page` member on the `view` type enum — mount an already-published page on an object view (#13216)
+  
+  A custom page created and published at runtime through the metadata API had no
+  in-protocol way to reach an end user (#13100's evidence map). App navigation is
+  closed to runtime content (`app.allowOrgOverride: false`), and the `view` `type`
+  enum — on one of the five types the platform deliberately leaves open
+  (`allowOrgOverride: true`, `allowRuntimeCreate: true`) — was closed over
+  declarative row renderers, so a published page could not be mounted as an
+  object's list view or tab.
+  
+  Maintainer ruling 2026-08-29 (live director session, verbatim 「同意」), 方向 1:
+  
+  > `view` 的 `type` 枚举新增 `page` 成员——对象的列表视图/标签页可挂载一个已发布页面。走平台**有意开着**的门(`view` 本就 `allowOrgOverride=true` + 运行时可创建),零新增授权面;设计要点:`page` 型 view 需声明 `pageName` 绑定,校验目标页面存在,渲染委托既有页面渲染器
+  
+  **Zero new authorization surface, as the ruling's basis requires.** Nothing in
+  this change touches a metadata type's `allowOrgOverride` / `allowRuntimeCreate`
+  flags, adds a write door, or adds a read door. A `page` view is a `view` written
+  through the door `view` already opens, and it holds a NAME — the page itself is
+  still fetched through the page read path it already had, and still renders
+  through the existing page renderer, so the page's own audience gate
+  (`page.assignedProfiles`) rides along unchanged. Delegation is what preserves
+  that: a second renderer is what would have introduced a second gate.
+  
+  **The binding, refused in both directions at parse.** `ListViewSchema` gains
+  `pageName`, declared with `SnakeCaseIdentifierSchema` — the same grammar
+  `PageSchema.name` carries, so the accepted set is exactly the set of strings that
+  could name a page. `checkListViewPageMount` then refuses:
+  
+  - `type: 'page'` with no `pageName` — unlike every other view type there is no
+    degraded rendering to fall back to, so the view would be blank;
+  - `pageName` on any other view type — the accepted-and-ignored shape;
+  - a non-empty `columns` beside a page mount — `columns` is the one required key
+    on a list view, and the only truthful value for a page mount is `[]`.
+  
+  The check is attached at all three list-view doors (`ListViewSchema`,
+  `ObjectListViewSchema`, and the flattened runtime overlay behind
+  `PUT /api/v1/meta/view`), with a pinned test that fails if any attachment is
+  dropped.
+  
+  **Existence of the target page** is answered where the collection is visible:
+  `defineStack`'s `validateCrossReferences` refuses at build time (same
+  `pageNames.size > 0` policy the two other page references in that function
+  already use), and the new `@objectstack/lint` rule `view-page-unresolved`
+  (`validateViewPageRefs`) resolves it on `os validate` / `os lint` / `os compile`
+  **and** at the runtime publish gate. Advisory, not gating, for its nav twin's
+  reason: with no curated cross-package page registry, "unresolved here" cannot be
+  told apart from "provided by a package this stack cannot see".
+  
+  Reaching the runtime publish gate needed the per-write snapshot to carry the
+  `pages` collection (`RuntimeStackContext.pages`, threaded through
+  `evaluateRuntimeAuthoringGate` and read off the live registry in
+  `saveMetaItem`'s gate call). That is the one-key widening `RuntimeStackContext`
+  documents, made when a rule that reads the collection crossed the wall — never
+  in advance — and the false-positive channel it closes is measured both ways in
+  `runtime-gate.view-page-refs.test.ts`. `pages` joined `NAME_KEYED_STACK_KEYS` in
+  the same edit, because a collection that is both context-filled and
+  write-targeted must have its finding paths name-keyed (#10064).
+  
+  **Downstream note (not an accept-set narrowing).** No previously valid metadata
+  becomes invalid: `pageName` is a new key and `page` a new enum member, so every
+  refusal above can only fire on a document that could not be written before.
+  What does change for a downstream schema author is composition: `ListViewSchema`
+  now carries a refinement, and zod 4 refuses `.omit()` / key-overwriting
+  `.extend()` on a refined object. The unrefined shape stays module-private
+  (publishing it would mint a duplicate protocol def and a second full set of
+  ratcheted authorable-surface keys), so a consumer that derived from
+  `ListViewSchema` by omission should compose with `.safeExtend()` or narrow after
+  parsing. `FormViewSchema` has had this property since its own refinement landed,
+  so this is the established shape for view schemas rather than a new one.
+  
+  **Deliberately out of scope**, per the same ruling: 方向 2 (registering app
+  navigation at publish time) is deferred to its own design card — it would
+  require reversing the `app.allowOrgOverride: false` authorization decision — and
+  with it the known limitation the ruling accepts on the record, that a page
+  belonging to no object still has no browse-to entry. `page` is also NOT added to
+  `VisualizationTypeSchema`: the switcher offers alternative ways to draw the same
+  rows, and a page draws none.
+
+### Patch Changes
+
+- e5ed943: fix(lint): guard `collectBare`'s recursion so a self-referential page terminates instead of killing the stack (#13235)
+  
+  `page-envelope-audit`'s `collectBare` is a lockstep raw/parsed value walker,
+  separate from the shared `walkPageComponents` traversal, and it carried no cycle
+  guard. A page whose component tree contains itself (`A -> B -> A` through
+  `properties.children`) is input the schema **admits** — `properties` is
+  `z.record(z.unknown())` and `properties.children` is `z.array(z.unknown())`, so
+  `PageSchema.safeParse` succeeds — and door 1 then recursed until
+  `RangeError: Maximum call stack size exceeded`. Door 1 runs over the whole page
+  before any other door, so this is the first thing that died on such a page.
+  
+  The guard is an **ancestor set on the authored side**: objects are added on
+  entry to the descent and removed on exit, so a node is skipped only when it is
+  its own ancestor. Two consequences are pinned by tests:
+  
+  - **Report-neutral on acyclic input, by construction.** No node is ever its own
+    ancestor on an acyclic page, so the guard never fires and findings are
+    unchanged. A visited-set would instead have skipped merely *shared* subtrees —
+    the same component literal referenced from two slots is legal authoring — and
+    silently dropped their findings.
+  - **Nothing distinct is lost on a cyclic page.** Every node of a finite graph is
+    reachable by a simple path, so each authored position is still visited; only
+    the infinite tail of re-reports at ever-longer paths is dropped.
+  
+  Cycles through arrays are covered as well as cycles through records.
+  
+  Scope: this is door 1 only. `walkPageComponents` carries its own separate
+  unguarded recursion, so `auditPageExpressionEnvelopes` end-to-end still dies at
+  the walk on the same input until that lands (#13217). No published type changes
+  and no accept/reject behaviour changes on any page that parses today.
+- 4301f78: refactor(lint): derive the runtime gate's name-keyed collection set instead of hand-listing it (#13390)
+  
+  The set of collections the runtime publish gate carries in a per-write snapshot was
+  written down in five places, and `NAME_KEYED_STACK_KEYS` was the one with no guard of
+  any kind — `CONTEXT_STACK_KEYS` carries a `satisfies` clause, which is validity rather
+  than completeness, and the compiler held nothing else.
+  
+  That list carries a real invariant: a collection the CONTEXT fills **and** that some
+  write type maps into must be name-keyed, or a finding's `path` is a positional index
+  into an in-memory snapshot the caller has never seen and cannot enumerate — the defect
+  #10064 fixed for `objects` / `permissions` / `books`. Omitting a member did not fail to
+  build, fail a test, or fail a gate; it produced correct-LOOKING findings with paths the
+  receiver cannot resolve. Adding the `pages` collection had to touch all five spellings
+  and only one of them announced itself.
+  
+  `NAME_KEYED_STACK_KEYS` and the `TOP_LEVEL_INDEX` pattern built from it are now derived
+  from the two inputs that already state the answer: `CONTEXT_STACK_KEYS` intersected with
+  the values of `TYPE_TO_STACK_KEY`. The intersection was measured against the list it
+  replaces before anything changed — same four members (`objects`, `permissions`, `books`,
+  `pages`) in the same order, and `datasets` excluded on its own because no write type maps
+  into it, so no member needed a hand-written exception and none is kept.
+  
+  Constructive preservation, not a tightening or a loosening: the derived pattern's `source`
+  is byte-identical to the literal it replaces, and the gate returns the same findings for
+  the same inputs. No published entry point changed — `@objectstack/lint` and
+  `@objectstack/lint/runtime` export exactly the names they did before.
+- e7191ce: fix(build): give each `exports` condition its own `types` target in the 28 dual-build packages (#13112)
+  
+  **Published-surface change, zero runtime change.** No emitted byte moves; what
+  moves is which declaration file a resolver READS. Maintainer ruling 2026-08-29
+  (decision batch #3, verbatim 「同意」) chose declaring the files over deleting
+  them.
+  
+  ## What was wrong
+  
+  These 28 packages are `"type": "module"` and dual-built, and each spelled one
+  `types` condition as a **sibling** of `import`/`require`:
+  
+  ```json
+  "exports": { ".": {
+    "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs"
+  } }
+  ```
+  
+  A sibling `types` answers for **both** conditions, so a CommonJS consumer was
+  handed `dist/index.d.ts` — an ES-module declaration, because the package is
+  `"type": "module"` — for an entry point it reaches with `require`. Measured with
+  `tsc --traceResolution` on a `"type": "commonjs"` fixture at `moduleResolution:
+  node16`:
+  
+  ```
+  error TS1479: The current file is a CommonJS module whose imports will produce
+  'require' calls; however, the referenced file is an ECMAScript module and cannot
+  be imported with 'require'.
+  ```
+  
+  The JavaScript at `dist/index.cjs` loads perfectly (`check:dual-build-cjs-loads`
+  has asserted that for months). It is the **types** that told the consumer the
+  supported `require` entry point could not be required. The `dist/index.d.cts`
+  twin tsup emits beside it — 36 files, 5,517,701 B on this build — was named by
+  no condition at all and shipped in every tarball unreachable.
+  
+  ## What changed
+  
+  Each condition now names its own declaration, the shape TypeScript documents:
+  
+  ```json
+  "exports": { ".": {
+    "import":  { "types": "./dist/index.d.ts",  "default": "./dist/index.js" },
+    "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+  } }
+  ```
+  
+  33 entry points across 27 packages, subpaths included. The root `types` field is
+  untouched, so `node10` resolvers are unaffected; the `import` condition resolves
+  exactly what it resolved before, measured as an unchanged control in the same
+  run.
+  
+  ## `@objectstack/core` is deliberately NOT changed
+  
+  Splitting a declaration in two makes TypeScript compare it nominally, and
+  `ObjectKernel` carries a `private plugins` member that reaches every plugin
+  through `PluginContext.getKernel()`. With core split, whole-repo `pnpm build`
+  fails in `@objectstack/verify` with 5 × TS2345 ("Types have separate
+  declarations of a private property 'plugins'"); with core held back and the
+  other 27 split, 71/71 tasks pass. So core keeps the sibling-`types` shape and
+  its two `.d.cts` files (220,854 B) stay unreachable, declared as such in
+  `check:dual-build-cjs-loads`. Splitting it needs a decision about core's public
+  types, not about an exports map.
+  
+  ## For consumers
+  
+  - **ESM consumers: nothing changes.** Same declaration file, byte for byte.
+  - **CJS consumers under `node16`/`nodenext`: TS1479 goes away** and the
+    declarations they get are the ones built for CommonJS.
+  - **`node10` / `moduleResolution: node` consumers: nothing changes** — they never
+    read `exports`.
+  - Nothing is removed: every path that resolved before still resolves.
+  
+  Packages that are CJS-first (`require` → `./dist/index.js`, no `"type": "module"`)
+  were already correct and are untouched — their `dist/index.d.ts` really is the
+  CommonJS declaration. Their ESM mirror (an unreachable `.d.mts` under the
+  `import` condition) is a separate, larger population and is filed separately per
+  the ruling, not fixed here.
+  
+  `check:dual-build-cjs-loads` grew a fourth invariant (TYPED) that reds on the old
+  shape, so the drift cannot return silently.
+- 7345308: fix(lint): drop the `element:form` entry from `COMPONENT_FIELD_SPECS` (#9249)
+  
+  The whole `element:form` element retired at element grain (ADR-0049 — no
+  renderer ever shipped for it; the #9220 shape one element over), so every
+  `ElementFormProps` key is a `retiredKey()` tombstone and no spec-conformant
+  page carries `fields` on it. The field-binding rule's job (resolve a field
+  NAME against the object) is not the question a retired key raises: an authored
+  key is already reported by name with the element-retirement prescription —
+  which names the live replacement, the object-bound `object-form` block —
+  through the #5068 props gate, and the binding entry would only add a second
+  finding about a key that no longer exists — the #5775/#6629 residue class the
+  package's own `component-field-specs-liveness` gate refuses.
+- f887e52: Re-measure four stale `current_user` binding-text sites, including the form SECTION slot
+  
+  The claim that `current_user` is unbound on a form-view **section** predicate was true when
+  it was written and is not any more: the console form renderer threads the host shell's
+  predicate scope into `isSectionVisible` (objectui#6110), and the object-view chain now
+  carries an authored `section.visibleWhen` through to an evaluator via the `section-divider`
+  pseudo-field (objectui#6111). Text only — no schema, no verdict and no runtime behaviour
+  moves.
+  
+  - `FormSectionSchema.visibleWhen` (`ui/view.zod.ts`) — the JSDoc and `describe()` now say the
+    root resolves, carrying the two qualifications the field-slot text already carried: the
+    binding is **client-side only** (no write-path evaluator reads a form-view section or field
+    `visibleWhen` — the rule validator's list is field `readonlyWhen` / `requiredWhen` and
+    per-option `visibleWhen`), and the scope is **empty on the public `/f/:slug` route**, which
+    is mounted outside any provider on purpose. The `features.*` refusal sentence is unchanged:
+    that root is unbound on both standalone form routes.
+  - `SelectOptionSchema.visibleWhen` (`data/field.zod.ts`) and
+    `SELECT_OPTION_EDITABILITY_GUIDANCE` (`shared/editability-boundary.ts`) — the retired
+    exclusivity claim ("the one `*When` surface where `current_user` resolves") is trimmed. The
+    durable grounding stays and is now what the prescription rests on: per-option is the one
+    visibility predicate the **server** enforces, so the rule validator refuses a write of a
+    value whose predicate is false.
+  - `@objectstack/lint`'s field-rule message — the `visibleWhen` consequence clause is
+    re-measured. Under a scope-publishing host the predicate no longer faults: it resolves, the
+    control is hidden client-side, and the server still returns the value to every other reader
+    — a silent enforcement gap. The fault-open leg survives wherever no host publishes a scope.
+    The verdict is unchanged and the message says why it is now *more* justified: trading a loud
+    lint error for a gap nobody can see is worse than the error.
+- 8b04c75: fix(cli,lint): stop lowering hook handlers that call `ctx.api.sudo()` into bodies that cannot run it (#14010)
+  
+  `ScopedContext.sudo()` is real in-process and is **not** marshalled into the
+  QuickJS sandbox: the VM's `ctx.api` carries `object()` and the transaction
+  surface, and nothing else. Every consumer of that fact had it backwards.
+  
+  The failure this closes is the expensive shape, not a cosmetic one. An author
+  writes an inline `handler`, tests it the way the docs teach — calling
+  `hook.handler(ctx)` natively, against the in-process `ScopedContext`, where
+  `sudo()` exists — and the suite is green. `objectstack build` then lowers that
+  same source into an L2 `body`, and in production the call is
+  `TypeError: ctx.api.sudo is not a function`. Under a hook's default
+  `onError: 'abort'` the TypeError aborts the **triggering write**, so the
+  symptom surfaces as an unrelated save being refused. Green tests, dead feature.
+  
+  - **`@objectstack/cli`** — `.sudo(` joins `FORBIDDEN_PATTERNS` in
+    `extractHookBody`, so the build declines to emit such a handler as
+    `body.source`. This is a repair, not just a refusal: `lowerCallables` already
+    registers the callable and ships it through the `.mjs` bundle when extraction
+    throws, so the handler keeps running **in-process, where `sudo()` is real**.
+    The build prints the reason; `--strict-body`, which demands a body for every
+    callable, turns it into a hard failure — correctly, since a body needing
+    elevation genuinely cannot be one. Same family as the `crypto.hash`
+    retirement (#4391): a member advertised ahead of its implementation, where
+    build-time inference was the amplifier rather than the safety net.
+  - **`@objectstack/lint`** — `hook-api-update-readonly-field` (severity
+    `error`, gating) and its `readonlyWhen` sibling both *prescribed*
+    `ctx.api.sudo()` as the remedy. That rule reads L2 body sources and nothing
+    else, so the prescribed shape was a TypeError for **100%** of its population:
+    a gating rule pointing at a dead feature. Both hints now name the own-hook
+    stamp and say plainly that `sudo()` is not reachable from a body. The rule's
+    findings, severities and exclusions are unchanged — only the advice.
+  
+  Docs: the `readonly` table in `automation/hook-bodies.mdx` claimed the
+  `sudo()` row **Lands**; it now records what actually happens.
+  
+  Not addressed here, and the reason this is only half the card: a hook still has
+  **no declared elevation knob** — there is no hook-side `runAs` the way
+  `FlowSchema` has one — so "this column is computed by automation and never
+  hand-written" remains inexpressible whenever the maintaining write is
+  cross-object. That is a contract-surface decision (see #14010), left to the
+  review chain rather than guessed at here.
+- 68c5dba: fix(cli,lint): stop `os lint` demanding translation keys the liveness ledger warns authors for writing (#11624)
+  
+  `os lint` computes i18n coverage and runs the authoring-rule registry in a
+  single pass over the same stack, and for the `flows` translation group the two
+  halves pointed opposite ways:
+  
+  | the author does | which rule fires | what it says |
+  |---|---|---|
+  | omits `flows.*` from the bundle | `i18n/missing-flow` | the key is missing a translation for locale X |
+  | adds it (`os i18n extract` scaffolds it) | `liveness-planned-property` | the `flows` group is `planned` — nothing reads it |
+  
+  Measured on one stack, one run: omitting produced **4** `i18n/missing-flow`
+  findings and 0 liveness findings; authoring produced 0 demands and **2**
+  `liveness-planned-property` findings ("sets `flows` but this translation
+  property is planned"). There is no per-rule suppression in `os lint`, only
+  `--skip-i18n`, which silences the entire `i18n/missing-*` family — so the
+  author's only escape cost them every other coverage signal. Under
+  `--i18n-strict` the demand side is an **error**, so a project could be forced
+  to author keys it is then warned for.
+  
+  ⛔ The warning is not the bug and is unchanged: no shipped screen-flow runner
+  reads the group, so a translated wizard string is stored and never shown — the
+  failure mode `validationMessages` was removed in 17.0.0 for. The premature half
+  is the demand.
+  
+  **The fix.** `collectExpectedEntries` — the single definition of what is
+  translatable at all, shared by the coverage gate and the `os i18n extract`
+  skeleton — now leaves out any translation group the liveness ledger warns
+  authors for authoring. It reads that set from `@objectstack/lint`'s new
+  `authorWarnedProperties(type)`, which returns the very warn-map
+  `lintLivenessProperties` iterates, so the demand side and the warn side cannot
+  drift into disagreeing about the same keys again.
+  
+  Two properties fall out of reading the ledger rather than switching on `flows`
+  by name: the bucket **turns itself back on** the day an objectui screen-flow
+  runner lands and the row flips to `live` (no flag, no follow-up edit), and any
+  future group that acquires an `authorWarn` is covered on the day it is marked
+  rather than re-opening this collision one group at a time. Today `flows` is the
+  only such group — pinned as an equality so a second one goes red instead of
+  shipping.
+  
+  No other bucket changes: `objects`, `apps`, `pages`, `dashboards`,
+  `globalActions` and `metadataForms` are all `live` and are reported exactly as
+  before. `@objectstack/spec` is untouched — the `flows` row keeps `planned` +
+  `authorWarn: true`.
+- 5228e52: fix(lint): `lintDataModel` reads only the canonical `reference` target (#13250)
+  
+  `refOf` in `packages/lint/src/data-model-rules.ts` resolved
+  `def?.reference || def?.reference_to`, so a relationship field spelled with the
+  rejected alias resolved a target. #11567 settled that `reference` is the only
+  relationship spelling `@objectstack/spec` declares — `FieldSchema` answers
+  `reference_to` with `unrecognized_keys` and *"Did you mean `reference_to` →
+  `reference`?"* — and put it as "one key, one answer, on both doors".
+  
+  `@objectstack/lint` runs over an in-memory, schema-parsed stack, so the alias
+  cannot legitimately appear here at all: the tolerance was inert. Where it did
+  fire, it made the rule whose entire job is to catch a relationship with no
+  target — `relationship/missing-reference` — report a valid target for a field
+  that has none, i.e. the one component that exists to tell an author their
+  metadata is wrong was the component accepting the wrong spelling.
+  
+  This mirrors the deliberate canonical-only narrowing already recorded in-file
+  for `refOf` in `packages/lint/src/validate-security-posture.ts`, including its
+  `typeof r === 'string'` guard — which also makes the declared
+  `string | undefined` return type true, where the old `||` chain returned
+  whatever truthy value it found (a non-string `reference` was reported as a
+  resolved target).
+  
+  What changes for a consumer, only for metadata the spec already refuses:
+  `relationship/missing-reference` (error) now fires on a relationship field
+  whose only target spelling is `reference_to`, and the rules that need a
+  resolved target (`relationship/master-detail-required`, `rollup/missing-summary`
+  and the rest of the relationship family) no longer treat such a field as
+  pointing anywhere. Canonical `reference` is untouched.
+  
+  Scope note: the two remaining tolerant readers named in #13250 —
+  `packages/verify/src/derive.ts` and
+  `packages/plugins/plugin-security/src/security-plugin.ts` — are deliberately
+  NOT narrowed here. Both were measured to sit on populations the alias can
+  actually reach (raw `registerObject`, which skips Zod by design, and an app
+  config that never passes through a `define*` parse), so narrowing them is a
+  triage call rather than a defect fix.
+- 9057811: fix(lint): `relationship/delete-behavior` suggestion no longer names `set_null` as declarable on a `master_detail`
+  
+  `lintDataModel`'s `relationship/delete-behavior` suggestion told an author an
+  undeclared `master_detail.deleteBehavior` could be `cascade`, `restrict`, or
+  `set_null`. Since #9689 (PR #11406, maintainer ruling 2026-08-19), an authored
+  `deleteBehavior: 'set_null'` on a `master_detail` field is a named parse-time
+  rejection — a detail row cannot outlive its master, so the engine resolves
+  every value except `restrict` to `cascade` on this type. Following the
+  suggestion's own `set_null` mention literally walked an author into that
+  rejection at publish time.
+  
+  The message now enumerates only the two values `FieldSchema` actually accepts
+  on a `master_detail` (`cascade`/`restrict` — matching the vocabulary already
+  offered by the metadata-admin field form, `object.form.ts`'s `master_detail`
+  `deleteBehavior` options), and keeps the same outcome-naming courtesy as the
+  parse-time rejection message: it still names `set_null` to say plainly that it
+  is not honored on this type, and points to `lookup` for the case where
+  children must survive the parent. The `fix` payload (`deleteBehavior:
+  'cascade'`) was already correct and is unchanged.
+- 365e334: **Fix:** `lintLivenessProperties` walks `stack.translations` as the locale-keyed bundle it is, so the `translation` liveness ledger finally reaches the author (#11288).
+  
+  `stack.translations` is `z.array(TranslationBundleSchema)` — each item is a `TranslationBundle`, i.e. `z.record(LocaleSchema, TranslationDataSchema)`, whose top-level keys are locale codes. The lint registered `{ type: 'translation', key: 'translations' }` in `TYPE_COLLECTIONS` and then walked those items flat, the way every other collection there is walked: `checkItem` read `bundle['flows']` for the ledger's one `authorWarn` row. A bundle has no `flows` key at any depth reachable that way — the groups live one level down, under each locale — so every warned lookup missed and the whole `translation` ledger was silent for file-authored bundles, the only way apps author translations today.
+  
+  That is the failure mode the comment above `TYPE_COLLECTIONS` names ("a newly governed type needs its collection registered or its ledger warns nobody"), reached from the other side: the collection *was* registered, and the shape underneath it was the mismatch. Registering a collection is only half the contract — the walk has to match the collection's shape — so the row is now a tombstone comment saying exactly that, and `translation` joins `object`/`field` as a bespoke walk: for each bundle, each locale entry's `TranslationData` is checked, with the finding subject naming the bundle index and the locale (`translation bundle #0 · locale 'zh-CN'`).
+  
+  Measured on a real app before the fix, as a guarded ablation: injecting a `flows:` section into a locale bundle and re-running `objectstack lint --json` produced **zero** delta — 91 issues before and after, 0 liveness findings naming `flows`. The author who reached for a `planned` translation group got silence, which is strictly worse than the ledger being absent, because the ledger's stated contract is that `authorWarn` is what tells them.
+  
+  Advisory-only as before: the finding is a warning, and `os lint` exits on errors, never on warnings.
+  
+  The regression test is pinned on the **bundle** shape, and a `TranslationItem`-shaped anti-fixture is pinned alongside it. That shape — `locale` plus the groups at the top level — is the runtime metadata door, and it *warned on the broken walk*, so a fixture written that way would have been green from the day the bug shipped and pinned nothing. Runtime-authored `translation` items are reached by this lint through no door at all: no stack collection carries them, and the rule is `surfaces: CLI_ONLY`, so it does not run at the runtime publish gate either. The two doors share the group vocabulary, not the container; only the file-authored one is lintable, and now it is linted.
+- 20a452e: `lintLivenessProperties` now honours its own docblock contract ("Advisory only
+  — returns findings, never throws") when a collection item is `null` or
+  otherwise not an object. The object walk, the field walk nested under it, and
+  the flat `TYPE_COLLECTIONS` loop that covers every other governed type (flow,
+  action, agent, tool, …) each read `item.name`/`item.object` straight off every
+  element with no record guard, throwing `TypeError: Cannot read properties of
+  null (reading 'name')` on a malformed item instead of skipping it — reachable
+  via the exported `stack: AnyRec` signature on an unparsed or hand-built stack.
+  The translation bundle walk already guarded its two levels (#11383); this
+  closes the same hole on the three walks that did not (#11385).
+- 289cf91: fix(lint): guard `walkPageComponents` against component cycles (#13217)
+  
+  `walkPageComponents` — the one shared page-component traversal under every
+  page-shaped lint rule and the CLI's i18n object-sections pass — descended the
+  untyped composition slots inside `properties` with no cycle guard. Every one of
+  those slots is `z.array(z.unknown())` authored data, so a component whose
+  `properties.children` contains itself is **legal input**, and feeding one in
+  recursed until the stack died with `RangeError: Maximum call stack size
+  exceeded`. Because the walk is shared rather than copied, that crash was not
+  scoped to one rule: it took every rule standing on the walk down in the same
+  process.
+  
+  The descent now carries an **ancestor set** — the node is added before
+  descending and removed on the way out — so a node that is its own ancestor
+  stops the descent. Measured on the shapes that matter: a direct self-reference,
+  an indirect cycle (`A -> B -> A`) and a longer chain (`A -> B -> C -> A`) all
+  terminate, through every descended slot (`properties.children`,
+  `properties.items[].children`, `properties.body`, `properties.footer`).
+  
+  Two deliberate non-changes, both pinned:
+  
+  - **An ancestor set, not a visited set.** A component object placed twice as a
+    *sibling*, or reached down two different branches, is legitimate re-use at two
+    distinct config paths, and every rule built on this walk must see both
+    placements. A visited set would yield the first and silently drop the rest —
+    trading a loud crash for missing lint coverage. This matches the predicate the
+    sibling resolver `translatePage` already settled on.
+  - **No depth cap.** A cap and a cycle guard are different instruments. On a
+    resolver a cap leaves copy untranslated; on a lint walk it would drop real
+    components from the walk output and every rule would go quiet about them — a
+    silent truncation that reads exactly like a clean page. With the cycle guard
+    the descent is bounded by the document's own finite nesting, so a cap could
+    only ever fire on acyclic input, which is the input it must not truncate.
+  
+  The guard is silent: a cycle stops the descent and yields nothing extra, and no
+  finding or warning is produced. Deciding that a self-referential page is itself
+  an authoring error would be new reject behaviour on authored input, which is a
+  contract call and not this walk's to make. Measured on a cyclic-but-otherwise
+  valid page, all six rules that route through the walk report exactly what they
+  report for the equivalent acyclic document (zero findings either way).
+  
+  No authored page in this repo carries such a cycle — swept across 57
+  page-shaped objects with a positive control, zero hits — so this fixes a
+  reachable crash, not an active incident.
+- ba8420b: `lintLivenessProperties` no longer tells authors a `planned` property is `dead`
+  
+  `describe()` in `lint-liveness-properties.ts` only knew two verdicts
+  (`experimental`, everything else → `dead`), while the liveness ledger ships a
+  third: `status: 'planned'` (declared, and a consumer is being built against
+  it — contract-first, the opposite of `dead`). Every `planned` row fell through
+  into the `dead` branch, so the finding's own **message** told the author to
+  remove metadata the platform had asked them to write, while the same finding's
+  **hint** (when the row carried one) said the opposite one sentence later. Three
+  shipped rows hit this: `field.relatedListFilter`, `object.externalSharingModel`,
+  `translation.flows`.
+  
+  `describe()` now has a third branch: `status === 'planned'` gets its own rule
+  id (`liveness-planned-property`, mirroring `liveness-dead-property` /
+  `liveness-experimental-property`'s advisory-only posture — nothing downstream
+  keys off these ids today) and its own message/default hint ("keep it — a
+  consumer is being built against this property", never "Remove it").
+  
+  The ledger's `status` field is a documented vocabulary, not a Zod-enforced
+  enum — nothing rejects a ledger entry with an unrecognised status. `describe()`
+  previously graded any such entry `dead` silently; it now throws, naming the
+  offending status, so a ledger-authoring mistake (a typo, or a new status added
+  without teaching this file about it) fails loudly at test time instead of
+  mislabelling a finding.
+- b5a2398: Correct three stale `current_user` binding claims about a form FIELD `visibleWhen`
+  
+  A runtime form field's `visibleWhen` has resolved `current_user` — and the ADR-0068 D1 aliases `user` / `ctx.user` / `os.user` — since objectui#6010, but three texts shipped by these two packages still told authors the root was unbound there, and that per-option `visibleWhen` was "the only `*When` surface where it resolves".
+  
+  - `@objectstack/spec`: `FormFieldSchema.visibleWhen`'s doc block and its `describe()` now state the binding together with the two limits it does not remove — it is a rendering rule that nothing on the write path evaluates, so a role test written there protects no data; and the scope belongs to the host, so it is empty on the console's public standalone form route, where the predicate faults and visibility fails open. The generated `content/docs/references/ui/view.mdx` rows follow from the `describe()`.
+  - `@objectstack/lint`: the field-rule prescription no longer grounds "move it to the option's own `visibleWhen`" on exclusivity. It grounds it on enforcement — the rule validator evaluates a per-option predicate on every write — and names the form-view field predicate only to refuse it as a destination for a server-enforced object rule, since moving one there would trade a loud lint error for a silent enforcement gap.
+  
+  No schema, validation or verdict change: the set of accepted metadata is byte-identical, and the rule still refuses a user root on an object field-level `*When`.
+- b2dea86: Retire the "no `current_user` at section level" claim from the three prose sites the
+  re-measurement left unswept
+  
+  A form-view **section** `visibleWhen` binds `current_user` today. That was measured and
+  landed for the schema text and the field-rule lint message, but three hand-written sites
+  still taught the retired claim, so an author reading the docs or hitting the gate was told
+  the opposite of what the platform does. Text only — no schema, no verdict and no runtime
+  behaviour moves.
+  
+  Re-verified at source in `objectui` before trimming anything, because a prose trim applied
+  to a claim someone had since fixed would silently regress their work:
+  
+  - `apps/console/src/components/FormPage.tsx` threads the host shell's scope into
+    `isSectionVisible`, which forwards it to `evalFieldPredicate` (objectui#6110).
+  - `packages/plugin-form/src/ObjectForm.tsx` copies an authored section `visibleWhen` onto
+    the `section-divider` pseudo-field the renderer evaluates with that scope bound
+    (objectui#6111); `SplitForm` / `ModalForm` / `DrawerForm` carry the same line.
+  
+  The three sites:
+  
+  - `content/docs/ui/views.mdx` listed *"section-level predicates (objectui#6111)"* as a
+    surface that still evaluates the predicate unbound — naming as evidence the very PR that
+    bound it. The same sentence also listed `/forms/:name` as unbound; that route renders
+    inside `InternalFormRoute`, which publishes the session principal and binds normally, so
+    the public `/f/:slug` route is now the only unbound surface named.
+  - `content/docs/protocol/objectui/layout-dsl.mdx` carried the claim four times — a code
+    comment, the binding-root table row, the paragraph under it, and the "two limits" prose —
+    where the card recorded three. All four are re-measured together.
+  - `packages/lint/scripts/check-doc-formula-expressions.mjs`'s field-rule epilogue still said
+    a faulting field-level `visibleWhen` is simply fail-OPEN. Under a host that publishes a
+    scope the predicate RESOLVES instead: the control is hidden in that one form while no
+    server-side gate evaluates a field-level `visibleWhen` at all, so every other reader still
+    returns the value — a silent enforcement gap, and the worse of the two outcomes. The
+    fault-open leg is kept rather than replaced, because it is still what happens wherever no
+    host publishes a scope. The verdict is untouched and the message says why it is now *more*
+    justified.
+  
+  Both replacement texts carry the two qualifications the retired claim's correction needs, so
+  "sections bind `current_user`" cannot be read as an authorization primitive: the binding is
+  **client-side only** (nothing on the write path evaluates a form-view field or section
+  `visibleWhen` — it evaluates field `readonlyWhen` / `requiredWhen` and per-option
+  `visibleWhen`, and that is the whole list), and **the scope belongs to the host**, so it is
+  empty on the public `/f/:slug` route and the predicate faults open there.
+  
+  The epilogue is a plain string nobody else read — deleting the re-measured clause broke no
+  assertion and turned no gate red, which is exactly how the stale claim outlived its sibling.
+  It is now pinned by a `--self-test` case that scopes itself to the real epilogue (so it
+  cannot satisfy itself from its own literal) and asserts both outcomes plus the surviving
+  fault-open leg. Proven capable of failing by ablation: reverting the clause on disk turns
+  the self-test red, and restoring returns it to green.
+- f213793: `validate-translation-references` now checks the `flows` group — an authored key naming a
+  flow, screen node or screen field that does not exist warns instead of resolving to nothing
+  
+  The rule walked `objects`, `globalActions`, `apps` and `dashboards`; an unrecognised
+  top-level namespace is skipped and never reported, and `flows` was one of them. So a
+  bundle keyed to `flows.<name>.screens.<node_id>.fields.<field_name>` parsed, shipped, and
+  silently resolved to nothing — the wizard rendering its source-locale string while every
+  other label on the screen was translated, which is the exact failure this rule exists for,
+  one namespace over.
+  
+  All three levels are exact-match identifiers with an enumerable universe, so the leg
+  mirrors the `dashboards` → `widgets` leg one level further: flow → `Flow.name`, screen →
+  `FlowNode.id` on `type: 'screen'` nodes, field → `ScreenFieldConfig.name`. Findings are
+  `warning`, like every other finding in this rule (ADR-0072 D1 — an orphan key is inert,
+  not broken), and each names the declared universe it resolved against.
+  
+  Two shape facts the collector respects, both measured against the schemas rather than
+  assumed — either one read the obvious way would have made the leg a false-positive
+  generator:
+  
+  - **Screen nodes nest.** A screen inside an ADR-0031 region (`loop.config.body`,
+    `parallel.config.branches[].nodes`, `try_catch.config.try`/`.catch`) is a real screen the
+    runner pauses on, so the universe is collected through `walkFlowNodes` rather than the
+    flat `flow.nodes`.
+  - **`ScreenConfigSchema` has two mutually exclusive shapes.** An object-form screen
+    (`config.objectName`) renders that object's own create/edit form and declares no
+    `config.fields`; its input labels resolve through `objects.<objectName>.fields.*`, so a
+    field key there is reported with that redirect rather than a bare "not declared".
+  
+  A key naming a node that exists but is not a `screen` is diagnosed as the wrong node type,
+  not as a missing node.
+- Updated dependencies [387e231]
+- Updated dependencies [cae2169]
+- Updated dependencies [2d4fa75]
+- Updated dependencies [0e4e51b]
+- Updated dependencies [e84bbf6]
+- Updated dependencies [c45d8e6]
+- Updated dependencies [40a93b5]
+- Updated dependencies [dda969c]
+- Updated dependencies [277948f]
+- Updated dependencies [8bdd955]
+- Updated dependencies [4f24e9d]
+- Updated dependencies [474242f]
+- Updated dependencies [803eaab]
+- Updated dependencies [eae824e]
+- Updated dependencies [f6fa22c]
+- Updated dependencies [8a483b3]
+- Updated dependencies [df59de0]
+- Updated dependencies [96e25a8]
+- Updated dependencies [713f83f]
+- Updated dependencies [77d4b3c]
+- Updated dependencies [f75a38a]
+- Updated dependencies [7a25e7d]
+- Updated dependencies [1fa05a6]
+- Updated dependencies [c85a265]
+- Updated dependencies [dcb10a5]
+- Updated dependencies [776a098]
+- Updated dependencies [5060877]
+- Updated dependencies [4f6325d]
+- Updated dependencies [52954c0]
+- Updated dependencies [93809a3]
+- Updated dependencies [7c0d0c3]
+- Updated dependencies [daae7aa]
+- Updated dependencies [8dc22d6]
+- Updated dependencies [3b4c56c]
+- Updated dependencies [ae8edd2]
+- Updated dependencies [e25403c]
+- Updated dependencies [64baa68]
+- Updated dependencies [9fa70d7]
+- Updated dependencies [09db64a]
+- Updated dependencies [92916e7]
+- Updated dependencies [a84f3ea]
+- Updated dependencies [f2eaae8]
+- Updated dependencies [c09451b]
+- Updated dependencies [ba64877]
+- Updated dependencies [7345308]
+- Updated dependencies [30d96ab]
+- Updated dependencies [f658793]
+- Updated dependencies [c95ad19]
+- Updated dependencies [4a17645]
+- Updated dependencies [3795c5f]
+- Updated dependencies [e25e839]
+- Updated dependencies [5997207]
+- Updated dependencies [8b13cc8]
+- Updated dependencies [86e765a]
+- Updated dependencies [53dc739]
+- Updated dependencies [fd289be]
+- Updated dependencies [03bf7b1]
+- Updated dependencies [f90e820]
+- Updated dependencies [e8bd715]
+- Updated dependencies [a28a3c0]
+- Updated dependencies [daeaaf9]
+- Updated dependencies [c459da6]
+- Updated dependencies [e914733]
+- Updated dependencies [f887e52]
+- Updated dependencies [881f8d8]
+- Updated dependencies [3bfa1e6]
+- Updated dependencies [901355c]
+- Updated dependencies [4635f3e]
+- Updated dependencies [ee3595c]
+- Updated dependencies [3a04b01]
+- Updated dependencies [b9e9227]
+- Updated dependencies [d395692]
+- Updated dependencies [5894d30]
+- Updated dependencies [a3765f6]
+- Updated dependencies [e22158f]
+- Updated dependencies [7404925]
+- Updated dependencies [0c2334f]
+- Updated dependencies [d2619fd]
+- Updated dependencies [6acb11a]
+- Updated dependencies [33c5fd3]
+- Updated dependencies [20b0fdb]
+- Updated dependencies [905019b]
+- Updated dependencies [a286411]
+- Updated dependencies [98c0d33]
+- Updated dependencies [93ea19b]
+- Updated dependencies [9ee2dcf]
+- Updated dependencies [8cb96ec]
+- Updated dependencies [8f10a79]
+- Updated dependencies [6269a55]
+- Updated dependencies [0fb8760]
+- Updated dependencies [e5ce2ed]
+- Updated dependencies [be21955]
+- Updated dependencies [bc56e18]
+- Updated dependencies [be21955]
+- Updated dependencies [a9ee989]
+- Updated dependencies [15d58db]
+- Updated dependencies [d63b014]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [2cc7122]
+- Updated dependencies [9e0ba21]
+- Updated dependencies [311433f]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [b7131f3]
+- Updated dependencies [ce7e497]
+- Updated dependencies [51ecb2f]
+- Updated dependencies [9086761]
+- Updated dependencies [42a117b]
+- Updated dependencies [4297fe7]
+- Updated dependencies [e398863]
+- Updated dependencies [f11fc61]
+- Updated dependencies [8f79379]
+- Updated dependencies [e6ca40e]
+- Updated dependencies [0c77ea4]
+- Updated dependencies [52954c0]
+- Updated dependencies [aa5994e]
+- Updated dependencies [be93457]
+- Updated dependencies [a65db76]
+- Updated dependencies [15eb2c9]
+- Updated dependencies [5691b07]
+- Updated dependencies [2a6122b]
+- Updated dependencies [225e769]
+- Updated dependencies [8af88dd]
+- Updated dependencies [fb5fbb8]
+- Updated dependencies [d7b3963]
+- Updated dependencies [b72db01]
+- Updated dependencies [dce5cd4]
+- Updated dependencies [177ebdc]
+- Updated dependencies [8d237b4]
+- Updated dependencies [2d2e6f0]
+- Updated dependencies [2d8dd8d]
+- Updated dependencies [b5a2398]
+- Updated dependencies [348860c]
+- Updated dependencies [5383fa6]
+- Updated dependencies [5b3ff63]
+- Updated dependencies [1a6a19c]
+- Updated dependencies [527e050]
+- Updated dependencies [dd33bf9]
+- Updated dependencies [4cb2a90]
+- Updated dependencies [74a7804]
+- Updated dependencies [033a34c]
+- Updated dependencies [4d25d22]
+- Updated dependencies [1ffee51]
+- Updated dependencies [5ae4303]
+- Updated dependencies [ece4dad]
+- Updated dependencies [146f448]
+- Updated dependencies [735f5c7]
+- Updated dependencies [366f895]
+- Updated dependencies [dc75ba8]
+- Updated dependencies [2182bd1]
+- Updated dependencies [2a5c1cd]
+- Updated dependencies [34f60b7]
+- Updated dependencies [8beb3de]
+- Updated dependencies [4a9f461]
+- Updated dependencies [cce0aa9]
+- Updated dependencies [cff17af]
+- Updated dependencies [39404f3]
+- Updated dependencies [ca1965f]
+- Updated dependencies [8619f95]
+- Updated dependencies [b706af9]
+- Updated dependencies [fc9ba76]
+- Updated dependencies [a11c1a5]
+- Updated dependencies [71f9cd1]
+- Updated dependencies [ee17d86]
+- Updated dependencies [cdbd920]
+- Updated dependencies [18c432e]
+- Updated dependencies [3c418c4]
+- Updated dependencies [a933ed7]
+- Updated dependencies [b3ca463]
+- Updated dependencies [a933ed7]
+- Updated dependencies [0d4a6a8]
+- Updated dependencies [518d5e5]
+- Updated dependencies [6643ba1]
+- Updated dependencies [eeba2ef]
+- Updated dependencies [ec4c4d2]
+- Updated dependencies [424f73c]
+- Updated dependencies [cccbe51]
+- Updated dependencies [a8d6b1d]
+- Updated dependencies [e4a7695]
+- Updated dependencies [87075b1]
+- Updated dependencies [14cfc00]
+- Updated dependencies [dfebfc8]
+- Updated dependencies [d028b37]
+- Updated dependencies [122ef38]
+- Updated dependencies [428f9b2]
+- Updated dependencies [aa7ff56]
+- Updated dependencies [c4db311]
+- Updated dependencies [750fff5]
+- Updated dependencies [c19035e]
+- Updated dependencies [ececf7a]
+- Updated dependencies [d173125]
+- Updated dependencies [8425c17]
+- Updated dependencies [a5ef1d8]
+- Updated dependencies [772d5de]
+- Updated dependencies [ce80ec2]
+- Updated dependencies [b372318]
+- Updated dependencies [29d0676]
+- Updated dependencies [6bd3231]
+- Updated dependencies [b799ac5]
+- Updated dependencies [8f74307]
+- Updated dependencies [d23dc08]
+- Updated dependencies [644ad50]
+- Updated dependencies [0da7cd2]
+- Updated dependencies [28a5c3e]
+- Updated dependencies [4bc18e5]
+  - @objectstack/spec@17.3.0
+  - @objectstack/formula@17.3.0
+  - @objectstack/sdui-parser@17.3.0
+
 ## 17.2.0
 
 ### Minor Changes

@@ -1,5 +1,487 @@
 # @objectstack/plugin-mcp-server
 
+## 17.3.0
+
+### Minor Changes
+
+- e29fc21: Tools bridged from an AI service's `ToolRegistry` now reach MCP clients with the
+  input schema their definition declares, and the arguments a client sends now
+  reach the tool.
+  
+  `MCPServerRuntime.registerToolFromDefinition` passed a name, a description and
+  three annotation hints to `McpServer.registerTool` and never read
+  `tool.parameters`. Measured over a real `StdioServerTransport` at `74049254`, a
+  bridged `query_records` declaring
+  `{ objectName: string (required), limit: number }` was served to `tools/list` as
+  `inputSchema: { "type": "object", "properties": {} }` — the SDK's synthesised
+  empty schema, i.e. a positive claim that the tool takes no arguments — and a
+  `tools/call` carrying `{ objectName: 'task', limit: 5 }` reached
+  `toolRegistry.execute` as `input: {}`.
+  
+  The second half was invisible for the same reason as the first. The handler read
+  `extra.arguments`, a member `RequestHandlerExtra` does not have in any version of
+  the SDK this package has depended on, so it was always `undefined`; and
+  `McpServer.executeToolHandler()` branches on `tool.inputSchema`, invoking a
+  schema-less tool as `handler(extra)`. Declaring the schema is what makes the SDK
+  hand the call's arguments to the handler at all, so both halves are one fix.
+  
+  `AIToolDefinition.parameters` is JSON Schema and `registerTool` accepts only Zod
+  — a raw JSON Schema object reaches the SDK's `getZodSchemaObject()` and throws
+  `inputSchema must be a Zod schema or raw shape, received an unrecognized object`
+  — so the new `toolInputSchema()` converts it with `zod@4`'s own
+  `fromJSONSchema`, adding no dependency. The SDK converts the result straight back
+  to JSON Schema for `tools/list`; properties, types, descriptions, `required`,
+  enums, nested objects and `anyOf`/`oneOf` survive the round trip.
+  
+  Two consequences worth stating rather than discovering. Declaring an
+  `inputSchema` is also what turns on `McpServer.validateToolInput()`, which this
+  SDK offers no way to decline: a call whose arguments do not match the declared
+  schema is now answered with an `isError` result naming the offending field
+  instead of being executed with `{}`. And a definition whose `parameters` does not
+  describe an object — absent, `{}`, or untyped — is bridged with a loose empty
+  object, which advertises exactly what the SDK synthesised before and constrains
+  nothing, so a tool that genuinely declares no arguments behaves as it did.
+  
+  The docblocks were the reason this survived a reading: `bridgeTools` claimed each
+  tool became "an MCP tool with the same name, description, and JSON Schema
+  parameters", and the comment on the call claimed the schema was passed "as
+  annotations metadata" — through an `annotations` object that carries only
+  `destructiveHint` / `readOnlyHint` / `openWorldHint`, and is typed to accept
+  nothing else. Both now describe what the code does.
+
+### Patch Changes
+
+- e7191ce: fix(build): give each `exports` condition its own `types` target in the 28 dual-build packages (#13112)
+  
+  **Published-surface change, zero runtime change.** No emitted byte moves; what
+  moves is which declaration file a resolver READS. Maintainer ruling 2026-08-29
+  (decision batch #3, verbatim 「同意」) chose declaring the files over deleting
+  them.
+  
+  ## What was wrong
+  
+  These 28 packages are `"type": "module"` and dual-built, and each spelled one
+  `types` condition as a **sibling** of `import`/`require`:
+  
+  ```json
+  "exports": { ".": {
+    "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs"
+  } }
+  ```
+  
+  A sibling `types` answers for **both** conditions, so a CommonJS consumer was
+  handed `dist/index.d.ts` — an ES-module declaration, because the package is
+  `"type": "module"` — for an entry point it reaches with `require`. Measured with
+  `tsc --traceResolution` on a `"type": "commonjs"` fixture at `moduleResolution:
+  node16`:
+  
+  ```
+  error TS1479: The current file is a CommonJS module whose imports will produce
+  'require' calls; however, the referenced file is an ECMAScript module and cannot
+  be imported with 'require'.
+  ```
+  
+  The JavaScript at `dist/index.cjs` loads perfectly (`check:dual-build-cjs-loads`
+  has asserted that for months). It is the **types** that told the consumer the
+  supported `require` entry point could not be required. The `dist/index.d.cts`
+  twin tsup emits beside it — 36 files, 5,517,701 B on this build — was named by
+  no condition at all and shipped in every tarball unreachable.
+  
+  ## What changed
+  
+  Each condition now names its own declaration, the shape TypeScript documents:
+  
+  ```json
+  "exports": { ".": {
+    "import":  { "types": "./dist/index.d.ts",  "default": "./dist/index.js" },
+    "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+  } }
+  ```
+  
+  33 entry points across 27 packages, subpaths included. The root `types` field is
+  untouched, so `node10` resolvers are unaffected; the `import` condition resolves
+  exactly what it resolved before, measured as an unchanged control in the same
+  run.
+  
+  ## `@objectstack/core` is deliberately NOT changed
+  
+  Splitting a declaration in two makes TypeScript compare it nominally, and
+  `ObjectKernel` carries a `private plugins` member that reaches every plugin
+  through `PluginContext.getKernel()`. With core split, whole-repo `pnpm build`
+  fails in `@objectstack/verify` with 5 × TS2345 ("Types have separate
+  declarations of a private property 'plugins'"); with core held back and the
+  other 27 split, 71/71 tasks pass. So core keeps the sibling-`types` shape and
+  its two `.d.cts` files (220,854 B) stay unreachable, declared as such in
+  `check:dual-build-cjs-loads`. Splitting it needs a decision about core's public
+  types, not about an exports map.
+  
+  ## For consumers
+  
+  - **ESM consumers: nothing changes.** Same declaration file, byte for byte.
+  - **CJS consumers under `node16`/`nodenext`: TS1479 goes away** and the
+    declarations they get are the ones built for CommonJS.
+  - **`node10` / `moduleResolution: node` consumers: nothing changes** — they never
+    read `exports`.
+  - Nothing is removed: every path that resolved before still resolves.
+  
+  Packages that are CJS-first (`require` → `./dist/index.js`, no `"type": "module"`)
+  were already correct and are untouched — their `dist/index.d.ts` really is the
+  CommonJS declaration. Their ESM mirror (an unreachable `.d.mts` under the
+  `import` condition) is a separate, larger population and is filed separately per
+  the ruling, not fixed here.
+  
+  `check:dual-build-cjs-loads` grew a fourth invariant (TYPED) that reds on the old
+  shape, so the drift cannot return silently.
+- c39369d: fix(mcp): assert `openWorldHint: false` only for platform-registered tool names (#13350)
+  
+  The MCP tool bridge (`registerToolFromDefinition` in `mcp-server-runtime.ts`)
+  put `openWorldHint: false` in every bridged tool's `annotations` — for every
+  tool an app registers under its own name as well as the platform's own. No
+  source existed for that claim: `AIToolDefinition` has no member expressing it,
+  so the `false` was a property of the bridge file presented to every MCP client
+  as a property of the tool. An app tool that calls a weather API, an LLM or any
+  other outbound service was announced as having a closed, well-defined domain of
+  interaction. Same defect class as the `readOnlyHint` / `destructiveHint` repair
+  that preceded it.
+  
+  The hint is now derived from `PLATFORM_PROVIDED_TOOL_NAMES`
+  (`@objectstack/spec/system`) — the canonical registry of the statically named
+  tools the cloud AI runtime registers, and the same registry the bridge's
+  existing `readOnlyHint` name fallback is pinned to as a subset. A platform name
+  keeps `openWorldHint: false`, which is known-correct: those tools act on this
+  stack's own records and metadata. Every other bridged tool is served **no
+  `openWorldHint` key at all**.
+  
+  ⚠️ **What omission means here, and why it differs from the sibling hints.**
+  `@modelcontextprotocol/sdk` 1.30.0 documents `openWorldHint` as `Default: true`
+  (`ToolAnnotationsSchema`), so an app tool that declares nothing is now read by
+  a conforming host as reaching an **open** world — where before it was told the
+  world was closed. That is the intended direction: the bridge has no source for
+  an app tool, and the protocol's own default is a better answer than a
+  fabricated one. It is the opposite of the `readOnlyHint` (`Default: false`) and
+  `destructiveHint` (`Default: true`) cases, where omission lands on the cautious
+  reading; the asymmetry is documented at the derivation site so it is not
+  "tidied" back into the defect.
+  
+  Hosts that keyed behaviour off a bridged app tool's `openWorldHint: false` will
+  now see the annotation absent. The platform tools' `false` is unchanged, and
+  the object-CRUD and action bridges in `mcp-http-tools.ts` — including
+  `run_action`'s deliberate `openWorldHint: true` — are untouched.
+  
+  Making the hint a property of the tool (a declared member on
+  `AIToolDefinition`, with action-backed tools inheriting `run_action`'s
+  `openWorldHint: true`) is a public contract extension and was ruled a
+  follow-up; this is the zero-contract-change half.
+- 6193e57: fix(mcp): pin the tool bridge's two hand-copied safety name sets in the direction the old pin could not see (#13486)
+  
+  `mcp-server-runtime.ts` keeps two literal name sets — `PLATFORM_READ_ONLY_TOOL_NAMES`
+  and `PLATFORM_DESTRUCTIVE_TOOL_NAMES` — that `safetyAnnotations` consults to decide a
+  bridged tool's `readOnlyHint` / `destructiveHint` when the definition declares nothing.
+  Both are hand copies of `PLATFORM_TOOLS_BY_PACKAGE` (`@objectstack/spec/system`), and
+  the docblock claimed a sibling pin held them there.
+  
+  It held them in one direction only. That pin bridges `[...PLATFORM_PROVIDED_TOOL_NAMES]`
+  and asserts every annotated name is in the registry, so its **iteration source is the
+  registry**: it sees a name added to a local set that the platform never registers. A name
+  **withdrawn** from `PLATFORM_TOOLS_BY_PACKAGE` while it stays in a local set is not among
+  the tools it bridges at all — nothing drives it, nothing is annotated, and the case stays
+  green over exactly the drift it is named for.
+  
+  The harm in that direction is not "a tool the platform no longer registers keeps a hint".
+  These sets annotate **by name**, so once a name leaves the registry, a **plugin**
+  registering a tool of that name inherits a `readOnlyHint` it never declared — a read-only
+  promise the plugin may not honour, handed to it by a stale literal. That is what makes the
+  gap worth closing while the data is still clean.
+  
+  The new pin iterates the thing that can drift — the two sets — and checks each name
+  against the registry, plus a coverage guard that fails if the module exports a
+  name-keyed safety set the pin does not cover. Reaching the sets from a test required
+  exporting them from `mcp-server-runtime.ts`; they are deliberately **not** re-exported
+  from `index.ts`, so `dist/index.d.ts` and the package's published surface are unchanged.
+  No runtime behaviour changes: no name was added, removed or reclassified, and all six
+  were re-verified present in the registry (size 30).
+  
+  `worldAnnotation` is untouched on purpose. It reads `PLATFORM_PROVIDED_TOOL_NAMES`
+  directly, so derivation and pin share one source and a withdrawn name simply stops being
+  annotated — the shape that does not get this disease, kept as the contrast.
+- 4ceae8a: MCP stdio transport now serves the workspace's CONFIGURED timezone/locale
+  instead of the manifest defaults
+  
+  The stdio transport resolved its localization inside `MCPServerPlugin.start()`.
+  `SettingsServicePlugin` registers its service in `init()` but binds its data
+  engine from a `kernel:ready` hook registered in its own `start()`, and every
+  plugin's `start()` body runs strictly before the first `kernel:ready` handler —
+  so that read was inside the settings bind window under **every** composition
+  order. Being ordered after the settings plugin did not help, and the
+  `optionalDependencies` edge that repairs the neighbouring ordering defects would
+  not have moved it either.
+  
+  In that window the read does not fail: the empty in-memory fallback plus the
+  manifest defaults answer with `source: 'default'`, so `resolveLocalizationContext`
+  returned `UTC` / `en-US` and reported success, never reaching its direct
+  `sys_setting` fallback. The value is then held for the life of the transport by
+  design, so a long-lived stdio MCP server served every call with `UTC` / `en-US`
+  on a workspace whose persisted `localization` settings said otherwise, and never
+  self-corrected.
+  
+  The resolution now happens from a `kernel:bootstrapped` hook — the earliest phase
+  strictly after the bind, and the one `SettingsService.reportPreBindRead` names as
+  the remedy — memoized so it stays one resolution for the life of the transport
+  rather than a per-call settings read. A host that never fires the boot hooks
+  resolves it lazily at first use instead, so nothing can deadlock on a hook that
+  never arrives.
+  
+  **Behaviour change on a declared setting**: a deployment that has configured
+  `localization.timezone` / `localization.locale` / `localization.currency` will
+  see those values take effect on the stdio MCP surface, where it previously
+  always received the platform defaults. Formula evaluation (`ctx.timezone`) and
+  message localization on that surface change accordingly.
+- 48318f7: The stdio MCP transport no longer freezes a pre-bind localization when a data call races the boot. #11580 moved the localization read onto a `kernel:bootstrapped` hook, but its lazy entry point memoized whatever the FIRST read produced — and the transport goes live inside `MCPServerPlugin.start()`, before the remaining plugins' `start()` bodies and before every `kernel:ready` handler, which is where `SettingsServicePlugin` binds its data engine. A client fast enough to send a data call in that stretch resolved localization pre-bind, received `UTC` / `en-US` from the manifest defaults, and kept them for the life of the process — the narrow race turning into the permanent wrong value #11580 was about.
+  
+  The memo is now armed by the bind rather than by the first read: a resolution taken while the settings bind window is still open is answered but not kept, so a call arriving after the bind (even before `kernel:bootstrapped`) already sees the configured value, and the first resolution taken once the window has closed is the one that lives for the life of the transport. #7279's steady state is unchanged — one resolution, never a per-call settings read — because the `kernel:bootstrapped` hook takes that resolution the moment the window closes. A host that never fires the boot hooks (a bare kernel, a test harness) still answers rather than deadlocking, which is why the read is not made to wait for the bind.
+- 3ec8646: Bridged MCP tools are now annotated from what their definition DECLARES, not from a seven-name allowlist. `registerToolFromDefinition` built both safety hints as membership tests against two literal sets (`READ_ONLY_TOOLS`, 6 names; `DESTRUCTIVE_TOOLS`, 1), so every tool outside them — every tool an app registers under its own name, and every action-backed tool (`delete_opportunity`, `void_invoice`, `archive_account`, …) — reached each MCP client as `readOnlyHint: false, destructiveHint: false`. That pair is not a missing annotation: it is a positive claim of "not read-only, and not destructive", on the one field an MCP host reads to decide whether to interrupt the user before a call, so a destructive action-backed tool arrived flagged as safe. It also inverted the protocol's own conservative default (`@modelcontextprotocol/sdk` 1.30.0 documents `destructiveHint` as `Default: true`).
+  
+  The declared source is `AIToolDefinition.requiresConfirmation` — the runtime contract member that already carries the framework's one maintainer-ruled definition of destructive (`actionLooksDestructive`, #7828 Option A, whose output `summarizeAction` writes into that very field). ⛔ Nothing here restores the retired metadata key `ToolSchema.requiresConfirmation`, which ADR-0033 §2 removed and which still hard-rejects; it is a different member, on a different object, at a different layer, and no metadata author can reach the one read here.
+  
+  What a `tools/list` now serves, per tool:
+  
+  - **declares `requiresConfirmation: true`** → `destructiveHint: true, readOnlyHint: false` (was `destructiveHint: false`). ⚠️ Hosts will start prompting before these calls, which is the point of the change and the intended direction.
+  - **declares `requiresConfirmation: false`** → `destructiveHint: false`, no `readOnlyHint` (was an asserted `readOnlyHint: false`; the MCP default is `false`, so nothing changes for a conforming host).
+  - **declares nothing** → NEITHER hint (was `false, false`). MCP has no spelling for "unknown" other than absence, so the protocol's own defaults apply — `readOnlyHint` false, `destructiveHint` **true** — instead of a value this bridge cannot source.
+  - **a platform tool name** (`list_objects`, `describe_object`, `query_records`, `get_record`, `aggregate_data`, `delete_field`) → unchanged, as an explicit last-resort fallback for the names the platform itself registers, now outranked by anything the definition declares and pinned to be a subset of `PLATFORM_PROVIDED_TOOL_NAMES`.
+  
+  One name left the read-only fallback: `aggregate_records` is not a platform tool name (`aggregate_data` is) — it belongs to the object-CRUD bridge, which registers it, annotated `readOnlyHint: true`, at its own site in `mcp-http-tools.ts`, so nothing loses that annotation where it is actually served. `openWorldHint: false` is unchanged for every bridged tool.
+- 8649b39: `CONNECT_AGENT_PAGE` is declared `: Page` (type-level only; no runtime change) so export-shape page discovery can see it. It reaches the kernel through `CONNECT_AGENT_UI_BUNDLE.pages`, but was authored as a bare `export const CONNECT_AGENT_PAGE = { … }` with per-field `as const` — the same shape `MarketplaceInstalledPage` shipped in before #11574, and invisible to the export-shape scan the canonical-envelope gates (#11255, #11480) discover their population with. A new repo-wide gate, `check:page-declaration-shape`, now closes the class: every identifier in a bundle's `pages:` array must be declared `export const X: Page =` or through `definePage()` (#11576).
+- Updated dependencies [387e231]
+- Updated dependencies [cae2169]
+- Updated dependencies [2d4fa75]
+- Updated dependencies [0e4e51b]
+- Updated dependencies [e84bbf6]
+- Updated dependencies [c45d8e6]
+- Updated dependencies [40a93b5]
+- Updated dependencies [dda969c]
+- Updated dependencies [277948f]
+- Updated dependencies [8bdd955]
+- Updated dependencies [4f24e9d]
+- Updated dependencies [4bd6faa]
+- Updated dependencies [86cbe37]
+- Updated dependencies [6a180e4]
+- Updated dependencies [474242f]
+- Updated dependencies [803eaab]
+- Updated dependencies [983edf1]
+- Updated dependencies [eae824e]
+- Updated dependencies [f6fa22c]
+- Updated dependencies [8a483b3]
+- Updated dependencies [df59de0]
+- Updated dependencies [96e25a8]
+- Updated dependencies [713f83f]
+- Updated dependencies [77d4b3c]
+- Updated dependencies [f75a38a]
+- Updated dependencies [7a25e7d]
+- Updated dependencies [1fa05a6]
+- Updated dependencies [c85a265]
+- Updated dependencies [dcb10a5]
+- Updated dependencies [776a098]
+- Updated dependencies [5060877]
+- Updated dependencies [4f6325d]
+- Updated dependencies [52954c0]
+- Updated dependencies [93809a3]
+- Updated dependencies [7c0d0c3]
+- Updated dependencies [daae7aa]
+- Updated dependencies [8dc22d6]
+- Updated dependencies [3b4c56c]
+- Updated dependencies [ae8edd2]
+- Updated dependencies [e25403c]
+- Updated dependencies [a81aa9d]
+- Updated dependencies [64baa68]
+- Updated dependencies [9fa70d7]
+- Updated dependencies [09db64a]
+- Updated dependencies [92916e7]
+- Updated dependencies [a84f3ea]
+- Updated dependencies [f2eaae8]
+- Updated dependencies [56c093c]
+- Updated dependencies [c09451b]
+- Updated dependencies [ba64877]
+- Updated dependencies [7345308]
+- Updated dependencies [30d96ab]
+- Updated dependencies [f658793]
+- Updated dependencies [c95ad19]
+- Updated dependencies [4a17645]
+- Updated dependencies [3795c5f]
+- Updated dependencies [e25e839]
+- Updated dependencies [5997207]
+- Updated dependencies [8b13cc8]
+- Updated dependencies [86e765a]
+- Updated dependencies [53dc739]
+- Updated dependencies [fd289be]
+- Updated dependencies [03bf7b1]
+- Updated dependencies [f90e820]
+- Updated dependencies [e8bd715]
+- Updated dependencies [a28a3c0]
+- Updated dependencies [daeaaf9]
+- Updated dependencies [c459da6]
+- Updated dependencies [e914733]
+- Updated dependencies [f887e52]
+- Updated dependencies [881f8d8]
+- Updated dependencies [3bfa1e6]
+- Updated dependencies [0a8ebf3]
+- Updated dependencies [901355c]
+- Updated dependencies [bfe13c8]
+- Updated dependencies [4635f3e]
+- Updated dependencies [fd289be]
+- Updated dependencies [ee3595c]
+- Updated dependencies [3a04b01]
+- Updated dependencies [b9e9227]
+- Updated dependencies [d395692]
+- Updated dependencies [5894d30]
+- Updated dependencies [a3765f6]
+- Updated dependencies [2d5cee3]
+- Updated dependencies [e22158f]
+- Updated dependencies [7404925]
+- Updated dependencies [0c2334f]
+- Updated dependencies [d2619fd]
+- Updated dependencies [af56546]
+- Updated dependencies [6acb11a]
+- Updated dependencies [33c5fd3]
+- Updated dependencies [20b0fdb]
+- Updated dependencies [905019b]
+- Updated dependencies [a286411]
+- Updated dependencies [98c0d33]
+- Updated dependencies [93ea19b]
+- Updated dependencies [9ee2dcf]
+- Updated dependencies [8cb96ec]
+- Updated dependencies [8f10a79]
+- Updated dependencies [6269a55]
+- Updated dependencies [a17da05]
+- Updated dependencies [a8c00e2]
+- Updated dependencies [0fb8760]
+- Updated dependencies [e5ce2ed]
+- Updated dependencies [be21955]
+- Updated dependencies [bc56e18]
+- Updated dependencies [be21955]
+- Updated dependencies [a9ee989]
+- Updated dependencies [15d58db]
+- Updated dependencies [d63b014]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [2cc7122]
+- Updated dependencies [9e0ba21]
+- Updated dependencies [311433f]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [b7131f3]
+- Updated dependencies [ce7e497]
+- Updated dependencies [51ecb2f]
+- Updated dependencies [9086761]
+- Updated dependencies [42a117b]
+- Updated dependencies [4297fe7]
+- Updated dependencies [e398863]
+- Updated dependencies [f11fc61]
+- Updated dependencies [8f79379]
+- Updated dependencies [e6ca40e]
+- Updated dependencies [0c77ea4]
+- Updated dependencies [52954c0]
+- Updated dependencies [7131f12]
+- Updated dependencies [aa5994e]
+- Updated dependencies [be93457]
+- Updated dependencies [a65db76]
+- Updated dependencies [2cf5a96]
+- Updated dependencies [15eb2c9]
+- Updated dependencies [5691b07]
+- Updated dependencies [2a6122b]
+- Updated dependencies [225e769]
+- Updated dependencies [8af88dd]
+- Updated dependencies [fb5fbb8]
+- Updated dependencies [d7b3963]
+- Updated dependencies [33184fd]
+- Updated dependencies [7c41693]
+- Updated dependencies [b72db01]
+- Updated dependencies [dce5cd4]
+- Updated dependencies [9688f58]
+- Updated dependencies [556ebc1]
+- Updated dependencies [177ebdc]
+- Updated dependencies [8d237b4]
+- Updated dependencies [2d2e6f0]
+- Updated dependencies [2d8dd8d]
+- Updated dependencies [b5a2398]
+- Updated dependencies [348860c]
+- Updated dependencies [5383fa6]
+- Updated dependencies [5b3ff63]
+- Updated dependencies [1a6a19c]
+- Updated dependencies [527e050]
+- Updated dependencies [dd33bf9]
+- Updated dependencies [4cb2a90]
+- Updated dependencies [74a7804]
+- Updated dependencies [49f0dcf]
+- Updated dependencies [033a34c]
+- Updated dependencies [4d25d22]
+- Updated dependencies [1ffee51]
+- Updated dependencies [5ae4303]
+- Updated dependencies [ece4dad]
+- Updated dependencies [146f448]
+- Updated dependencies [735f5c7]
+- Updated dependencies [366f895]
+- Updated dependencies [dc75ba8]
+- Updated dependencies [cce0aa9]
+- Updated dependencies [cff17af]
+- Updated dependencies [39404f3]
+- Updated dependencies [ca1965f]
+- Updated dependencies [8619f95]
+- Updated dependencies [b706af9]
+- Updated dependencies [db8c288]
+- Updated dependencies [0e5fe7f]
+- Updated dependencies [add4360]
+- Updated dependencies [fc9ba76]
+- Updated dependencies [a11c1a5]
+- Updated dependencies [71f9cd1]
+- Updated dependencies [ee17d86]
+- Updated dependencies [cdbd920]
+- Updated dependencies [18c432e]
+- Updated dependencies [3c418c4]
+- Updated dependencies [a933ed7]
+- Updated dependencies [b3ca463]
+- Updated dependencies [a933ed7]
+- Updated dependencies [0d4a6a8]
+- Updated dependencies [518d5e5]
+- Updated dependencies [6643ba1]
+- Updated dependencies [eeba2ef]
+- Updated dependencies [ec4c4d2]
+- Updated dependencies [424f73c]
+- Updated dependencies [cccbe51]
+- Updated dependencies [a8d6b1d]
+- Updated dependencies [e4a7695]
+- Updated dependencies [87075b1]
+- Updated dependencies [14cfc00]
+- Updated dependencies [dfebfc8]
+- Updated dependencies [d028b37]
+- Updated dependencies [f7b25c5]
+- Updated dependencies [122ef38]
+- Updated dependencies [428f9b2]
+- Updated dependencies [aa7ff56]
+- Updated dependencies [c4db311]
+- Updated dependencies [750fff5]
+- Updated dependencies [c19035e]
+- Updated dependencies [ececf7a]
+- Updated dependencies [d173125]
+- Updated dependencies [8425c17]
+- Updated dependencies [a5ef1d8]
+- Updated dependencies [772d5de]
+- Updated dependencies [ce80ec2]
+- Updated dependencies [b372318]
+- Updated dependencies [29d0676]
+- Updated dependencies [6bd3231]
+- Updated dependencies [b799ac5]
+- Updated dependencies [8f74307]
+- Updated dependencies [d23dc08]
+- Updated dependencies [644ad50]
+- Updated dependencies [9735662]
+- Updated dependencies [4d5b4f8]
+- Updated dependencies [0da7cd2]
+- Updated dependencies [28a5c3e]
+- Updated dependencies [4bc18e5]
+  - @objectstack/spec@17.3.0
+  - @objectstack/core@17.3.0
+  - @objectstack/types@17.3.0
+  - @objectstack/formula@17.3.0
+
 ## 17.2.0
 
 ### Minor Changes

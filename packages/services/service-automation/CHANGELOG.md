@@ -1,5 +1,850 @@
 # @objectstack/service-automation
 
+## 17.3.0
+
+### Minor Changes
+
+- 4bb09e8: feat(service-automation): an operator can put back a suspension a failed resume consumed (#13909)
+  
+  A run that was resumed and whose downstream node merely **threw** was
+  terminally unresumable, and nothing anywhere could move it. The engine consumes
+  the suspension *before* running downstream nodes, so such a node throws with
+  the pause already gone and the catch arm records the run `failed`: `resume`
+  then answers `RUN_NOT_FOUND`, `cancelRun` is a no-op, and none of the engine's
+  other public methods takes the run anywhere. A deployment could enter that
+  state and never leave it.
+  
+  `AutomationEngine.restoreConsumedSuspension(runId, { requestedBy, reason })`
+  is the exit. It puts the consumed suspension back — verbatim, as it stood at
+  the pause — so the run is resumable again through an ordinary `resume`, with
+  the same authority gate, the same screen validation and the same idempotency
+  guard as any other.
+  
+  - **Deliberate, never automatic.** Nothing calls it on its own: no retry, no
+    sweeper. An operator asks for one run, by id.
+  - **Safe to refuse, with the reason named.** A run that is still suspended, one
+    whose resume is *in flight*, one that completed, one that was cancelled, one
+    that never suspended, and an unknown id each get their own refusal — as does
+    an unreadable store, which is refused rather than guessed at.
+  - **Idempotent.** A suspension is keyed by run id, so however many operators
+    ask there is one resumable pause and no extra traversal — the verb re-arms
+    and stops. Two racing callers in one process get one restore and one refusal.
+  - **It leaves a trace.** The restore is logged with the run, flow, node, when
+    the suspension was consumed, who asked and why, and the run is recorded
+    `paused` again so the repair is not invisible. Across a restart the exit
+    still works: the consumed suspension rides the run's own terminal history row
+    (in `sys_automation_run` columns that already existed), and a run that is
+    restored and then finishes clears it.
+  
+  ⚠️ A repair, not a prevention. The failed attempt's side effects are **not**
+  undone and the original resume signal is **not** replayed — the continuation
+  must be re-issued. Whether the pause should survive a downstream throw at all
+  is a separate, unruled decision (#13937); this change leaves the resume
+  ordering, `forgetSuspendedRun` and `traverseNext` exactly as they are, mints no
+  new run status, and works whichever way that is ruled — the runs already stuck
+  today are not released by changing what future resumes do.
+  
+  `plugin-approvals` carries a comment correction only: its organization backfill
+  documented `context_json` as never written on terminal rows, which this change
+  makes false for that one class of row. No behaviour change there.
+- 803eaab: Automation write doors answer the canonicalized (parsed) flow (#12206, Option A — maintainer ruling 2026-08-26).
+  
+  `POST /api/v1/automation` and `PUT /api/v1/automation/:name` now answer the canonicalized, parsed flow the engine stored — the same shape `GET /api/v1/automation/:name` already answers — instead of echoing the caller's own pre-parse request bytes. `IAutomationService.registerFlow` returns that `FlowParsed` (previously `void`), and the SDK's `client.automation.create` / `client.automation.update` bind `Promise<FlowParsed>` (previously deliberate `Promise<any>`). `CreateFlowResponseSchema` / `UpdateFlowResponseSchema` are now conformant with the real wire body, and `UpdateFlowRequestSchema.definition` requires the complete flow definition the engine actually requires (its former `.partial()` declared a partial-update capability nothing implements; a real partial update would be its own feature).
+  
+  **Migration note (behaviour change on a published SDK surface).** A caller that read the write response back gets the canonicalized flow rather than its own bytes: schema defaults are materialized (`version`, `status`, `runAs`, per-edge `type` / `isDefault`), keys re-emit in schema order, and the PUT answer always carries `name`. The #12206 consumer survey measured zero non-test consumers of the old echo across objectstack and objectui. The one residual risk, named verbatim from that survey: "One real TYPE change — the only shape-breaking difference in the whole measurement": a string `edge.condition` becomes the lowered CEL envelope — the `edge.condition` string → `{dialect, source}` type change, zero measured consumers. A consumer doing `typeof edge.condition === 'string'` on the write response would break; per the survey no such consumer exists in either repo (the cloud repo was not measurable and is the declared gap). Implementers of `IAutomationService.registerFlow` must now return the stored parsed flow.
+- 0d7b1f3: fix(service-automation): one renderer for the contested-flow phrase, and the two spellings it had drifted into (#12563)
+  
+  `minor`, not `patch`, and not empty: this adds a new export
+  (`renderFlowContender`) to a published package's public API, and it changes
+  **shipped operator-facing log text**. Both are real changes a consumer can
+  observe.
+  
+  ## What changed
+  
+  One event — a flow name claimed by more than one definition — was described to
+  an operator in three places, each with its own private `const describe` beside
+  the log call: `flow-precedence.ts`'s precedence warning, `plugin.ts`'s bootstrap
+  audit, and (in `@objectstack/cli`) the startup banner. Nothing held them equal,
+  and two axes had already drifted:
+  
+  - **Quoting.** `flow-precedence.ts` rendered `package "crm"`; the other two
+    rendered `package 'crm'`.
+  - **Absent package id.** The two engine copies interpolated a bare `undefined`
+    into the sentence; the CLI copy rendered a real fallback.
+  
+  The two copies in this package are now one exported renderer. The choice on
+  each axis was measured, not voted:
+  
+  - **Single quotes**, measured against this package rather than across the three
+    copies: of the interpolated identifiers in operator prose under
+    `service-automation/src`, 203 are single-quoted and 3 double-quoted — one of
+    those 3 being this phrase. The sentence already single-quotes the flow name
+    beside it.
+  - **A named fallback** (`a code-shipped package (id unknown)`) instead of
+    `package 'undefined'`. This package's own callers cannot reach that branch
+    today, because `isCodeArtifactBody` is false on a falsy `_packageId` — but
+    that is a property of today's callers, not of an exported function.
+  
+  ## Log text a consumer may be matching on
+  
+  `[Automation] Flow name collision: …` (the precedence warning) now renders a
+  packaged contender as `package 'crm'` rather than `package "crm"`.
+  `plugin.ts`'s bootstrap `[Automation] flow '<name>' is claimed by …` warning is
+  byte-identical to before for every input its callers can produce; only its
+  unreachable absent-id branch changed.
+  
+  ## Why the CLI still renders its own
+  
+  `@objectstack/cli` deliberately keeps its own spelling and takes no value
+  import of this package for the banner: its engine reads are structural and
+  feature-detected so a host on an older automation package still boots. The
+  third copy is held equal by a test-only agreement pin
+  (`packages/cli/src/utils/format.flow-contender-agreement.test.ts`) that asserts
+  the banner line through this renderer, so it goes red in both directions.
+- 8155855: Flow value expressions (`create_record`/`update_record` `config.fields`, `assignment` `config.assignments`) now support a small numeric function table — `round`, `floor`, `ceil`, `abs`, `min`, `max` — with every name and semantic mirrored 1:1 from the `@objectstack/formula` CEL stdlib (no second dialect: `round` is integer-only exactly like CEL's; for N-decimal rounding write `round(x * 100) / 100`, the same pattern CEL authors use). A flow can finally write a computed money value that satisfies its field's declared `scale` (`{round(amount * (1 - discount / 100) * 100) / 100}` → a `scale: 2` currency field).
+  
+  Loud diagnostic in the same stroke: an identifier in call position that is not a supported function — `ROUND(...)`, `Math.round(...)`, `(x).toFixed(2)`, or the next name anyone invents — now fails the node with a named `FlowExpressionFunctionError` (guard-marked, so a `fault` edge cannot swallow it) instead of being silently rewritten to `null` and writing the field as `undefined`. Non-call template resolution is unchanged: unresolved plain tokens still become `null`/empty, and `NOW()`/`TODAY()` whole-token macros behave exactly as before.
+- 1524927: Packaged flows can be switched off durably, and the process-local off-switch is retired
+  
+  Disabling a packaged flow now writes an install-level row to the
+  `sys_metadata_activation` ledger (ADR-0126 §4/§7.2) instead of setting a
+  process-local map. The engine consults that ledger at the `execute()` seam —
+  the one seam every entry path crosses (record-change, schedule, time-relative,
+  api, subflow) — and refuses a disabled flow there with the existing
+  `FLOW_DISABLED` code; the ledger case is distinguished by the message, so no
+  new error code joins the ADR-0112 ledger. An install-level disable also unbinds
+  the flow's trigger, and re-enabling rebinds it. Absence of a row means the
+  packaged default, active, so a deployment that never flips anything behaves
+  exactly as before.
+  
+  This retires the mechanism behind #10243 rather than refining it. The old
+  `flowEnabled` map was not a row, so no organization wall scoped it: on a walled
+  multi-organization deployment a tenant org owner could switch a shipped flow
+  off environment-wide and an unrelated tenant read it off. The durable row
+  replaces it, and because a durable install-wide switch writable by tenants
+  would be that leak with persistence, the write is now authority-gated:
+  `POST /automation/:name/toggle` requires the platform operator in the `group`
+  and `isolated` postures, while the `single` posture — where install-level and
+  org-level are the same scope — is unchanged for the org admin who already holds
+  `manage_metadata`. The refusal names the posture and points at the clone path.
+  
+  Disabling a flow that packaged flows still call as a subflow is refused, and
+  the refusal names the callers (ADR-0126 §7.3). Without it a vendor flow breaks
+  mid-run at its subflow node with an inexplicable late failure. The check is a
+  definition scan at disable time over both `subflow` and `map` nodes; no
+  reference index is built. Enabling is never guarded.
+  
+  One behaviour change worth calling out: a disable now survives
+  unregister-and-re-register, which is what a package upgrade, a Studio publish
+  and the boot pull all do. ADR-0126 §6 requires it — the ledger records the
+  customer's choice, and no upgrade un-makes a choice — but it is the opposite of
+  what the retired in-process map did, where any re-registration silently
+  re-armed the flow.
+- af56546: feat(platform-objects): packaged disable works without the automation service, and the activation ledger has one implementation (#12359, #12350)
+  
+  Two halves of ADR-0126's "ledger convergence", bundled by maintainer ruling
+  (2026-08-26, verbatim and untranslated: 「同意」).
+  
+  ## The registration follows the declaration (#12359)
+  
+  `sys_metadata_activation` is declared in `@objectstack/platform-objects`, but
+  the only thing that REGISTERED it was the automation service's manifest —
+  because flows were the ledger's first and, until packaged actions landed, only
+  consumer. Packaged actions are a second consumer with a different owner: their
+  consult and write path live on the ObjectQL engine, present in every
+  composition that can execute an action.
+  
+  So a deployment with actions and no automation service had no ledger table, and
+  the activation door answered **503 SERVICE_UNAVAILABLE** on every flip —
+  correctly (ADR-0126 §6 wall 3: a flip that cannot be made durable must not be
+  reported as one) and permanently. Measured on a real boot; it is now this
+  change's positive test, measured on the same boot:
+  
+  ```
+  POST /api/v1/actions/_activation/showcase_task/showcase_mark_done {"enabled":false}
+    before -> 503 SERVICE_UNAVAILABLE   after -> 200, and dispatch refuses 409 ACTION_DISABLED
+  ```
+  
+  `PlatformObjectsPlugin` registers it now, so every composition carrying
+  platform-objects has the ledger and each future ADR-0126 §8 consumer (`tool`,
+  `skill`, `position`) inherits it. **MOVE, not add** — the automation service no
+  longer names the object. That was not a style choice: a second code package
+  claiming one object throws `Object "…" is already owned by package "…"`
+  (ADR-0029 D3/D7), measured, so adding a registrant would have been a boot
+  failure rather than a duplicate.
+  
+  **Upgrade is a no-op for existing data, and that is measured rather than
+  asserted.** A manifest is also a ROUTING decision — `resolveDatasourceBinding`
+  step 4 routes an object by its owning package's `defaultDatasource` — so the
+  registrar carries the table's datasource with it:
+  
+  ```
+  owner com.objectstack.service-automation (defaultDatasource:'cloud') -> 'cloud'
+  owner com.objectstack.platform-objects   (none)                     -> undefined (global default driver)
+  ```
+  
+  The ledger table already exists in live databases, so on any deployment
+  carrying a `cloud` datasource that difference would leave the rows in one
+  database and read another — every disabled artifact silently re-arming. The
+  ledger therefore rides its own manifest from the same plugin, carrying the
+  automation manifest's `scope` / `namespace` / `defaultDatasource` triple
+  verbatim. The three siblings (`sys_migration`, `sys_migration_journal`,
+  `sys_secret`) deliberately do not get it and keep riding the project database.
+  
+  ## One implementation of the §4 row contract (#12350)
+  
+  ADR-0126 §4 declares one activation ledger; it had two independent
+  implementations of that one row contract — `ObjectStoreFlowActivationStore`
+  (service-automation) and `ObjectStoreActionActivationStore` (objectql). They
+  agreed because the second was written from the first, and nothing structurally
+  held them together; §8 pre-charts `tool`, `skill` and `position`, and a third
+  and fourth copy is where the org-row skip and the `0`-is-false read get lost
+  quietly, in the direction (an artifact re-arming) nothing else measures.
+  
+  Neither consumer could import the other, so the contract now lives once in
+  `@objectstack/core` — the package both already depend on — as
+  `ObjectStoreMetadataActivationStore(engine, metadataType)`, exported alongside
+  `InMemoryMetadataActivationStore`, `MetadataActivationRow`,
+  `MetadataActivationStore`, `MetadataActivationStoreEngine` and
+  `METADATA_ACTIVATION_TABLE`. Each consumer keeps its own name, its own
+  one-argument constructor and its own docs, and fixes the discriminator.
+  
+  **No behaviour change and no API break.** `ObjectStoreFlowActivationStore` /
+  `InMemoryFlowActivationStore` / `FlowActivationStoreEngine` and
+  `ObjectStoreActionActivationStore` / `InMemoryActionActivationStore` /
+  `ActionActivationRow` / `ActionActivationStore` / `ActionActivationStoreEngine`
+  / `ACTION_ACTIVATION_TABLE` are exported from the same modules with the same
+  shapes. Row semantics are byte-equivalent: install-level rows only
+  (`organization_id` never written), org-carrying rows skipped on read and
+  ignored when deciding insert-vs-update, a driver `0` read as false,
+  read-then-write rather than a blind upsert, and no `delete` in the engine slice
+  because re-enabling rewrites the row.
+  
+  Both existing pin suites stay green **unchanged**, which is what makes them the
+  proof the consolidation lost nothing — verified by ablation: removing the
+  org-row skip from the one shared implementation turns both of them red on their
+  own org-skip assertion, so both really reach it.
+
+### Patch Changes
+
+- 86cbe37: feat(core): cross-request authorization grants cache — leg B of #11633 (#11971)
+  
+  `resolveUserAuthzGrants` can now cache its resolved envelope across requests,
+  governed by `OS_AUTHZ_GRANTS_CACHE_TTL_MS`. **The default is `0` — the cache is
+  OFF and the shipped behaviour is unchanged** (Fork 4 of the accepted #11633
+  design): a deployment that enables it accepts the configured staleness window
+  explicitly, and the boot-time posture statement says so out loud when no
+  cross-node invalidation bus is attached.
+  
+  With the cache on:
+  
+  - **Coarse write-invalidation (Fork 1A).** Any engine write to a watched
+    authorization object (`sys_member`, `sys_user_position`,
+    `sys_user_permission_set`, `sys_position`, `sys_position_permission_set`,
+    `sys_permission_set`, `sys_user`) retires every entry on the writing node —
+    a grant/revoke/role change is observed by the very next request there, by
+    invalidation and not by TTL. `metadata.changed` and peer-node
+    `authz.invalidated` hints retire wholesale via the engine write epoch.
+    `sys_session` is deliberately not watched (its once-a-minute
+    `last_activity_at` cadence would turn the cache into a non-cache).
+  - **Expiry-boundary rule.** Entries expire at `min(ttl, nextBoundary)`, where
+    `nextBoundary` is the earliest upcoming ADR-0091 `valid_from`/`valid_until`
+    among the rows consulted — a validity window flipping is a permission change
+    with no write anywhere, so the timer is the only mechanism for that class.
+  - **Ruled bypass list.** The permission explainer
+    (`plugin-security` `buildContextForUser`) and `runAs:'user'` automation runs
+    (`service-automation`) always resolve fresh, and never populate the cache.
+  - The TTL remains the correctness contract; the `authz.invalidated` bus only
+    narrows the typical cross-node window (no shipped driver exceeds
+    at-most-once delivery).
+- 8bb05ea: fix(service-automation): the documented broken-sweep predicate is a first FILTER, not the detector (#12685)
+  
+  `patch`, and not empty: `sys_automation_run`'s field descriptions are shipped,
+  translated, operator-facing text — they are what an admin reads in Setup while
+  wiring an alert they will then trust for months. No counter, no schema and no
+  engine behaviour changes here; the run summary measured by #4354 is correct and
+  untouched.
+  
+  ## The wrong claim
+  
+  `acted_count` advertised `selected_count > 0 AND acted_count = 0 AND
+  unmeasured_count = 0` as *the* broken-sweep signal, unqualified. Measured A/B on
+  one graph pair through the real engine — a healthy idempotent sweep (re-select
+  the same records, gate each one on "was this already handled") and a dead gate
+  (#4347's shape, the gate sitting in front of the lookup) — **both** report
+  `selected > 0, acted 0, unmeasured 0`. The predicate cannot make the one
+  distinction it was advertised to make.
+  
+  "Over N consecutive runs" does not rescue it either: the healthy steady state
+  trips it on *every* run for as long as the outstanding work stands, so it is
+  persistent rather than transient. Consecutiveness filters flapping, which is a
+  different failure.
+  
+  Why a wrong sentence here is worse than a wrong sentence elsewhere: a detector
+  that fires during normal operation gets muted, and a muted broken-sweep detector
+  is the same silence #4347 produced — with the added cost that it now *looks*
+  monitored.
+  
+  ## What the descriptions say now
+  
+  - `acted_count` states the predicate as the **first filter** and names the
+    discriminator: a healthy skip is accounted for by a read the run performed
+    (the lookup the gate depends on shows `runs > 0` and `selected > 0` in
+    `summary_json.nodes[]`), while a dead gate skips just as often with nothing
+    behind it (`runs: 0`, or `selected: 0`).
+  - `skipped_count` points at the same fold — `gates[]` names which edge closed
+    and how often, `nodes[]` says whether the lookup behind it found anything.
+  - `unmeasured_count` keeps its own point (why the third clause exists) and now
+    calls the query a filter rather than an alert.
+  
+  The discriminating data was already shipped by #4354; nothing new is measured
+  and no detector is implemented in the platform. `run-summary.test.ts` pins the
+  pair as executable evidence: both shapes match the filter, and the per-node fold
+  separates them. `content/docs/automation/flows.mdx` carries the same correction
+  with the measured table and the two authoring shapes that make a sweep's signal
+  quiet in its healthy steady state.
+- fa5d137: feat(devx,datasource,automation): published `src/**` may only import workspace packages it declares (#10062)
+  
+  A package's non-test `src/**` was free to import any workspace package,
+  declared or not, and nothing checked it. The class was filed with one member
+  and a mitigation — the import was type-only, so nothing reached the emitted
+  JavaScript and rollup-plugin-dts inlined the declaration rather than naming an
+  unresolvable module. It grew to four members with no signal, and one of them
+  killed the mitigation: `service-automation/src/flow-precedence.ts` **value**
+  imports from `@objectstack/objectql`, which it does not declare, and because
+  the shared tsup config externalises only `dependencies`/`peerDependencies`, the
+  bundler answered by inlining objectql's implementation into
+  `service-automation/dist/index.js` — a second copy of another package's code,
+  kept correct by build configuration alone.
+  
+  `pnpm check:undeclared-dep-imports` is the gate, and the per-member fixes here
+  are decided one at a time rather than by a uniform policy — declaring makes a
+  coupling real and installable, routing it away removes it, and the two are not
+  interchangeable:
+  
+  * **`@objectstack/service-datasource`** now declares `@objectstack/driver-sql`
+    and `@objectstack/driver-memory` as **dependencies**. Both are loaded through
+    an *unguarded* `await import(...)` on the postgres, mysql, sqlite and memory
+    arms, so a consumer reaching one of those paths needed a package it was never
+    told to install, and would have met `ERR_MODULE_NOT_FOUND` rather than a
+    diagnosis. The three *guarded* driver arms — `@objectstack/driver-sqlite-wasm`,
+    `@objectstack/driver-mongodb`, `@objectstack/driver-turso` — are deliberately
+    left undeclared: each load sits in a `try`/`catch` that answers an absent
+    package with the fault, the consequence and the install command, and each
+    rides as an optional install. Declaring them would install them (turso drags
+    `@libsql/client`'s native bindings) and, measured on this branch, takes a live
+    assertion out of the tree: `default-datasource-driver-factory.test.ts` reaches
+    the missing-package arm with no stub precisely because the package does not
+    resolve from here.
+  * **`@objectstack/metadata-core`** now owns the ADR-0029 D9.6 provenance pair,
+    `isCodeArtifactBody` and `isTenantAuthored`, sunk out of
+    `@objectstack/objectql`'s registry by the same criterion as the write-verb
+    dispatch predicates and the audit governance table beside them: a second layer
+    needs the answer and the reverse import would either close a cycle or make the
+    consumer depend on the whole data engine for one predicate. `objectql`
+    re-exports `isCodeArtifactBody` from its original path, so its public API is
+    unchanged; `service-automation` imports it from `metadata-core`, which it
+    already declared, and its bundle no longer carries a copy of objectql's code.
+  
+  Two members stay recorded rather than remediated, because the tree already
+  carries the decision not to declare them together with its reason
+  (`@objectstack/runtime` → `@objectstack/driver-turso`, whose bare `import()` is
+  a host-replaceable default thunk under #6268; `@objectstack/rest` →
+  `@objectstack/objectql`, whose absence must degrade to `501 NOT_IMPLEMENTED`
+  rather than fail module load). Their ledger rows carry mechanical evidence and
+  go red the moment that evidence stops holding — in particular, a `type-only`
+  row reds on the day its import becomes a value import, which is exactly the
+  transition nothing caught the first time.
+- e7191ce: fix(build): give each `exports` condition its own `types` target in the 28 dual-build packages (#13112)
+  
+  **Published-surface change, zero runtime change.** No emitted byte moves; what
+  moves is which declaration file a resolver READS. Maintainer ruling 2026-08-29
+  (decision batch #3, verbatim 「同意」) chose declaring the files over deleting
+  them.
+  
+  ## What was wrong
+  
+  These 28 packages are `"type": "module"` and dual-built, and each spelled one
+  `types` condition as a **sibling** of `import`/`require`:
+  
+  ```json
+  "exports": { ".": {
+    "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs"
+  } }
+  ```
+  
+  A sibling `types` answers for **both** conditions, so a CommonJS consumer was
+  handed `dist/index.d.ts` — an ES-module declaration, because the package is
+  `"type": "module"` — for an entry point it reaches with `require`. Measured with
+  `tsc --traceResolution` on a `"type": "commonjs"` fixture at `moduleResolution:
+  node16`:
+  
+  ```
+  error TS1479: The current file is a CommonJS module whose imports will produce
+  'require' calls; however, the referenced file is an ECMAScript module and cannot
+  be imported with 'require'.
+  ```
+  
+  The JavaScript at `dist/index.cjs` loads perfectly (`check:dual-build-cjs-loads`
+  has asserted that for months). It is the **types** that told the consumer the
+  supported `require` entry point could not be required. The `dist/index.d.cts`
+  twin tsup emits beside it — 36 files, 5,517,701 B on this build — was named by
+  no condition at all and shipped in every tarball unreachable.
+  
+  ## What changed
+  
+  Each condition now names its own declaration, the shape TypeScript documents:
+  
+  ```json
+  "exports": { ".": {
+    "import":  { "types": "./dist/index.d.ts",  "default": "./dist/index.js" },
+    "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+  } }
+  ```
+  
+  33 entry points across 27 packages, subpaths included. The root `types` field is
+  untouched, so `node10` resolvers are unaffected; the `import` condition resolves
+  exactly what it resolved before, measured as an unchanged control in the same
+  run.
+  
+  ## `@objectstack/core` is deliberately NOT changed
+  
+  Splitting a declaration in two makes TypeScript compare it nominally, and
+  `ObjectKernel` carries a `private plugins` member that reaches every plugin
+  through `PluginContext.getKernel()`. With core split, whole-repo `pnpm build`
+  fails in `@objectstack/verify` with 5 × TS2345 ("Types have separate
+  declarations of a private property 'plugins'"); with core held back and the
+  other 27 split, 71/71 tasks pass. So core keeps the sibling-`types` shape and
+  its two `.d.cts` files (220,854 B) stay unreachable, declared as such in
+  `check:dual-build-cjs-loads`. Splitting it needs a decision about core's public
+  types, not about an exports map.
+  
+  ## For consumers
+  
+  - **ESM consumers: nothing changes.** Same declaration file, byte for byte.
+  - **CJS consumers under `node16`/`nodenext`: TS1479 goes away** and the
+    declarations they get are the ones built for CommonJS.
+  - **`node10` / `moduleResolution: node` consumers: nothing changes** — they never
+    read `exports`.
+  - Nothing is removed: every path that resolved before still resolves.
+  
+  Packages that are CJS-first (`require` → `./dist/index.js`, no `"type": "module"`)
+  were already correct and are untouched — their `dist/index.d.ts` really is the
+  CommonJS declaration. Their ESM mirror (an unreachable `.d.mts` under the
+  `import` condition) is a separate, larger population and is filed separately per
+  the ruling, not fixed here.
+  
+  `check:dual-build-cjs-loads` grew a fourth invariant (TYPED) that reds on the old
+  shape, so the drift cannot return silently.
+- b6d3d76: A definition-level input-schema refusal is now non-retryable and classified as a
+  never-dispatched exit (#10025, maintainer ruling 2026-08-20). When a node's
+  static `config` violates the `inputSchema` its own flow definition declares,
+  `execute()` refuses once with the ADR-0112 code `FLOW_INPUT_SCHEMA_INVALID`
+  (registered by #11504) and **no** `status`, and never hands the throw to the
+  retry loop — the guard's verdict is a pure function of the flow definition, so
+  re-running it cannot change the answer. All flow-dispatch doors (trigger,
+  `/actions`, declared endpoints) answer it `422` through the shared
+  `classifyFlowRefusal` table.
+  
+  Retry accounting and run-log volume change for affected flows, deliberately: a
+  `strategy: 'retry'` flow with a mis-declared `inputSchema` now writes exactly
+  **one** failed run-log row instead of `1 + maxRetries` identical ones, consumes
+  no retry budget and no backoff delay, and its result carries the code instead of
+  `status: 'failed'` (previously answered `400 FLOW_FAILED`; now
+  `422 FLOW_INPUT_SCHEMA_INVALID`). The #9889 parity floor is unchanged
+  underneath: the guard still runs on every attempt path.
+- 99d23b1: fix(service-messaging,service-automation,plugin-webhooks): stamp `organization_id` on `sys_http_delivery` rows so the cross-organization wall on `redeliver()` actually excludes other tenants' rows (#13546)
+  
+  `sys_http_delivery` is tenant-scoped and `redeliver()` — the one
+  request-reachable door on it — deliberately scopes by the caller's
+  organization (#10740). But the enqueue door never stamped the
+  `organization_id` column, and the SQL driver's tenant term is
+  `(organization_id = :tenantId OR organization_id IS NULL)` — a deliberate
+  global-row fail-open — so 100% of delivery rows landed in the NULL arm:
+  visible to, and replayable by, every organization on a walled deployment.
+  
+  The repair mirrors the notification outbox's existing convention
+  (`EnqueueDeliveryInput.organizationId`), end to end:
+  
+  - `EnqueueHttpInput` gains an **optional** `organizationId` member (inherited
+    by `UndeliverableHttpInput`, so parked rows are tenant-stamped too), and
+    `HttpDelivery` surfaces it on read-back. `SqlHttpOutbox.insert` writes
+    `organization_id: input.organizationId ?? null` exactly like
+    `SqlOutbox.enqueue`; `MemoryHttpOutbox` stores the same field and — now
+    that its rows carry a tenant — applies `RedeliverOptions.tenantId` in
+    `redeliver()` with the driver's exact semantics (another organization's row
+    is invisible/`RESOURCE_NOT_FOUND`; an org-less row stays a global row; a
+    tenant-less caller stays unscoped).
+  - The flow `http` node (durable mode) threads its run's acting organization
+    (`AutomationContext.tenantId` — the same source as the `notify` node's
+    #11303 repair) and warns loudly when a multi-org run has none to thread.
+  - The webhook auto-enqueuer stamps each delivery with its subscription's own
+    organization (`sys_webhook.organization_id`); org-less subscriptions
+    enqueue org-less, unchanged.
+  
+  Forward-stamping only: existing NULL rows are untouched (their disposition is
+  a separate decision). Producers with genuinely no organization — a
+  `single`-posture deployment, a stack before its first organization — keep
+  working unchanged; their rows land NULL, which is the honest global-row shape.
+- e577445: The `notify` node's Studio form and the messaging registration log now state the locale the delivery path actually resolves — one per notification, not one per recipient
+  
+  `NotifyConfigSchema` was corrected in `packages/spec` to say that the `template`
+  path resolves `(name, locale)` with **one** locale for the whole notification.
+  The same retired promise survived outside the spec file, in the places an app
+  author is most likely to read it:
+  
+  - `service-automation/src/builtin/notify-node.ts` — the `template` field's
+    `configSchema` description, i.e. the text rendered in the **Studio form** the
+    author fills in. It said the row is "resolved by (name, recipient locale) at
+    delivery time and rendered per recipient".
+  - `content/docs/automation/email-templates.mdx` — the only site that stated the
+    conclusion outright rather than merely licensing it: "so one node mails each
+    person in their own language".
+  - `service-messaging/src/messaging-service-plugin.ts` — the channel-registration
+    log line, which advertised "resolve sys_email_template per recipient locale".
+  - Two internal comments in `notify-node.ts` and one in its test, describing the
+    payload the outbox snapshots as carrying a per-recipient-locale resolution.
+  
+  None of that is what the delivery path does. `payload.locale` is interpolated
+  **once, before fan-out**, so it is a single value for the whole notification, and
+  its fallback is the deployment default (`II18nService.getDefaultLocale()`). The
+  platform has no per-user locale to read — `sys_user` carries no locale column,
+  and request-scoped locale does not exist at async delivery time — so recipients
+  whose personal languages differ all receive the same template row. A per-user
+  locale is deferred until measured pull (maintainer ruling, 2026-08-13) and layers
+  in as an override at that same seam when it lands; the corrected wording dates
+  the deferral so it reads as a decision with provenance rather than an oversight.
+  
+  The gap was worth correcting because the wording licensed exactly one action —
+  convert `notify` nodes on the belief that non-English recipients get non-English
+  mail — and that action is a **net regression**: `TEMPLATE_*` failures classify
+  `permanent` and dead-letter, and the inbox channel starts requiring an email
+  service with `renderTemplate()` where inline text needed none.
+  
+  Text only: no schema accepts or refuses anything it did not before, no delivery
+  behaviour moves, and no wire value changes. A new pin in `notify-node.test.ts`
+  asserts the form description names `payload.locale` and the deployment default
+  and refuses a bare "recipient locale", so a later edit cannot quietly restore the
+  promise.
+- 1272f0a: Promote `resolveRecordOrganizationField` to the shared platform-row organization resolver (the cloud#1395 Option A ruling): a platform row's organization is the SUBJECT record's organization; actor context is the fallback, never the primary.
+  
+  - `@objectstack/metadata-core` now owns the resolver (`resolveRecordOrganizationField`, `createFieldPresenceProbe`, and the new memoized `createRecordOrganizationResolver` factory) so all three sanctioned writers share one precedence.
+  - `@objectstack/plugin-approvals`: `openNodeRequest` stamps `sys_approval_request`, `sys_approval_action` and the `sys_approval_approver` index from the subject record's organization (acting context as fallback). Fixes the measured defect where every schedule / time-relative / api triggered approval persisted `organization_id = NULL` — locking the record it was about while being invisible in every inbox, its owner's included.
+  - `@objectstack/service-automation`: `sys_automation_run` rows (paused and terminal) resolve their organization from the trigger-record snapshot, with the acting tenant as fallback. Terminal rows previously never carried an organization at all.
+  - `@objectstack/plugin-audit`: the resolver moved out; the package re-exports it from the original paths, behavior unchanged.
+  
+  The `sys_api_key` divergence is preserved and pinned: `tenancy.organizationField` (who a row is ABOUT) still wins over the tenant wall answer, and the credential table stays unwalled.
+- ffbb7a1: Stamp `organization_id` on flow-produced notifications and on `markRead`
+  receipts, so the notification family stops writing org-less rows
+  
+  An application project's read-only inventory found `sys_inbox_message`,
+  `sys_notification`, `sys_notification_receipt` and `sys_notification_delivery`
+  carrying `organization_id = NULL` on **100%** of their rows — existing rows and
+  same-day new ones alike, while `sys_approval_request` in the same database
+  carried an organization on every row. Ruled a gap, not a design choice.
+  
+  Everything below the messaging ingress was already threaded: `emit()` stamps the
+  `sys_notification` event, the inbox channel stamps `sys_inbox_message` and its
+  `delivered` receipt, and the outbox carries the value onto
+  `sys_notification_delivery`. Each of them reads `EmitInput.organizationId` —
+  and the `notify` flow node, the dominant producer, never supplied it. Its local
+  structural mirror of `emit()` did not even declare the field, so the value could
+  not have been passed. One missing argument, four tables at 100% null.
+  
+  The node now threads the organization from the run's own acting context
+  (`AutomationContext.tenantId`), the same source the `collab.mention` producer in
+  `@objectstack/plugin-audit` already uses, so the two notification producers agree
+  about whose organization a notification carries.
+  
+  A second producer of the same table is fixed alongside it: the `read` receipt
+  `markRead` inserts — written when a user reads a notification whose delivered
+  receipt never landed — named no organization at all. It now carries the
+  organization of the `sys_notification` row it is about.
+  
+  There is deliberately **no fallback limb** in either producer: not "the current
+  organization", not the install's first organization, not the recipient's first
+  membership. A run with no organization in scope still emits and still writes its
+  rows, and the `notify` node warns audibly naming the topic and the consequence.
+  A wrong `organization_id` is worse than a null — a null is visibly missing,
+  while a wrong value is silently authoritative to every report, export and
+  cleanup script that filters by organization.
+  
+  Forward-stamping only. Existing rows are not backfilled and no migration ships.
+- aa0688a: Arm a deterministic flow when a runtime-authored flow reuses a packaged flow's name
+  
+  A runtime-authored flow that reused a packaged flow's name silently replaced it,
+  and which of the two ended up armed depended on registration order. The metadata
+  registry keys items `packageId:name` and deliberately coexists both (ADR-0048
+  §3.4), `listItems('flow')` returns both with no precedence, and the automation
+  engine keys flows by bare name — so the boot pull registered both under one key
+  and Map iteration order picked the survivor. Measured: registering the package
+  first armed the runtime flow, registering the runtime row first armed the
+  packaged flow, with no warning and no way to tell which had won.
+  
+  The boot pull now collapses same-named definitions before anything is armed,
+  applying the ADR-0005 overlay precedence ADR-0048 §3.4 routes this case to: the
+  runtime/DB overlay wins over the packaged artifact, which is the sanctioned
+  override path. Two packages shipping one bare name resolve by package id, so
+  boot order no longer decides anything.
+  
+  Collisions are no longer silent. The pull warns once per colliding name — naming
+  the name, every contender, and which one is armed — and repeats it at bootstrap
+  beside the other automation audits. `getShadowedFlows()` is a new receipt listing
+  each contested name with its armed and shadowed definitions, and
+  `getFlowRuntimeStates()` rows now carry `armedFrom`/`shadowed` for contested
+  names; previously the displaced definition was invisible by construction, since
+  the flow map holds one entry per name. The `Pulled N flow(s)` line now counts
+  distinct names rather than registrations.
+  
+  `isCodeArtifactBody` is exported from `@objectstack/objectql` so consumers that
+  collapse same-named metadata answer "does a code package ship this?" with the
+  registry's own test instead of re-deriving it from `_packageId`.
+- Updated dependencies [387e231]
+- Updated dependencies [cae2169]
+- Updated dependencies [2d4fa75]
+- Updated dependencies [0e4e51b]
+- Updated dependencies [e84bbf6]
+- Updated dependencies [c45d8e6]
+- Updated dependencies [40a93b5]
+- Updated dependencies [dda969c]
+- Updated dependencies [277948f]
+- Updated dependencies [8bdd955]
+- Updated dependencies [54e2d36]
+- Updated dependencies [b745157]
+- Updated dependencies [4f24e9d]
+- Updated dependencies [4bd6faa]
+- Updated dependencies [86cbe37]
+- Updated dependencies [6a180e4]
+- Updated dependencies [474242f]
+- Updated dependencies [803eaab]
+- Updated dependencies [983edf1]
+- Updated dependencies [eae824e]
+- Updated dependencies [f6fa22c]
+- Updated dependencies [8a483b3]
+- Updated dependencies [3bc2e38]
+- Updated dependencies [df59de0]
+- Updated dependencies [96e25a8]
+- Updated dependencies [713f83f]
+- Updated dependencies [77d4b3c]
+- Updated dependencies [f75a38a]
+- Updated dependencies [7a25e7d]
+- Updated dependencies [1fa05a6]
+- Updated dependencies [c85a265]
+- Updated dependencies [dcb10a5]
+- Updated dependencies [776a098]
+- Updated dependencies [5060877]
+- Updated dependencies [4f6325d]
+- Updated dependencies [52954c0]
+- Updated dependencies [d23ebb9]
+- Updated dependencies [93809a3]
+- Updated dependencies [7c0d0c3]
+- Updated dependencies [daae7aa]
+- Updated dependencies [8dc22d6]
+- Updated dependencies [fa5d137]
+- Updated dependencies [3b4c56c]
+- Updated dependencies [ae8edd2]
+- Updated dependencies [e25403c]
+- Updated dependencies [64baa68]
+- Updated dependencies [9fa70d7]
+- Updated dependencies [09db64a]
+- Updated dependencies [92916e7]
+- Updated dependencies [a84f3ea]
+- Updated dependencies [f2eaae8]
+- Updated dependencies [c09451b]
+- Updated dependencies [ba64877]
+- Updated dependencies [e7191ce]
+- Updated dependencies [7345308]
+- Updated dependencies [30d96ab]
+- Updated dependencies [f658793]
+- Updated dependencies [0fd4899]
+- Updated dependencies [c95ad19]
+- Updated dependencies [4a17645]
+- Updated dependencies [3795c5f]
+- Updated dependencies [e25e839]
+- Updated dependencies [5997207]
+- Updated dependencies [8b13cc8]
+- Updated dependencies [00d8f65]
+- Updated dependencies [86e765a]
+- Updated dependencies [53dc739]
+- Updated dependencies [fd289be]
+- Updated dependencies [03bf7b1]
+- Updated dependencies [f90e820]
+- Updated dependencies [e8bd715]
+- Updated dependencies [a28a3c0]
+- Updated dependencies [200d255]
+- Updated dependencies [2852acc]
+- Updated dependencies [daeaaf9]
+- Updated dependencies [c459da6]
+- Updated dependencies [e914733]
+- Updated dependencies [f887e52]
+- Updated dependencies [881f8d8]
+- Updated dependencies [3bfa1e6]
+- Updated dependencies [0a8ebf3]
+- Updated dependencies [901355c]
+- Updated dependencies [4635f3e]
+- Updated dependencies [fd289be]
+- Updated dependencies [ee3595c]
+- Updated dependencies [09b4f4e]
+- Updated dependencies [3a04b01]
+- Updated dependencies [3954fb7]
+- Updated dependencies [4805b56]
+- Updated dependencies [b9e9227]
+- Updated dependencies [d395692]
+- Updated dependencies [5894d30]
+- Updated dependencies [a3765f6]
+- Updated dependencies [2d5cee3]
+- Updated dependencies [e22158f]
+- Updated dependencies [7404925]
+- Updated dependencies [0c2334f]
+- Updated dependencies [d2619fd]
+- Updated dependencies [af56546]
+- Updated dependencies [6acb11a]
+- Updated dependencies [33c5fd3]
+- Updated dependencies [20b0fdb]
+- Updated dependencies [905019b]
+- Updated dependencies [a286411]
+- Updated dependencies [98c0d33]
+- Updated dependencies [93ea19b]
+- Updated dependencies [9ee2dcf]
+- Updated dependencies [8cb96ec]
+- Updated dependencies [8f10a79]
+- Updated dependencies [6269a55]
+- Updated dependencies [a17da05]
+- Updated dependencies [a8c00e2]
+- Updated dependencies [0fb8760]
+- Updated dependencies [e5ce2ed]
+- Updated dependencies [be21955]
+- Updated dependencies [bc56e18]
+- Updated dependencies [be21955]
+- Updated dependencies [a9ee989]
+- Updated dependencies [15d58db]
+- Updated dependencies [d63b014]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [2cc7122]
+- Updated dependencies [15d55fb]
+- Updated dependencies [9e0ba21]
+- Updated dependencies [311433f]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [b7131f3]
+- Updated dependencies [ce7e497]
+- Updated dependencies [51ecb2f]
+- Updated dependencies [9086761]
+- Updated dependencies [f6344e7]
+- Updated dependencies [42a117b]
+- Updated dependencies [4297fe7]
+- Updated dependencies [e398863]
+- Updated dependencies [d79c602]
+- Updated dependencies [f11fc61]
+- Updated dependencies [8f79379]
+- Updated dependencies [e6ca40e]
+- Updated dependencies [0c77ea4]
+- Updated dependencies [52954c0]
+- Updated dependencies [7131f12]
+- Updated dependencies [aa5994e]
+- Updated dependencies [be93457]
+- Updated dependencies [a65db76]
+- Updated dependencies [15eb2c9]
+- Updated dependencies [5691b07]
+- Updated dependencies [2a6122b]
+- Updated dependencies [225e769]
+- Updated dependencies [8af88dd]
+- Updated dependencies [fb5fbb8]
+- Updated dependencies [d7b3963]
+- Updated dependencies [33184fd]
+- Updated dependencies [7c41693]
+- Updated dependencies [b72db01]
+- Updated dependencies [dce5cd4]
+- Updated dependencies [9688f58]
+- Updated dependencies [556ebc1]
+- Updated dependencies [177ebdc]
+- Updated dependencies [8d237b4]
+- Updated dependencies [2d2e6f0]
+- Updated dependencies [2d8dd8d]
+- Updated dependencies [b5a2398]
+- Updated dependencies [348860c]
+- Updated dependencies [5383fa6]
+- Updated dependencies [5b3ff63]
+- Updated dependencies [1a6a19c]
+- Updated dependencies [064d484]
+- Updated dependencies [527e050]
+- Updated dependencies [dd33bf9]
+- Updated dependencies [4cb2a90]
+- Updated dependencies [74a7804]
+- Updated dependencies [49f0dcf]
+- Updated dependencies [033a34c]
+- Updated dependencies [4d25d22]
+- Updated dependencies [1ffee51]
+- Updated dependencies [5ae4303]
+- Updated dependencies [ece4dad]
+- Updated dependencies [146f448]
+- Updated dependencies [735f5c7]
+- Updated dependencies [366f895]
+- Updated dependencies [dc75ba8]
+- Updated dependencies [cce0aa9]
+- Updated dependencies [cff17af]
+- Updated dependencies [39404f3]
+- Updated dependencies [ca1965f]
+- Updated dependencies [8619f95]
+- Updated dependencies [b706af9]
+- Updated dependencies [add4360]
+- Updated dependencies [e0abc38]
+- Updated dependencies [fc9ba76]
+- Updated dependencies [1272f0a]
+- Updated dependencies [a11c1a5]
+- Updated dependencies [71f9cd1]
+- Updated dependencies [ee17d86]
+- Updated dependencies [cdbd920]
+- Updated dependencies [18c432e]
+- Updated dependencies [3c418c4]
+- Updated dependencies [a933ed7]
+- Updated dependencies [b3ca463]
+- Updated dependencies [a933ed7]
+- Updated dependencies [0d4a6a8]
+- Updated dependencies [518d5e5]
+- Updated dependencies [6643ba1]
+- Updated dependencies [eeba2ef]
+- Updated dependencies [ec4c4d2]
+- Updated dependencies [424f73c]
+- Updated dependencies [cccbe51]
+- Updated dependencies [a8d6b1d]
+- Updated dependencies [e4a7695]
+- Updated dependencies [87075b1]
+- Updated dependencies [14cfc00]
+- Updated dependencies [dfebfc8]
+- Updated dependencies [598b7ec]
+- Updated dependencies [d028b37]
+- Updated dependencies [f7b25c5]
+- Updated dependencies [122ef38]
+- Updated dependencies [428f9b2]
+- Updated dependencies [aa7ff56]
+- Updated dependencies [811a3c2]
+- Updated dependencies [d41d166]
+- Updated dependencies [c4db311]
+- Updated dependencies [750fff5]
+- Updated dependencies [c19035e]
+- Updated dependencies [ececf7a]
+- Updated dependencies [d173125]
+- Updated dependencies [8425c17]
+- Updated dependencies [a5ef1d8]
+- Updated dependencies [772d5de]
+- Updated dependencies [ce80ec2]
+- Updated dependencies [b372318]
+- Updated dependencies [29d0676]
+- Updated dependencies [6bd3231]
+- Updated dependencies [b799ac5]
+- Updated dependencies [8f74307]
+- Updated dependencies [d23dc08]
+- Updated dependencies [644ad50]
+- Updated dependencies [5d16379]
+- Updated dependencies [0da7cd2]
+- Updated dependencies [28a5c3e]
+- Updated dependencies [4bc18e5]
+  - @objectstack/spec@17.3.0
+  - @objectstack/metadata-core@17.3.0
+  - @objectstack/core@17.3.0
+  - @objectstack/platform-objects@17.3.0
+  - @objectstack/formula@17.3.0
+
 ## 17.2.0
 
 ### Minor Changes

@@ -1,5 +1,369 @@
 # @objectstack/driver-turso
 
+## 17.3.0
+
+### Minor Changes
+
+- 9f4a6d5: feat(driver-sql,driver-turso,driver-sqlite-wasm): SQLite-family JSON columns declare `TEXT`; server dialects keep native JSON (#12738)
+  
+  A `Field.json` column — and any field with `multiple: true` — is now declared as
+  the JSON column type the **target dialect actually has**. Postgres and MySQL are
+  untouched: their native `json`/`jsonb` and `JSON` types are correct and stay.
+  The SQLite family (plain `SqlDriver` on `sqlite3`/`better-sqlite3`, `TursoDriver`
+  in all three transport modes, and `SqliteWasmDriver`) now declares `text`.
+  
+  **Why.** SQLite has no JSON type. It derives a column's *affinity* from
+  substrings of the declared type name, and `json` contains none of the markers
+  (`INT`, `CHAR`/`CLOB`/`TEXT`, `BLOB`, `REAL`/`FLOA`/`DOUB`), so it fell through
+  to **NUMERIC** and converted number-like input on the way in — measured through
+  raw SQL, a bare `'0123'` was stored as the integer `123`. `text` takes TEXT
+  affinity, converts nothing, and is what SQLite's own JSON1 functions operate on.
+  It is also what `RemoteTransport.mapFieldTypeToSQL` had spelled all along, so
+  turso's two transports now agree instead of diverging on one column.
+  
+  ## The migration shape
+  
+  - **New columns only.** The change is to the DDL emitter. Schema sync is
+    additive, so no existing column is altered, dropped or rewritten.
+  - **Existing columns keep their declared type.** A column created before this
+    release stays `json` and keeps NUMERIC affinity — including through an
+    unrelated SQLite drift rebuild, which re-declares an introspected `json`
+    column as `json` rather than converting it.
+  - **Platform write-path behaviour is unchanged.** The `Field.json` codec stays
+    injective and stays in force: what the platform writes and reads back is
+    identical before and after, on legacy and new columns alike. Nothing on the
+    read path consults the physical column type — `isJsonField` answers from
+    metadata — so decoding is the same on both spellings.
+  - **No new schema-drift findings.** The multi-value base-type finding is gated
+    on the dialect where the column type is load-bearing (Postgres and MySQL);
+    SQLite was already excluded, and the emitter now agrees with the differ
+    instead of merely being excused by it.
+  - **The visible difference is raw-SQL-only, and in the safe direction.** A value
+    written to a JSON column by raw SQL (bypassing the driver) is preserved as
+    text on a new column where it would previously have been coerced to a number.
+    Nothing that was preserved before is coerced now.
+
+### Patch Changes
+
+- 242eb0a: chore(driver-turso): declare and pin the `Field.json` column-type asymmetry between the local and remote transports (#12586)
+  
+  `TursoDriver` is dual-transport, and one declared `Field.json` becomes a
+  different physical column on each. Local/replica mode extends `SqlDriver` and
+  lets knex spell it (`table.json(name)` — a `json` column); remote mode never
+  touches knex and spells its own SQLite types in
+  `RemoteTransport.mapFieldTypeToSQL` (`TEXT`). Nothing in the tree said whether
+  that was a design or an oversight — a grep found the two `mapFieldTypeToSQL`
+  lines and one passing comment — and no test would have gone red if either side
+  moved.
+  
+  ⛔ Nothing is broken and no behaviour changes here. Both transports round-trip
+  every `VALUE_ROUNDTRIP_CASES` value faithfully today and did before this PR.
+  
+  **Why it is still worth recording.** Every column type in this driver is
+  spelled differently by the two halves — `varchar(255)`/`TEXT`,
+  `float`/`REAL`, `boolean`/`INTEGER` — and for all of those the difference is
+  cosmetic, because SQLite derives affinity from substrings of the declared type
+  name and both spellings land in the same class. `json` is the one that does
+  not: it matches none of SQLite's affinity markers, so it carries **NUMERIC**
+  affinity and converts number-like input on the way in, while `TEXT` converts
+  nothing. Measured on the shared fixture, that is not theoretical — a declared
+  `Field.json` holding the native `123` is an **INTEGER cell locally and a TEXT
+  cell remotely**, with `find()` answering `123` on both. Equal answers, unequal
+  bytes: the #11535 class in its quiet phase, where the next codec change has no
+  reason to be kind to both. PR #12585's ablation is the same fact in its loud
+  phase — the pre-#12380 `json` branch broke the two transports by *different*
+  counts, diverging on `s_0123`, because only the local column had NUMERIC
+  affinity to destroy a bare `'0123'` with.
+  
+  **What lands:**
+  
+  - The declaration, at the site a reader lands on when they ask why this returns
+    `TEXT` — `RemoteTransport.mapFieldTypeToSQL`'s doc comment: the full
+    local/remote type table, which rows are cosmetic and which one is not, the
+    affinity mechanism as the "why it is safe today", and the instruction to
+    delete or invert the pin rather than patch it green.
+  - The pin, `turso-json-column-type-asymmetry.test.ts`, driven by the same
+    `VALUE_ROUNDTRIP_FIELDS` / `VALUE_ROUNDTRIP_CASES` table the round-trip
+    conformance suite uses. It asserts each transport's declared types from the
+    **catalog**, demonstrates the affinity mechanism with raw SQL that bypasses
+    the driver codec, and asserts that the set of cases whose on-disk storage
+    class differs is exactly `{n_int, n_real}` — so convergence (an empty set) is
+    as red as one side drifting (a longer one).
+  - A note in `turso-value-roundtrip-conformance.test.ts` saying it is
+    deliberately blind to this, since it is green either way.
+  
+  ⛔ Convergence (making both transports emit one type) is **not** done here.
+  It changes what new columns are physically declared as and needs the
+  un-measured "why did remote choose `TEXT`?" answered first; #12586 ruled it a
+  separate decision.
+  
+  Grade: `patch`, argued rather than defaulted. Not `minor` — no new public API,
+  no widened accept set, no behaviour change, and the emitted DDL is byte-for-byte
+  what it was. Not `skip-changeset` either, though the only executable code this
+  PR ships is a test: what becomes a checked invariant here is a property of the
+  published package (which physical column a declared field gets on each
+  transport), and the CHANGELOG line is the record a future reader needs when
+  this guard goes red on them.
+- Updated dependencies [387e231]
+- Updated dependencies [cae2169]
+- Updated dependencies [2d4fa75]
+- Updated dependencies [0e4e51b]
+- Updated dependencies [e84bbf6]
+- Updated dependencies [c45d8e6]
+- Updated dependencies [40a93b5]
+- Updated dependencies [ef52884]
+- Updated dependencies [9e1b2de]
+- Updated dependencies [dda969c]
+- Updated dependencies [277948f]
+- Updated dependencies [8bdd955]
+- Updated dependencies [4f24e9d]
+- Updated dependencies [4bd6faa]
+- Updated dependencies [86cbe37]
+- Updated dependencies [6a180e4]
+- Updated dependencies [474242f]
+- Updated dependencies [803eaab]
+- Updated dependencies [983edf1]
+- Updated dependencies [eae824e]
+- Updated dependencies [178f90c]
+- Updated dependencies [f6fa22c]
+- Updated dependencies [8a483b3]
+- Updated dependencies [84de7e3]
+- Updated dependencies [3bc2e38]
+- Updated dependencies [df59de0]
+- Updated dependencies [96e25a8]
+- Updated dependencies [f75a38a]
+- Updated dependencies [7a25e7d]
+- Updated dependencies [1fa05a6]
+- Updated dependencies [c85a265]
+- Updated dependencies [dcb10a5]
+- Updated dependencies [0010797]
+- Updated dependencies [776a098]
+- Updated dependencies [5060877]
+- Updated dependencies [4f6325d]
+- Updated dependencies [52954c0]
+- Updated dependencies [93809a3]
+- Updated dependencies [7c0d0c3]
+- Updated dependencies [daae7aa]
+- Updated dependencies [8dc22d6]
+- Updated dependencies [3b4c56c]
+- Updated dependencies [ae8edd2]
+- Updated dependencies [e25403c]
+- Updated dependencies [f9ffd01]
+- Updated dependencies [64baa68]
+- Updated dependencies [9fa70d7]
+- Updated dependencies [09db64a]
+- Updated dependencies [92916e7]
+- Updated dependencies [a84f3ea]
+- Updated dependencies [f2eaae8]
+- Updated dependencies [09f9361]
+- Updated dependencies [c804f0c]
+- Updated dependencies [34d3011]
+- Updated dependencies [c09451b]
+- Updated dependencies [ba64877]
+- Updated dependencies [9d3c04d]
+- Updated dependencies [d29e42f]
+- Updated dependencies [fcd0efc]
+- Updated dependencies [d0e3a88]
+- Updated dependencies [3f42920]
+- Updated dependencies [dd4113e]
+- Updated dependencies [992161b]
+- Updated dependencies [ebcc34e]
+- Updated dependencies [64505a5]
+- Updated dependencies [7345308]
+- Updated dependencies [30d96ab]
+- Updated dependencies [f658793]
+- Updated dependencies [c95ad19]
+- Updated dependencies [4a17645]
+- Updated dependencies [3795c5f]
+- Updated dependencies [e25e839]
+- Updated dependencies [5997207]
+- Updated dependencies [8b13cc8]
+- Updated dependencies [86e765a]
+- Updated dependencies [53dc739]
+- Updated dependencies [fd289be]
+- Updated dependencies [03bf7b1]
+- Updated dependencies [f90e820]
+- Updated dependencies [e8bd715]
+- Updated dependencies [a28a3c0]
+- Updated dependencies [daeaaf9]
+- Updated dependencies [c459da6]
+- Updated dependencies [e914733]
+- Updated dependencies [f887e52]
+- Updated dependencies [881f8d8]
+- Updated dependencies [3bfa1e6]
+- Updated dependencies [0a8ebf3]
+- Updated dependencies [901355c]
+- Updated dependencies [107bb4b]
+- Updated dependencies [4635f3e]
+- Updated dependencies [fd289be]
+- Updated dependencies [ee3595c]
+- Updated dependencies [3a04b01]
+- Updated dependencies [b9e9227]
+- Updated dependencies [d395692]
+- Updated dependencies [5894d30]
+- Updated dependencies [a3765f6]
+- Updated dependencies [2d5cee3]
+- Updated dependencies [e22158f]
+- Updated dependencies [7404925]
+- Updated dependencies [0c2334f]
+- Updated dependencies [d2619fd]
+- Updated dependencies [af56546]
+- Updated dependencies [6acb11a]
+- Updated dependencies [33c5fd3]
+- Updated dependencies [20b0fdb]
+- Updated dependencies [905019b]
+- Updated dependencies [a286411]
+- Updated dependencies [98c0d33]
+- Updated dependencies [93ea19b]
+- Updated dependencies [9ee2dcf]
+- Updated dependencies [8cb96ec]
+- Updated dependencies [8f10a79]
+- Updated dependencies [6269a55]
+- Updated dependencies [a17da05]
+- Updated dependencies [a8c00e2]
+- Updated dependencies [0fb8760]
+- Updated dependencies [e5ce2ed]
+- Updated dependencies [be21955]
+- Updated dependencies [bc56e18]
+- Updated dependencies [be21955]
+- Updated dependencies [a9ee989]
+- Updated dependencies [15d58db]
+- Updated dependencies [d63b014]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [2cc7122]
+- Updated dependencies [9e0ba21]
+- Updated dependencies [311433f]
+- Updated dependencies [0e5bea6]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [b7131f3]
+- Updated dependencies [e40a28c]
+- Updated dependencies [7e83932]
+- Updated dependencies [ce7e497]
+- Updated dependencies [51ecb2f]
+- Updated dependencies [9086761]
+- Updated dependencies [42a117b]
+- Updated dependencies [4297fe7]
+- Updated dependencies [e398863]
+- Updated dependencies [f11fc61]
+- Updated dependencies [8f79379]
+- Updated dependencies [e6ca40e]
+- Updated dependencies [0c77ea4]
+- Updated dependencies [52954c0]
+- Updated dependencies [7131f12]
+- Updated dependencies [aa5994e]
+- Updated dependencies [be93457]
+- Updated dependencies [a65db76]
+- Updated dependencies [15eb2c9]
+- Updated dependencies [5691b07]
+- Updated dependencies [431d2fb]
+- Updated dependencies [2a6122b]
+- Updated dependencies [225e769]
+- Updated dependencies [8af88dd]
+- Updated dependencies [fb5fbb8]
+- Updated dependencies [c05b40b]
+- Updated dependencies [80f1dcd]
+- Updated dependencies [6c6157a]
+- Updated dependencies [d7b3963]
+- Updated dependencies [33184fd]
+- Updated dependencies [7c41693]
+- Updated dependencies [b72db01]
+- Updated dependencies [dce5cd4]
+- Updated dependencies [9688f58]
+- Updated dependencies [556ebc1]
+- Updated dependencies [177ebdc]
+- Updated dependencies [8d237b4]
+- Updated dependencies [2d2e6f0]
+- Updated dependencies [2d8dd8d]
+- Updated dependencies [b5a2398]
+- Updated dependencies [348860c]
+- Updated dependencies [5383fa6]
+- Updated dependencies [5b3ff63]
+- Updated dependencies [1a6a19c]
+- Updated dependencies [527e050]
+- Updated dependencies [dd33bf9]
+- Updated dependencies [4cb2a90]
+- Updated dependencies [6757eb2]
+- Updated dependencies [74a7804]
+- Updated dependencies [1c66fe4]
+- Updated dependencies [49f0dcf]
+- Updated dependencies [033a34c]
+- Updated dependencies [4d25d22]
+- Updated dependencies [1ffee51]
+- Updated dependencies [b826390]
+- Updated dependencies [5ae4303]
+- Updated dependencies [ece4dad]
+- Updated dependencies [146f448]
+- Updated dependencies [735f5c7]
+- Updated dependencies [366f895]
+- Updated dependencies [dc75ba8]
+- Updated dependencies [cce0aa9]
+- Updated dependencies [cff17af]
+- Updated dependencies [39404f3]
+- Updated dependencies [ca1965f]
+- Updated dependencies [8619f95]
+- Updated dependencies [b706af9]
+- Updated dependencies [add4360]
+- Updated dependencies [cd13488]
+- Updated dependencies [df1c75c]
+- Updated dependencies [fc9ba76]
+- Updated dependencies [a11c1a5]
+- Updated dependencies [71f9cd1]
+- Updated dependencies [ee17d86]
+- Updated dependencies [cdbd920]
+- Updated dependencies [18c432e]
+- Updated dependencies [3c418c4]
+- Updated dependencies [a933ed7]
+- Updated dependencies [b3ca463]
+- Updated dependencies [a933ed7]
+- Updated dependencies [0d4a6a8]
+- Updated dependencies [518d5e5]
+- Updated dependencies [6643ba1]
+- Updated dependencies [eeba2ef]
+- Updated dependencies [ec4c4d2]
+- Updated dependencies [424f73c]
+- Updated dependencies [cccbe51]
+- Updated dependencies [a8d6b1d]
+- Updated dependencies [e4a7695]
+- Updated dependencies [87075b1]
+- Updated dependencies [14cfc00]
+- Updated dependencies [3956069]
+- Updated dependencies [dfebfc8]
+- Updated dependencies [5dd3bc9]
+- Updated dependencies [9f4a6d5]
+- Updated dependencies [4045b95]
+- Updated dependencies [7adcd07]
+- Updated dependencies [f5a7f9c]
+- Updated dependencies [d028b37]
+- Updated dependencies [c49afd0]
+- Updated dependencies [f7b25c5]
+- Updated dependencies [122ef38]
+- Updated dependencies [428f9b2]
+- Updated dependencies [aa7ff56]
+- Updated dependencies [c4db311]
+- Updated dependencies [750fff5]
+- Updated dependencies [c19035e]
+- Updated dependencies [ececf7a]
+- Updated dependencies [d173125]
+- Updated dependencies [8425c17]
+- Updated dependencies [a5ef1d8]
+- Updated dependencies [772d5de]
+- Updated dependencies [ce80ec2]
+- Updated dependencies [f24c90d]
+- Updated dependencies [b372318]
+- Updated dependencies [29d0676]
+- Updated dependencies [6bd3231]
+- Updated dependencies [1246b4c]
+- Updated dependencies [b799ac5]
+- Updated dependencies [8f74307]
+- Updated dependencies [d23dc08]
+- Updated dependencies [644ad50]
+- Updated dependencies [0da7cd2]
+- Updated dependencies [28a5c3e]
+- Updated dependencies [4bc18e5]
+  - @objectstack/spec@17.3.0
+  - @objectstack/driver-sql@17.3.0
+  - @objectstack/core@17.3.0
+
 ## 17.2.0
 
 ### Patch Changes

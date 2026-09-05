@@ -1,5 +1,778 @@
 # @objectstack/plugin-sharing
 
+## 17.3.0
+
+### Minor Changes
+
+- 599515d: Four more system objects declare their polymorphic pointer pair (#11386, ADR-0052 §5, adopting the carrier #11339 landed): `sys_audit_log.record_id`, `sys_approval_request.record_id`, `sys_record_share.record_id` and `sys_share_link.record_id` now carry `referenceVia: 'object_name'`. A seed row addressing one of these by the target's natural key resolves against the object its sibling column names, per row — so a packaged app can ship audit history, pending approvals, record grants and share links that actually attach to the records they are about, and the queries that give each row its meaning (the `{object_name, record_id}` index, the pending-request lock, the sharing middleware's grant lookup, the share link's fail-closed record-existence gate) match on the target's real id.
+  
+  The accept/reject contract changes with it on those four objects, deliberately and in the already-ruled direction: an unresolvable pointer on a DECLARED pair is a loud, counted failure instead of the old silent verbatim store. On a grant table that is the sharper win — a share whose `record_id` stayed a natural key enforced nothing while displaying as a grant, and was then deleted by the orphan sweep for describing a record that does not exist. Internal-id-shaped values still pass through verbatim, so a demo row about an already-deleted record (an `action: 'delete'` audit row) stays authorable. Undeclared text columns are untouched.
+  
+  The fifth object surveyed, `sys_automation_run` (`trigger_object` / `trigger_record_id`), deliberately STAYS UNDECLARED. Its pair has the same shape but its rows are not content about a record: a `paused` row is a live continuation the engine rehydrates on boot, terminal rows are telemetry under a 30-day sweep, and the object has no natural key to address rows by. The verdict, its reasons, and what would have to change to flip it are recorded on the field itself and pinned by a test.
+- fc9ba76: fix(plugin-sharing,spec): hold `publicSharing.eligibility` at redemption, not only at mint (#13608)
+  
+  **BREAKING** runtime behaviour change on a published package: share links that
+  were legitimately minted can now stop resolving without anyone revoking them.
+  Shipped as `minor` under the repo's launch-window convention.
+  
+  `ShareLinkService.createLink()` evaluated the object's declared
+  `publicSharing.eligibility` predicate before writing a `sys_share_link` row, and
+  nothing evaluated it again. `resolveToken()` checked `revoked_at`, `expires_at`,
+  the audience gates, the password and record EXISTENCE — then served whatever
+  survived, under the system context, to a caller with no principal at all. So the
+  declaration read as a standing policy about which records may be reached
+  anonymously, while the platform held it at exactly one instant in a link's life.
+  
+  The state the predicate reads is the state an editor changes. Publish an article
+  `published` + `public`, mint a link, then flip `audience` to `internal` or
+  `status` back to `draft`: the object's own policy now says the record is not
+  eligible for link sharing, and the old token kept resolving and kept serving the
+  record in full. The remedy was to revoke every link on the record by hand, which
+  first requires knowing they exist.
+  
+  It also sat oddly beside its neighbour. In that same `resolveToken()`, the
+  record-existence probe is deliberately fail-CLOSED (an unanswered probe denies),
+  so a **deleted** record stopped being served immediately while a
+  **reclassified** one did not — two failure directions in one door.
+  
+  **What changed.** `resolveToken()` re-evaluates the predicate against the record
+  it is about to serve, through the same `assertEligible` the mint path calls, so
+  the two points cannot drift on strictness, on the declared-field binding, or on
+  which faults refuse. It is one read either way: when a predicate is declared the
+  existence probe's projection widens from `['id']` to the whole row instead of a
+  second query being issued, so an object with no `eligibility` key keeps the
+  exact probe it always had. Fail-closed, matching mint: a predicate that will not
+  compile, faults on the record, or answers anything other than `true` refuses.
+  
+  **The refusal is deliberately indistinguishable.** For a caller who may hold
+  nothing but a token, telling "does not exist" apart from "revoked" apart from
+  "no longer eligible" is an existence oracle, so the redemption refusal is the
+  same undifferentiated `null` a revoked, expired or unknown token already gets —
+  no new error code, no new response branch, and no usage stamp. Over HTTP an
+  ineligible link is answered with the generic `404 INVALID_OR_EXPIRED`, byte-for-
+  byte what a token that never existed receives. The readable reason a link died
+  is written to the server-side log instead.
+  
+  **Operator impact.** Deployments upgrading across this change can feel it
+  immediately: any live link whose record has since moved out of its object's
+  `eligibility` predicate stops resolving, with no revocation event and no grace
+  period. That is the intent — the alternative is a declared policy the platform
+  does not hold — but it is worth measuring before rollout: an object's
+  `eligibility` predicate is the thing to read, and the links at risk are those on
+  records that no longer satisfy it. An operator who needs such links to keep
+  working must widen the predicate; there is no per-link opt-out, deliberately.
+  `redactFields` behaviour, the audience/password gates and objects that declare
+  no `eligibility` key are all untouched and pinned.
+  
+  <!-- adr-0087: not-required (no-migration-prescription) Nothing authorable is removed, renamed or re-shaped: `publicSharing.eligibility` keeps its name, its type and its accept-set, and the change is WHEN the platform evaluates it. There is therefore no tombstone for `objectstack migrate meta` to carry and no mechanical rewrite it could perform — a deployment whose links stop resolving must decide whether its own predicate is still the policy it wants, which is an authoring decision no ledger entry can make on its behalf. -->
+- 18b53ac: ⚠️ **Published-contract break for external hosts.** The `logger` option on the three
+  PUBLICLY EXPORTED options types — `SharingServiceOptions`, `ShareLinkServiceOptions` and
+  `SharingRuleServiceOptions` — now **requires** a `warn` channel, and its members carry real
+  signatures (`(msg: any, ...rest: any[]) => void`) instead of bare `Function`. A host that
+  constructs any of these services with `{ logger: { info, error } }` compiles today and stops
+  compiling after this release; add `warn` (or drop the `logger` option) to migrate. Nothing
+  about the services' runtime behaviour changes, and no call site inside this package moved:
+  the tightening was measured at ZERO compile errors within `plugin-sharing`, so the whole cost
+  falls on hosts, which is why it is declared here rather than shipped as a patch.
+  
+  Why: #9754 rules that a sink declaring an optional `error` must declare a NON-optional
+  `warn`, so a durability report always has somewhere to land — an optional `error` beside an
+  optional `warn` is a contract that permits silence. These three sinks were red against that
+  rule from the day it was written and were only invisible to its checker until #11069 taught it
+  to read bare `Function` as a channel. The maintainer ruled on 2026-08-24 (#10556) that they
+  tighten rather than stay baselined, shipped `minor` with the break named here.
+  
+  The bare-`Function` spelling was also its own defect: `Function` is not assignable to a
+  concrete signature, so `record-orphan-cleanup.ts` could not tighten its own `MinimalLogger`
+  while these producers stayed loose (#10692). That producer-side blocker is now clear.
+- 3194c91: ⚠️ **BREAKING (published parameter tightened):** `sweepOrphanedRowsByRecordExistence` —
+  publicly exported from `@objectstack/plugin-sharing` — now types its optional `logger`
+  parameter as `{ info?, warn }` with real signatures (`(msg: any, ...rest: any[]) => void`)
+  and a **required** `warn`, replacing the old `{ info?: Function, warn?: Function }`. A host
+  that passed this function a logger without a `warn` member (for example an
+  `{ info, error }`-only literal) compiles today and stops compiling after this release. The
+  one-line fix: add a `warn` callback to that logger object — or omit the `logger` argument
+  entirely, since the parameter itself stays optional. Nothing about the sweep's runtime
+  behaviour changes, and no call site in this repo moved: both in-package callers forward the
+  owning services' `logger` options, whose `warn` is already required since the producer
+  tightening (`SharingServiceOptions` / `ShareLinkServiceOptions` /
+  `SharingRuleServiceOptions`) shipped in the previous release.
+  
+  Why: every report this sweep emits lands on `warn` — the "could not check whether records
+  still exist", "stopped early" and "revoked N rows" lines — so a logger without a
+  guaranteed `warn` is one the sweep can lose its ONLY output into. That is #9754's
+  permit-silence shape, one module downstream of the producers #10556 tightened, and the
+  maintainer ruled (#10692, 2026-08-25) that this package's logger contracts refuse it
+  loudly at compile time rather than keep it. The bare `Function` members were also their
+  own defect: they documented no call shape and caught no arity mistake. The refusal is
+  pinned at compile time in `logger-required-warn.pin.ts`, which also pins the three
+  publicly exported options types above.
+  
+  Breaking ships as `minor` per the launch-window convention
+  (`scripts/check-changeset-no-major.mjs`).
+  
+  <!-- adr-0087: not-required (no-migration-prescription) A TypeScript parameter type on one published function tightens; no metadata surface is involved — no Zod schema, no `packages/spec` declaration, no authorable key, no stored representation — so `objectstack migrate meta` has nothing to visit and no conversion-layer entry could replay anything. The affected caller is host CODE, and the compiler names the exact argument at the exact call line on upgrade, which is more precise than a ledger entry; the repair is adding a `warn` callback to that logger object. The sibling host repo objectui was grepped at claim time (ref 194fae18): zero imports of this package and zero warn-less logger literals, so no known caller has code to rewrite. -->
+- 65759ba: fix(plugin-sharing): the by-id write denial renders through the Operation
+  Message Catalog instead of a hardcoded English sentence (#12260, the consumer
+  half of the key #12493 landed)
+  
+  A user holding object-level allowRead + allowEdit — and no `modifyAllRecords` —
+  PATCHed a record they do not own on an object declaring
+  `sharingModel: 'public_read'` with `access: { default: 'private' }`. The sharing
+  middleware refused, correctly, and the client showed the server's reason
+  verbatim to the end user: one hardcoded English sentence naming the object's API
+  name and the row's opaque id. In a fully Chinese deployment that was the only
+  thing the user was told about why their save failed.
+  
+  The refusal now renders through the shared Operation Message Catalog in
+  `@objectstack/spec/system` under the key `record_write_denied` that #12493
+  landed for it — the same mechanism `plugin-security`'s record-level denial
+  already uses, which is exactly the comparison the report drew: the same "I can
+  see this record but cannot change it" situation showed human language or raw
+  English depending on which layer refused. Same resolution ladder (deployment
+  override → the caller's locale → `en` → the key), same guarantee that a
+  misbehaving i18n service cannot turn a 403 into a 500. All four platform
+  locales (`en`, `zh-CN`, `ja-JP`, `es-ES`) ship copy that sends the reader to the
+  record's owner or an administrator instead of dead-ending them.
+  
+  `record_write_denied` is deliberately not `record_access_denied`: this gate
+  fires on a row the READ path already admitted, so "You do not have access to
+  this record" would be false the moment it rendered. It is one key for BOTH write
+  verbs — the user's situation and remedy are identical for `update` and `delete`.
+  
+  `buildSharingMiddleware` gains an optional third argument, a lazily resolved
+  `II18nService.t`-compatible lookup wired by `SharingServicePlugin`, because the
+  i18n service is contributed by another plugin and may start later. It is what
+  makes the override address the catalog documents,
+  `errors.record_write_denied`, take effect for this emitter. The argument is
+  additive: every existing caller passes two and is unchanged, and a stack with no
+  i18n service still renders the built-in catalog in the caller's locale.
+  
+  **Not changed: who may write.** The gate is byte-identical — ownership, write
+  depth, an edit-level share for `update`, Modify All Data — and the app-authored
+  RLS deferral ahead of it is untouched. The `FORBIDDEN:` prefix the REST layer
+  classifies 403 on is untouched, and so is the ADR-0111 D10 `delete`-verb
+  diagnostic breadcrumb. The verb, object and row id the old sentence carried are
+  now developer facts on the error's `developerMessage` and `details` and in the
+  log, where a developer reads them and a user never does.
+
+### Patch Changes
+
+- 6a180e4: fix(core,rest,services)!: a permission-store read failure now fails LOUD instead of resolving as an authenticated caller holding zero capabilities (#13279)
+  
+  **BREAKING** runtime behaviour change on the shared authorization resolver,
+  shipped as `minor` under the repo's launch-window convention.
+  
+  `resolveAuthzContext`'s per-read helper `tryFind` answered a THROWN read exactly
+  the way it answered an EMPTY one: `[]`. So an outage of the permission store
+  resolved as a well-formed context for an authenticated principal holding no
+  capabilities, and the package-management door answered
+  `403 FORBIDDEN` — "Reading packages requires the `studio.access` or
+  `setup.access` capability." That answer was measured byte-identical
+  (`JSON.stringify` equal, against a control that separates two answers which do
+  differ) to what a caller who genuinely holds nothing receives. An administrator
+  was told they lack a capability, during an outage of the store that holds the
+  capability.
+  
+  Maintainer ruling 2026-08-30, verbatim 「第一批其余同意」: `tryFind` 区分「无行」
+  与「读失败」,读失败 fail-loud —— 权限库不可达时不再解析为「已认证零能力」,而是
+  响亮拒绝(与真实能力拒绝的 403 可区分)。
+  
+  Second maintainer ruling the same day (第 5 场总监席决裁批 #9, verbatim 「同意」),
+  after implementing the first one showed that "the read failed" is two facts:
+  采**选项 A** —— 把 `isMissingTableError` 从 `@objectstack/metadata` 迁至
+  `@objectstack/types`(core 已依赖),metadata 保留 re-export 兼容;`tryFind` 仅对
+  **未被判定为「表未 provision」**的读失败抛 `AuthzStoreUnavailableError`。
+  
+  **What changed.** A permission-store read that is issued and throws now raises
+  `AuthzStoreUnavailableError`, which carries the EXISTING ADR-0112 wire code
+  `SERVICE_UNAVAILABLE` and status `503`. No code is added to the closed wire
+  vocabulary and no response envelope gains or loses a key — only which declared
+  code an outage selects. Doors that map thrown errors through
+  `resolveThrownHttpError` answer 503 with no per-door change.
+  
+  **What did NOT change**, and is pinned:
+  
+  - A reachable, genuinely EMPTY store (reads return no rows) still resolves to
+    zero capabilities.
+  - A genuine capability denial still answers `403 FORBIDDEN` with its message.
+  - An ABSENT engine (`ql` unwired, so no read is ever issued) still resolves to
+    an empty-but-valid envelope.
+  - Anonymous requests never reach the store, so an outage cannot make them loud.
+  - A REAL engine whose `sys_*` tables were never provisioned resolves to zero
+    capabilities, quietly — pinned to be byte-identical to the empty-store
+    envelope, in every dialect spelling and in the production wrapper shape where
+    the driver's phrase is on `cause` rather than the outer message.
+  
+  **The boundary between the two kinds of read failure.** An earlier revision of
+  this changeset claimed "embedders without a data plane are unaffected". That
+  claim was too broad; it is retracted here, and the gap it named is now closed
+  rather than merely disclosed. A read also throws when the table was never
+  PROVISIONED — a real engine, wired and reachable, whose `sys_*` tables were
+  never created — and that is a supported deployment shape, not an outage. There
+  "zero capabilities" is the TRUE answer rather than a fabrication: nothing is
+  provisioned, so nothing was withheld. Only an UNREACHABLE store — the ruling's
+  own word 不可达 — leaves the capability set unknown, and only an unknown answer
+  may not be reported as a denial.
+  
+  Treating the two alike was measured, not theorised: it turned four CI suites
+  red, all from `no such table` on `sys_user` / `sys_member` /
+  `sys_user_position` / `sys_user_permission_set`. Ordinary CRUD in
+  `@objectstack/client` answered `503`; batch validation errors that owe `400`
+  answered `503`, because authorization refused before validation ran; runtime
+  notifications answered `401` where authenticated callers must be served `200`;
+  and two `.integration.test.ts` noise guards reported that the driver and engine
+  diagnostics for `sys_position` stopped being emitted — the eager throw aborted
+  the resolution before that later read was ever issued, so a change made to stop
+  a failed read being silent had made two other channels silent.
+  
+  `tryFind` therefore raises `AuthzStoreUnavailableError` only for a read failure
+  that is NOT positively identified as an unprovisioned table.
+  
+  **`isMissingTableError` moved to `@objectstack/types`.** The classifier that
+  draws that boundary already existed and was already right — driver-code based
+  rather than prose-sniffing, documented so that "cannot say" never means "be
+  loud". It lived in `@objectstack/metadata`, which DEPENDS ON `@objectstack/core`,
+  so the resolver could not import it. Rather than keep a second copy of a
+  security-relevant predicate, the ruling relocated the one classifier to
+  `@objectstack/types` — the package core already depends on, and the repo's own
+  stated Home rule for a cross-package error predicate ("every consumer of the
+  question already depends on it, so adopting the predicate never adds an edge",
+  `packages/types/src/unique-violation.ts`). `@objectstack/metadata/errors` still
+  exports `isMissingTableError`, re-exported from the new home, so no consumer of
+  that published subpath changes.
+  
+  Its sibling `isSchemaAlreadyExistsError` moved with it — the two are not two
+  modules but two signatures over one matcher, and separating them would have
+  meant re-rolling the matcher, which is the duplication the module exists to
+  prevent. Both are now exported from `@objectstack/types`; the metadata subpath
+  deliberately still publishes only `isMissingTableError`, which is the only one
+  anything imports through it.
+  
+  ⚠️ **Signed-off risk, recorded because it is load-bearing.** Gating loudness on
+  a driver-error predicate was approved with its false-positive direction stated:
+  mis-reading a genuine outage as "table not provisioned" silently restores the
+  quiet 403 this change removes, with no thrown error and no other failing test.
+  That direction is accepted, not overlooked — the predicate keys on driver codes,
+  SQLSTATEs and errnos first, excludes the known superstring traps up front, and
+  returns `false` for anything it does not positively recognise, so an
+  unrecognised outage stays loud by default. The risk is written beside the
+  predicate in `resolve-authz-context.ts` and both directions are pinned by name
+  in `authz-store-unavailable.test.ts`. ⛔ Do not widen `isMissingTableError` to
+  make a first boot quieter: every widening moves outages into the quiet branch.
+  
+  **All-transport, not just REST.** Every transport authorizing through
+  `resolveAuthzContext` inherits this. Six of the eight production transports
+  wrapped the call in a fail-closed `catch` that would have re-silenced the
+  outage — measured, not assumed: with the resolver loud but the nets untouched,
+  the package door answered `401`, i.e. the outage merely changed disguises. Those
+  `catch` blocks now re-raise via `isAuthzStoreUnavailableError` and keep their
+  previous behaviour for every other fault. The transport set is rebuilt from
+  source and audited for set equality on every test run, so a transport added
+  later cannot inherit the old silence unnoticed.
+  
+  Callers that treat any throw from `resolveAuthzContext` as "anonymous" should
+  re-raise `isAuthzStoreUnavailableError(err)` instead: degrading it restores the
+  disguise this removes.
+  
+  <!-- adr-0087: not-required (runtime-interface-only packages/core/src/security/resolve-authz-context.ts#ResolvedAuthzContext, packages/core/src/security/authz-store-unavailable.ts#AuthzStoreUnavailableError) The breaking surface is runtime TypeScript in `@objectstack/core`'s security module and nothing else: `resolveAuthzContext` stops always-resolving and raises `AuthzStoreUnavailableError` when a permission-store read is issued and throws. NO metadata surface is touched in either direction. No Zod schema changes, no `packages/spec` declaration is added or removed, no authorable key moves, no stored row shape changes, and no object definition is edited — a customer's metadata app is byte-for-byte unaffected, so `objectstack migrate meta` has nothing to visit and there is no tombstone to mint. The wire vocabulary is likewise untouched: `SERVICE_UNAVAILABLE` is an EXISTING `StandardErrorCode` member that `HttpStatusErrorCodeMap` already maps to 503, so this change only selects a different DECLARED code for an outage rather than adding one. Both named symbols resolve at HEAD as exported declarations whose files are not `*.zod.ts`, are not under `packages/spec/src/contracts/`, are not object definitions and are not `z.input` projections; neither is referenced in code by any metadata surface (the `packages/spec` hits for `resolveAuthzContext` are comment prose describing the envelope, which this gate masks). The channel that reaches an affected consumer is therefore code review and this changeset, never the upgrade guide: a ledger entry could not express "your fail-closed catch should re-raise this error", because there is no metadata for a migration to rewrite. -->
+- 35202f1: fix(plugin-auth,plugin-sharing): a refused bootstrap write stops reading as a clean one (#12981)
+  
+  Two boot-time seams answered a REFUSED write exactly the way they answer a
+  write there was no need to make. Nothing else failed on either path, so the
+  deployment kept looking healthy — the durability class AGENTS.md separates
+  from the functional one, and the class `check-durability-degradation-log-level`
+  exists for and, at these two sites, structurally cannot see (it matches callee
+  NAMES from an 18-entry vocabulary, and a seeder reaching storage through
+  `ql.insert` is not in it; a green there means NOT MEASURED for the site, never
+  "level approved").
+  
+  **`plugin-auth` — `ensureDefaultOrganization` reported at `warn`.** A refused
+  `sys_organization` or `sys_member` insert leaves the platform admin with no
+  organization: under multi-org the default `tenant_isolation` RLS policy filters
+  their console to zero rows, and under single-org better-auth has no active org
+  to resolve, so there is no way to add a user at all (ADR-0081 D1). Both lines
+  now report at `error` and each names the consequence AND the remedy, per
+  "Degradation log levels". `BootstrapLogger` gains an OPTIONAL `error`
+  (`message, error?, meta?` — the spec `Logger` arity, so the kernel logger
+  satisfies it as-is) beside its already-required `warn`; the fallback to `warn`
+  is mandatory and lives in one helper so no site can forget it. Additive: a host
+  passing `{ info, warn }` compiles and behaves exactly as before, and gets the
+  same line on the `warn` channel.
+  
+  **`plugin-sharing` — `backfillPrimaryBu` printed NOTHING when every row was
+  refused.** Its per-row `catch { }` counted nothing and its report was gated on
+  `updated > 0`, so a pass in which every `sys_user` write was refused emitted
+  byte-identical output to a pass with nothing to do, while every affected user
+  kept a stale or absent `primary_business_unit_id` and every sharing rule keyed
+  on the primary business unit evaluated against the wrong value. Refusals are
+  now counted, reported once with the consequence and the remedy, and the summary
+  branch is `updated > 0 || refused > 0` — the same suppressor, repaired the same
+  way, as `permission-set-drift.ts` in #12970. `backfillPrimaryBu` now answers
+  `{ updated, refused }`; the added field is additive and its only in-tree caller
+  ignores the result.
+  
+  `patch` rather than `minor` for both: no entry-barrel surface is added, no
+  command or flag, and neither change can turn a previously accepted call into a
+  rejected one. The `plugin-sharing` report deliberately stays on `warn` even
+  though the consequence is durability-shaped — `OptionalSharingLogger`'s own
+  header forbids growing an `error`, and giving that function a stricter sink
+  means requiring `warn` on a publicly exported shape, which
+  `scripts/optional-error-sink-contract.baseline.json` records in as many words
+  as #10556's contract call. What is fixed here is the SILENCE, which needed no
+  contract at all; the LEVEL belongs to that card.
+- 30928a6: fix(i18n): read the provenance companion at serving time, not only record it (#12642)
+  
+  Maintainer ruling #12069 Option A (#11671) landed translation provenance as
+  **two** halves: `os i18n extract --source-hashes` RECORDS which source revision
+  a generated leaf is still a byte copy of, and `withSourceFallback` READS those
+  records at serving time and substitutes the current source for a leaf whose
+  source has moved underneath it. The recording half was then rolled out to every
+  bundle set. The reading half was not — measured on `main`: provenance
+  **recorded in 9 of 9** bundle sets and **read at serving time in 1**.
+  
+  The other eight assembled their `TranslationBundle` straight from the raw
+  generated modules and never consulted the companion sitting beside them, so
+  they recorded the drift and went on serving the superseded draft. Nothing said
+  so: `check:i18n` compares key sets and they still matched, `check:i18n-coverage`
+  counts a present leaf as translated, and `check:i18n-stale-fill`'s cross-locale
+  rule needs a SECOND locale holding the same stale bytes before it can testify.
+  The measured case had one locale and no second witness.
+  
+  All eight are wired here, in the shape `@objectstack/platform-objects`'s own
+  `metadata-translations/index.ts` uses — the committed
+  `<locale>.source-hashes.generated.ts` passed as the fourth argument, the third
+  left `undefined` because these sets have no hand-authored sections. Provenance
+  is now recorded in 9 of 9 sets and served in 9 of 9.
+  
+  `@objectstack/plugin-webhooks` was the last of them and is the only one whose
+  manifest changed: `withSourceFallback` lives in `@objectstack/platform-objects`,
+  which that package did not declare. It was **already in that package's install
+  closure** through `@objectstack/service-messaging`, so the edge declares a
+  resolution that already resolved rather than adding a package to the graph —
+  and relying on it undeclared would have been a phantom dependency under this
+  repo's strict package manager.
+  
+  `check:i18n-stale-fill` gains a second verdict, **UNSERVED PROVENANCE**, so this
+  cannot silently come apart again: a bundle set that commits a companion and
+  does not consult it at serving time now fails the build, including a tenth set
+  that lands tomorrow.
+  
+  **Graded `patch`, and the grade is the interesting part.** No API changes, no
+  new exported surface, and no key set moves — substitution was chosen over
+  deletion precisely so key-set claims stay put (ruling #8765 Option B). What
+  changes is which STRING a stale leaf serves. On this tree that is **zero
+  leaves**: a record is only ever written for a leaf that IS a byte copy of the
+  current source, so the companions arrive 0-stale by construction. The change is
+  in what happens the next time a source string moves — the reader sees the
+  English source rather than a superseded draft of it, which is the same
+  degradation an untranslated key already produces and not a new state.
+- de47336: chore(i18n): roll the generated-leaf provenance companion out to the remaining bundle sets (#12559)
+  
+  `os i18n extract --source-hashes` (#11671, maintainer ruling #12069 Option A)
+  records, per generated translation leaf, the digest of the source revision that
+  leaf is **still a byte copy of** — the one signal that tells a stale fill from a
+  real translation once the source has moved and the two stopped being
+  distinguishable by value. It shipped opt-in, and exactly one of the nine i18n
+  bundle sets opted in. A landed detector, a changeset announcing it and a green
+  gate read together as *"generated translation staleness is now caught"*; for
+  eight of nine sets it was not, and the thing making it not caught was a single
+  absent flag in an extract config — invisible from all three of those surfaces.
+  
+  **All eight remaining sets now opt in** — `plugin-approvals`, `plugin-audit`,
+  `plugin-security`, `plugin-sharing`, `plugin-webhooks`, `service-messaging`,
+  `service-realtime`, `service-storage`. Each documents `source-hashes` in its
+  extract config and commits three `<locale>.source-hashes.generated.ts`
+  companions, produced by the same extract run as the bundles they sit beside
+  (`check:i18n` compares them byte-for-byte, so they cannot be written by hand).
+  `check:i18n` now reports 7 bundles per set where it reported 4, and 11 for
+  `platform-objects` where it reported 8.
+  
+  **Records count what is currently RECORDABLE, never what is covered.** A record
+  is written only for a leaf that *is* right now a byte copy of the current
+  source, so a fully translated locale starts with an empty table — which is the
+  instrument armed, not an instrument that measures nothing: the entry appears by
+  itself on the first extract after a leaf becomes a fill. Measured at this
+  commit, per set over its three translated locales: `service-messaging` 289,
+  `plugin-approvals` 61, `plugin-security` 33, `plugin-webhooks` 20,
+  `plugin-audit` 8, `service-storage` 7, `plugin-sharing` 1 (es-ES only; zh-CN and
+  ja-JP are fully translated and start empty), `service-realtime` 0 (all three
+  locales fully translated). **419 records written across the eight sets, 0
+  stale.**
+  
+  **One extractor fix the rollout forced.** `--source-hashes` had one user, and
+  that user commits both generated sections, so the interaction with
+  `--no-metadata-forms` had never been exercised. The provenance table is computed
+  over every generated section the extractor builds; the eight sets here commit no
+  metadata-forms bundle, and their `metadataForms` subtree — absent from their
+  merge baseline — arrives as a fresh `--fill=default` copy of `en`, so every leaf
+  of it was recordable. First measured on `plugin-audit`: **763 records, of which
+  2 were its own objects and 761 were digests of the Studio metadata-form baseline
+  `@objectstack/platform-objects` owns.** Those records are unreadable in the
+  package holding them and would have rewritten all 24 companions on any unrelated
+  `*.form.ts` change in `packages/spec` — the cross-package coupling ADR-0029 D8
+  and every `bundle-ownership.test.ts` keep out of committed bundles. The
+  companion now covers exactly the sections a run commits, decided by the same two
+  predicates that decide the bundle files. `platform-objects` commits both, so its
+  three committed companions are byte-for-byte unchanged.
+  
+  **Grade: `patch`, and behaviour on the day it lands is unchanged for every
+  leaf.** A record is written only where a leaf is currently a byte copy of the
+  **current** source, so every record written equals the current digest and none
+  of them can be stale; the mechanism cannot arrive red. No committed translation
+  bundle changed a byte, no public API moved, and no leaf's rendered text changed.
+  `narrowToCommittedSections` is new but internal to `@objectstack/cli` — the
+  package's entrypoint does not re-export the extractor utils.
+  
+  **What this does not do**, stated so the boundary is not inferred wrongly a
+  second time: these eight sets now *record* provenance. Reading it at serving
+  time is `withSourceFallback`, and that is still wired in
+  `@objectstack/platform-objects` alone — so a stale fill in one of the eight is
+  now recorded and reportable, but not yet substituted at runtime. Tracked
+  separately.
+- 9e72090: fix(sharing): honour the declared `organizationId` in `managerOf` (#10231)
+  
+  `ITeamGraphService.managerOf(userId, organizationId?)` declares an organization
+  parameter. `TeamGraphService.managerOf` spelled it `_organizationId` and
+  discarded it, and the `BusinessUnitGraphService` standalone fallback read
+  `sys_user` the same unscreened way — a declared-but-unenforced parameter on a
+  security seam, while `expandRoleUsers` on the same class applied
+  `organization_id` to its own read.
+  
+  Both now apply the screen #10153 landed for the identical column
+  (`sys_user.manager_id`) on the approvals side: a manager who is **provably**
+  outside the caller's organization — membership rows exist for him, none of
+  them in that organization — is dropped. The read is `sys_member`, because
+  `sys_user` is the global better-auth identity table and carries no
+  `organization_id` at all; filtering the `sys_user` read on a column that does
+  not exist would match nothing and silently return `null` for every lookup.
+  
+  The screen is fail-open on an ABSENT tenancy fact (no membership rows, or the
+  membership read failed) and issues no query at all when no organization is in
+  play, so callers that pass nothing — which is how the parameter is used today —
+  are byte-identical to before. The manager cache key is now organization-
+  qualified; a user-keyed cache would have served one screened `null` to every
+  unscoped reader behind it.
+- 6c3f9f5: fix(plugin-sharing): the record-share `$in` guard now tests `record_id` before `String()` coerces it (#13551)
+  
+  `buildReadFilter` and the bulk-write half of `buildWriteFilter` each turned the
+  `sys_record_share` rows granted to the caller into the members of a security
+  predicate, `{ id: { $in: [...] } }`, with the same expression:
+  
+  ```ts
+  grants.map((g: any) => String(g.record_id)).filter(Boolean)
+  ```
+  
+  `.filter(Boolean)` reads as "drop rows whose `record_id` is nullish". It cannot:
+  `String(null)` is `'null'` and `String(undefined)` is `'undefined'`, and both are
+  truthy. The only value that spelling could drop was the empty string, so the
+  guard was dead for exactly the case its spelling advertised, and a
+  `sys_record_share` row with a nullish `record_id` put the literal string
+  `'null'` into the emitted `$in`.
+  
+  **Direction — this was not an open bypass, and the repair is not a bypass fix.**
+  The emitted member is a bogus id that matches no row on any backend, and both
+  sites are positive polarity (an OR-ed branch beside the owner match, never
+  negated), so a corrupt row lost its grant rather than widening anyone's scope.
+  It also took an already-corrupt row to reach at all. What was actually broken is
+  the guard's honesty: a reader — or an audit asking which security paths already
+  handle nullish ids — would have counted these two sites as covered when they
+  provably were not.
+  
+  Both sites now share one module-private helper that tests the raw column value
+  first and coerces after, the shape the sibling id-list guards already use
+  (`plugin-sharing`'s own `sharing-rule-service.ts` and `primary-bu-projection.ts`,
+  `core`'s `resolve-authz-context.ts`, `plugin-security`'s controlled-by-parent
+  `masterIds`, `objectql`'s master-detail parent resolution). Factoring it into one
+  helper is deliberate: the expression stood in two places, and repairing one would
+  have left the other advertising a guarantee it does not keep.
+  
+  The non-null path is unchanged. Every non-nullish value still stringifies exactly
+  as it did — a driver-numeric primary key still becomes its decimal string — and
+  the empty string, the one value the old spelling really did drop, is still
+  dropped. The only behavioural difference is that rows with a nullish `record_id`
+  now contribute no member at all; when they were the *only* grants, the filter
+  collapses to the plain owner match instead of OR-ing in a branch that matched
+  nothing.
+- Updated dependencies [387e231]
+- Updated dependencies [cae2169]
+- Updated dependencies [2d4fa75]
+- Updated dependencies [0e4e51b]
+- Updated dependencies [e84bbf6]
+- Updated dependencies [c45d8e6]
+- Updated dependencies [40a93b5]
+- Updated dependencies [dda969c]
+- Updated dependencies [277948f]
+- Updated dependencies [8bdd955]
+- Updated dependencies [54e2d36]
+- Updated dependencies [b745157]
+- Updated dependencies [4f24e9d]
+- Updated dependencies [4bd6faa]
+- Updated dependencies [86cbe37]
+- Updated dependencies [6a180e4]
+- Updated dependencies [474242f]
+- Updated dependencies [803eaab]
+- Updated dependencies [983edf1]
+- Updated dependencies [eae824e]
+- Updated dependencies [f6fa22c]
+- Updated dependencies [8a483b3]
+- Updated dependencies [3bc2e38]
+- Updated dependencies [df59de0]
+- Updated dependencies [96e25a8]
+- Updated dependencies [713f83f]
+- Updated dependencies [77d4b3c]
+- Updated dependencies [f75a38a]
+- Updated dependencies [7a25e7d]
+- Updated dependencies [1fa05a6]
+- Updated dependencies [c85a265]
+- Updated dependencies [dcb10a5]
+- Updated dependencies [0010797]
+- Updated dependencies [776a098]
+- Updated dependencies [5060877]
+- Updated dependencies [4f6325d]
+- Updated dependencies [52954c0]
+- Updated dependencies [0db5520]
+- Updated dependencies [d23ebb9]
+- Updated dependencies [93809a3]
+- Updated dependencies [7c0d0c3]
+- Updated dependencies [daae7aa]
+- Updated dependencies [8dc22d6]
+- Updated dependencies [fa5d137]
+- Updated dependencies [3b4c56c]
+- Updated dependencies [ae8edd2]
+- Updated dependencies [e25403c]
+- Updated dependencies [a81aa9d]
+- Updated dependencies [64baa68]
+- Updated dependencies [9fa70d7]
+- Updated dependencies [09db64a]
+- Updated dependencies [92916e7]
+- Updated dependencies [a84f3ea]
+- Updated dependencies [f2eaae8]
+- Updated dependencies [56c093c]
+- Updated dependencies [c09451b]
+- Updated dependencies [ba64877]
+- Updated dependencies [e7191ce]
+- Updated dependencies [7345308]
+- Updated dependencies [30d96ab]
+- Updated dependencies [30d96ab]
+- Updated dependencies [f658793]
+- Updated dependencies [b1b7d60]
+- Updated dependencies [0fd4899]
+- Updated dependencies [c95ad19]
+- Updated dependencies [9a71af3]
+- Updated dependencies [4a17645]
+- Updated dependencies [3795c5f]
+- Updated dependencies [e25e839]
+- Updated dependencies [5997207]
+- Updated dependencies [8b13cc8]
+- Updated dependencies [00d8f65]
+- Updated dependencies [86e765a]
+- Updated dependencies [53dc739]
+- Updated dependencies [fd289be]
+- Updated dependencies [c3c72a4]
+- Updated dependencies [03bf7b1]
+- Updated dependencies [7bd6447]
+- Updated dependencies [86df0c9]
+- Updated dependencies [5a22dd7]
+- Updated dependencies [f90e820]
+- Updated dependencies [e8bd715]
+- Updated dependencies [a28a3c0]
+- Updated dependencies [200d255]
+- Updated dependencies [2852acc]
+- Updated dependencies [daeaaf9]
+- Updated dependencies [c459da6]
+- Updated dependencies [e914733]
+- Updated dependencies [f887e52]
+- Updated dependencies [881f8d8]
+- Updated dependencies [3bfa1e6]
+- Updated dependencies [0a8ebf3]
+- Updated dependencies [901355c]
+- Updated dependencies [8542bd4]
+- Updated dependencies [2af5eac]
+- Updated dependencies [c34f693]
+- Updated dependencies [bfe13c8]
+- Updated dependencies [4635f3e]
+- Updated dependencies [fd289be]
+- Updated dependencies [ee3595c]
+- Updated dependencies [09b4f4e]
+- Updated dependencies [3a04b01]
+- Updated dependencies [3954fb7]
+- Updated dependencies [4805b56]
+- Updated dependencies [b9e9227]
+- Updated dependencies [d395692]
+- Updated dependencies [5894d30]
+- Updated dependencies [a3765f6]
+- Updated dependencies [2d5cee3]
+- Updated dependencies [e22158f]
+- Updated dependencies [7404925]
+- Updated dependencies [0c2334f]
+- Updated dependencies [d2619fd]
+- Updated dependencies [af56546]
+- Updated dependencies [bd0c5cc]
+- Updated dependencies [6acb11a]
+- Updated dependencies [33c5fd3]
+- Updated dependencies [20b0fdb]
+- Updated dependencies [905019b]
+- Updated dependencies [a286411]
+- Updated dependencies [98c0d33]
+- Updated dependencies [93ea19b]
+- Updated dependencies [9ee2dcf]
+- Updated dependencies [8cb96ec]
+- Updated dependencies [8f10a79]
+- Updated dependencies [6269a55]
+- Updated dependencies [a17da05]
+- Updated dependencies [a8c00e2]
+- Updated dependencies [0fb8760]
+- Updated dependencies [e5ce2ed]
+- Updated dependencies [be21955]
+- Updated dependencies [bc56e18]
+- Updated dependencies [be21955]
+- Updated dependencies [a9ee989]
+- Updated dependencies [15d58db]
+- Updated dependencies [d63b014]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [2cc7122]
+- Updated dependencies [15d55fb]
+- Updated dependencies [9e0ba21]
+- Updated dependencies [311433f]
+- Updated dependencies [3a86a65]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [4cda78c]
+- Updated dependencies [b7131f3]
+- Updated dependencies [ce7e497]
+- Updated dependencies [51ecb2f]
+- Updated dependencies [9086761]
+- Updated dependencies [f6344e7]
+- Updated dependencies [42a117b]
+- Updated dependencies [4297fe7]
+- Updated dependencies [e398863]
+- Updated dependencies [d79c602]
+- Updated dependencies [f11fc61]
+- Updated dependencies [8f79379]
+- Updated dependencies [e6ca40e]
+- Updated dependencies [0c77ea4]
+- Updated dependencies [52954c0]
+- Updated dependencies [c5b9ccc]
+- Updated dependencies [7131f12]
+- Updated dependencies [aa5994e]
+- Updated dependencies [be93457]
+- Updated dependencies [a65db76]
+- Updated dependencies [2cf5a96]
+- Updated dependencies [15eb2c9]
+- Updated dependencies [5691b07]
+- Updated dependencies [2a6122b]
+- Updated dependencies [225e769]
+- Updated dependencies [8af88dd]
+- Updated dependencies [fb5fbb8]
+- Updated dependencies [d7b3963]
+- Updated dependencies [33184fd]
+- Updated dependencies [7c41693]
+- Updated dependencies [b72db01]
+- Updated dependencies [dce5cd4]
+- Updated dependencies [9688f58]
+- Updated dependencies [556ebc1]
+- Updated dependencies [177ebdc]
+- Updated dependencies [8d237b4]
+- Updated dependencies [2d2e6f0]
+- Updated dependencies [2d8dd8d]
+- Updated dependencies [b5a2398]
+- Updated dependencies [348860c]
+- Updated dependencies [5383fa6]
+- Updated dependencies [5b3ff63]
+- Updated dependencies [878aa2e]
+- Updated dependencies [1a6a19c]
+- Updated dependencies [064d484]
+- Updated dependencies [527e050]
+- Updated dependencies [dd33bf9]
+- Updated dependencies [4cb2a90]
+- Updated dependencies [fe72aa5]
+- Updated dependencies [bc5156f]
+- Updated dependencies [5700d83]
+- Updated dependencies [21196cf]
+- Updated dependencies [74a7804]
+- Updated dependencies [49f0dcf]
+- Updated dependencies [033a34c]
+- Updated dependencies [4d25d22]
+- Updated dependencies [1ffee51]
+- Updated dependencies [5ae4303]
+- Updated dependencies [ece4dad]
+- Updated dependencies [146f448]
+- Updated dependencies [735f5c7]
+- Updated dependencies [366f895]
+- Updated dependencies [dc75ba8]
+- Updated dependencies [cce0aa9]
+- Updated dependencies [cff17af]
+- Updated dependencies [39404f3]
+- Updated dependencies [ca1965f]
+- Updated dependencies [8619f95]
+- Updated dependencies [b706af9]
+- Updated dependencies [db8c288]
+- Updated dependencies [0e5fe7f]
+- Updated dependencies [add4360]
+- Updated dependencies [e0abc38]
+- Updated dependencies [fc9ba76]
+- Updated dependencies [1272f0a]
+- Updated dependencies [a11c1a5]
+- Updated dependencies [71f9cd1]
+- Updated dependencies [ee17d86]
+- Updated dependencies [cdbd920]
+- Updated dependencies [18c432e]
+- Updated dependencies [3c418c4]
+- Updated dependencies [a933ed7]
+- Updated dependencies [b3ca463]
+- Updated dependencies [a933ed7]
+- Updated dependencies [0d4a6a8]
+- Updated dependencies [518d5e5]
+- Updated dependencies [6643ba1]
+- Updated dependencies [eeba2ef]
+- Updated dependencies [ec4c4d2]
+- Updated dependencies [424f73c]
+- Updated dependencies [cccbe51]
+- Updated dependencies [a8d6b1d]
+- Updated dependencies [e4a7695]
+- Updated dependencies [87075b1]
+- Updated dependencies [14cfc00]
+- Updated dependencies [dfebfc8]
+- Updated dependencies [598b7ec]
+- Updated dependencies [d028b37]
+- Updated dependencies [f7b25c5]
+- Updated dependencies [122ef38]
+- Updated dependencies [428f9b2]
+- Updated dependencies [aa7ff56]
+- Updated dependencies [811a3c2]
+- Updated dependencies [e49d988]
+- Updated dependencies [d41d166]
+- Updated dependencies [c4db311]
+- Updated dependencies [750fff5]
+- Updated dependencies [c19035e]
+- Updated dependencies [ececf7a]
+- Updated dependencies [d173125]
+- Updated dependencies [8425c17]
+- Updated dependencies [a5ef1d8]
+- Updated dependencies [772d5de]
+- Updated dependencies [ce80ec2]
+- Updated dependencies [b372318]
+- Updated dependencies [29d0676]
+- Updated dependencies [6bd3231]
+- Updated dependencies [b799ac5]
+- Updated dependencies [8f74307]
+- Updated dependencies [d23dc08]
+- Updated dependencies [644ad50]
+- Updated dependencies [9735662]
+- Updated dependencies [4d5b4f8]
+- Updated dependencies [5d16379]
+- Updated dependencies [aa0688a]
+- Updated dependencies [0da7cd2]
+- Updated dependencies [28a5c3e]
+- Updated dependencies [4bc18e5]
+  - @objectstack/spec@17.3.0
+  - @objectstack/metadata-core@17.3.0
+  - @objectstack/objectql@17.3.0
+  - @objectstack/core@17.3.0
+  - @objectstack/types@17.3.0
+  - @objectstack/platform-objects@17.3.0
+  - @objectstack/formula@17.3.0
+
 ## 17.2.0
 
 ### Minor Changes

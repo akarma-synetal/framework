@@ -1,5 +1,262 @@
 # @objectstack/formula
 
+## 17.3.0
+
+### Patch Changes
+
+- 713f83f: fix(formula): fail closed on a null MEMBER of a resolved membership array in the CEL pushdown (#13496)
+  
+  `compileCelToFilter` already fails closed when a `current_user.*` variable
+  resolves to `undefined`/`null` — the module's docblock calls it "the no active
+  org fail-closed path" and it is pinned for the SCALAR case. `lowerMembership`
+  did not apply the same discipline one level in: it checked only
+  `Array.isArray(value)` and emitted the list verbatim, so a null MEMBER of a
+  resolved membership array went straight into a security `$in`. The one shape
+  that IS a permission predicate was the one shape that did not fail closed.
+  
+  `lowerMembership` now refuses a `null`/`undefined` member of a **variable-resolved**
+  membership array with the same `unresolved-variable` reason the scalar path
+  uses, which the RLS path already turns into the deny sentinel.
+  
+  Maintainer ruling, 2026-08-31 (quoted unchanged): 「membership 数组中的 null
+  **成员**触发与 null 标量同款处置——`unresolved-variable` / deny sentinel,⛔ 不
+  strip、不静默清洗。」
+  
+  **Why refuse rather than strip.** Stripping the unresolved member is safe in
+  POSITIVE polarity only. `not in` is a supported, pinned member of the pushdown
+  subset (`!(x in y)` lowers to `$not` wrapping `$in`), and `$in: []` matches
+  nothing on every backend — so `$not { $in: [] }` matches the WHOLE table.
+  Stripping therefore inverts into fail-OPEN exactly where the predicate is a
+  blocklist, and it silently deletes a blocklist entry in the mixed
+  `['u1', null]` case. Refusing needs no polarity awareness at all: it throws
+  before any `$not` wrapper is built. Both polarities are pinned.
+  
+  **No shipped behaviour changes.** No first-party provider puts a null into a
+  membership array — `resolve-authz-context.ts` filters non-strings out of
+  `org_user_ids`, and the kernel spec declares `org_user_ids: z.array(z.string())`
+  — so the refused shape was never a declared-valid input. This makes the
+  implementation match the declaration rather than narrowing it. A fully resolved
+  list, an empty list (`$in: []`, a legitimate declared predicate) and the
+  authoring-time `isPushdownableCel` shape gate are all unchanged and pinned so.
+  
+  Out of scope, deliberately: an AUTHORED literal null inside a list
+  (`record.status in ['lost', null]`) is a declared predicate, not an unresolved
+  variable, and what such a filter should select is a separate open question. It
+  is untouched, with a pin recording that.
+- 77d4b3c: Pin `CEL_STDLIB_FUNCTIONS` to the real CEL `Environment` as a declared subset
+  
+  The exported catalog advertises 35 function names while the evaluation
+  environment resolves 72, and nothing asserted the relationship between them. A
+  new drift pin (`cel-stdlib-drift.test.ts`) reads the authoritative environment
+  through `Environment.getDefinitions()` and holds three directions: every
+  advertised name is registered **and bare-callable**; every bare-callable
+  function `registerStdLib` adds is advertised; and the bare-callable built-ins
+  deliberately withheld (`bytes`, `dyn`, `type`, `uint`) are exactly a declared
+  list, so a cel-js upgrade cannot add one unnoticed.
+  
+  The catalog's contents are unchanged. Its docblock now records the measured
+  decomposition of the 72 and states the membership rule that makes the gap
+  deliberate rather than stale: 33 of the 72 are callable only on a receiver
+  (`s.split(',')`), and every consumer spends an entry as a bare call.
+- Updated dependencies [387e231]
+- Updated dependencies [cae2169]
+- Updated dependencies [2d4fa75]
+- Updated dependencies [0e4e51b]
+- Updated dependencies [e84bbf6]
+- Updated dependencies [c45d8e6]
+- Updated dependencies [40a93b5]
+- Updated dependencies [dda969c]
+- Updated dependencies [277948f]
+- Updated dependencies [8bdd955]
+- Updated dependencies [4f24e9d]
+- Updated dependencies [474242f]
+- Updated dependencies [803eaab]
+- Updated dependencies [eae824e]
+- Updated dependencies [f6fa22c]
+- Updated dependencies [8a483b3]
+- Updated dependencies [df59de0]
+- Updated dependencies [96e25a8]
+- Updated dependencies [f75a38a]
+- Updated dependencies [7a25e7d]
+- Updated dependencies [1fa05a6]
+- Updated dependencies [c85a265]
+- Updated dependencies [dcb10a5]
+- Updated dependencies [776a098]
+- Updated dependencies [5060877]
+- Updated dependencies [4f6325d]
+- Updated dependencies [52954c0]
+- Updated dependencies [93809a3]
+- Updated dependencies [7c0d0c3]
+- Updated dependencies [daae7aa]
+- Updated dependencies [8dc22d6]
+- Updated dependencies [3b4c56c]
+- Updated dependencies [ae8edd2]
+- Updated dependencies [e25403c]
+- Updated dependencies [64baa68]
+- Updated dependencies [9fa70d7]
+- Updated dependencies [09db64a]
+- Updated dependencies [92916e7]
+- Updated dependencies [a84f3ea]
+- Updated dependencies [f2eaae8]
+- Updated dependencies [c09451b]
+- Updated dependencies [ba64877]
+- Updated dependencies [7345308]
+- Updated dependencies [30d96ab]
+- Updated dependencies [f658793]
+- Updated dependencies [c95ad19]
+- Updated dependencies [4a17645]
+- Updated dependencies [3795c5f]
+- Updated dependencies [e25e839]
+- Updated dependencies [5997207]
+- Updated dependencies [8b13cc8]
+- Updated dependencies [86e765a]
+- Updated dependencies [53dc739]
+- Updated dependencies [fd289be]
+- Updated dependencies [03bf7b1]
+- Updated dependencies [f90e820]
+- Updated dependencies [e8bd715]
+- Updated dependencies [a28a3c0]
+- Updated dependencies [daeaaf9]
+- Updated dependencies [c459da6]
+- Updated dependencies [e914733]
+- Updated dependencies [f887e52]
+- Updated dependencies [881f8d8]
+- Updated dependencies [3bfa1e6]
+- Updated dependencies [901355c]
+- Updated dependencies [4635f3e]
+- Updated dependencies [ee3595c]
+- Updated dependencies [3a04b01]
+- Updated dependencies [b9e9227]
+- Updated dependencies [d395692]
+- Updated dependencies [5894d30]
+- Updated dependencies [a3765f6]
+- Updated dependencies [e22158f]
+- Updated dependencies [7404925]
+- Updated dependencies [0c2334f]
+- Updated dependencies [d2619fd]
+- Updated dependencies [6acb11a]
+- Updated dependencies [33c5fd3]
+- Updated dependencies [20b0fdb]
+- Updated dependencies [905019b]
+- Updated dependencies [a286411]
+- Updated dependencies [98c0d33]
+- Updated dependencies [93ea19b]
+- Updated dependencies [9ee2dcf]
+- Updated dependencies [8cb96ec]
+- Updated dependencies [8f10a79]
+- Updated dependencies [6269a55]
+- Updated dependencies [0fb8760]
+- Updated dependencies [e5ce2ed]
+- Updated dependencies [be21955]
+- Updated dependencies [bc56e18]
+- Updated dependencies [be21955]
+- Updated dependencies [a9ee989]
+- Updated dependencies [15d58db]
+- Updated dependencies [d63b014]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [2cc7122]
+- Updated dependencies [9e0ba21]
+- Updated dependencies [311433f]
+- Updated dependencies [9abe4e4]
+- Updated dependencies [b7131f3]
+- Updated dependencies [ce7e497]
+- Updated dependencies [51ecb2f]
+- Updated dependencies [9086761]
+- Updated dependencies [42a117b]
+- Updated dependencies [4297fe7]
+- Updated dependencies [e398863]
+- Updated dependencies [f11fc61]
+- Updated dependencies [8f79379]
+- Updated dependencies [e6ca40e]
+- Updated dependencies [0c77ea4]
+- Updated dependencies [52954c0]
+- Updated dependencies [aa5994e]
+- Updated dependencies [be93457]
+- Updated dependencies [a65db76]
+- Updated dependencies [15eb2c9]
+- Updated dependencies [5691b07]
+- Updated dependencies [2a6122b]
+- Updated dependencies [225e769]
+- Updated dependencies [8af88dd]
+- Updated dependencies [fb5fbb8]
+- Updated dependencies [d7b3963]
+- Updated dependencies [b72db01]
+- Updated dependencies [dce5cd4]
+- Updated dependencies [177ebdc]
+- Updated dependencies [8d237b4]
+- Updated dependencies [2d2e6f0]
+- Updated dependencies [2d8dd8d]
+- Updated dependencies [b5a2398]
+- Updated dependencies [348860c]
+- Updated dependencies [5383fa6]
+- Updated dependencies [5b3ff63]
+- Updated dependencies [1a6a19c]
+- Updated dependencies [527e050]
+- Updated dependencies [dd33bf9]
+- Updated dependencies [4cb2a90]
+- Updated dependencies [74a7804]
+- Updated dependencies [033a34c]
+- Updated dependencies [4d25d22]
+- Updated dependencies [1ffee51]
+- Updated dependencies [5ae4303]
+- Updated dependencies [ece4dad]
+- Updated dependencies [146f448]
+- Updated dependencies [735f5c7]
+- Updated dependencies [366f895]
+- Updated dependencies [dc75ba8]
+- Updated dependencies [cce0aa9]
+- Updated dependencies [cff17af]
+- Updated dependencies [39404f3]
+- Updated dependencies [ca1965f]
+- Updated dependencies [8619f95]
+- Updated dependencies [b706af9]
+- Updated dependencies [fc9ba76]
+- Updated dependencies [a11c1a5]
+- Updated dependencies [71f9cd1]
+- Updated dependencies [ee17d86]
+- Updated dependencies [cdbd920]
+- Updated dependencies [18c432e]
+- Updated dependencies [3c418c4]
+- Updated dependencies [a933ed7]
+- Updated dependencies [b3ca463]
+- Updated dependencies [a933ed7]
+- Updated dependencies [0d4a6a8]
+- Updated dependencies [518d5e5]
+- Updated dependencies [6643ba1]
+- Updated dependencies [eeba2ef]
+- Updated dependencies [ec4c4d2]
+- Updated dependencies [424f73c]
+- Updated dependencies [cccbe51]
+- Updated dependencies [a8d6b1d]
+- Updated dependencies [e4a7695]
+- Updated dependencies [87075b1]
+- Updated dependencies [14cfc00]
+- Updated dependencies [dfebfc8]
+- Updated dependencies [d028b37]
+- Updated dependencies [122ef38]
+- Updated dependencies [428f9b2]
+- Updated dependencies [aa7ff56]
+- Updated dependencies [c4db311]
+- Updated dependencies [750fff5]
+- Updated dependencies [c19035e]
+- Updated dependencies [ececf7a]
+- Updated dependencies [d173125]
+- Updated dependencies [8425c17]
+- Updated dependencies [a5ef1d8]
+- Updated dependencies [772d5de]
+- Updated dependencies [ce80ec2]
+- Updated dependencies [b372318]
+- Updated dependencies [29d0676]
+- Updated dependencies [6bd3231]
+- Updated dependencies [b799ac5]
+- Updated dependencies [8f74307]
+- Updated dependencies [d23dc08]
+- Updated dependencies [644ad50]
+- Updated dependencies [0da7cd2]
+- Updated dependencies [28a5c3e]
+- Updated dependencies [4bc18e5]
+  - @objectstack/spec@17.3.0
+
 ## 17.2.0
 
 ### Patch Changes

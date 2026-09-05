@@ -1,5 +1,55 @@
 # @objectstack/hono
 
+## 17.3.0
+
+### Patch Changes
+
+- Updated dependencies [387e231]
+- Updated dependencies [39d625f]
+- Updated dependencies [7ef0268]
+- Updated dependencies [4bd6faa]
+- Updated dependencies [6a180e4]
+- Updated dependencies [fe3d74f]
+- Updated dependencies [266436a]
+- Updated dependencies [803eaab]
+- Updated dependencies [23843d3]
+- Updated dependencies [a81aa9d]
+- Updated dependencies [c54d4d3]
+- Updated dependencies [d2b2381]
+- Updated dependencies [0783d7b]
+- Updated dependencies [a21d2a9]
+- Updated dependencies [67ceb9a]
+- Updated dependencies [56c093c]
+- Updated dependencies [e7191ce]
+- Updated dependencies [e7dfb1d]
+- Updated dependencies [b6d3d76]
+- Updated dependencies [1524927]
+- Updated dependencies [8542bd4]
+- Updated dependencies [2af5eac]
+- Updated dependencies [bfe13c8]
+- Updated dependencies [e5ce2ed]
+- Updated dependencies [3800e42]
+- Updated dependencies [c68c670]
+- Updated dependencies [090f230]
+- Updated dependencies [2cf5a96]
+- Updated dependencies [15eb2c9]
+- Updated dependencies [fb5fbb8]
+- Updated dependencies [6a571d3]
+- Updated dependencies [878aa2e]
+- Updated dependencies [7986d97]
+- Updated dependencies [469cbc9]
+- Updated dependencies [735f5c7]
+- Updated dependencies [dc75ba8]
+- Updated dependencies [db8c288]
+- Updated dependencies [0e5fe7f]
+- Updated dependencies [add4360]
+- Updated dependencies [9981f31]
+- Updated dependencies [9735662]
+- Updated dependencies [4d5b4f8]
+  - @objectstack/runtime@17.3.0
+  - @objectstack/types@17.3.0
+  - @objectstack/plugin-hono-server@17.3.0
+
 ## 17.2.0
 
 ### Patch Changes
