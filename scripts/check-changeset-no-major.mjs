@@ -765,7 +765,7 @@ export function render(result) {
 //      the fixed `Clause-②: yes` line the PM protocol spells (read here through
 //      `check-clause2-carriers.mjs`'s own `readClause2Line`, imported rather
 //      than restated, so the two readers cannot drift);
-//   ② the CHANGESET LEVEL for the package whose `packages/*/src/**` the diff
+//   ② the CHANGESET LEVEL for the package whose `packages/**/src/**` the diff
 //      moves.
 //
 // A declaration of ① plus a `patch` in ② is a self-contradiction inside one
@@ -812,7 +812,7 @@ export function render(result) {
 // asked at the declaration's own grain:
 //
 //     A PR that declares clause-② `yes` must grade AT LEAST ONE package whose
-//     `packages/*/src/**` it moves at `minor` or above.
+//     `packages/**/src/**` it moves at `minor` or above.
 //
 // The widened package IS one of the packages the diff moved src of — a widening
 // moves source — so "the widened package is graded `minor`+" IMPLIES "some
@@ -889,19 +889,117 @@ export function render(result) {
 //     a two-condition case with no motive, and the alternative — a second step
 //     — is refused by `check-empty-changeset.mjs`'s pin on this job's failable
 //     step count.
+//
+// ## THE DEPTH: which packages this axis can see at all (#16713)
+//
+// ⭐ Everything above describes what the axis DOES with a package it can see.
+// Until #16713 it could see 23 of this workspace's 74 packages, because the
+// package half of the path reading was one path segment wide and 51 packages
+// sit at `packages/<group>/<name>/`. That is not a weaker verdict on the other
+// 51 — it is NO verdict, rendered identically to a pass, and it is the failure
+// this whole file is otherwise built to refuse: the green printed for them said
+// "the axis looked and approved" while meaning "the axis did not look".
+//
+// It also escaped the one instrument that should have caught it. `unreadable`
+// exists so a package this reading cannot NAME is never mistaken for a package
+// the diff did not TOUCH (#4690) — and it stayed empty here, because a nested
+// package was not an unreadable reading, it was never a candidate. ⇒ A gate
+// cannot report a limb it never grew, and the residual an instrument names is
+// only ever a residual of what it looks at.
+//
+// The reach is now the manifest set rather than a depth, and the widening was
+// measured before it was chosen rather than after: over the 150 most recently
+// merged PRs, driving this file's own `judgeLevel` at each merge commit against
+// its parent, SEVEN verdicts move from exit 0 to exit 1 — six of them
+// `not-measured-moot` -> `not-measured-material`, which one `Clause-②:` line in
+// the PR body clears with no push, and one — PR #16650, `@objectstack/driver-sql`
+// and `@objectstack/driver-turso` graded `patch` under a durable `Clause-②: yes`
+// body line — `clean` -> `enforce`, which is this gate's own rule finding, on a
+// merged PR, the thing it exists to find. ⛔ That count is a reading for the
+// maintainer, never an argument for a tolerance: there is no allowlist and no
+// grandfathering here, and the six are cleared by declaring, not by softening.
 
-/** The paths whose movement makes a package's PUBLISHED surface the thing that grew. */
-const PUBLISHED_SOURCE_PATH = /^packages\/([^/]+)\/src\//;
+/**
+ * The `src` root whose movement makes a package's PUBLISHED surface the thing
+ * that grew. WHICH roots ship is a different axis and is deliberately left
+ * alone here — `bin/**` ships too, and that is #16692's card, not this one.
+ * What this half answers is only HOW DEEP the package owning the root may sit.
+ */
+const PUBLISHED_SOURCE_ROOT = 'src';
+
+/**
+ * Every directory this path could be the published source OF: each ancestor `D`
+ * under `packages/` for which the path reads `D/src/**`, SHALLOWEST FIRST.
+ *
+ * ## Why this is shape only, and not a deeper pattern (#16713)
+ *
+ * The reading used to be a single regular expression whose package segment was
+ * one-path-segment-wide, so it saw `packages/<name>/src/**` and nothing else.
+ * This workspace is not flat: 51 of its 74 packages live at
+ * `packages/<group>/<name>/` — every driver, service, plugin, connector,
+ * trigger, adapter and app — and for all of them the segment after `packages/`
+ * is the GROUP, which no `/src/` follows. So 69% of the workspace was not a
+ * candidate this gate could refuse, and — worse than unrefusable — not even
+ * REPORTABLE: `unreadable` stayed empty too, because a nested package never
+ * entered the reading at all. #4690's distinction ("a name it could not read
+ * must not look like a package the diff did not touch") was kept for an
+ * unreadable manifest and could not be kept here, because the gate cannot
+ * report a limb it never grew.
+ *
+ * ⛔ The repair is NOT a second segment in the pattern. That re-encodes today's
+ * layout in a second place and goes blind again the day a package sits one
+ * level deeper — the same defect by the same means, its recurrence merely
+ * postponed. What is enumerated here is SHAPE ONLY, at any depth; WHICH of the
+ * candidates is a real package is decided by reading its manifest out of the
+ * tree in `packagesTouched`, so the layout is read rather than written down.
+ *
+ * ## Why SHALLOWEST first — measured, not assumed
+ *
+ * A path can have more than one candidate, and this repo contains the case:
+ * `packages/create-objectstack/src/templates/blank/src/objects/note.object.ts`
+ * is `D/src/**` for BOTH `packages/create-objectstack` and the scaffold
+ * template dir `packages/create-objectstack/src/templates/blank`, which carries
+ * its own manifest (`objectstack-blank`, `private: true`) — template CONTENT
+ * that create-objectstack ships, not a workspace member. Resolving to the
+ * NEAREST manifest would name that private template and drop the real package:
+ * a regression against the one-segment reading this replaces. Shallowest first
+ * returns the old answer on every path the old pattern matched and adds the
+ * nested ones — measured over the whole tree, 22 package dirs matched before,
+ * 72 after, and none lost.
+ *
+ * @param {string} path a repo-relative path, as `git diff --name-only` prints it
+ * @returns {string[]} candidate package directories, shallowest first
+ */
+export function publishedSourceOwners(path) {
+  const segments = path.split('/');
+  if (segments[0] !== 'packages') return [];
+  const owners = [];
+  // `i` indexes the `src` segment. It starts at 2 so the owner is at least
+  // `packages/<something>` — `packages/src/**` names no package — and stops one
+  // short of the end, so the path is INSIDE `src/` rather than a file called
+  // `src`.
+  for (let i = 2; i < segments.length - 1; i += 1) {
+    if (segments[i] === PUBLISHED_SOURCE_ROOT) owners.push(segments.slice(0, i).join('/'));
+  }
+  return owners;
+}
 
 /**
  * The workspace package names whose `src/**` this diff moves, read from the
  * HEAD tree rather than from the working directory — the self-test and the
  * acceptance run both drive commits that are not checked out.
  *
- * `unreadable` is returned beside them, never folded into them: a
- * `packages/<dir>/src/**` path whose manifest could not be read is a package
- * this reading could not name, and a name it could not read must not look like
- * a package the diff did not touch (#4690).
+ * `unreadable` is returned beside them, never folded into them: a `<dir>/src/**`
+ * path whose manifest could not be read is a package this reading could not
+ * name, and a name it could not read must not look like a package the diff did
+ * not touch (#4690).
+ *
+ * ⭐ That distinction is the bill the widening above has to keep paying, and it
+ * is exactly where the NEW failure mode lands. A nested path now MATCHES, so a
+ * nested directory whose manifest is missing or unparseable is REPORTED as
+ * unreadable instead of vanishing the way every nested path used to. The
+ * invariant, stated so it can be tested: a path that matches the shape lands in
+ * `packages` or in `unreadable` — never in neither.
  *
  * @param {{ cwd: string, from: string, head: string }} opts
  * @returns {{ packages: string[], unreadable: string[] }}
@@ -913,27 +1011,38 @@ export function packagesTouched({ cwd, from, head }) {
   } catch {
     return { packages: [], unreadable: [] };
   }
-  const dirs = new Set();
-  for (const line of out.split('\n')) {
-    const m = PUBLISHED_SOURCE_PATH.exec(line.trim());
-    if (m) dirs.add(m[1]);
-  }
-  const packages = [];
-  const unreadable = [];
-  for (const dir of [...dirs].sort()) {
-    const manifest = showOrNull(head, `packages/${dir}/package.json`, cwd);
-    let name = null;
-    if (manifest !== null) {
-      try {
-        name = JSON.parse(manifest).name ?? null;
-      } catch {
-        name = null;
+  // One manifest read per candidate DIRECTORY rather than per changed file: a
+  // diff that moves forty files in one package would otherwise ask forty times.
+  const nameOfDir = new Map();
+  const nameFor = (dir) => {
+    if (!nameOfDir.has(dir)) {
+      const manifest = showOrNull(head, `${dir}/package.json`, cwd);
+      let name = null;
+      if (manifest !== null) {
+        try {
+          name = JSON.parse(manifest).name ?? null;
+        } catch {
+          name = null;
+        }
       }
+      nameOfDir.set(dir, typeof name === 'string' && name ? name : null);
     }
-    if (typeof name === 'string' && name) packages.push(name);
-    else unreadable.push(`packages/${dir}`);
+    return nameOfDir.get(dir);
+  };
+
+  const packages = new Set();
+  const unreadable = new Set();
+  for (const line of out.split('\n')) {
+    const owners = publishedSourceOwners(line.trim());
+    if (owners.length === 0) continue;
+    const owner = owners.find((dir) => nameFor(dir) !== null);
+    if (owner) packages.add(nameFor(owner));
+    // Nothing nameable on the chain: the SHALLOWEST candidate is what gets
+    // reported, because it is the directory the old one-segment reading named,
+    // so an unreadable manifest keeps reporting the dir it always reported.
+    else unreadable.add(owners[0]);
   }
-  return { packages, unreadable };
+  return { packages: [...packages].sort(), unreadable: [...unreadable].sort() };
 }
 
 /**
@@ -1180,7 +1289,7 @@ export function renderLevel(result) {
       stdout.push(
         'ℹ️ LEVEL AXIS: NOT MEASURED, and it could not have changed this verdict — no clause-② declaration was ' +
           'readable for this PR, AND there is nothing here a `yes` would have refused: either no changeset grades ' +
-          '`patch` a package whose `packages/*/src/**` this PR moves, or one of the packages it moves is already ' +
+          '`patch` a package whose `packages/**/src/**` this PR moves, or one of the packages it moves is already ' +
           'graded `minor` or above and carries the level for the PR (#16361). ' +
           '`yes` and `no` reach the same answer on this diff, so this exit 0 is a decided one rather than an unread one (#16776).',
         ...readings,
@@ -1190,7 +1299,7 @@ export function renderLevel(result) {
 
     case 'not-measured-material':
       stderr.push('⛔ LEVEL AXIS: NOT MEASURED, and it is the one reading this PR needed.\n');
-      stderr.push('   The packages this PR moves `packages/*/src/**` of, and the level each is graded:');
+      stderr.push('   The packages this PR moves `packages/**/src/**` of, and the level each is graded:');
       stderr.push(...patchLines(result.offenders));
       stderr.push('   ⇒ none of them is graded `minor` or above, so a `yes` here would REFUSE (#16361).\n');
       stderr.push(
@@ -1202,7 +1311,7 @@ export function renderLevel(result) {
           'conclusion for a reading that passed and a reading that never happened, on every surface that reads\n' +
           'conclusions rather than step logs (#16776, and #4690: a reading that cannot fail is indistinguishable from\n' +
           'one that passed). Where the declaration could not have mattered this gate still exits 0 and says so — it is\n' +
-          'refusing HERE because every package this diff moves under `packages/*/src/**` is graded `patch`, which is\n' +
+          'refusing HERE because every package this diff moves under `packages/**/src/**` is graded `patch`, which is\n' +
           'exactly the shape a `yes` refuses (#16361).\n' +
           '\n' +
           'DECLARE IT. One line, at the START of a line in the PR BODY (a `- `, `> ` or `**` prefix is read too):\n' +
@@ -1229,7 +1338,7 @@ export function renderLevel(result) {
 
     case 'clean':
       stdout.push(
-        '✓ LEVEL AXIS: this PR declares clause-② `yes`, and no package whose `packages/*/src/**` it moves is graded `patch`.',
+        '✓ LEVEL AXIS: this PR declares clause-② `yes`, and no package whose `packages/**/src/**` it moves is graded `patch`.',
         ...readings,
         ...unreadableNote,
       );
@@ -1242,7 +1351,7 @@ export function renderLevel(result) {
     // mode the filing card is about, one layer along.
     case 'discharged':
       stdout.push(
-        '✓ LEVEL AXIS: this PR declares clause-② `yes`, and it grades a package whose `packages/*/src/**` ' +
+        '✓ LEVEL AXIS: this PR declares clause-② `yes`, and it grades a package whose `packages/**/src/**` ' +
           'it moves at `minor` or above — the declared widening is accounted for:',
         ...raisedLines(result.raised),
         '',
@@ -1261,10 +1370,10 @@ export function renderLevel(result) {
 
     case 'enforce':
       stderr.push(
-        '⛔ This PR declares clause-② YES, and it grades NO package whose `packages/*/src/**` it moves\n' +
+        '⛔ This PR declares clause-② YES, and it grades NO package whose `packages/**/src/**` it moves\n' +
           '   at `minor` or above.\n',
       );
-      stderr.push('   The packages this PR moves `packages/*/src/**` of, and the level each is graded:');
+      stderr.push('   The packages this PR moves `packages/**/src/**` of, and the level each is graded:');
       stderr.push(...patchLines(result.offenders));
       stderr.push('   ⇒ none of them is graded `minor` or above.\n');
       stderr.push(
@@ -1541,11 +1650,12 @@ const SELF_TEST_BATTERIES = Object.freeze({
   'The wiring: these fixtures must actually run on every PR': 22,
   "The LEVEL axis: #16044's two heads, one word apart (#16055)": 56,
   'The GRAIN: a PR-scoped declaration judged at PR scope (#16361)': 25,
+  'THE DEPTH: a nested package is a candidate the axis can refuse (#16713)': 21,
 });
 
 // DELETING an entry silences that battery's floor exactly as effectively as
 // zeroing it, so the roster's own size is pinned too.
-const SELF_TEST_BATTERY_FLOOR = 15;
+const SELF_TEST_BATTERY_FLOOR = 16;
 
 // The key an assertion is filed under when no battery is open. It is not a
 // declared battery, so it reds by the same set difference rather than silently
@@ -2323,7 +2433,7 @@ function selfTest() {
       // The package axis, same patch head: `patch` for a package this diff did
       // not grow is not this gate's business.
       const untouched = judgeLevel({ levels: levelsFor(PATCH_HEAD), touched: { packages: ['@objectstack/spec'], unreadable: [] }, declaration: declaredYes });
-      assert(untouched.verdict === 'clean', `\`patch\` for a package the diff does not move under packages/*/src/** is not refused — got ${untouched.verdict}`);
+      assert(untouched.verdict === 'clean', `\`patch\` for a package the diff does not move under packages/**/src/** is not refused — got ${untouched.verdict}`);
 
       // #4690, on this axis too.
       assert(judgeLevel({ levels: null, touched: touchedCli, declaration: declaredYes }).verdict === 'unreadable-diff', 'an uncomputable diff is a failure on the level axis as well');
@@ -2402,7 +2512,7 @@ function selfTest() {
         );
         const scanned = scan({ cwd: dir, base });
         const touched = packagesTouched({ cwd: dir, from: scanned.base, head: 'HEAD' });
-        assert(touched.packages.length === 0, `a diff outside packages/*/src/** grows no published surface — got ${JSON.stringify(touched.packages)}`);
+        assert(touched.packages.length === 0, `a diff outside packages/**/src/** grows no published surface — got ${JSON.stringify(touched.packages)}`);
         assert(
           judgeLevel({ levels: scanned.levels, touched, declaration: declaredYes }).verdict === 'clean',
           'end to end: `patch` beside a tests-only diff is not this gate\'s business, even under a `yes` declaration',
@@ -2675,6 +2785,154 @@ function selfTest() {
           'end to end control: one word along — the lint entry graded `patch` — and the same two-package diff is refused, so the pass above is about the level and not about the shape of the diff',
         );
       }
+    }
+
+    // ── THE DEPTH: a nested package is a candidate at all (#16713) ───────────
+    //
+    // The axis used to read the package segment one path segment wide, so it
+    // saw 23 of this workspace's 74 packages and the other 51 — every driver,
+    // service, plugin, connector, trigger, adapter and app — could pair a
+    // `Clause-②: yes` with a `patch` and stay green. THE PAIR IS THE CONTROL
+    // here exactly as it is above: the nested leg going red proves nothing on
+    // its own, because "the matcher was widened" and "the gate now refuses
+    // everything" produce the same red. So every fixture below is answered by a
+    // control that must STAY green, and the flat leg is re-asserted in this
+    // same harness so a nested red is readable as a widening rather than as a
+    // gate that lost its discrimination.
+    battery('THE DEPTH: a nested package is a candidate the axis can refuse (#16713)');
+    {
+      const owners = (p) => JSON.stringify(publishedSourceOwners(p));
+      const declaredYes = { value: 'yes', payload: true, readings: ['carrier: on'] };
+
+      // The shape reading, at three depths and its controls. Depth-agnostic is
+      // the whole point: a repair that merely allowed ONE extra segment passes
+      // the first two of these and fails the third.
+      assert(owners('packages/cli/src/commands/lint.ts') === '["packages/cli"]', `flat: one segment ⇒ the package dir — got ${owners('packages/cli/src/commands/lint.ts')}`);
+      assert(
+        owners('packages/drivers/driver-sql/src/sql-driver.ts') === '["packages/drivers/driver-sql"]',
+        `nested: the GROUP is not the package, the dir under it is — got ${owners('packages/drivers/driver-sql/src/sql-driver.ts')}`,
+      );
+      assert(
+        owners('packages/a/b/c/src/x.ts') === '["packages/a/b/c"]',
+        `three levels deep reads the same way — a fix that hard-codes ONE optional group segment fails HERE, which is why the reading is a walk and not a wider pattern — got ${owners('packages/a/b/c/src/x.ts')}`,
+      );
+      assert(owners('packages/drivers/driver-sql/README.md') === '[]', 'control: a path with no `src/` segment owns nothing — otherwise the three positives above would hold for every file in the repo');
+      assert(
+        owners('packages/cli/bin/os.mjs') === '[]',
+        'control: `bin/**` is still NOT read — WHICH roots ship is #16692\'s axis and this card must not silently close it; a fix that reddened here would be answering a different card',
+      );
+      assert(owners('scripts/check-changeset-no-major.mjs') === '[]', 'control: outside `packages/` there is no owner at all');
+      assert(owners('packages/src/x.ts') === '[]', 'control: the owner must be at least `packages/<something>` — `packages` itself is not a package');
+      assert(owners('packages/cli/src') === '[]', 'control: a path that IS `src` is not a path INSIDE `src/` — the walk stops one short of the end');
+
+      // The multi-candidate case, which this repo really contains, and the
+      // reason the walk resolves SHALLOWEST first. `packages/create-objectstack`
+      // ships a scaffold template that carries its own `package.json`
+      // (`objectstack-blank`, private, not a workspace member), and the template
+      // has a `src/` of its own. Resolving to the NEAREST manifest would name
+      // the private template and DROP the real package — a regression against
+      // the one-segment reading this replaces.
+      const twin = 'packages/create-objectstack/src/templates/blank/src/objects/note.object.ts';
+      assert(
+        owners(twin) === '["packages/create-objectstack","packages/create-objectstack/src/templates/blank"]',
+        `a path can own two candidates and they are ordered SHALLOWEST first — got ${owners(twin)}`,
+      );
+
+      const NESTED = '@objectstack/driver-sql';
+      const NESTED_DIR = 'packages/drivers/driver-sql';
+      const CS = '.changeset/depth-leg.md';
+      const nestedRepo = (bump) =>
+        makeRepo(
+          { [`${NESTED_DIR}/package.json`]: JSON.stringify({ name: NESTED, version: '0.0.0' }), [`${NESTED_DIR}/src/sql-driver.ts`]: 'export const before = 1;\n' },
+          { [`${NESTED_DIR}/src/sql-driver.ts`]: 'export const after = 2;\n', [CS]: `---\n"${NESTED}": ${bump}\n---\n\nbody\n` },
+        );
+      const levelOf = ({ dir, base }) => {
+        const scanned = scan({ cwd: dir, base });
+        const touched = packagesTouched({ cwd: dir, from: scanned.base, head: 'HEAD' });
+        return { touched, result: judgeLevel({ levels: scanned.levels, touched, declaration: declaredYes }) };
+      };
+
+      // THE LEG THIS CARD IS ABOUT. Byte for byte the assertion the flat leg
+      // has carried since #16055, with the package one directory deeper.
+      const nestedPatch = levelOf(nestedRepo('patch'));
+      assert(
+        nestedPatch.touched.packages.includes(NESTED),
+        `end to end: a nested package's src moved must NAME the package from its own manifest — got ${JSON.stringify(nestedPatch.touched)}`,
+      );
+      assert(
+        nestedPatch.result.verdict === 'enforce',
+        `end to end: a real diff that moves ${NESTED_DIR}/src/** and grades it \`patch\` under a \`yes\` declaration is REFUSED — got ${nestedPatch.result.verdict}`,
+      );
+      assert(renderLevel(nestedPatch.result).exitCode === 1, 'and it EXITS 1 — the exit code is what becomes the check-run conclusion, and a verdict name CI never reads is not a refusal');
+      assert(
+        renderLevel(nestedPatch.result).stderr.join('\n').includes(NESTED),
+        'the refusal must NAME the nested package — an author who cannot see which line is being asked about cannot act on it',
+      );
+
+      // CONTROL 1, the level: the same repository one word along. Without this,
+      // the red above is equally consistent with "any nested diff is now
+      // refused", which is the shape a tolerance-free fix must not have.
+      const nestedMinor = levelOf(nestedRepo('minor'));
+      assert(
+        nestedMinor.touched.packages.includes(NESTED) && nestedMinor.result.verdict === 'clean',
+        `control: the same nested diff graded \`minor\` PASSES while still being SEEN — so the refusal is about the level, not about the depth — got ${JSON.stringify(nestedMinor.touched)} / ${nestedMinor.result.verdict}`,
+      );
+      assert(renderLevel(nestedMinor.result).exitCode === 0, 'and the two nested legs differ in EXIT CODE, one word apart');
+
+      // CONTROL 2, the flat leg, re-driven HERE. #16055's assertion lives in
+      // its own battery; re-stating it inside this harness is what makes the
+      // nested red above readable as a WIDENING rather than as a gate that
+      // stopped discriminating.
+      const flat = levelOf(
+        makeRepo(
+          { 'packages/cli/package.json': JSON.stringify({ name: '@objectstack/cli', version: '0.0.0' }), 'packages/cli/src/commands/lint.ts': 'export const before = 1;\n' },
+          { 'packages/cli/src/commands/lint.ts': 'export const after = 2;\n', [CS]: '---\n"@objectstack/cli": patch\n---\n\nbody\n' },
+        ),
+      );
+      assert(
+        flat.result.verdict === 'enforce' && renderLevel(flat.result).exitCode === 1,
+        `control: the FLAT leg still reds in this same harness — a nested red beside a flat green would mean the reading moved rather than widened — got ${flat.result.verdict}`,
+      );
+
+      // CONTROL 3, the nonsense leg: a diff that publishes nothing must stay
+      // green under the very same `yes`. An implementation that simply always
+      // enforced would satisfy every positive above and fail only here.
+      const nonsense = levelOf(
+        makeRepo(
+          { 'packages/cli/package.json': JSON.stringify({ name: '@objectstack/cli', version: '0.0.0' }), 'content/docs/a.mdx': 'a\n' },
+          { 'content/docs/a.mdx': 'b\n', [CS]: '---\n"@objectstack/cli": patch\n---\n\nbody\n' },
+        ),
+      );
+      assert(
+        nonsense.touched.packages.length === 0 && nonsense.result.verdict === 'clean' && renderLevel(nonsense.result).exitCode === 0,
+        `control: a diff that moves no published source is still not this gate's business under a \`yes\` — got ${JSON.stringify(nonsense.touched)} / ${nonsense.result.verdict}`,
+      );
+
+      // ⭐ THE NEW FAILURE MODE. Widening the shape means nested paths now
+      // MATCH, so a nested dir whose manifest cannot be read has somewhere to
+      // land. Before this change it landed in NEITHER set — the exact shape
+      // #4690 forbids, and the one the filing card names: the gate could not
+      // report a limb it never grew. `packages/mystery` pins this for a flat
+      // dir in the battery above; this pins it at depth.
+      const { dir: nmDir, base: nmBase } = makeRepo(
+        { 'packages/newgroup/newpkg/src/a.ts': 'a\n' },
+        { 'packages/newgroup/newpkg/src/a.ts': 'b\n', [CS]: '---\n"@objectstack/cli": patch\n---\n\nbody\n' },
+      );
+      const nmScanned = scan({ cwd: nmDir, base: nmBase });
+      const nmTouched = packagesTouched({ cwd: nmDir, from: nmScanned.base, head: 'HEAD' });
+      assert(
+        nmTouched.unreadable.includes('packages/newgroup/newpkg'),
+        `a NESTED dir whose manifest cannot be read is reported as unreadable, not as absent (#4690) — got ${JSON.stringify(nmTouched)}`,
+      );
+      assert(nmTouched.packages.length === 0, 'and it is not named as a package either — an unreadable manifest yields no name to report');
+      assert(
+        nmTouched.unreadable.length + nmTouched.packages.length === 1,
+        'the invariant the widening owes: a path that MATCHES the shape lands in exactly one of the two sets, never in neither — landing in neither is the whole finding this battery closes',
+      );
+      assert(
+        renderLevel(judgeLevel({ levels: nmScanned.levels, touched: nmTouched, declaration: declaredYes })).stdout.join('\n').includes('packages/newgroup/newpkg'),
+        'and the tick PRINTS it — an offender that could not be seen must be stated beside the green, or the green is the same silent pass this card is about',
+      );
     }
 
   } finally {
