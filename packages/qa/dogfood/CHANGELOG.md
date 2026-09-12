@@ -1,5 +1,54 @@
 # @objectstack/dogfood
 
+## 0.0.45
+
+### Patch Changes
+
+- Updated dependencies [041d9fd]
+- Updated dependencies [dd2fd20]
+- Updated dependencies [23aa83c]
+- Updated dependencies [854639b]
+- Updated dependencies [58b36fa]
+- Updated dependencies [288fe9c]
+- Updated dependencies [d127f9b]
+- Updated dependencies [c17b494]
+- Updated dependencies [a016f08]
+- Updated dependencies [f7a9740]
+- Updated dependencies [ca31ff6]
+- Updated dependencies [9b9581b]
+- Updated dependencies [8d4690b]
+- Updated dependencies [2e8e118]
+- Updated dependencies [de1a611]
+- Updated dependencies [db76982]
+- Updated dependencies [ab1c585]
+- Updated dependencies [7cd5874]
+  - @objectstack/spec@17.5.0
+  - @objectstack/plugin-security@17.5.0
+  - @objectstack/service-analytics@17.5.0
+  - @objectstack/verify@17.5.0
+  - @objectstack/plugin-auth@17.5.0
+  - @objectstack/platform-objects@17.5.0
+  - @objectstack/objectql@17.5.0
+  - @objectstack/metadata@17.5.0
+  - @objectstack/types@17.5.0
+  - @objectstack/plugin-email@17.5.0
+  - @objectstack/plugin-audit@17.5.0
+  - @objectstack/example-crm@4.0.97
+  - @objectstack/example-multi-package@0.0.4
+  - @objectstack/example-showcase@0.3.19
+  - @objectstack/connector-mcp@17.5.0
+  - @objectstack/connector-openapi@17.5.0
+  - @objectstack/connector-rest@17.5.0
+  - @objectstack/formula@17.5.0
+  - @objectstack/mcp@17.5.0
+  - @objectstack/metadata-core@17.5.0
+  - @objectstack/plugin-approvals@17.5.0
+  - @objectstack/plugin-sharing@17.5.0
+  - @objectstack/plugin-webhooks@17.5.0
+  - @objectstack/service-messaging@17.5.0
+  - @objectstack/service-storage@17.5.0
+  - @objectstack/trigger-record-change@17.5.0
+
 ## 0.0.44
 
 ### Patch Changes

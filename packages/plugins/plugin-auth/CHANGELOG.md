@@ -1,5 +1,99 @@
 # Changelog
 
+## 17.5.0
+
+### Minor Changes
+
+- 854639b: feat(engine)!: `findOne`, `update` and `delete` declare what they answer, and their hook seams are guarded (#16231)
+  
+  <!-- adr-0087: not-required (no-migration-prescription) Nothing authorable moves. No spec key, no authored metadata property, no config field, no accepted request shape and no stored artifact changes spelling or shape; `objectstack migrate meta` has nothing to rewrite, `spec-changes.json` has nothing to project and the upgrade guide has no row to gain. What moves is the declared RETURN TYPE of three TypeScript methods (`packages/spec/src/contracts/data-engine.ts`, its `scoped-context.ts` mirrors, and `ObjectQL` itself) plus three new registered ADR-0112 error codes. The rewrite this ships — add the null check the type now demands — is addressed to a TYPESCRIPT CONSUMER and is delivered by the compiler at their own call site, which is the audience the ADR-0087 ledger explicitly does not serve. `type-surface-only` is the category built for exactly this class and it is NOT claimed here, because its predicate 2 (`no-spec-diff`) is mechanically false for this PR: the surface the maintainer ruling names IS `packages/spec/src/contracts/**`. That gap is reported on the card rather than worked around, and the `**BREAKING**` banner below is carried rather than dropped. -->
+  
+  **BREAKING** on three published `.d.ts` surfaces. `ObjectQL.findOne`, `ObjectQL.update` and `ObjectQL.delete` — and the `IDataEngine` / `IScopedObjectRepository` contracts they implement — declared `Promise<any>` and now declare the answers they have always given:
+  
+  - `findOne` → `Promise<Record<string, any> | null>`
+  - `update` → `Promise<Record<string, any> | number | null>`
+  - `delete` → `Promise<boolean | number>`
+  
+  `any` is assignable to everything and admits every property read, so TypeScript consumers of these three methods can stop compiling — most often on the null check the declaration now demands. Shipped as `minor` under the repo's launch-window convention, in which `major` is refused by `check-changeset-no-major` and breaking-ness is carried by this banner plus the ADR-0087 disposition rather than by the level. The governing text is the **WHICH LEVEL** maintainer ruling of 2026-09-04 (decision batch #35, on #15294) recorded at `.github/workflows/pr-automation.yml`; `AGENTS.md`'s "a bug fix in a released package takes a patch changeset — never none" is the floor against `none` and was rejected as the ceiling here, because this PR also widens `@objectstack/objectql`'s index with new exported symbols, which that ruling puts at `minor` on its own.
+  
+  **Why.** `engine.ts` has four `return hookContext.result` sites, one per hook-bearing verb. #15823 closed the `find()` one — an `afterFind` handler that replaced the array made a method declared `Promise<any[]>` resolve to an envelope, silently — and recorded that it could close only that one: the other three declared `Promise<any>` and so carried no declaration a handler could break. A guard cannot exist before a declaration worth guarding does. The maintainer ruled the gap shut (option A, 2026-09-07, director seat summon #17, decision batch #2; option B "declare only, no enforcement" and option C "record `any` as intended" were refused).
+  
+  The shapes are read off the driver contract each engine exit delegates to, not invented: `driver.findOne` and the by-id `driver.update` declare `Record<string, unknown> | null`, `driver.delete` declares `boolean`, and the predicate exits `driver.updateMany` / `driver.deleteMany` declare the affected-row `number` a bulk write resolves (#4639). Row FIELD values stay erased (`Record<string, any>`), which is #15823's precedent extended exactly rather than softened: `find()` declares `Promise<any[]>`, so the CONTAINER is the contract and the rows inside it are `any`. It is also the only spelling that can state "record or null" at all, since `any | null` collapses to `any`.
+  
+  **What is enforced now.** Each seam re-checks `hookContext.result` against its declaration immediately after the `after*` dispatch and ahead of the consumers that already assume the shape, and refuses a value outside it with a registered ADR-0112 envelope — `FIND_ONE_HOOK_RESULT_NOT_RECORD`, `UPDATE_HOOK_RESULT_NOT_WRITE_SHAPE`, `DELETE_HOOK_RESULT_NOT_WRITE_SHAPE`, all `500`, all branchable on `error.code`. Shaping stays legal exactly as it does on `find()`: a handler may mutate what it is handed, drop keys, or assign a different value of a declared shape. The falsy answers are legal and deliberately so — `null` from `findOne`, `null` or a count from `update`, and `false` or `0` from `delete`, the two most ordinary answers that verb gives.
+  
+  **Who has to change something, on the TYPE axis.** A TypeScript consumer that reads a field off `findOne`'s result without a null check, or off `update`'s result without separating the by-id record from the predicate count. In this repository that was measured before anything moved, at the maintainer's instruction: 18 files and 92 compile errors, all repaired here.
+  
+  **What changes at RUNTIME, per door.** TWO things can put an off-declaration value at a seam, and every refusal's `developerMessage` names both: an `after*` handler that assigned one, and a DRIVER whose own exit answered off `IDataDriver`. Each door goes from returning that value silently to refusing it — one door, one registered code, all `500`:
+  
+  - `findOne` — FROM: whatever the `afterFind` dispatch left in `ctx.result`, or whatever `driver.findOne` answered off its declared `Promise<Record<string, unknown> | null>`, returned to the caller as-is and walked first by `maskSecretFields` / `stripSearchCompanionFromRead`. TO: `500 FIND_ONE_HOOK_RESULT_NOT_RECORD`, raised at the seam when that value is neither a record nor `null`.
+  - `update` — FROM: whatever the `afterUpdate` dispatch left in the batch `ctx.result`, or whatever `driver.update` / `driver.updateMany` answered off their declared `Promise<Record<string, unknown> | null>` / `Promise<number>`, returned as-is and read first by `stripSearchCompanion` and the realtime publish. TO: `500 UPDATE_HOOK_RESULT_NOT_WRITE_SHAPE`, raised when that value is outside record-or-count-or-`null`.
+  - `delete` — FROM: whatever the `afterDelete` dispatch left in `ctx.result`, or whatever `driver.delete` / `driver.deleteMany` answered off their declared `Promise<boolean>` / `Promise<number>`, returned as-is to a caller such as `metadata-protocol`'s `deleteData`, which turns `false` into a 404. TO: `500 DELETE_HOOK_RESULT_NOT_WRITE_SHAPE`, raised when that value is neither a boolean nor a number — never on `false` or `0`, which are declared answers.
+  
+  The driver half of each line is not hypothetical: the seven off-contract test doubles this PR repairs are exactly that source, and they are why the refusal sentence names the SEAM instead of accusing the handler.
+
+### Patch Changes
+
+- dd2fd20: fix(plugin-auth): one base-path normalisation chain, and an MCP resource identifier that is always a URL
+  
+  `AuthManager` derived its base path in three independent places. `getMcpResourceUrl()`
+  read `this.config.basePath` directly and added no leading slash, so a `basePath`
+  configured without one produced a value that is not a URL at all:
+  
+      basePath 'api/v1/auth'   ->  http://localhost:3000api/v1/mcp
+  
+  `new URL()` throws on that (`3000api` is not a port), so the RFC 9728 path-inserted
+  well-known route derived from it throws too, and `@better-auth/oauth-provider` 1.7.2
+  refuses to seed the `sys_oauth_resource` row from it at plugin init ("resource
+  identifier ... must be an absolute URI (RFC 8707 §2)"). With
+  `enforcePerClientResources` at its `true` default, every MCP client was then refused
+  for want of a link row. That input class could never mint or match a token, so
+  repairing it re-selects nothing.
+  
+  There is now exactly one read of the configured value and one chain above it:
+  
+      configuredBasePath()   the configured value VERBATIM — what better-auth is handed
+        └─ rootedBasePath()  + a leading slash when absent (better-auth's own rule)
+             ├─ getAuthIssuer()      = origin + this
+             └─ getBasePath()        = this, trailing slashes stripped
+                  └─ getMcpResourceUrl()  = origin + this minus `/auth` + `/mcp`
+  
+  `getAuthIssuer()` and `getBasePath()` answer byte-identically to before for every
+  spelling. Only `getMcpResourceUrl()` moves, and only for a non-canonical `basePath`:
+  a missing leading slash (was not a URL), repeated trailing slashes, or a configured
+  `/` (was a `//mcp` path no mount serves). A canonical `basePath` is unchanged on all
+  three getters.
+- ab1c585: `POST /two-factor/verify-totp` and `/two-factor/verify-otp` now echo the user row as it stands when the response is written, instead of the pre-rotation snapshot the vendor closes over.
+  
+  On the enrolment lane — a signed-in caller confirming a new factor — better-auth writes `twoFactorEnabled: true`, rotates the session, and only then calls the `valid(ctx)` closure it built at entry. That closure still holds the pre-rotation session, so a successful verification answered `user.twoFactorEnabled: false` to the very caller who had just switched 2FA on. An account portal reading that body renders the factor as still OFF right after enrolment, and a bearer client that caches the echoed user carries the wrong flag until its next `get-session`.
+  
+  `two-factor-rotated-token-echo` already repaired the body's other stale member, `token`, on exactly these routes and on exactly this predicate — the response staged a session cookie whose token differs from the one echoed. The `user` member is stale for the same reason, so it is repaired under the same predicate rather than a new one.
+  
+  - **Two narrowings, both load-bearing.** Only the members the vendor already echoed are written, so the published payload shape (`AuthWireUser`) cannot widen — better-auth's own output filter is a deny-list, and forwarding a raw row would put every column it happens to carry on the wire. And the row is re-read through `internalAdapter` by the id the response itself published, so the repair travels the same output transform that produced the echo (a driver that stores booleans as `1`/`0` cannot change a member's wire type) and can never substitute a different principal into a response.
+  - **`/two-factor/verify-backup-code` is untouched.** It does not rotate and already echoed the live row; it is in neither path list, its row is not read, and it is pinned as a negative control on both the in-memory engine and a real `SqlDriver` — an unconditional re-read would have "fixed" the broken lane and quietly rewritten one that was already right.
+  - **The failure posture is inherited.** A row read that throws or answers nothing degrades to the vendor's own echo, never to a failed verification and never to a lost `token` repair, which is written first for that reason.
+  
+  `@objectstack/client` drops the `AuthTwoFactorVerificationResult.user` warning that told callers to re-read the session for the live flag; the wire shape it declares is unchanged.
+- Updated dependencies [041d9fd]
+- Updated dependencies [23aa83c]
+- Updated dependencies [854639b]
+- Updated dependencies [58b36fa]
+- Updated dependencies [288fe9c]
+- Updated dependencies [d127f9b]
+- Updated dependencies [c17b494]
+- Updated dependencies [f7a9740]
+- Updated dependencies [dfb42c5]
+- Updated dependencies [2e8e118]
+- Updated dependencies [de1a611]
+- Updated dependencies [db76982]
+- Updated dependencies [7cd5874]
+  - @objectstack/spec@17.5.0
+  - @objectstack/platform-objects@17.5.0
+  - @objectstack/types@17.5.0
+  - @objectstack/rest@17.5.0
+  - @objectstack/core@17.5.0
+  - @objectstack/service-messaging@17.5.0
+
 ## 17.4.0
 
 ### Minor Changes
