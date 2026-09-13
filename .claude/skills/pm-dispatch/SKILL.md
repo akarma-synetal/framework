@@ -57,7 +57,7 @@ PM 的工作是循环:选卡 → 认领 → 派发 → 收集 → 复核 → 报
 | `director` | 以项目总监席身份运行(人工召唤;四职见 升级与决策 节与 `references/lanes/director.md`) | — |
 | `label:<name>` | backlog 过滤标签;`label:all` = 全部 open 未认领 | `pm:queue` |
 | `repo:<owner/name>` | 扫哪个仓的 backlog(单 issue 的落地仓看它自己的 `repo:*` 标签) | `objectstack-ai/objectstack` |
-| `batch:<n>` | 同时在飞的 dev 上限 | 默认 `3`;`n` 的维护者天花板 `5` |
+| `batch:<n>` | 同时在飞的 dev 上限 | 默认 `2`;`n` 的维护者天花板 `5` |
 | `rounds:<n>` | 跑 N 轮后停 | 队列清空为止 |
 | `mode:subagent` \| `mode:cloud` | 派发后端 | 按卡分流:S+M ⇒ `subagent`,`cloud` 只留 L/XL 等保留面 |
 | `#12 #34 …` | 显式 issue 清单,整体覆盖标签查询 | — |
@@ -91,10 +91,10 @@ PM 的工作是循环:选卡 → 认领 → 派发 → 收集 → 复核 → 报
 
 ## 全体座位的不变量
 
-- 所有状态在 GitHub:只经 issue 标签、assignee、正文行与 `pm:seat` 座位贴读写。
-- 循环必须能从全新会话恢复。
-- GitHub 上一切新内容用英文;中文只留四通道,含 `## 维护者速读`(受管 PR 与决策卡)。
-- 另三通道:轮次报告、派发令里的裁决引文、决策四维分析(评论与四棱块)。
+- 状态只经 GitHub 标签、assignee、正文行与 `pm:seat` 座位贴读写;循环须能从全新会话恢复。
+- 用户账号仅三用:assignee、授权批准、维护者亲手;⛔ 席位与 dev 永不以用户账号写内容。
+- 内容恒经 REST 代理(`claude[bot]`);批准账号永不跑席位、不作席位 claude.ai 的关联用户。
+- GitHub 上一切新内容用英文;中文只留四通道(维护者速读、轮报、裁决引文、四维分析)。
 - 裁决引文照抄不译;四维中文只管新记录,存量英文块 ⛔ 不迁移;存量中文 ⛔ 不追溯改写。
 - 一座位一车道双射:域 X 谁管、PM Y 管什么,各恰好一个答案。
 
@@ -462,7 +462,7 @@ PM 的工作是循环:选卡 → 认领 → 派发 → 收集 → 复核 → 报
 
 ### 认领(先认领后动工)
 
-- 同账号多会话共享 GitHub 身份:assignee 只回答有 agent 认领了,认领评论承载身份。
+- 共享身份下 assignee 只答有无认领;身份只认正文 session ID,⛔ 不认作者字段。
 - assignee 字段归 PM:原子对 step 1 设,dev 席恒不写它;跨账号 assignee 不是你 ⇒ 永不碰。
 - 释放是显式动作:让卡离手者同笔清 assignee + `Release:` 行(会话/因/去向);下一任重新认领。
 - 部分落地(PR 带 `Refs #N (item k)`,⛔ 不 `Fixes`)即释放:合入同笔回 `pm:queue` + 清 assignee。
