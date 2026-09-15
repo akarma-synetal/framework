@@ -1,5 +1,198 @@
 # @objectstack/spec
 
+## 17.5.0
+
+### Minor Changes
+
+- 041d9fd: fix(service-analytics)!: `POST /analytics/dataset/query` asks the OBJECT-level read grant before it serves an inline dataset (#16645)
+  
+  <!-- adr-0087: not-required (no-migration-prescription) Nothing authorable is renamed, retired or re-typed: no `packages/spec` key changes its name, its type or its optionality, no stored shape moves, and every dataset, dashboard and analytics request body parses byte-identically to before — so `objectstack migrate meta` has nothing to rewrite and this changeset carries no rewrite instructions. What narrows is the ACCEPT SET of a published route at REQUEST time: `POST /analytics/dataset/query` (and the `/analytics/query` and `/analytics/sql` doors) now refuse a caller who holds no object-level read grant on an object the request reads, which is the same verdict `GET /data/<object>` already returns for that caller on that deployment. The remedy for a caller who is refused is a GRANT, held in permission-set data rather than in an authored file: the deployment gives the principal read on the object, exactly as it must today to use `/data`. There is no authored artifact and no stored representation for a migration to act on, and the additions to the contract are additive (a new OPTIONAL `ISecurityService.canReadObject`, new optional keys on three option payloads), which is a widening rather than a retirement. -->
+  
+  **BREAKING** in the accept-set sense — an accept-set narrowing on a published
+  route — landing in the launch window as `minor` on all four packages (the
+  lockstep convention: during the window the bump level is not the carrier, this
+  banner and the disposition above are). Nothing that was already admitted
+  becomes refused **except** the requests `GET /data/<object>` refuses today for
+  the same principal, which is the defect. Nothing that was refused becomes
+  admitted.
+  
+  `POST /analytics/dataset/query` now asks the OBJECT-level read grant before it serves an inline dataset, so the analytics door and `GET /data/<object>` reach one admission verdict on every driver.
+  
+  The route accepts an inline dataset definition (`body.dataset`) from any authenticated caller. On a SQL driver the compiled statement ran through the driver's raw `execute()`, which is documented as a tenant-isolation bypass and which no middleware sits in front of — so the request reached the database having passed exactly ONE of the three read layers (the row scope, threaded since ADR-0021 D-C). A caller with **no grant of any kind** on an object received its row count, and with `dimensions` its grouped counts by any column, where the `/data` door answered `403 PERMISSION_DENIED` for the same principal on the same deployment. On the memory driver the identical request fell through to the ObjectQL engine, which applies all three layers in one place, and was refused. The exposure is not opt-in and an application cannot decline it: a deployment shipping 0 datasets and 0 dashboards has the identical surface, because the reachable slot is the inline definition rather than a declared one.
+  
+  **This change NARROWS what the analytics doors accept.** Requests that were already refused by `/data` are now refused by analytics too; nothing that was refused becomes admitted. "Fails closed" is a statement about a WIRED provider: a deployment with no `security` service registered keeps its previous analytics behaviour by design, because on that deployment `/data` carries no object-level gate either and the equivalence is what is being defended.
+  
+  - **`ISecurityService.canReadObject(object, context)`** (`@objectstack/spec`, optional) — the object-level half of a read, the sibling of `getReadFilter`'s row-level half. It exists because the two are not interchangeable: `getReadFilter` answers "which rows" and answers `undefined` — "no row restriction" — for a caller who may not read the object at all, so a door holding only the filter reads a caller with NO grant as a caller with NO restriction. Fails CLOSED. Absence is a defined state and its fallback is **not** "admit": a consumer composes the same verdict from `explain`, which is not optional.
+  - **`@objectstack/plugin-security` implements it** as the middleware's own read gate, arm for arm and in its order — the `isSystem` bypass, the "no permission sets resolved" skip, the #3545 fail-closed refusal on an unresolvable object posture, the ADR-0066 D3 `requiredPermissions` capability AND-gate, the `allowRead` CRUD grant, and the ADR-0090 D10 delegator intersection — from the same primitives the middleware calls, and it is exposed on the registered `security` service.
+  - **`@objectstack/service-analytics` asks it once at the door**, for the base object and every joined object, **ahead of strategy selection**. Placement is the fix: two strategies each enforcing their own copy of three layers is the CAUSE of the divergence, not its remedy, so both strategies — and any strategy added later — inherit one verdict by construction. `AnalyticsServicePlugin` auto-bridges the new `admitObjectRead` hook to the `security` service (`canReadObject`, falling back to `explain`), the same way it already bridges `getReadScope`, and warns loudly at init when no security service is registered. The bridge tells three resolutions apart: an ABSENT `security` service admits (that deployment has no object-level gate on `/data` either, so the two doors still agree, and this is what keeps a deployment shipping no `plugin-security` working as before); a service that cannot be USED — resolving it throws, or it exposes neither `canReadObject` nor `explain` — DENIES and reports at `error`, because `/data`'s middleware does not fall open in those states.
+  - **`@objectstack/verify`** gains `bootStack(app, { databaseDriver: 'sqlite-wasm' | 'memory' })`, because a two-driver equivalence property cannot be measured on one driver — which is how the strategies were allowed to disagree.
+  
+  The refusal is `PERMISSION_DENIED` / 403, the same code and status the engine path already answers, and it names only the object the caller themselves named.
+- 23aa83c: `DataMigrationFlagSchema` gains `columns_moved_at`, and the `sys_migration` platform object gains the matching column: the deployment-level attestation that a migration's COLUMN MOVE ran here — the step that retypes the migrated columns and rewrites the values they hold into the new encoding.
+  
+  **What it attests** is a fact the ledger could not previously express. `applied_at` says the backfill ran in apply mode; `verified_at` says the self-check passed. Neither says anything about the physical columns, because the backfill and the column move are separate acts and only the first of them had somewhere to be recorded. A deployment can therefore have applied AND verified a migration and still store the legacy encoding. `columns_moved_at` is that second fact, carried as its own member rather than as a widening of either existing one: folding it into `verified_at` would change what an already-verified row authorises on every deployment that has never heard of a column move.
+  
+  **Absence is the contract, not a default.** The member is optional and nullable, and nothing in this change writes it. Null or absent means the columns still hold the legacy encoding — a real, expected steady state on any deployment that has run the backfill but not the move, and never an error state — so every row that exists in the world today, and any consumer that cannot read the member at all, lands on the legacy encoding with no extra logic. A required member, or a default value, would destroy the exact property the mechanism was chosen for.
+  
+  **Nothing reads it yet, and the arbiter is untouched.** `isDataMigrationFlagVerified` — documented as the ONE arbiter for the existing consumers (reap gating, the strict value-shape flip) — is unchanged in this diff, and is now pinned to return the same verdict for a row that omits the new member as it returned before the member existed; `authorisesIrreversibleAction`, which composes it, is pinned the same way. The predicate that will require `columns_moved_at` non-null belongs to the driver work this change unblocks, and reads it in addition to the arbiter, never inside it.
+  
+  This is an additive widening: `DataMigrationFlag` (`z.input` of the schema) gains one optional member, no existing member changes or moves, and no export is added or removed.
+- 854639b: feat(engine)!: `findOne`, `update` and `delete` declare what they answer, and their hook seams are guarded (#16231)
+  
+  <!-- adr-0087: not-required (no-migration-prescription) Nothing authorable moves. No spec key, no authored metadata property, no config field, no accepted request shape and no stored artifact changes spelling or shape; `objectstack migrate meta` has nothing to rewrite, `spec-changes.json` has nothing to project and the upgrade guide has no row to gain. What moves is the declared RETURN TYPE of three TypeScript methods (`packages/spec/src/contracts/data-engine.ts`, its `scoped-context.ts` mirrors, and `ObjectQL` itself) plus three new registered ADR-0112 error codes. The rewrite this ships — add the null check the type now demands — is addressed to a TYPESCRIPT CONSUMER and is delivered by the compiler at their own call site, which is the audience the ADR-0087 ledger explicitly does not serve. `type-surface-only` is the category built for exactly this class and it is NOT claimed here, because its predicate 2 (`no-spec-diff`) is mechanically false for this PR: the surface the maintainer ruling names IS `packages/spec/src/contracts/**`. That gap is reported on the card rather than worked around, and the `**BREAKING**` banner below is carried rather than dropped. -->
+  
+  **BREAKING** on three published `.d.ts` surfaces. `ObjectQL.findOne`, `ObjectQL.update` and `ObjectQL.delete` — and the `IDataEngine` / `IScopedObjectRepository` contracts they implement — declared `Promise<any>` and now declare the answers they have always given:
+  
+  - `findOne` → `Promise<Record<string, any> | null>`
+  - `update` → `Promise<Record<string, any> | number | null>`
+  - `delete` → `Promise<boolean | number>`
+  
+  `any` is assignable to everything and admits every property read, so TypeScript consumers of these three methods can stop compiling — most often on the null check the declaration now demands. Shipped as `minor` under the repo's launch-window convention, in which `major` is refused by `check-changeset-no-major` and breaking-ness is carried by this banner plus the ADR-0087 disposition rather than by the level. The governing text is the **WHICH LEVEL** maintainer ruling of 2026-09-04 (decision batch #35, on #15294) recorded at `.github/workflows/pr-automation.yml`; `AGENTS.md`'s "a bug fix in a released package takes a patch changeset — never none" is the floor against `none` and was rejected as the ceiling here, because this PR also widens `@objectstack/objectql`'s index with new exported symbols, which that ruling puts at `minor` on its own.
+  
+  **Why.** `engine.ts` has four `return hookContext.result` sites, one per hook-bearing verb. #15823 closed the `find()` one — an `afterFind` handler that replaced the array made a method declared `Promise<any[]>` resolve to an envelope, silently — and recorded that it could close only that one: the other three declared `Promise<any>` and so carried no declaration a handler could break. A guard cannot exist before a declaration worth guarding does. The maintainer ruled the gap shut (option A, 2026-09-07, director seat summon #17, decision batch #2; option B "declare only, no enforcement" and option C "record `any` as intended" were refused).
+  
+  The shapes are read off the driver contract each engine exit delegates to, not invented: `driver.findOne` and the by-id `driver.update` declare `Record<string, unknown> | null`, `driver.delete` declares `boolean`, and the predicate exits `driver.updateMany` / `driver.deleteMany` declare the affected-row `number` a bulk write resolves (#4639). Row FIELD values stay erased (`Record<string, any>`), which is #15823's precedent extended exactly rather than softened: `find()` declares `Promise<any[]>`, so the CONTAINER is the contract and the rows inside it are `any`. It is also the only spelling that can state "record or null" at all, since `any | null` collapses to `any`.
+  
+  **What is enforced now.** Each seam re-checks `hookContext.result` against its declaration immediately after the `after*` dispatch and ahead of the consumers that already assume the shape, and refuses a value outside it with a registered ADR-0112 envelope — `FIND_ONE_HOOK_RESULT_NOT_RECORD`, `UPDATE_HOOK_RESULT_NOT_WRITE_SHAPE`, `DELETE_HOOK_RESULT_NOT_WRITE_SHAPE`, all `500`, all branchable on `error.code`. Shaping stays legal exactly as it does on `find()`: a handler may mutate what it is handed, drop keys, or assign a different value of a declared shape. The falsy answers are legal and deliberately so — `null` from `findOne`, `null` or a count from `update`, and `false` or `0` from `delete`, the two most ordinary answers that verb gives.
+  
+  **Who has to change something, on the TYPE axis.** A TypeScript consumer that reads a field off `findOne`'s result without a null check, or off `update`'s result without separating the by-id record from the predicate count. In this repository that was measured before anything moved, at the maintainer's instruction: 18 files and 92 compile errors, all repaired here.
+  
+  **What changes at RUNTIME, per door.** TWO things can put an off-declaration value at a seam, and every refusal's `developerMessage` names both: an `after*` handler that assigned one, and a DRIVER whose own exit answered off `IDataDriver`. Each door goes from returning that value silently to refusing it — one door, one registered code, all `500`:
+  
+  - `findOne` — FROM: whatever the `afterFind` dispatch left in `ctx.result`, or whatever `driver.findOne` answered off its declared `Promise<Record<string, unknown> | null>`, returned to the caller as-is and walked first by `maskSecretFields` / `stripSearchCompanionFromRead`. TO: `500 FIND_ONE_HOOK_RESULT_NOT_RECORD`, raised at the seam when that value is neither a record nor `null`.
+  - `update` — FROM: whatever the `afterUpdate` dispatch left in the batch `ctx.result`, or whatever `driver.update` / `driver.updateMany` answered off their declared `Promise<Record<string, unknown> | null>` / `Promise<number>`, returned as-is and read first by `stripSearchCompanion` and the realtime publish. TO: `500 UPDATE_HOOK_RESULT_NOT_WRITE_SHAPE`, raised when that value is outside record-or-count-or-`null`.
+  - `delete` — FROM: whatever the `afterDelete` dispatch left in `ctx.result`, or whatever `driver.delete` / `driver.deleteMany` answered off their declared `Promise<boolean>` / `Promise<number>`, returned as-is to a caller such as `metadata-protocol`'s `deleteData`, which turns `false` into a 404. TO: `500 DELETE_HOOK_RESULT_NOT_WRITE_SHAPE`, raised when that value is neither a boolean nor a number — never on `false` or `0`, which are declared answers.
+  
+  The driver half of each line is not hypothetical: the seven off-contract test doubles this PR repairs are exactly that source, and they are why the refusal sentence names the SEAM instead of accusing the handler.
+
+### Patch Changes
+
+- 58b36fa: fix(spec): project a union branch-by-branch, so five filter operators reach a published reference page
+  
+  `z.toJSONSchema()` refuses a whole schema the moment ONE node in it has no JSON
+  form, and `build-schemas.ts` applied that refusal per SCHEMA. `orderingComparandSchema`
+  is `z.union([z.number(), z.date(), z.string(), FieldReferenceSchema])`, so four
+  `data/filter.zod.ts` exports emitted nothing at all — and `$gt`, `$gte`, `$lt`,
+  `$lte` and `$between` reached no reference row. Not a blank Description cell: no
+  section. The ~2000 characters of `.describe()` on those slots — the #5685 comparand
+  contract, the #6571 endpoint contract, and the `{ "$gte": "2026-01-01" }` shape the
+  platform's own date-macro resolver produces — reached no reader.
+  
+  The generator now makes a third attempt when both strict directions refuse: it
+  projects with Zod's `unrepresentable: 'any'`, marks every node that came back with
+  no structural keyword, and DROPS the marked ones that are direct members of an
+  `anyOf` / `oneOf`. That is not a narrowing. These artifacts describe JSON
+  documents, a JSON document cannot carry a `Date` INSTANCE, so the set of JSON
+  documents that union accepts is unchanged by the drop.
+  
+  ⛔ A marked node anywhere else — an object property, a record value, an array item
+  — refuses the projection and the export is skipped with the message Zod threw, so
+  this cannot change WHY anything is skipped. Five exports leave
+  `unemitted-schemas.baseline.json` (23 → 18): the four filter exports, plus
+  `data/Hook`, whose only unprojectable member was the deprecated inline-function
+  handler branch — that puts 22 `data/Hook:` authorable keys under the key ratchet
+  for the first time.
+  
+  Published artifacts gain `json-schema/data/{ComparisonOperator,FieldOperators,
+  NormalizedFilter,RangeOperator,Hook}.json`, each carrying an
+  `x-unprojectable-branches` record naming exactly which branch the projection
+  dropped and where.
+- d127f9b: `i18n.zod.ts` stops asserting a stale size for the inline-locale-map population.
+  
+  Two docblocks in this file each stated that the repo authors 31 inline locale maps — the
+  `INLINE_LOCALE_KEY` rationale ("Every inline map authored in this repo (31 of them, across
+  three platform pages) uses `en` / `zh-CN` / `ja-JP` / `es-ES`, so the constraint costs no real
+  authoring surface") and the `I18nLabelSchema` form-2 note ("Three published platform pages
+  author 31 of these"). The measured population is 45: 33 in `sys-user.page.ts`, 6 in
+  `sys-organization.page.ts`, 6 in `sys-position.page.ts`.
+  
+  The number is **dropped** at both sites rather than corrected to 45. Neither sentence's
+  argument needs a magnitude. The first turns on the universal — *every* authored map uses those
+  four tags — so the accept set is what makes the constraint free, not the size of the set. The
+  second turns on the map being authored on published platform pages *and* resolved by
+  `pickLocalized`; one authored-and-resolved map already refutes "a convention the runtime
+  ignores", so the count was never load-bearing there either. Writing 45 would buy one release of
+  accuracy in prose that is cited as evidence for a schema constraint, and the figure has already
+  drifted once with nothing noticing; deriving it would mean a permanent gate whose only job is
+  keeping a number in a comment true.
+  
+  The measured half survives untouched at both sites: three platform pages author these maps, and
+  that is still exactly three. No schema arm, bound, default, `.describe()` string or export
+  changes; nothing an author can write is affected.
+- c17b494: `id_field` now gets a named answer instead of a bare refusal: `FIELD_KEY_GUIDANCE` declares it a retirement with **no successor**, which is the spec-side fact objectui's ingestion choke point needs before it can canonicalise the key (objectui#7650 ruling A — retired spellings are folded once, at ingestion, never at the consumer).
+  
+  The direction was a factual finding, not a preference, and it went the way the cheaper branch happens to point — so here is the evidence rather than the verdict alone. A lookup stores the referenced record's id, and which field holds that value is not an authored per-field choice: the picker resolves record identity itself. Nothing on `FieldSchema` names it, nothing in `objectql` / `runtime` / `metadata-protocol` reads a per-field id key, and the two places the platform does let a reference be stored by something other than an id are declared elsewhere — `APPROVER_VALUE_BINDINGS.valueField` (per approver type, e.g. `position` routing by `sys_position.name`) and a seed dataset's `externalId`, the channel lookup references already resolve through. So there is no member to fold onto, and the prescription says what to reach for instead: `displayField` for the candidate's label, a dataset `externalId` for a portable natural key.
+  
+  **The entry is keyed `id_field`, in snake_case, and that is deliberate.** The two channels this table feeds disagree about the key face. A `to` becomes a `strictObject` alias, matched through `aliasProbe` — case folded, separators stripped — so one camelCase row covers every spelling. A `why` becomes strict guidance, matched exactly and case-sensitively on the authored spelling. A camelCase row would therefore never be reached by the key authors write, and every existing test in the file would still pass, because none of them asks whether an entry is ever consulted.
+  
+  That gap is closed too. Three assertions read the channel that actually answers an authored field key — `FieldSchema.safeParse`, since the schema is strict and the authoring-key walker stays silent on a strict surface by its own posture rule — and pin that the refusal carries this table's sentence verbatim, that a retirement suppresses the rename channel, and that the same-named `idField` on the `inlineColumns` GridColumn mirror is a different schema that stays live.
+- f7a9740: The lookup-picker "who reads this" claims in `packages/spec` are re-measured against objectui and dated to the commit they were measured on. No schema, accept set, default or refusal moves — this is evidence prose, and every verdict it sits under is unchanged.
+  
+  Three claims had gone false, all in the same direction: they credited objectui's picker with reading a `snake_case` alias that objectui no longer reads. A stale *tolerance* claim fails in the dangerous direction — it tells an author a spelling is accepted downstream when it is not, so a value that will silently arrive as nothing looks supported by the spec's own prose.
+  
+  - **`liveness/field.json`, both `displayField` notes.** `/props/displayField` claimed the record picker "reads displayField || display_field"; `/props/inlineColumns/children/displayField` named the `snake_case` spelling flatly as *the* key the grid's lookup cells pass. objectui deleted that twin from `LookupFieldMetadata` with no deprecation window and no dual read. Both notes now name the read chain they actually have — `LookupField.tsx`'s `fieldMeta?.displayField || fieldMeta?.reference_field || 'name'`, and `GridField.tsx` handing the column's camelCase `displayField` straight through at all three lookup-cell call sites. Both entries stay `status: "live"`: `displayField` is live, and more exclusively so than the notes claimed.
+  - **`src/data/field.zod.ts`, the LOOKUP PICKER (forward) docblock.** It told authors that objectui's `LookupField` / `RecordPickerDialog` / `deriveLookupColumns` read "both these camelCase keys and their snake_case aliases" — a blanket claim over all seven keys declared beneath it. Measured, it holds for three: `lookupColumns`, `lookupPageSize` and `allowCreate` are each read as `<snake> ?? <camel>`. The other four — `displayField`, `descriptionField`, `lookupFilters` and `dependsOn` — are read camelCase-only. The docblock now states that per key, keeps saying the truth for the three aliases that survive, and records that those three are objectui's own back-compat rather than a spelling this schema declares.
+  - **`liveness/field.json`, the `valueDomain` `evidence` string.** It described the shared membership predicate as one "the write path **will** call" while its own first clause already quotes the landed call site that calls it. Tense corrected; the pointer is unchanged.
+  
+  Each rewritten claim now names the objectui commit it is dated to, so a later reader can tell how old the evidence is instead of assuming it is current. That dating is prose by design: a gate over a pinned foreign tree would go stale at every pin bump and need its own anti-vacuity self-test, which is a worse trade than a dated sentence.
+- de1a611: `AppPlugin` now supplies `SeedLoaderConfig.locale`, so the `Seed.locale` axis takes effect on the default boot path.
+  
+  The locale filter axis landed complete on the consumer side: the loader reads `Seed.locale`, composes it with `env` by conjunction, and names every dataset it drops. What it never had was a **producer** — no first-party call site passed `config.locale`, so `filterByLocale` returned its input on its first line and `dataset.locale` was never read at all. Authoring the key changed nothing. That is the same shape `Seed.env` spent releases in before framework#4704.
+  
+  - **The locale is resolved from the app's own `i18n.defaultLocale`** — the same envelope key, read the same way `loadTranslations` already reads it for `setDefaultLocale` — and threaded into all three `SeedLoaderRequest`s `AppPlugin` builds: the inline boot seed, the per-org replayer registered for tenant provisioning, and the dev hot-reload seeder.
+  - **An app that declares no locale sends no `locale` key at all**, rather than an `'en'` default. Absence is the loader's unrestricted spelling, so a stack that never opted in keeps loading every dataset exactly as before; defaulting would have turned a wiring change into a data change, silently dropping a `locale: ['zh-CN']` dataset on every stack without an `i18n` block. A blank or non-string `defaultLocale` is treated as absence for the same reason.
+  - **Resolved at the call sites, not inside `load()`.** The sibling `env` axis resolves itself in the loader off an ambient `NODE_ENV`; a locale has no ambient source, and the only layer that knows which locale a stack runs in is the app config the loader is never handed. So this axis needs a real producer, which is what this change is.
+  
+  `SeedLoaderService#warnOnUnresolvedLocaleScope` **stays**. It is not a signpost for an unwired state that has now gone away: three of this repo's six seed-request builders are publish/install-time paths that are handed no stack config and still pass no locale, embedding hosts build their own requests, and a stack may declare no `i18n` block at all. Every one of those still reaches `load()` with locale-scoped datasets and no `config.locale`, and the warning is what keeps that loud instead of silently inert.
+  
+  The liveness ledger row `seed.locale` moves `experimental` → `live` with a `producer` pointer naming this wiring, and records which call sites supply the locale and which do not rather than claiming the frontier away.
+  
+  ⚠️ **Release-note reconciliation, for whoever compiles this release.** The sibling changeset `seed-locale-axis.md` (from the PR that landed the consumer half) states in the present tense that no first-party call site supplies `config.locale`, that the axis is inert on the default boot path, and that the liveness ledger records `seed.locale` as `experimental`. All three sentences describe the state that changeset shipped into, and **this change ends all three**. If both land in one release, the notes must read them in order — or fold them into one entry — rather than publishing the earlier state as current. ⛔ That sibling changeset is deliberately not edited here: it accurately records what its own PR did, and release notes are compiled centrally.
+  
+  ⛔ Out of scope, unchanged: rows already written under a different locale stay resident. Every seed is an `upsert` and the loader only writes, so switching a stack's locale on a non-empty database does not remove the other market's rows.
+- db76982: `ai/solution-blueprint.zod.ts` publishes its own sentence again, instead of a list of the symbols it happens to export.
+  
+  The file always carried a real module header — ADR-0033 §4 plan-first authoring, and how the `apply_blueprint` tool expands each entry into a proper metadata body. But only a blank line separated that header from `const SNAKE_CASE`, and TSDoc's own attachment rule says a block belongs to the declaration it immediately precedes. The header-zone selector reads that rule back, so the header counted as the regex constant's documentation and was disqualified as the module's. Both generators then fell through to their export-list fallback, and the row published into the `objectstack-ai` skill index read:
+  
+  ```
+  - `…/ai/solution-blueprint.zod.ts` — Exports: BlueprintConditionSchema, BlueprintSummaryOperationsSchema, …
+  ```
+  
+  A true statement about the file that says nothing about its subject — on the one row whose job is to send an agent to this source for exact field shapes.
+  
+  `SNAKE_CASE` now carries the one-line doc it always deserved. A comment is not a declaration, so the preamble ends there and the header becomes the module's own block. The published row and the public reference page both open on it:
+  
+  ```
+  - `…/ai/solution-blueprint.zod.ts` — Solution Blueprint Schema (ADR-0033 §4 — plan-first authoring)
+  ```
+  
+  The selector is untouched. Under its own rule it was deciding correctly, and a census of every source under `packages/spec/src` found this file to be the only one of its kind: 19 shipped `*.zod.ts` sources have a header-zone block sitting against a declaration, and in the other 18 that block genuinely documents the symbol it sits against (`Transport Protocol Enum` against `TransportProtocol`, `Shared history for this file` against `AGENT_HISTORY`). Only here did a module header sit against a constant it says nothing about.
+  
+  Neither generator can see this class — each compares its artifact against itself, and each reproduced the selector faithfully, so a generator-only check passes on the defect. A pin now asserts the content of the published row directly.
+- 7cd5874: docs(spec): the `field.valueDomain` liveness note stops claiming the settings door is "unchanged until then"
+  
+  The `valueDomain` row of the published `liveness/field.json` ledger ended on a sentence written
+  while the re-point was still in the future:
+  
+  > The settings door (`service-settings/value-domains.ts`) re-points onto the shared predicate in
+  > its own follow-up card and is unchanged until then.
+  
+  Both halves of the 2026-09-02 ruling have since landed — the settings half (#15434) and the engine
+  half (#15316) — and the engine half rewrote this note wholesale while carrying that sentence
+  forward verbatim. "Unchanged until then" therefore described a state that no longer existed: the
+  door it names had already re-pointed, one commit earlier.
+  
+  The sentence now says what is true of that door, read off its source rather than off a PR title:
+  its second copy of all three definitions is deleted, `firstRejectedDomainMember` asks
+  `isValueDomainMember` — the same call `record-validator.ts` makes — and what remains on that side
+  is the door's own business (which declarations it agrees to enforce, how a multi-value carrier is
+  walked, the fragments the env-override log line needs). A re-added local table reddens
+  `value-domains.shared-predicate.pin.test.ts`.
+  
+  Ledger-note text only. The row's `status` is untouched — it tracks the engine write path, and
+  `liveness/state-counts.md` is derived by `gen:liveness-counts` from the row states, none of which
+  move here (`check:liveness` reports the counts file current).
+
 ## 17.4.0
 
 ### Minor Changes

@@ -1,5 +1,44 @@
 # @objectstack/plugin-dev
 
+## 17.5.0
+
+### Patch Changes
+
+- Updated dependencies [041d9fd]
+- Updated dependencies [dd2fd20]
+- Updated dependencies [23aa83c]
+- Updated dependencies [854639b]
+- Updated dependencies [58b36fa]
+- Updated dependencies [288fe9c]
+- Updated dependencies [d127f9b]
+- Updated dependencies [c17b494]
+- Updated dependencies [a016f08]
+- Updated dependencies [f7a9740]
+- Updated dependencies [555a89c]
+- Updated dependencies [dfb42c5]
+- Updated dependencies [ca31ff6]
+- Updated dependencies [9b9581b]
+- Updated dependencies [2e8e118]
+- Updated dependencies [de1a611]
+- Updated dependencies [db76982]
+- Updated dependencies [ab1c585]
+- Updated dependencies [7cd5874]
+  - @objectstack/spec@17.5.0
+  - @objectstack/plugin-security@17.5.0
+  - @objectstack/plugin-auth@17.5.0
+  - @objectstack/objectql@17.5.0
+  - @objectstack/types@17.5.0
+  - @objectstack/driver-memory@17.5.0
+  - @objectstack/rest@17.5.0
+  - @objectstack/plugin-hono-server@17.5.0
+  - @objectstack/runtime@17.5.0
+  - @objectstack/account@17.5.0
+  - @objectstack/setup@17.5.0
+  - @objectstack/core@17.5.0
+  - @objectstack/service-i18n@17.5.0
+  - @objectstack/service-realtime@17.5.0
+  - @objectstack/service-storage@17.5.0
+
 ## 17.4.0
 
 ### Patch Changes

@@ -1,5 +1,93 @@
 # @objectstack/plugin-security
 
+## 17.5.0
+
+### Minor Changes
+
+- 041d9fd: fix(service-analytics)!: `POST /analytics/dataset/query` asks the OBJECT-level read grant before it serves an inline dataset (#16645)
+  
+  <!-- adr-0087: not-required (no-migration-prescription) Nothing authorable is renamed, retired or re-typed: no `packages/spec` key changes its name, its type or its optionality, no stored shape moves, and every dataset, dashboard and analytics request body parses byte-identically to before — so `objectstack migrate meta` has nothing to rewrite and this changeset carries no rewrite instructions. What narrows is the ACCEPT SET of a published route at REQUEST time: `POST /analytics/dataset/query` (and the `/analytics/query` and `/analytics/sql` doors) now refuse a caller who holds no object-level read grant on an object the request reads, which is the same verdict `GET /data/<object>` already returns for that caller on that deployment. The remedy for a caller who is refused is a GRANT, held in permission-set data rather than in an authored file: the deployment gives the principal read on the object, exactly as it must today to use `/data`. There is no authored artifact and no stored representation for a migration to act on, and the additions to the contract are additive (a new OPTIONAL `ISecurityService.canReadObject`, new optional keys on three option payloads), which is a widening rather than a retirement. -->
+  
+  **BREAKING** in the accept-set sense — an accept-set narrowing on a published
+  route — landing in the launch window as `minor` on all four packages (the
+  lockstep convention: during the window the bump level is not the carrier, this
+  banner and the disposition above are). Nothing that was already admitted
+  becomes refused **except** the requests `GET /data/<object>` refuses today for
+  the same principal, which is the defect. Nothing that was refused becomes
+  admitted.
+  
+  `POST /analytics/dataset/query` now asks the OBJECT-level read grant before it serves an inline dataset, so the analytics door and `GET /data/<object>` reach one admission verdict on every driver.
+  
+  The route accepts an inline dataset definition (`body.dataset`) from any authenticated caller. On a SQL driver the compiled statement ran through the driver's raw `execute()`, which is documented as a tenant-isolation bypass and which no middleware sits in front of — so the request reached the database having passed exactly ONE of the three read layers (the row scope, threaded since ADR-0021 D-C). A caller with **no grant of any kind** on an object received its row count, and with `dimensions` its grouped counts by any column, where the `/data` door answered `403 PERMISSION_DENIED` for the same principal on the same deployment. On the memory driver the identical request fell through to the ObjectQL engine, which applies all three layers in one place, and was refused. The exposure is not opt-in and an application cannot decline it: a deployment shipping 0 datasets and 0 dashboards has the identical surface, because the reachable slot is the inline definition rather than a declared one.
+  
+  **This change NARROWS what the analytics doors accept.** Requests that were already refused by `/data` are now refused by analytics too; nothing that was refused becomes admitted. "Fails closed" is a statement about a WIRED provider: a deployment with no `security` service registered keeps its previous analytics behaviour by design, because on that deployment `/data` carries no object-level gate either and the equivalence is what is being defended.
+  
+  - **`ISecurityService.canReadObject(object, context)`** (`@objectstack/spec`, optional) — the object-level half of a read, the sibling of `getReadFilter`'s row-level half. It exists because the two are not interchangeable: `getReadFilter` answers "which rows" and answers `undefined` — "no row restriction" — for a caller who may not read the object at all, so a door holding only the filter reads a caller with NO grant as a caller with NO restriction. Fails CLOSED. Absence is a defined state and its fallback is **not** "admit": a consumer composes the same verdict from `explain`, which is not optional.
+  - **`@objectstack/plugin-security` implements it** as the middleware's own read gate, arm for arm and in its order — the `isSystem` bypass, the "no permission sets resolved" skip, the #3545 fail-closed refusal on an unresolvable object posture, the ADR-0066 D3 `requiredPermissions` capability AND-gate, the `allowRead` CRUD grant, and the ADR-0090 D10 delegator intersection — from the same primitives the middleware calls, and it is exposed on the registered `security` service.
+  - **`@objectstack/service-analytics` asks it once at the door**, for the base object and every joined object, **ahead of strategy selection**. Placement is the fix: two strategies each enforcing their own copy of three layers is the CAUSE of the divergence, not its remedy, so both strategies — and any strategy added later — inherit one verdict by construction. `AnalyticsServicePlugin` auto-bridges the new `admitObjectRead` hook to the `security` service (`canReadObject`, falling back to `explain`), the same way it already bridges `getReadScope`, and warns loudly at init when no security service is registered. The bridge tells three resolutions apart: an ABSENT `security` service admits (that deployment has no object-level gate on `/data` either, so the two doors still agree, and this is what keeps a deployment shipping no `plugin-security` working as before); a service that cannot be USED — resolving it throws, or it exposes neither `canReadObject` nor `explain` — DENIES and reports at `error`, because `/data`'s middleware does not fall open in those states.
+  - **`@objectstack/verify`** gains `bootStack(app, { databaseDriver: 'sqlite-wasm' | 'memory' })`, because a two-driver equivalence property cannot be measured on one driver — which is how the strategies were allowed to disagree.
+  
+  The refusal is `PERMISSION_DENIED` / 403, the same code and status the engine path already answers, and it names only the object the caller themselves named.
+- a016f08: fix(plugin-security)!: the insert-side RLS `check` is evaluated on the row that will be STORED — after `beforeInsert` — instead of on the caller's raw payload (#16608)
+  
+  <!-- adr-0087: not-required (no-migration-prescription) an enforcement-ORDER change: no authorable key, spelling or stored shape moves, so a stored `sys_metadata` row needs no conversion and an upgrader has nothing to hand-edit. What changes is which image the existing `check` predicate is evaluated against; the remedy for a newly-refused insert is to fix the policy or the data, not to migrate metadata. -->
+  
+  **BREAKING** — an accept-set narrowing on the write gate's refusal behaviour. An insert that is admitted today can be refused after this change.
+  
+  `check` validates the row a write produces — the PostgreSQL `WITH CHECK` analog. `update` reached that row by merging the caller's pre-image with the change set. `insert` could not: it has no pre-image, and the security middleware runs BEFORE the engine's operation, so its post-image was `opCtx.data` — the caller's payload as it arrived, ahead of `applyFieldDefaults` and ahead of every `beforeInsert` hook.
+  
+  A denormalised scoping field is exactly what an RLS predicate compares (ADR-0055: a predicate cannot traverse a lookup) and exactly what an app stamps server-side so a caller cannot choose it. Judging the raw payload therefore inverted the policy in both directions, measured on 17.3.0 with a real engine, a real `SecurityPlugin` and both drivers:
+  
+  - **the derived value was not on the image**, so the only way to pass a `check` over it was for the caller to SEND the value the hook exists to make un-sendable. Same identity, same object, same second: the payload carrying the stamped field returned 201, the identical payload leaving it to the hook returned 403 — and the stored row was identical either way.
+  - **the sent value WAS on the image and was then overwritten**, so an insert naming an in-scope organization while pointing at a parent in ANOTHER organization PASSED the check and stored the parent's organization. That is a row whose stored scope the caller does not hold, and it is why this is a narrowing rather than a widening: today it is admitted, after this change it is refused with nothing stored.
+  
+  Ruled 2026-09-07 (maintainer, verbatim 「同意」, director seat, summon #17, decision batch #3). The refused alternative — keep the order and write the contract that a checked field must arrive from the caller, plus an `os validate` rule to police it — institutionalises the contradiction and needs a permanent lint to hold it in place.
+  
+  **What changed, mechanically.** `OperationContext` gains `postHookWriteImageCheck` (`@objectstack/objectql`), an optional judgement an enforcement layer installs and `ObjectQL.insert` runs once the `beforeInsert` chain has produced the row — after the post-hook declared-field door, after the two value-changing strips (`stripRuntimeOwnedFields` and the static-`readonly` strip with its `defaultValue` re-default, both moved ahead of it), and before every producer with a side effect (the secret channel, the autonumber, validation, the statement), so a refusal still costs nothing. `@objectstack/plugin-security` installs its compiled `check` filter there for `insert` instead of matching it against `opCtx.data`; `update` is unchanged. The compiled filter is still built in the middleware, where the caller's permission sets, the ADR-0090 D10 delegator's, the staged membership and the request context are all resolved — only the IMAGE is deferred. A middleware that installed the judgement and finds the seam was never run refuses the write and logs at ERROR: an unjudged write is not an allowed one.
+  
+  **Who is affected.** Only objects governed by a permission set that EXPLICITLY declares `check`, on single-row inserts by a non-system caller — the gate's existing scope, unchanged. Two behaviour changes to expect, and they are the two halves of the same correction: an insert that left a hook-stamped field off the payload now succeeds where it used to be refused, and an insert whose hook-stamped field lands outside the caller's scope is now refused where it used to be admitted. Callers that were duplicating the stamp to get past the gate keep working and may stop.
+  
+  **Two further behaviour changes the reorder produces, measured on both legs** (the reviewed order and this one), because moving the strips ahead of the seam also moves them ahead of the credential channel:
+  
+  - a caller-forged value on an author-declared `readonly` **`secret`** field is now stripped. Before, `encryptSecretFields` ran first and replaced the row's value with a `sys_secret` reference, so the strip's `Object.is` value test compared that reference against the caller's plaintext, read the difference as a hook's write, and KEPT the forgery — measured on 17.3.0's order as stored `token: "secret:sec_1"` with a `sys_secret` row minted. This is a narrowing, and it closes a hole that predates this card.
+  - an empty string on a `readonly` **`password`** field is stripped instead of answering `VALIDATION_ERROR`. `""` reaches the store on neither order, so the 2026-08-13 empty-credential ruling's guarantee is unchanged; only which refusal a caller sees moves, on a payload a caller was never allowed to send. ⚠️ This is the one direction of the reorder that is not a narrowing, and it is recorded rather than left to be discovered.
+  
+  **The invariant this buys, stated to its real edge.** A stored row satisfies the insert `check` on every field the CALLER can steer, whatever the caller sent. Nothing offered any such guarantee before: the check read the payload, and the payload was entirely the caller's.
+  
+  ⚠️ It is deliberately not "on every field", and the difference is a boundary rather than a hedge. Four engine-owned passes still run between the judgement and the driver, and each substitutes a platform value for whatever stands on the row: the tenant fill of an ABSENT organization column (`resolveSystemInsertOrganization` plus the driver's `injectTenantOnInsert`), `encryptSecretFields` replacing a `secret` field's plaintext with a `sys_secret` reference, `applyAutonumbers` issuing a record number, and `normalizeMultiValueFields` coercing a declared multi-value field to its stored shape. A policy whose `check` names an autonumber, a `secret` or the tenant column is therefore judging a value the platform is about to replace. None of those four is caller-steerable — which is exactly why the two passes that WERE (`stripRuntimeOwnedFields` and the static-`readonly` strip) moved above the seam instead of being explained away.
+- 9b9581b: First-boot platform-admin promotion under the `single` posture now CHOOSES its target instead of sampling one: the candidate read is ordered by the database, and an operator who declared an owner gets that owner — and only once that owner has verified the address.
+  
+  Before this change the selection read `sys_user` with **no `orderBy` and a cap of 50** and then sorted that array client-side, so "the oldest authenticable user" actually meant *the oldest authenticable user among whatever 50 rows the driver produced first*. Measured on 113 seeded users with the intended owner inserted first, holding the oldest `created_at` and an id that collates last: the in-memory driver returned it in row 1 and promoted it, while the default sqlite driver returned rows in id order, never saw it at all, and handed the unscoped `admin_full_access` grant — plus, through `claimSeedOwnership`, ownership of every seeded business record — to a seeded job-seeker persona. Same code, same config, same data; the answer changed with the storage driver.
+  
+  - **The read is ordered where the driver can see it.** `created_at` ascending with `id` as the tie-breaker (seeded populations routinely share one timestamp). There is deliberately no client-side re-sort left behind: one would re-rank the returned page and keep the guard passing if the ordering were ever lost again.
+  - **The declared owner is asked first, and must be a VERIFIED holder.** `OS_PLATFORM_OWNER_EMAIL` was imported into this file and read only on the walled branch, so a deployment that had said who its owner is could still have someone else promoted. Under `single` the target is now a row that holds a declared address, is human, can authenticate, and has `email_verified === true` — all four. Requiring verification rather than merely preferring it answers the one direction in which honouring the declaration would otherwise have been a widening: because `sys_user.email` is UNIQUE on the SQL family, an attacker who registers the declared address before the operator does would have been promoted with no way for the real owner to coexist, so an unverified holder is refused instead.
+  - **A declared owner who cannot sign in, or has not verified, REFUSES.** No silent fall-back to whoever happens to be oldest — that is the outcome this fixes. The pass warns, naming the variable, the address and which of the two is missing (`declared_owner_not_authenticable` / `declared_owner_not_verified`), and promotes nobody. **Accepted cost, stated rather than discovered:** a `single` deployment whose declared owner has not verified their email gets no platform admin at first boot until they do, loudly. Because the pass replays per sign-up while no admin exists, that warning re-emits on each replay until the owner is promotable; it is deliberately not latched, so the condition stays visible in the log a fresh operator is actually reading.
+  - **Verification landing is a replay trigger again.** `shouldReplayBootstrapFor` admits a `sys_user` update touching `email` / `email_verified` under `single` — but only while an owner is declared, which is the only configuration where such a write can change the answer. With none declared, the trigger set stays exactly as narrow as it was.
+  - **The cap is replaced, and never silent again.** A 200-row page with a 5000-row scan ceiling, walked oldest-first. Because the page is ordered it holds the rows the age rule actually wants, so truncation can only bite when every one of the oldest 5000 humans is non-authenticable — and reaching the ceiling now WARNS, naming the number examined.
+  - **The grant's log line records WHY and FROM HOW MANY.** `[security] first user promoted to platform admin: <email>` keeps its prefix and gains the basis (`declared-owner` / `oldest-authenticable`) and the candidate-pool size, repeated as `basis` / `candidatePoolSize` fields for structured sinks. The returned report carries `basis` too.
+  
+  Unchanged: no declaration still means first-user promotion by age (`single` keeps Choice 4A), and that leg has no verification requirement; a user nobody can authenticate as is still never promoted; an existing unscoped grant still short-circuits before any selection runs, so no deployment that already has an administrator can be re-pointed by this.
+
+### Patch Changes
+
+- Updated dependencies [041d9fd]
+- Updated dependencies [23aa83c]
+- Updated dependencies [854639b]
+- Updated dependencies [58b36fa]
+- Updated dependencies [288fe9c]
+- Updated dependencies [d127f9b]
+- Updated dependencies [c17b494]
+- Updated dependencies [f7a9740]
+- Updated dependencies [de1a611]
+- Updated dependencies [db76982]
+- Updated dependencies [7cd5874]
+  - @objectstack/spec@17.5.0
+  - @objectstack/platform-objects@17.5.0
+  - @objectstack/types@17.5.0
+  - @objectstack/core@17.5.0
+  - @objectstack/formula@17.5.0
+  - @objectstack/metadata-core@17.5.0
+
 ## 17.4.0
 
 ### Minor Changes

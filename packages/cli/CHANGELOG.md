@@ -1,5 +1,86 @@
 # @objectstack/cli
 
+## 17.5.0
+
+### Patch Changes
+
+- Updated dependencies [041d9fd]
+- Updated dependencies [86f4246]
+- Updated dependencies [dd2fd20]
+- Updated dependencies [23aa83c]
+- Updated dependencies [854639b]
+- Updated dependencies [58b36fa]
+- Updated dependencies [288fe9c]
+- Updated dependencies [d127f9b]
+- Updated dependencies [c17b494]
+- Updated dependencies [a016f08]
+- Updated dependencies [f7a9740]
+- Updated dependencies [555a89c]
+- Updated dependencies [dfb42c5]
+- Updated dependencies [ca31ff6]
+- Updated dependencies [775e5ec]
+- Updated dependencies [9b9581b]
+- Updated dependencies [8d4690b]
+- Updated dependencies [2e8e118]
+- Updated dependencies [e4fd55d]
+- Updated dependencies [ba17017]
+- Updated dependencies [131851f]
+- Updated dependencies [de1a611]
+- Updated dependencies [db76982]
+- Updated dependencies [ab1c585]
+- Updated dependencies [7cd5874]
+  - @objectstack/spec@17.5.0
+  - @objectstack/plugin-security@17.5.0
+  - @objectstack/service-analytics@17.5.0
+  - @objectstack/verify@17.5.0
+  - @objectstack/lint@17.5.0
+  - @objectstack/plugin-auth@17.5.0
+  - @objectstack/platform-objects@17.5.0
+  - @objectstack/objectql@17.5.0
+  - @objectstack/metadata@17.5.0
+  - @objectstack/metadata-protocol@17.5.0
+  - @objectstack/types@17.5.0
+  - @objectstack/driver-memory@17.5.0
+  - @objectstack/rest@17.5.0
+  - @objectstack/plugin-email@17.5.0
+  - @objectstack/plugin-hono-server@17.5.0
+  - @objectstack/service-automation@17.5.0
+  - @objectstack/plugin-audit@17.5.0
+  - @objectstack/runtime@17.5.0
+  - @objectstack/client@17.5.0
+  - @objectstack/account@17.5.0
+  - @objectstack/setup@17.5.0
+  - @objectstack/cloud-connection@17.5.0
+  - @objectstack/core@17.5.0
+  - @objectstack/driver-mongodb@17.5.0
+  - @objectstack/driver-sql@17.5.0
+  - @objectstack/driver-sqlite-wasm@17.5.0
+  - @objectstack/driver-turso@17.5.0
+  - @objectstack/formula@17.5.0
+  - @objectstack/mcp@17.5.0
+  - @objectstack/metadata-core@17.5.0
+  - @objectstack/observability@17.5.0
+  - @objectstack/plugin-approvals@17.5.0
+  - @objectstack/plugin-reports@17.5.0
+  - @objectstack/plugin-sharing@17.5.0
+  - @objectstack/plugin-webhooks@17.5.0
+  - @objectstack/service-cache@17.5.0
+  - @objectstack/service-datasource@17.5.0
+  - @objectstack/service-job@17.5.0
+  - @objectstack/service-messaging@17.5.0
+  - @objectstack/service-package@17.5.0
+  - @objectstack/service-queue@17.5.0
+  - @objectstack/service-realtime@17.5.0
+  - @objectstack/service-settings@17.5.0
+  - @objectstack/service-sms@17.5.0
+  - @objectstack/service-storage@17.5.0
+  - @objectstack/trigger-api@17.5.0
+  - @objectstack/trigger-record-change@17.5.0
+  - @objectstack/trigger-schedule@17.5.0
+  - @objectstack/plugin-pinyin-search@17.5.0
+  - @objectstack/console@17.5.0
+  - create-objectstack@17.5.0
+
 ## 17.4.0
 
 ### Minor Changes
