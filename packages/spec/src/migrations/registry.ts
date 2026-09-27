@@ -5324,8 +5324,7 @@ const step18: MigrationStep = {
     + 'as a lossless delete, in both collections a record travels in — `views` (stack sources '
     + 'and stored rows) and the assembled-manifest `viewItems` channel (package export, '
     + 'environment artifacts), whose registration parse would otherwise refuse an artifact '
-    + 'assembled before this release; a flattened overlay keeps its own `owner` / `hidden`, '
-    + 'which are declared on a different door this retirement does not touch. '
+    + 'assembled before this release. '
     + 'It also retires a `joined` report\'s `chart` at both coordinates (#20161, ADR-0049 '
     + 'enforce-or-remove): the joined renderer draws each block as a table and returns before '
     + 'the one container `chart` read, and no renderer reads a block\'s `chart` at all, so a '
@@ -5336,7 +5335,21 @@ const step18: MigrationStep = {
     + '`report-joined-chart-removed` strips both as a pure lossless delete — neither ever had '
     + 'an effect to lose — because a stored report row CAN carry them (the Studio report form '
     + 'offered a block `chart` input until this change); it is retired from the load path, so '
-    + 'authors are refused at parse rather than rewritten.',
+    + 'authors are refused at parse rather than rewritten. '
+    + 'It retires the view item\'s `owner` / `hidden` pair on the flattened overlay door too '
+    + '(#20230, ADR-0049; triage '
+    + 'direction 「follow #20085\'s disposition for the same key pair」): the lean personalization '
+    + 'PUT with no `config` declared its own `owner` / `hidden`, accepted and stored them, and '
+    + 'nothing read either. Both are `retiredKey()` tombstones on the two overlay members with '
+    + 'the view item\'s own prescription texts, and the D2 conversion '
+    + '`view-overlay-owner-hidden-removed` strips them from the flattened spelling (no `config`, '
+    + 'no container slot) in `views` and `viewItems`, so a stored overlay row is served without '
+    + 'them. A row that held other view keys is then valid again and re-saves; a row that held '
+    + 'nothing but its identity and the two keys is left identity-only, which the door refuses, '
+    + 'so it is badged invalid, refused on a whole-row re-save and reported `failed` by '
+    + '`os migrate meta --stored --apply` until it is deleted or given the setting its author '
+    + 'meant. Its D3 record is the semantic entry '
+    + '`view-overlay-owner-hidden-retired`.',
   conversionIds: [
     'field-malformed-scale-precision-removed',
     'record-chatter-position-vocabulary',
@@ -5375,6 +5388,7 @@ const step18: MigrationStep = {
     'page-component-filter-record-to-rule-array',
     'view-item-owner-hidden-removed',
     'report-joined-chart-removed',
+    'view-overlay-owner-hidden-removed',
   ],
   semantic: [
     // One file per entry under `entries/semantic/`, concatenated here sorted by
@@ -16018,8 +16032,9 @@ const step18: MigrationStep = {
         + 'A view an author marked as one user\'s, or hid from the switcher, has always been listed to '
         + 'every user who can read the object — its name, its columns, its filters and its sort. '
         + 'Whether anything in such a view was meant to stay private, and whether it should now be '
-        + 'deleted rather than kept, is the author\'s call. A flattened view overlay keeps its own '
-        + '`owner` and `hidden`: those live on a different door that this retirement does not touch.',
+        + 'deleted rather than kept, is the author\'s call. A flattened view overlay\'s own `owner` and '
+        + '`hidden` are a separate family on a different door, with their own D2 conversion '
+        + '`view-overlay-owner-hidden-removed` and their own D3 entry `view-overlay-owner-hidden-retired`.',
       acceptanceCriteria: 'No view item record in `views` or in an assembled artifact carries `owner` or '
         + '`hidden`; the parse refuses both by name, and an artifact assembled before the upgrade '
         + 'registers without a refusal over them. For every view that had carried either key, the '
@@ -16108,6 +16123,61 @@ const step18: MigrationStep = {
         + 'read and nothing is refused on read: a row that fails is served exactly as stored until it is '
         + 'saved. Verify by re-saving each stored overlay that carries `options` (a GET then a PUT of the '
         + 'same body) and reading a `200`.',
+    },
+    // #20230 (ADR-0049 enforce-or-remove; triage direction 「follow #20085's
+    // disposition for the same key pair」) — the D3 entry of the
+    // `view-overlay-owner-hidden-removed` family (ruling B on #17152: one D3 entry
+    // per retirement family, even when D2 is lossless). Registered keys: `owner` /
+    // `hidden` on `ui/ViewMetadata`, the door the two flattened overlay members are
+    // reached through. The same key pair on the view item RECORD is a separate
+    // family with its own conversion and its own D3 entry, disjoint from this one
+    // by `config`; the two share the prescription texts, not a conversion.
+    {
+      id: 'view-overlay-owner-hidden-retired',
+      // No backticks in `surface` — build-upgrade-guide.ts renders it inside a code
+      // span AND a table cell.
+      surface:
+        'view.owner / view.hidden on a flattened view overlay — the lean PUT /api/v1/meta/view/:name body '
+        + 'with no config that the console saves for a view it personalizes',
+      replacement:
+        '(removed — no per-user view scope and no switcher filter exists.) A view is listed to everyone '
+        + 'who can read its object. A view that must not be listed is deleted, or no longer shipped from '
+        + 'source; per-user view scoping is a parked direction (ADR-0017), not a shipped mechanism.',
+      reason:
+        'The D2 conversion `view-overlay-owner-hidden-removed` deletes both keys from every flattened '
+        + 'overlay (a view body with no `config` and no container slot) — in `views` (stack sources, and '
+        + 'every stored row, replayed on each read before it is served or badged) and in the '
+        + 'assembled-manifest view item channel — and the delete is lossless: both switcher read paths '
+        + 'filter on the view kind and object and sort on `order`, so an overlay saved with '
+        + '`hidden: true` hid nothing and no scope ever read `owner`. The judgment is about exposure, '
+        + 'the same one the view item record\'s retirement leaves. A view someone hid or marked as one '
+        + 'user\'s through its overlay has always been listed to every user who can read the object. '
+        + 'The delete is lossless but does not always close the row: an overlay row that held nothing '
+        + 'but its identity and these keys is left identity-only, a body the view door refuses, so '
+        + 'that row needs its author (see the acceptance criteria). '
+        + 'Measured writers in this repository and its sibling UI: zero (no source, example or skill, '
+        + 'and objectui at its pinned commit and at main writes neither key on an overlay; the HotCRM '
+        + 'app writes neither). NOT MEASURED: clients outside this repository, and production stored '
+        + 'rows — the write door accepted and stored both until this release, and no deployment store '
+        + 'is reachable from here.',
+      acceptanceCriteria:
+        'No flattened view overlay you save carries `owner` or `hidden`: the write door refuses either '
+        + 'with 422 INVALID_METADATA, the issue located at the key and the retirement prescription as '
+        + 'its message. A stored overlay row that held either is stripped of it on every read, and what '
+        + 'follows depends on what else the row holds. (1) A row with any other view key (a column '
+        + 'state, a sort, a default flag, an order) is served and badged valid without the keys, a GET '
+        + 'then a PUT of the whole row answers 200 (if it was otherwise valid), and '
+        + '`os migrate meta --stored --apply` rewrites it. (2) A hide-only row — nothing but its '
+        + 'identity (name, object, viewKind, label) and `owner` / `hidden`, such as '
+        + '`{ object, viewKind, hidden: true }` — is left with identity only, which the view door '
+        + 'refuses ("only identity fields"): it is served badged invalid (it was badged valid before '
+        + 'this release), a whole-row re-save or one that adds only identity answers 422 '
+        + 'INVALID_METADATA, and `--apply` reports it `failed` and leaves it as stored. A write that '
+        + 'adds a real view key, such as a toolbar toggle, saves. Resolve each such row: delete it (it '
+        + 'never changed what anyone saw), or add the personalization setting its author meant and '
+        + 'save that. For every view whose overlay had carried either key, its author has confirmed '
+        + 'that the view may be listed to all readers of its object, or has deleted it. No switcher '
+        + 'read path ever read either key, so which views the switcher lists does not change.',
     },
     // The display page size a view gets when it declares none moved from 25 to 50
     // (maintainer ruling on objectui#9853). A default move reaches every silent
@@ -20006,6 +20076,32 @@ export const RETIRED_KEYS_BY_MAJOR: Readonly<Record<number, readonly string[]>> 
     // `properties`, so no gate judges this row.
     // D2: `view-item-owner-hidden-removed`.
     'ui/ViewItemWire:owner',
+    // #20230 (ADR-0049 enforce-or-remove; triage direction 「follow #20085's
+    // disposition for the same key pair」). The flattened view overlay's `hidden` —
+    // the lean personalization PUT with no `config`, members 3 and 4 of the `view`
+    // union `saveMetaItem` validates — was declared by `flattenedViewOverlayFields()`
+    // separately from the view item's, accepted, stored verbatim, and read by
+    // nothing: both switcher read paths filter on `viewKind` + `object` only, so a
+    // `hidden: true` overlay hid no view. No writer in this framework, its examples,
+    // objectui at its pin and at `main`, or the HotCRM app (cloud not reachable).
+    // Tombstoned with `retiredKey()` on both overlay members, with the view item's
+    // own prescription text; `.strip()` members, so a bare deletion would have
+    // dropped the key in silence. Registered under `ui/ViewMetadata`, the exported
+    // door the overlay members are reached through (the members themselves are not
+    // exported). ⚠️ No gate below can JUDGE this row: `ui/ViewMetadata` is in
+    // `unemitted-schemas.baseline.json` (its `config: z.undefined()` guards have no
+    // JSON Schema form), so `authorable-surface/` carries no `ui/ViewMetadata:*`
+    // line and check (b) never sees the tombstone — the row is declared, not
+    // checked. D2: `view-overlay-owner-hidden-removed`.
+    'ui/ViewMetadata:hidden',
+    // #20230 — the overlay door's `owner`, the sibling of `ui/ViewMetadata:hidden`
+    // (see that row for the measurement and the registration's def key). It named
+    // a user nothing ever read: no per-user scope exists for a view (ADR-0017,
+    // parked), so an overlay marked as one user's changed nothing for anyone.
+    // Tombstoned with `retiredKey()` on both overlay members, with the view item's
+    // own prescription text. Same blind spot as its sibling: the def is unemitted,
+    // so no gate judges this row. D2: `view-overlay-owner-hidden-removed`.
+    'ui/ViewMetadata:owner',
     // </os-generated retired-key:18>
   ],
 };
