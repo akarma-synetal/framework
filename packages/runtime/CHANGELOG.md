@@ -1,5 +1,70 @@
 # @objectstack/runtime
 
+## 17.8.0
+
+### Minor Changes
+
+- 5cfd866: feat(sharing): a share-link password can be sent in the `X-Share-Password` header whatever its characters, under a declared encoding (`X-Share-Password-Encoding: utf-8`)
+  
+  Clause-②: yes (widening)
+  
+  - **What was missing.** A browser cannot put a character above U+00FF in a request header (`Headers` throws a `TypeError` before the request leaves), and it strips leading and trailing spaces. `createLink` accepts any password, so a link whose password has a CJK character or an emoji could not be opened through the header.
+  - **What is now accepted.** A new companion request header, `X-Share-Password-Encoding`, declares how `X-Share-Password` is encoded. Its one value is `utf-8`, compared case-insensitively. Under it, `X-Share-Password` carries the password's UTF-8 bytes percent-encoded, as `encodeURIComponent(password)` produces them, and both public routes (`GET /api/v1/share-links/:token/resolve` and `/:token/messages`) decode it on both mounts: the sharing plugin's routes and the runtime dispatcher's `/share-links` domain. Both read the pair through one helper, `readSharePasswordHeader`, exported from `@objectstack/types` with the header-name constants.
+  - **Unchanged.** Without `X-Share-Password-Encoding`, `X-Share-Password` is read raw, exactly as before, so every value a client sends today resolves as it did. That includes a Latin-1 password and a raw password containing `%`; the server never percent-decodes a value nobody declared encoded. The `?password=` query parameter is still read first, and when it is present the header pair is not read.
+  - **What is refused.** `X-Share-Password-Encoding` naming any other value, or a password header that is not percent-encoded UTF-8 under `utf-8` (a `%` without two hex digits, octets that are not well-formed UTF-8, a character outside visible ASCII), answers `400 VALIDATION_FAILED` before the token is looked up. It is never compared raw instead. The message names the headers and the rule, never the presented value.
+  - **Response headers.** Both public routes now answer `Vary: X-Share-Password, X-Share-Password-Encoding`, still beside `Cache-Control: no-store`.
+  - **Cross-origin clients.** `X-Share-Password-Encoding` is in the default CORS preflight allow-list (`DEFAULT_CORS_ALLOW_HEADERS` in `@objectstack/plugin-hono-server`, which the `@objectstack/hono` adapter also applies). A deployment that passes its own `allowHeaders` must add `X-Share-Password-Encoding` beside `X-Share-Password` to let a cross-origin client send an encoded password.
+
+### Patch Changes
+
+- 1fb274e: The runtime dispatcher's `GET /meta/datasource/:name/published` serves a code-defined datasource's code definition while a stored row under its name still exists
+  
+  Clause-②: no
+  
+  - This is the dispatcher twin of the `@objectstack/rest` published door, and it now answers the same way. For a datasource name the host registers from code (one an installed package declares in `*.datasource.ts`, or the host's `default`), the door serves the layered read's `effective` layer, which is the code definition, instead of the leftover stored row. It asks the protocol's `declinesStoredRow` in place of `isShippedFlowName`. A shipped flow name is answered as before.
+  - Unchanged: a runtime datasource's stored row, and every stored row of every other type, is served as before. So is every row when the protocol does not provide `declinesStoredRow`.
+- Updated dependencies [0af4f66]
+- Updated dependencies [9a0401f]
+- Updated dependencies [b88c356]
+- Updated dependencies [1abfc58]
+- Updated dependencies [8a399b2]
+- Updated dependencies [db87a02]
+- Updated dependencies [04e776b]
+- Updated dependencies [a7df552]
+- Updated dependencies [6befe19]
+- Updated dependencies [8caa131]
+- Updated dependencies [1fb274e]
+- Updated dependencies [1fb274e]
+- Updated dependencies [c565813]
+- Updated dependencies [d5a14dd]
+- Updated dependencies [f85a83b]
+- Updated dependencies [f85a83b]
+- Updated dependencies [2015c54]
+- Updated dependencies [93125ae]
+- Updated dependencies [56c8844]
+- Updated dependencies [5cfd866]
+- Updated dependencies [ae97841]
+- Updated dependencies [299a2c6]
+  - @objectstack/spec@17.8.0
+  - @objectstack/metadata-protocol@17.8.0
+  - @objectstack/service-datasource@17.8.0
+  - @objectstack/rest@17.8.0
+  - @objectstack/objectql@17.8.0
+  - @objectstack/metadata-core@17.8.0
+  - @objectstack/types@17.8.0
+  - @objectstack/core@17.8.0
+  - @objectstack/driver-memory@17.8.0
+  - @objectstack/driver-sql@17.8.0
+  - @objectstack/driver-sqlite-wasm@17.8.0
+  - @objectstack/driver-turso@17.8.0
+  - @objectstack/formula@17.8.0
+  - @objectstack/metadata@17.8.0
+  - @objectstack/observability@17.8.0
+  - @objectstack/plugin-auth@17.8.0
+  - @objectstack/plugin-security@17.8.0
+  - @objectstack/service-cluster@17.8.0
+  - @objectstack/service-i18n@17.8.0
+
 ## 17.7.0
 
 ### Minor Changes

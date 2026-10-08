@@ -1,5 +1,36 @@
 # @objectstack/rest
 
+## 17.8.0
+
+### Patch Changes
+
+- 1fb274e: `GET /api/v1/meta/datasource/:name/published` serves a code-defined datasource's code definition while a stored row under its name still exists
+  
+  Clause-②: no
+  
+  - For a datasource name the host registers from code (one an installed package declares in `*.datasource.ts`, or the host's `default`), the published door now serves the layered read's `effective` layer, which is the code definition. Before this change it served the leftover stored `sys_metadata` row, with that row's label, `origin` and connection settings, while `GET /api/v1/meta/datasource/:name`, the `/meta/datasource` list and `/layers` all served the code definition. The door now asks the protocol's `declinesStoredRow`, the one decision those reads make, in place of `isShippedFlowName`. A shipped flow name is answered as before.
+  - Unchanged: a runtime datasource's stored row is still what the door serves, and so is every stored row of every other type. A protocol that does not provide `declinesStoredRow` still gets the stored row. The row itself stays at rest, `/layers` still reports it in `overlay`, and `DELETE /api/v1/meta/datasource/:name` still removes it as the repair.
+- Updated dependencies [0af4f66]
+- Updated dependencies [9a0401f]
+- Updated dependencies [77a94d8]
+- Updated dependencies [879bd38]
+- Updated dependencies [04e776b]
+- Updated dependencies [1c563af]
+- Updated dependencies [a7df552]
+- Updated dependencies [c565813]
+- Updated dependencies [d5a14dd]
+- Updated dependencies [93125ae]
+- Updated dependencies [56c8844]
+- Updated dependencies [5cfd866]
+- Updated dependencies [299a2c6]
+  - @objectstack/spec@17.8.0
+  - @objectstack/platform-objects@17.8.0
+  - @objectstack/metadata-core@17.8.0
+  - @objectstack/types@17.8.0
+  - @objectstack/core@17.8.0
+  - @objectstack/observability@17.8.0
+  - @objectstack/service-package@17.8.0
+
 ## 17.7.0
 
 ### Patch Changes

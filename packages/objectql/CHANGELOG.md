@@ -1,5 +1,43 @@
 # @objectstack/objectql
 
+## 17.8.0
+
+### Patch Changes
+
+- f85a83b: fix(objectql): a formula field that does not evaluate is logged once per object and field, instead of reading `null` in silence (#22019)
+  
+  A formula the engine cannot evaluate reads `null`, on `find`, on `findOne` and on the write response. Before this change nothing said why. A formula calling an unregistered function (`sqrt(record.amount)`) read `null` on every row with no log line anywhere. ADR-0032 says a call site must not silently swallow an expression fault.
+  
+  The engine now reports the fault through its logger at `warn`, once per (object, field) per engine instance, however many rows and reads hit it. The line names the object, the field and the evaluator's error (kind and first line; the full message is in the log metadata). It also says where the repair is: `os validate` or a re-save of the object refuses an expression-level fault with a located message, and a fault that depends on a record's values needs a guard on the operands it reads.
+  
+  Unchanged: the field still reads `null`, because what a read returns is protocol. `evaluateFormulaField`, the hook-side helper with no engine, still returns `null` without a log line. The built entry declarations gain three `private` member names on `ObjectQL`.
+- Updated dependencies [0af4f66]
+- Updated dependencies [9a0401f]
+- Updated dependencies [b88c356]
+- Updated dependencies [1abfc58]
+- Updated dependencies [db87a02]
+- Updated dependencies [04e776b]
+- Updated dependencies [a7df552]
+- Updated dependencies [6befe19]
+- Updated dependencies [8caa131]
+- Updated dependencies [1fb274e]
+- Updated dependencies [c565813]
+- Updated dependencies [d5a14dd]
+- Updated dependencies [f85a83b]
+- Updated dependencies [2015c54]
+- Updated dependencies [93125ae]
+- Updated dependencies [56c8844]
+- Updated dependencies [5cfd866]
+- Updated dependencies [ae97841]
+- Updated dependencies [299a2c6]
+  - @objectstack/spec@17.8.0
+  - @objectstack/metadata-protocol@17.8.0
+  - @objectstack/metadata-core@17.8.0
+  - @objectstack/types@17.8.0
+  - @objectstack/core@17.8.0
+  - @objectstack/formula@17.8.0
+  - @objectstack/metadata@17.8.0
+
 ## 17.7.0
 
 ### Minor Changes

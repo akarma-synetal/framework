@@ -1,5 +1,93 @@
 # @objectstack/cli
 
+## 17.8.0
+
+### Patch Changes
+
+- Updated dependencies [0af4f66]
+- Updated dependencies [9a0401f]
+- Updated dependencies [77a94d8]
+- Updated dependencies [879bd38]
+- Updated dependencies [a7a48b7]
+- Updated dependencies [b88c356]
+- Updated dependencies [1abfc58]
+- Updated dependencies [8a399b2]
+- Updated dependencies [db87a02]
+- Updated dependencies [04e776b]
+- Updated dependencies [1c563af]
+- Updated dependencies [1c563af]
+- Updated dependencies [a7df552]
+- Updated dependencies [6befe19]
+- Updated dependencies [8caa131]
+- Updated dependencies [f0022c4]
+- Updated dependencies [1fb274e]
+- Updated dependencies [1fb274e]
+- Updated dependencies [1fb274e]
+- Updated dependencies [c565813]
+- Updated dependencies [d5a14dd]
+- Updated dependencies [f85a83b]
+- Updated dependencies [f85a83b]
+- Updated dependencies [2015c54]
+- Updated dependencies [0db5ad5]
+- Updated dependencies [8601526]
+- Updated dependencies [93125ae]
+- Updated dependencies [56c8844]
+- Updated dependencies [5cfd866]
+- Updated dependencies [ae97841]
+- Updated dependencies [56bf27a]
+- Updated dependencies [299a2c6]
+- Updated dependencies [299a2c6]
+  - @objectstack/spec@17.8.0
+  - @objectstack/platform-objects@17.8.0
+  - @objectstack/service-storage@17.8.0
+  - @objectstack/service-messaging@17.8.0
+  - @objectstack/service-settings@17.8.0
+  - @objectstack/metadata-protocol@17.8.0
+  - @objectstack/service-datasource@17.8.0
+  - @objectstack/plugin-sharing@17.8.0
+  - @objectstack/plugin-approvals@17.8.0
+  - @objectstack/rest@17.8.0
+  - @objectstack/runtime@17.8.0
+  - @objectstack/service-analytics@17.8.0
+  - @objectstack/lint@17.8.0
+  - @objectstack/objectql@17.8.0
+  - @objectstack/cloud-connection@17.8.0
+  - @objectstack/metadata-core@17.8.0
+  - @objectstack/types@17.8.0
+  - @objectstack/plugin-hono-server@17.8.0
+  - @objectstack/plugin-email@17.8.0
+  - @objectstack/console@17.8.0
+  - @objectstack/account@17.8.0
+  - @objectstack/setup@17.8.0
+  - @objectstack/client@17.8.0
+  - @objectstack/core@17.8.0
+  - create-objectstack@17.8.0
+  - @objectstack/driver-memory@17.8.0
+  - @objectstack/driver-mongodb@17.8.0
+  - @objectstack/driver-sql@17.8.0
+  - @objectstack/driver-sqlite-wasm@17.8.0
+  - @objectstack/driver-turso@17.8.0
+  - @objectstack/formula@17.8.0
+  - @objectstack/mcp@17.8.0
+  - @objectstack/metadata@17.8.0
+  - @objectstack/observability@17.8.0
+  - @objectstack/plugin-audit@17.8.0
+  - @objectstack/plugin-auth@17.8.0
+  - @objectstack/plugin-security@17.8.0
+  - @objectstack/plugin-webhooks@17.8.0
+  - @objectstack/service-automation@17.8.0
+  - @objectstack/service-cache@17.8.0
+  - @objectstack/service-job@17.8.0
+  - @objectstack/service-package@17.8.0
+  - @objectstack/service-queue@17.8.0
+  - @objectstack/service-realtime@17.8.0
+  - @objectstack/service-sms@17.8.0
+  - @objectstack/trigger-api@17.8.0
+  - @objectstack/trigger-record-change@17.8.0
+  - @objectstack/trigger-schedule@17.8.0
+  - @objectstack/verify@17.8.0
+  - @objectstack/plugin-pinyin-search@17.8.0
+
 ## 17.7.0
 
 ### Minor Changes

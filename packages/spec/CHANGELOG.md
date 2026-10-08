@@ -1,5 +1,99 @@
 # @objectstack/spec
 
+## 17.8.0
+
+### Minor Changes
+
+- c565813: feat(spec,analytics): a dataset answer's measure column states its aggregate, labelled or not (`fields[].aggregate`)
+  
+  Clause-②: yes (widening)
+  
+  - **What a renderer can now read.** Each measure column of a dataset answer (`POST /analytics/dataset/query`) carries `fields[].aggregate`: the aggregate its dataset measure declares, in the closed `AggregationFunction` vocabulary (`count`, `sum`, `avg`, `min`, `max`, `count_distinct`). It is there whether or not the author gave the measure a `label`. So a chart can tell a count from a sum, for example to draw whole-number axis ticks for a count instead of 0.75 / 1.5 / 2.25.
+  - **What was missing.** The only aggregate on the wire was `builtinAggregate`, and it is present only when the measure has no `label`. A labelled measure, such as a `count` named "Tasks", reached the wire as `{ name, type: 'number', label }`, with nothing to say what kind of number it was.
+  - **Where it is set.** `AnalyticsService` writes it in the one step that describes a dataset answer's columns from the dataset's own measures. That step runs for both the live query and the draft-data preview, so the two answers agree. A measure's `__compare` column carries the same aggregate.
+  - **Where it is absent.** Dimension columns. Derived measures, which combine other measures and have no single aggregate (a stray `aggregate` written beside `derived` is ignored when the dataset compiles, so it is not stated here either). And a cube query answer (`POST /analytics/query`), which does not run through the dataset column step.
+  - **Unchanged.** `builtinAggregate` keeps its meaning: present only on a label-less measure column, to mark a header that is the server's default. No authoring key is added; `aggregate` is a response member only. `AnalyticsResultResponseSchema` and the `AnalyticsResult` contract declare the member, and the REST route relays it as it does every other column key.
+- 56c8844: `@objectstack/spec/ui` now exports the rule that decides which forms a `view` body opens to anonymous intake, so a console reads "published" from the same rule the server's anonymous form doors serve
+  
+  Clause-②: yes (widening)
+  
+  - **New on `@objectstack/spec/ui`:** `publicFormSlug`, `anonymousFormIntakeSlug`, `anonymousFormIntakeCandidates`, `anonymousFormIntakeSlugs` and the `AnonymousFormIntakeCandidate` type. They lived only in `@objectstack/metadata-core`, which a browser console should not depend on. They are pure functions with no imports, beside the `SharingConfigSchema` they read.
+  - **What they decide is unchanged.** A form is open when its `sharing` has `enabled === true`, `allowAnonymous === true` and a non-empty `publicLink`. The scan covers the same three shapes in the same order: the nested `form`, every `formViews` entry, then the `config` of a `viewKind: 'form'` item.
+  - **`@objectstack/metadata-core` re-exports the same functions** from `@objectstack/spec/ui`. They are the spec's own bindings, not wrappers or copies, so there is still one copy of the rule. Its exports, names and types are unchanged, and `@objectstack/rest` and `@objectstack/metadata-protocol` keep importing from it. Its built output now loads `@objectstack/spec/ui` to get them.
+  - **Not covered by the new export:** whether another metadata layer withdraws a form (`anonymousFormIntakeWithdrawnIn`), and whether the deployment's tenancy posture lets the form take an anonymous submission (`anonymousFormIntakeUnavailability`). These two read server state and stay in `@objectstack/metadata-core`. `anonymousFormObjectName`, which names the object a form submits into, stays there beside them; it is a pure read of the form and the view, not of server state. A form the new functions call open can still be withheld by a withdrawal in another layer or by the posture.
+
+### Patch Changes
+
+- 0af4f66: Three `ComponentPropsMap` read-point records now quote the objectui line they cite
+  
+  Clause-②: no
+  
+  The docblocks of `action:button`, `action:icon` and `element:definition-list` in
+  `src/ui/component.zod.ts` each quote the first line of the row's props-read site, re-read
+  against objectui at the pin this package builds against (`a58626c88`): the runner-forward
+  literal of the two action blocks, and the `readProps` call of the definition list. A pin bump
+  that moves one of those lines, or changes it, now fails `check:objectui-pin-citations` and
+  names where the quoted line went, where before only the cited sha was checked. The other
+  three rows of that section (`action:group`, `action:menu`, `element:repeater`) carry no quote
+  yet. Comment text only: no schema, key, type or export changes.
+- 9a0401f: The `action:group`, `action:menu` and `element:repeater` read-point records are re-measured at the objectui pin and quote the line they cite
+  
+  Clause-②: no
+  
+  The docblocks of `action:group`, `action:menu` and `element:repeater` in `src/ui/component.zod.ts`
+  cited objectui lines that had moved without any gate noticing: the two containers' anchors by 3 to 8
+  lines since objectui#11638, every repeater anchor by 28 lines since objectui#11168 slice 2, and the
+  repeater's `data-objectstack` filter and sort anchors since earlier pins. Each is now re-pointed at
+  the pin this package builds against (`a58626c88`), as are `action:button`'s `static-params.ts`
+  citation and the `element:definition-list` registration notes, which said the registration
+  publishes the strings `'1'` / `'2'` and marks `items` required (it no longer does either). Each of
+  the three rows now quotes the first line of its props-read site (the member forward of the two
+  containers, the `readProps` call of the repeater), so a pin bump that moves or changes one of those
+  lines fails `check:objectui-pin-citations`. All six rows of that section now carry a quote. Comment
+  text only: no schema, key, type or export changes.
+- 04e776b: `App.defaultAgent` docblock: the agent route is the one chat door, and the console is what reads the key.
+  
+  Clause-②: no
+  
+  - The docblock no longer says the assistant chat endpoint (`POST /api/v1/ai/assistant/chat`) resolves this agent from `context.appName`. That route, with `GET /api/v1/ai/assistant` and `GET /api/v1/ai/assistant/skills`, was retired in the cloud AI runtime (objectstack-ai/cloud#2621, objectstack-ai/cloud#2651), and no server route reads `defaultAgent`.
+  - It now says who does read it. The console's chat dock hands the active app's `defaultAgent` to its one surface-to-agent resolver, which honours only `ask` or `build` (legacy aliases included) and otherwise falls back to the surface default. The resolved agent is then called by name on `POST /api/v1/ai/agents/:agentName/chat`, where the path segment, not this key, selects the agent.
+  - The ADR-0063 surface-binding paragraph and the rule that only the two platform agents resolve are unchanged, as is the note that the bare `POST /api/v1/ai/chat` resolves no agent.
+  - The docs page `ai/actions-as-tools` lists the agent route as the only in-product chat route.
+  - ⛔ No schema, parse, `.describe()`, export, type or accept-set change. The docblock ships in the published package, in the `dist/ui` and `dist/browser` JavaScript bundles and in the shipped `src/ui/app.zod.ts`, which is why this is a patch.
+- a7df552: `ObjectNavItemSchema.viewName`'s describe no longer says the default is "all". It now states what the console does when an object nav entry names no view: it opens the object's default list view, else its first declared list view. `all` is only the console's fallback tab, and it exists only for an object that declares no list view.
+  
+  Clause-②: no
+  
+  - The rule is read from objectui at the `.objectui-sha` pin. `ObjectView` opens `defaultViewId || views[0]`, where `defaultViewId` is the view `buildViewTabs` marks `isDefault` (the default `list`). `buildViewTabs` adds the `all` tab only when the object has no list view at all.
+  - An author who omitted `viewName` expecting all records got that default or first declared view instead. When the object declares more than one list view, name the one the entry should open in `viewName`.
+  - The generated app reference page follows (#21973). The lint header that quoted the old sentence follows too, as a comment only.
+  - ⛔ No schema, type, optionality, default, export or accept-set change. The console's behaviour does not change.
+- d5a14dd: `EvalUserSchema.isPlatformAdmin` is no longer marked deprecated. Its describe and docblock now say what the key reports: the `PLATFORM_ADMIN` standing of ADR-0095 D3.
+  
+  Clause-②: no
+  
+  - The platform resolves that standing per request, from the deployment's declared administrator list (`OS_PLATFORM_OWNER_EMAIL`) under every tenancy posture, or from an unscoped `admin_full_access` grant under the `single` posture.
+  - It is the predicate platform-operator gates read: `current_user.isPlatformAdmin == true` (ADR-0068 D4). The session payload emits it from the posture rung, and the platform-admin route gate reads it.
+  - The resolver projects the `platform_admin` name into `positions` from the same grant, so the name and the key agree for every genuine administrator. Gate on the key, never on `'platform_admin' in current_user.positions`.
+  - The old text, "DERIVED alias of 'platform_admin' in positions. Deprecated.", described a reading ADR-0095 D3 superseded. ADR-0068 carries dated notes under D2 and D4 that say so.
+  - ⛔ Nothing you author changes. There is no schema, type, optionality, default, export or accept-set change, and `createEvalUser` computes exactly what it did. A predicate that already reads `current_user.isPlatformAdmin` keeps working and is the supported form.
+- 93125ae: A browser bundle that imports from `@objectstack/spec/shared` or the package root no longer keeps the ADR-0087 conversion table unless it uses it
+  
+  Clause-②: no
+  
+  Each published entry is one flat file, so a consumer's bundler keeps every top-level call it cannot prove pure, together with everything that call references. Two such calls built the conversion table when the module loaded: the major-18 list's `inApplicationOrder(...)` and the flattening into `ALL_CONVERSIONS`. So every bundle of an entry that reaches the table kept all of it: every conversion, plus the view, field, page-component, dashboard, chart and report schemas the conversions read. `./shared` reaches the table only through `normalizeStackInput`, so a bundle that imported an expression schema from it carried the table too, and 17.7.0's new conversions made that copy larger. Both calls now carry a `@__PURE__` annotation, so a bundle keeps the table only when something it keeps reads it, for example `defineStack`, `normalizeStackInput` or `applyConversions`.
+  
+  Measured on objectui's console (objectui `c0862c1c`), against the same build with this package's previous source: the first screen's eager closure is 226,238 bytes gzip smaller, all of it in the `vendor-objectstack` chunk. Every entry's export list, every declaration and every runtime value is unchanged. Only the bytes a bundler keeps change.
+- 299a2c6: The spec's objectui citations, and the shipped description text that names the `.objectui-sha` pin (the `FormField.span` describe and six migration-entry descriptions), are re-measured against the new console pin, objectui `a58626c88dc8`.
+  
+  Clause-②: no
+  
+  Every anchor was mapped through the objectui diff `0abd4f9f8769..a58626c88dc8`, 252 paths over 36 commits. Fifteen of those paths are files an asserting record cites: `ObjectKanban.tsx`, `KanbanImpl.tsx`, `ObjectTree.tsx`, `ObjectTimeline.tsx`, `record-details.tsx`, `action-group.tsx`, `action-menu.tsx`, `static-params.ts`, `MetricWidget.tsx`, `MetricCard.tsx`, `form.tsx`, `plugin-kanban.mdx` and the `en` / `zh` / `de` packs. In each, every cited line is byte-identical at the new pin, so each anchor that moved was re-pointed to its new line and the record says by how much; no read point an asserting record cites changed content or died. Every other cited file is byte-identical across the hop (`git diff --quiet`). The seven quoted anchor lines verify against objectui at the new pin. Three records carry a count, and each count was re-taken by its record's own method with the same reading: the `keyboardNavigation` hit lines (15, against 3 for the `schema.editable` control), `ObjectKanban.tsx`'s `quickAdd` / `onQuickAdd` (2 each, against 11 for `onCardClick`), and the `ElementDataSourceGate` occurrences in five `src/index.tsx` shells (0, 3, 3, 3 and 4).
+  
+  The six migration entries' corpus counts were re-taken with `git grep -o -F`, the method that first reproduced every `0abd4f9f8769` number. The corpus is now 7754 tracked files. All 99 checked tokens (the export lists of `plugin-lifecycle-advanced.zod.ts`, `tracing.zod.ts` and `metrics.zod.ts`, plus every named key) still read zero, except `Span` / `SpanSchema`, which read 509 / 57: the one new `Span` hit is a `colSpan`.
+  
+  No key, default, enum member or export moves.
+
 ## 17.7.0
 
 ### Minor Changes

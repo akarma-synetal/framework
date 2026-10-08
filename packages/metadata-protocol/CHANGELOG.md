@@ -1,5 +1,146 @@
 # @objectstack/metadata-protocol
 
+## 17.8.0
+
+### Minor Changes
+
+- 8caa131: A package's stored copy of a view container it ships overlays that package's shipped views, so a withdrawal saved in the copy holds at the anonymous form endpoints; the runtime save door refuses three copies it accepted before
+  
+  Clause-②: no (narrowing)
+  
+  <!-- adr-0087: not-required (no-migration-prescription) A validity narrowing at one runtime write door over existing keys, the consequence of where the read doors now place a stored copy's views: no key of `ViewSchema` or of any other metadata schema is removed, renamed or re-shaped, so there is no tombstone and nothing mechanical for `objectstack migrate meta` to rewrite. Whether a refused copy meant its added member as a view of its own, as an override of the other package's view, or under a key of its own is authoring intent no conversion entry can decide. New saves are refused with the remedy; a row stored before this change keeps its bytes, and no stored row is re-saved. No census of the writers that save such copies (a package's stored copy of a container it ships on another package's object) was taken: Studio, package duplication, `migrate meta --stored`, the example apps, hosted tenants and the cloud AI author were not measured. The other categories are closed on facts: the package publishes (not unpublished); no ADR-0087 id covers this rule and this diff adds none (not registered / already-registered); and the change narrows what a runtime write door accepts, not a runtime interface or a type surface alone (not runtime-interface-only / type-surface-only). -->
+  
+  **BREAKING** accept-set narrowing at the runtime save door, shipped as `minor` under the repo's launch-window convention for breaking changes, the grade the same door's earlier view container refusals shipped with.
+  
+  - **What was wrong.** The source loaders register a view container a package ships as `OBJECT.KEY` views for that package, whichever package owns the object. When that package stored a copy of the same container (a `PUT /api/v1/meta/view/NAME` of the container) and the object belonged to another code package, the copy expanded under its own name instead, as `OBJECT.CONTAINER.KEY` (a bare `list` as `OBJECT.CONTAINER`). So the copy overlaid none of the views its package ships: a form withdrawn from anonymous intake in the copy stayed open in the package's shipped form of that name, and the anonymous form endpoints kept serving it.
+  - **What it does now.** A package's stored copy of a container that package ships, bound to the same object, expands as the loaders expand the shipped container: each member is served under the loaders' name, `OBJECT.KEY`, in the copying package's own slot on the view list and on the by-name read naming that package. So a withdrawal saved in the copy holds at the anonymous form endpoints. The copy still declares no default view for an object another package owns. Any other container on another package's object keeps expanding under its own name, unchanged.
+  - **The by-name read on an unscoped kernel.** On a kernel with no environment id, a stored container's expanded views are also registered in the schema registry, under the bare name. A view whose name another package also ships is no longer registered there: the registry answered that bare entry ahead of the other package's own view, so `getMetaItem` naming the other package served this container's view. Every kernel's by-name read already serves such a view from its stored row, for its own package and for a read that names no package. Two packages that ship one container, with one of them storing a copy, were affected before this change too.
+  
+  **What is refused now.** `saveMetaItem`, which `PUT /api/v1/meta/view/NAME` and the dispatcher's metadata save both call, judges a copy at the names it now expands to, so three copies it accepted before are refused with `VALIDATION_ERROR` / 400, before anything is stored. Each is a package's copy of a container it ships on another package's object:
+  
+  - The copy adds a bare `list` whose name, `OBJECT.default`, only the other package ships. Before: accepted, served as `OBJECT.CONTAINER`. After: refused, naming the package that ships `OBJECT.default`.
+  - The copy adds a keyed member (a `formViews` or `listViews` entry, a named `list`, or a `form`) whose name, `OBJECT.KEY`, only the other package ships. Before: accepted, served as `OBJECT.CONTAINER.KEY`. After: refused, naming the package that ships `OBJECT.KEY`.
+  - Another stored container, saved under a different name, already expands a name the copy now expands. Before: accepted. After: refused, naming that stored container.
+  
+  **The fix.** For the first two, give the added member a key of its own that no package ships and no stored container expands, or save a view item (`name`, `object`, `viewKind`, `config`) under that name to override the other package's view. For the third, add the view as a member of the stored container that already expands the name, or save a view item under that name.
+  
+  **What still saves.** A copy that keeps the members its package's shipped container has, their contents edited, under the container's own name. A copy that adds a member under a key no package ships and no stored container expands. A view item under any of these names. Every container that is not a copy of its own package's shipped container, as before.
+  
+  **Rows stored before this change.** They keep their bytes. A stored copy of a container its package ships, on another package's object, is now served under the loaders' names (`OBJECT.KEY`) instead of `OBJECT.CONTAINER.KEY`, so it overlays the package's shipped views from the next read on, with no re-save. A reference to one of its old names (a navigation `viewName`, a form action `target`) no longer resolves; point it at `OBJECT.KEY`. A new save of a stored copy in one of the refused shapes, a re-save included, is refused until its body stops colliding. Delete stays open.
+- 1fb274e: `ObjectStackProtocolImplementation.declinesStoredRow(type, name)` is now public, so a door that serves a stored row out of the layered read can ask the same decision the reads make
+  
+  Clause-②: yes (widening)
+  
+  - The method answers `true` for exactly the names whose stored `sys_metadata` row the active reads (`getMetaItem`, the list, and the `effective` layer of `getMetaItemLayered`) do not adopt: a flow name a managed package ships (the answer `isShippedFlowName` gives), and a datasource name the host registers from code (one an installed package declares in `*.datasource.ts`, or the host's `default`). Every other type and name answers `false`.
+  - The `GET /meta/:type/:name/published` doors in `@objectstack/rest` and `@objectstack/runtime` now ask this method in place of `isShippedFlowName`. A door asks it, and does not restate either half or the host's code-datasource set.
+  - `isShippedFlowName` stays public and unchanged.
+  - The only change to the public surface is this one added method. No signature, schema or accept set changes, and no behaviour of this package changes.
+- f85a83b: fix(lint)!: the object save door refuses a formula field whose expression `os build` refuses (#22019)
+  
+  Clause-②: no (narrowing)
+  
+  `formulas.mdx` says the same `validateExpression` validator backs `os build` and metadata registration. At the object save door it did not. A formula field calling an unregistered function, such as `sqrt(record.amount)`, was refused by `os build` as an unknown function, but `PUT /api/v1/meta/object/:name` answered 200, stored it, and the field read `null` on every row.
+  
+  The runtime publish gate now runs the build's own formula check on an object write. The registry entry for the build's expression rule (`validateStackExpressions`) declared the flow, action and hook writes and never the object write, so the gate never dispatched it there. It now declares `object` as well, for one of its passes: a formula field's `expression`. The door's verdict is the build's finding: the same rule id (`expression-invalid`), location (`object 'NAME' · field 'FIELD' expression`), message and hint.
+  
+  **BREAKING — what moves for consumers.**
+  
+  - An object write in publish mode answered 200 for a formula field whose expression the shared validator refuses. It now answers `422 INVALID_METADATA`, with an `expression-invalid` issue located at that field's `expression`. This covers `PUT /api/v1/meta/object/:name` (and `saveMetaItem` in publish mode), the promotion of a draft (`POST /api/v1/meta/object/:name/publish`, `publishMetaItem`), and a package draft publish (`publishPackageDrafts`).
+  - The verdict is the one `os build`, `os validate` and `os lint` already gave: an unknown function, a field the object does not declare, a bare field reference (`amount` instead of `record.amount`), and the other errors in the build's formula check. Its warnings now ride the save response as advisories, as they already did for a flow write.
+  
+  **Remedy.** Fix the expression: the message names the unknown function or field and the position, as `os build` already requires. Use one of the functions `introspectScope` lists, qualify field reads as `record.FIELD`, or compute the value in a stored field and reference it. Saving it as a draft (`mode: 'draft'`) is still allowed, because drafts are never gated; publishing that draft is judged.
+  
+  **Unchanged.**
+  
+  - Stored rows are not migrated, and they are not refused on read. An object stored before this change keeps reading, with the formula still `null`, until it is next saved. At that save the gate judges it, because the differential compares the write against the stored universe without its own stored row.
+  - The other expressions an object carries are still not judged at this door: validation-rule predicates, the field-rule slots (`requiredWhen`, `readonlyWhen`, `conditionalRequired`, `visibleWhen`), option `visibleWhen`, and the object's own action predicates. `os build` judges them, and the door does not, as before. Each needs its own crossing, measured over the stored corpus first.
+  - `OS_ALLOW_UNLINTED_METADATA_WRITES=1` still turns a refusal into a logged write.
+  - Measured before crossing: every formula field this repository ships has 0 refusals and 0 advisories at the door. That is 29 fields on 28 objects: examples 7 on 6, and the platform `display_title` formulas 22 on 22.
+  - No public export or signature moves. `validateStackExpressions(stack)` keeps its signature. The registry entry reaches the passes through an internal function that is not on the package's entry. The built entry declarations differ only in one doc comment, on `AuthoringRuleContext.runtimeWriteType`.
+  
+  <!-- adr-0087: not-required (no-migration-prescription) a refusal at the object save door of a formula expression the published validator already refuses at `os build`: no authorable key, spelling, export or stored shape moves, and no stored row is read, rewritten or converted. A stored object whose formula the validator refuses keeps reading until it is next saved, and the repair is the author's edit of the expression, which no ledger entry can derive. The other categories are closed on facts: the packages publish (not unpublished); no ADR-0087 id covers this door (not already-registered); and the change is a door verdict, not a declaration (not runtime-interface-only or type-surface-only). -->
+
+### Patch Changes
+
+- b88c356: The remaining platform producers in these four packages now pass the explicit system opt-in (`{ isSystem: true }`) on their data-engine calls. Until now they reached the engine with no principal and no opt-in, and the security middleware let that through only because of its principal-less hand-off.
+  
+  Clause-②: no
+  
+  - **service-messaging, the inbox read state.** `listInbox` (and its unread total), the receipt read behind it, and mark-read / mark-all-read take the opt-in inside the service. Their scope is unchanged: every read of a user's rows is keyed on the user id the door derived from the session, the receipt a mark-read inserts is stamped with it, and the receipt it updates is one a user-keyed read returned.
+  - **service-messaging, `owner_of:` audiences.** The record read takes the opt-in, the same posture as the email lookup beside it. It reads only `id` and the owner fields, and only the owner id leaves the resolver. An `owner_of:` audience on an object whose sharing model is `private` now resolves its owner; before, it resolved to nobody.
+  - **service-messaging, the rest of the fan-out and the outboxes.** The `role:` and `team:` membership reads, the email and SMS recipient reads, the notification template read, the dedup lookup in `emit()`, and both outboxes' enqueue, ack and list.
+  - **service-storage.** `StorageMetadataStore.createFile` and `createSession` insert under the opt-in. The organization still reaches the driver beside it, so the stored organization is unchanged, and the file's `owner_id` is still the uploading user.
+  - **service-settings.** The `sys_secret` store the plugin builds (insert, get, update), and the read that verifies a rotation before the old secret is reaped. A store `update` now writes the `ciphertext` it is given; without a context the engine's read-only strip dropped it. No caller in this repository uses `update`.
+  - **metadata-protocol.** `SysMetadataRepository.getByHash`, `list`, `history` and the history replay of `watch()`.
+  - None of the gates the middleware runs before its hand-off applies to these calls. ⛔ No new export on any package entry, and no new elevation API.
+- 1abfc58: The metadata door serves a code-defined datasource's code definition while a stored row under its name still exists
+  
+  Clause-②: no
+  
+  - `GET /api/v1/meta/datasource/:name`, the `GET /api/v1/meta/datasource` list and the `effective` layer of `GET /api/v1/meta/datasource/:name/layers` now skip a stored `sys_metadata` row under a datasource name the host registers from code: one an installed package declares in `*.datasource.ts`, or the host's `default`. They serve the in-memory code definition instead. The datasource admin door and the boot restore already serve that ("code wins on collision"). Before this change the stored row was served first, so the two doors answered with two different bodies for one name.
+  - The decision is made by name, through the same predicate the reads already ask for a shipped flow name. It never reads a row's `origin`. Every other type keeps ADR-0005's read order, in which the stored overlay wins.
+  - Unchanged: the row stays at rest and is still reported in the layered read's `overlay`. The read envelope stays `deletable: true` while the row exists, and `DELETE /api/v1/meta/datasource/:name` still removes it as the repair. A draft read (`state: 'draft'`, or the draft preview) is still answered from the draft row. A runtime datasource's stored row is served as before.
+  - The `/meta` and admin doors already refuse to write such a row. This change affects only how a row left from before that refusal is read.
+  - Not moved: `GET /api/v1/meta/datasource/:name/published` still serves the stored row, which is the active overlay row that route describes.
+  - ⛔ No public export, signature, schema or accept-set change. The built entry declarations gain two `private` member names on `ObjectStackProtocolImplementation`.
+- db87a02: fix(metadata-protocol): another package's withdrawal of a form holds at the anonymous form endpoints, whatever packages' copies of a view container are saved
+  
+  Clause-②: no
+  
+  - **What was wrong.** Where packages ship the same view container, the view list (`getMetaItems` for `view`) served one item for each name a saved environment-wide copy of that container expands: the copy's own expansion. Every other package's item of that name, shipped or saved, was left out. The anonymous form endpoints judge a withdrawal against the environment-wide view list, so they could miss another package's withdrawal of such a form.
+  - **What it does now.** The view list serves each package its own item of such a name:
+    - a package's saved copy of the container serves that package's item of each name it expands;
+    - a package-less saved copy stands in for every package that has no copy of its own (ADR-0048);
+    - any other package keeps its own item.
+  
+    So another package's withdrawal of a form holds at the anonymous form endpoints, whatever packages' copies of the container are saved. The organization-scoped save check reads the same list, so it judges each package's item too.
+  - **A stored view row of exactly such a name** keeps its own package's slot only. A package-less row still serves every package's slot. Before, any package's row of the name kept every package's copy expansion of it out of the list.
+  - **The by-name read agrees.** `getMetaItem` naming a package serves the item that package's slot in the list serves. Where no copy belongs to that package, a package-less copy now stands in for it. A list scoped to a package (`GET /api/v1/meta/view?package=`) serves the same item in each slot the package lists. A package-less copy adds no item to that list.
+  - **What does not change.** Within one package, a later expansion of a name still replaces an earlier one, and the save door's view container collision check is unchanged. A by-name read that names no package answers as before. No key, export, status or error code changes.
+- 6befe19: A metadata row stored with no `checksum` can be edited and removed through the metadata door (#21978)
+  
+  Clause-②: no
+  
+  - `SysMetadataRepository` serves a `sys_metadata` row that carries no `checksum` as the hash of its stored body, but its `put` and `delete` compared the caller's parent with the raw column (`null`). So `PUT` and `DELETE /api/v1/meta/:type/:name` answered `409 METADATA_CONFLICT` ("Expected parent … but current is null") for every such row, with `If-Match` set to the version the door served and with no `If-Match` (last-write-wins) alike. A publish over such a row was refused the same way, as were the rollback and commit-revert doors, which take their parent from the same read. The datasource admin door stored such rows before it stamped them.
+  - `put` and `delete` now accept the version such a row is served as. A `null` parent still matches it, and a row with a `checksum` is judged exactly as before. A stale version is still refused with `409 METADATA_CONFLICT`, and the refusal now names the row's served version as the current one instead of `null`.
+  - The next write stamps the row's `checksum`, as every write does. Stored rows are not rewritten.
+  - Publishing a draft row stored with no `checksum` now also removes that draft row. Before, the post-promotion cleanup was refused by the same lock and the draft stayed pending, with nothing reported.
+- 2015c54: A by-name metadata read that names no package now wears the package of the body it serves
+  
+  Clause-②: no
+  
+  - **What was wrong.** `getMetaItem` with no `packageId` (behind `GET /api/v1/meta/TYPE/NAME` when no package is named) merges the registry artifact's protection envelope, `_packageId`, `_packageVersion` and `_provenance`, over the body it serves. With no package named, that envelope was the first-registered package's. When two installed packages ship one name and the body served was the other package's, the answer carried that body under the wrong package. Two cases were measured. In the first, both packages ship a view container and one of them stores a copy of it: the read served the copy's view and named the first-registered package. In the second, a stored row of the name is bound to one package. The answer's top-level `packageId` / `provenance` / `packageVersion` fields, which are read off the served item, said the same wrong thing.
+  - **What it does now.** With no package named, the envelope is looked up at the package the served item is bound to. That is the stored row's package, the package of the container copy that expands the name, or the `_packageId` of the MetadataService or registry item. This is the rule the `GET /api/v1/meta/TYPE` list already applies to each item it serves, so the list and the by-name read now give one envelope for one served body.
+  - **Unchanged.** Which body the read serves. A read naming a package. The lock family and the `lock` / `editable` / `deletable` envelope, which still come from the item-lock resolution over the read's own address. A served item bound to no package (a package-less stored row or copy, or a registry entry with no package) keeps the package-less lookup it had, so for a name only one package ships, a tenant's package-less overlay still wears that package's envelope. The layered read (`/layers`) is not changed.
+  - ⛔ No public export, signature, schema or accept-set change. Nothing is accepted or refused differently.
+- ae97841: A by-name view read naming a package now serves that package's view when another package's stored row has the same name
+  
+  Clause-②: no
+  
+  - **What was wrong.** Two installed packages can ship a view of one name, and a stored `sys_metadata` view row can be bound to one of them. The registry hydration registered that row under the view's bare name. The registry answers the bare name ahead of every package's own entry, whichever package the read names. So `getMetaItem` naming the OTHER package found no row of its own and served this row's body at its registry step, under the other package's envelope. That is the read behind `GET /api/v1/meta/view/NAME?package=…`. Meanwhile the list's slot for that package served its own view. This was measured on an unscoped kernel after a save, and on either kernel after a cold boot, because `loadMetaFromDb` hydrates through the same door on every kernel.
+  - **What it does now.** A view row bound to one package is not registered under a name another package ships. This is the shape the view-container expansion registration already takes. The reads answer the row from the row itself: the read naming its own package, the read naming no package, and the list's slot for that package. The read naming the other package serves that package's own view and envelope. The delete's registry heal also stops re-registering a metadata-service view baseline bound to one package under such a name.
+  - **Scope: `view` only.** Every other type registers as before: a row bound to one package, of a name two packages ship, keeps the bare entry with its own body and its own package's envelope. A package-less view row, and a view row of a name that only its own package ships or that no package ships, also register as before. The environment-scoped kernel's answer after a save is unchanged, because it registers nothing on a save.
+  - ⛔ No public export, signature, schema or accept-set change. Nothing is accepted or refused differently. The built entry declarations gain one `private` member name on `ObjectStackProtocolImplementation`.
+- Updated dependencies [0af4f66]
+- Updated dependencies [9a0401f]
+- Updated dependencies [04e776b]
+- Updated dependencies [a7df552]
+- Updated dependencies [c565813]
+- Updated dependencies [d5a14dd]
+- Updated dependencies [f85a83b]
+- Updated dependencies [93125ae]
+- Updated dependencies [56c8844]
+- Updated dependencies [5cfd866]
+- Updated dependencies [299a2c6]
+  - @objectstack/spec@17.8.0
+  - @objectstack/lint@17.8.0
+  - @objectstack/metadata-core@17.8.0
+  - @objectstack/types@17.8.0
+  - @objectstack/core@17.8.0
+  - @objectstack/formula@17.8.0
+  - @objectstack/metadata@17.8.0
+  - @objectstack/sdui-parser@17.8.0
+
 ## 17.7.0
 
 ### Minor Changes

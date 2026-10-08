@@ -1,5 +1,39 @@
 # @objectstack/service-automation
 
+## 17.8.0
+
+### Patch Changes
+
+- Updated dependencies [0af4f66]
+- Updated dependencies [9a0401f]
+- Updated dependencies [77a94d8]
+- Updated dependencies [879bd38]
+- Updated dependencies [b88c356]
+- Updated dependencies [1abfc58]
+- Updated dependencies [db87a02]
+- Updated dependencies [04e776b]
+- Updated dependencies [1c563af]
+- Updated dependencies [a7df552]
+- Updated dependencies [6befe19]
+- Updated dependencies [8caa131]
+- Updated dependencies [1fb274e]
+- Updated dependencies [c565813]
+- Updated dependencies [d5a14dd]
+- Updated dependencies [f85a83b]
+- Updated dependencies [2015c54]
+- Updated dependencies [93125ae]
+- Updated dependencies [56c8844]
+- Updated dependencies [5cfd866]
+- Updated dependencies [ae97841]
+- Updated dependencies [299a2c6]
+  - @objectstack/spec@17.8.0
+  - @objectstack/platform-objects@17.8.0
+  - @objectstack/metadata-protocol@17.8.0
+  - @objectstack/metadata-core@17.8.0
+  - @objectstack/types@17.8.0
+  - @objectstack/core@17.8.0
+  - @objectstack/formula@17.8.0
+
 ## 17.7.0
 
 ### Minor Changes

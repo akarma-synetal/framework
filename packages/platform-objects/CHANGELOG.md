@@ -1,5 +1,49 @@
 # @objectstack/platform-objects
 
+## 17.8.0
+
+### Patch Changes
+
+- 77a94d8: "Add Member" is offered only to a platform administrator, the one standing its endpoint admits.
+  
+  Clause-②: no
+  
+  - `sys_member`'s `add_member` toolbar action now declares `visible: 'current_user.isPlatformAdmin == true'`. `requiresFeature: 'organization'` composes onto it at parse time, so the served predicate reads `(current_user.isPlatformAdmin == true) && features.organization != false`.
+  - Its endpoint, `POST /api/v1/auth/organization/add-member`, has always admitted a platform administrator alone (ADR-0068) and answered every other caller, org owners and admins included, with 403 `PERMISSION_DENIED`. Before this change the button was still shown to every member of the organization.
+  - ⛔ Nothing you author changes. The endpoint and the callers it admits are unchanged, and no key, export or parameter is added. The action's label is unchanged.
+- 879bd38: The user, OAuth-application and SSO-provider actions whose endpoint admits only a platform administrator are now offered only to a platform administrator.
+  
+  Clause-②: no
+  
+  - These thirteen actions now declare `visible: 'current_user.isPlatformAdmin == true'`, composed with their existing terms:
+    - `sys_user`: `ban_user`, `unban_user`, `unlock_user`, `create_user`, `set_user_password`, `impersonate_user` and `set_user_manager`;
+    - `sys_oauth_application`: `disable_oauth_application` and `enable_oauth_application`;
+    - `sys_sso_provider`: `register_sso_provider`, `register_saml_provider`, `request_domain_verification` and `verify_domain`.
+  - Where an action also carries `requiresFeature`, the feature gate composes onto it at parse time. For example, `ban_user` now serves `(current_user.isPlatformAdmin == true) && features.admin == true`.
+  - Each endpoint (`/api/v1/auth/admin/*`) has always admitted a platform administrator alone (ADR-0068) and answered every other caller, org owners and admins included, with 403 `PERMISSION_DENIED`. Before this change the buttons were still shown to those callers.
+  - `create_oauth_application`, `rotate_client_secret`, `delete_oauth_application` and `delete_sso_provider` are unchanged: their endpoints authorize the signed-in user or the record's owner, not the platform administrator.
+  - ⛔ Nothing you author changes. The endpoints and the callers they admit are unchanged, and no key, export or parameter is added. The actions' labels are unchanged.
+- 1c563af: Setup's identity pages open on the tenant-wide list, not on the administrator's own rows. Before this, Setup → API Keys, Sessions, OAuth Applications, Identity Links and User Preferences opened each object's first declared list view, which was the caller-scoped "My …" view (`user_id = {current_user_id}`), so an administrator saw only their own keys, sessions, applications, links and preferences.
+  
+  Clause-②: no
+  
+  - On `sys_api_key`, `sys_session`, `sys_oauth_application`, `sys_account`, `sys_user_preference` and `sys_user`, the unscoped "All" view (`all_keys`, `all_sessions`, `all_apps`, `all_links`, `all_preferences`, `all_users`) is now declared first, and the caller-scoped view (`mine`, `me`) second. A route that names no view, such as a record page's object breadcrumb or the object switcher, now opens the "All" view. No view is added, removed or changed.
+  - The Setup entries `nav_api_keys`, `nav_sessions`, `nav_oauth_apps`, `nav_accounts` and `nav_user_preferences` now name that view with `viewName`, as `nav_users` already did. The Account app's Linked Accounts entry (`nav_account_linked`) now names `mine`, like the other Account entries, so neither app depends on the declared order.
+  - The "My …" views are still tabs on each page. The declared order decides which view opens, not which rows a caller may read: row-level security still scopes a member's rows.
+  - The generated translation bundles follow the new view order. No translated text changed.
+  - ⛔ No schema, parse, export or accept-set change.
+- Updated dependencies [0af4f66]
+- Updated dependencies [9a0401f]
+- Updated dependencies [04e776b]
+- Updated dependencies [a7df552]
+- Updated dependencies [c565813]
+- Updated dependencies [d5a14dd]
+- Updated dependencies [93125ae]
+- Updated dependencies [56c8844]
+- Updated dependencies [299a2c6]
+  - @objectstack/spec@17.8.0
+  - @objectstack/metadata-core@17.8.0
+
 ## 17.7.0
 
 ### Minor Changes
