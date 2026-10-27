@@ -786,6 +786,9 @@ const ja = {
     addRecord: "レコードを追加",
     // objectui#12703 — the compact list's footer link to the object's list or the block's view.
     viewAll: "すべて表示",
+    viewAllCount: "すべて表示（{{count}} 件）",
+    viewAllCount_one: "すべて表示（{{count}} 件）",
+    viewAllCount_other: "すべて表示（{{count}} 件）",
     tabs: "タブ",
     allRecords: "すべてのレコード",
     userFilters: {
