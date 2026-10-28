@@ -2623,6 +2623,8 @@ const STUDIO_ZH: Record<string, string> = {
   'engine.studio.toggleRail': '切换侧栏',
   'engine.studio.landingHome': 'Studio 首页',
   'engine.studio.desktopHint': 'Studio 专为桌面屏幕设计。',
+  'engine.studio.notFound.package': '未找到包。本部署没有安装 ID 为“{id}”的包，因此无处可构建。',
+  'engine.studio.notFound.pillar': '页面不存在。Studio 没有“{pillar}”这一栏，请在上方选择数据、自动化、界面或权限。',
   'engine.studio.aiCopilot': 'AI 副驾',
   // objectui#12725 — Studio 右栏：属性或 AI 副驾二选一。
   'engine.studio.slot.label': '右栏',

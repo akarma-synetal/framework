@@ -2956,6 +2956,10 @@ const STUDIO_EN: Record<string, string> = {
   'engine.studio.landingHome': 'Studio home',
   // objectui#11795 — the one line a phone shows under the Studio header.
   'engine.studio.desktopHint': 'Studio is built for a desktop screen.',
+  // objectstack#26708 — the builder's not-found states: a package id the
+  // package list does not hold, and a pillar segment Studio has no pillar for.
+  'engine.studio.notFound.package': 'Package not found. No package with the id "{id}" is installed here, so there is nothing to build in.',
+  'engine.studio.notFound.pillar': 'This page does not exist. Studio has no "{pillar}" section; pick Data, Automations, Interfaces or Access above.',
   'engine.studio.aiCopilot': 'AI copilot',
   // objectui#12725 — the Studio right slot: properties OR the copilot.
   'engine.studio.slot.label': 'Right panel',
